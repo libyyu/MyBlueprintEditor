@@ -1,0 +1,309 @@
+// Runtime/BlueprintRunner.h - 蓝图运行时执行器
+// 该模块完全独立于编辑器(ImGui)，可在任意环境中加载和执行蓝图数据
+//
+// 使用方式:
+//   1. 编辑器导出 JSON 文件
+//   2. 其他环境加载该 JSON
+//   3. 注册节点处理器（每种 definitionId 对应一个执行函数）
+//   4. 调用 Execute() 按拓扑顺序执行所有节点
+
+#pragma once
+
+#include "BlueprintData.h"
+#include "NodeDefinition.h"
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <functional>
+#include <memory>
+#include <queue>
+#include <algorithm>
+#include <unordered_set>
+
+namespace NodeEditor {
+namespace Runtime {
+
+// ============================================================================
+// 执行上下文 —— 节点处理函数可通过它读写引脚数据
+// ============================================================================
+
+class ExecutionContext
+{
+public:
+    // 获取输入引脚的值
+    Variant GetInputValue(PinId pinId) const
+    {
+        auto it = m_pinValues.find(pinId);
+        return (it != m_pinValues.end()) ? it->second : Variant();
+    }
+
+    // 获取输入引脚的值（按名称查找，在当前节点的输入引脚中搜索）
+    Variant GetInputValue(const std::string& pinName) const
+    {
+        auto it = m_pinNameToId.find(pinName);
+        if (it != m_pinNameToId.end())
+        {
+            return GetInputValue(it->second);
+        }
+        return Variant();
+    }
+
+    // 设置输出引脚的值
+    void SetOutputValue(PinId pinId, const Variant& value)
+    {
+        m_pinValues[pinId] = value;
+    }
+
+    // 设置输出引脚的值（按名称查找）
+    void SetOutputValue(const std::string& pinName, const Variant& value)
+    {
+        auto it = m_pinNameToId.find(pinName);
+        if (it != m_pinNameToId.end())
+        {
+            SetOutputValue(it->second, value);
+        }
+    }
+
+    // 获取节点自定义数据
+    Variant GetNodeData(const std::string& key) const
+    {
+        auto it = m_currentNodeData.find(key);
+        return (it != m_currentNodeData.end()) ? it->second : Variant();
+    }
+
+    // 获取蓝图变量
+    Variant GetVariable(const std::string& name) const
+    {
+        auto it = m_variables.find(name);
+        return (it != m_variables.end()) ? it->second : Variant();
+    }
+
+    // 设置蓝图变量
+    void SetVariable(const std::string& name, const Variant& value)
+    {
+        m_variables[name] = value;
+    }
+
+    // 获取当前正在执行的节点
+    const NodeInstance* GetCurrentNode() const { return m_currentNode; }
+
+    // 获取蓝图元数据
+    const BlueprintMetadata& GetMetadata() const { return m_metadata; }
+
+    // 日志输出（可被外部替换）
+    std::function<void(const std::string& message)> OnLog;
+
+    void Log(const std::string& message) const
+    {
+        if (OnLog) OnLog(message);
+    }
+
+    // ----------------------------------------------------------------
+    // 控制流 API —— 允许 handler 触发指定输出 exec 引脚连接的下游子图
+    // ----------------------------------------------------------------
+
+    // 按引脚名称激活输出流（执行连接到该输出 exec 引脚的所有下游节点）
+    // 可多次调用以实现循环；返回 false 表示执行失败
+    bool ActivateOutputFlow(const std::string& pinName);
+
+    // 按引脚 ID 激活输出流
+    bool ActivateOutputFlow(PinId pinId);
+
+private:
+    friend class BlueprintRunner;
+
+    // 所有引脚的当前值（输入和输出共用，通过链接传播）
+    std::unordered_map<PinId, Variant>              m_pinValues;
+
+    // 当前节点的引脚名到ID的映射（每次执行节点前重建）
+    std::unordered_map<std::string, PinId>          m_pinNameToId;
+
+    // 当前节点的自定义数据
+    std::unordered_map<std::string, Variant>         m_currentNodeData;
+
+    // 蓝图级别的变量
+    std::unordered_map<std::string, Variant>         m_variables;
+
+    // 当前正在执行的节点指针
+    const NodeInstance*                             m_currentNode = nullptr;
+
+    // 蓝图元数据
+    BlueprintMetadata                               m_metadata;
+
+    // 所属 runner（用于 ActivateOutputFlow 回调）
+    BlueprintRunner*                                m_runner = nullptr;
+};
+
+// ============================================================================
+// 节点处理器类型
+// ============================================================================
+
+// 节点处理函数签名: 接收执行上下文，返回是否成功
+using NodeHandler = std::function<bool(ExecutionContext& context)>;
+
+// ============================================================================
+// 执行结果
+// ============================================================================
+
+struct ExecutionResult
+{
+    bool                        success = false;
+    std::string                 errorMessage;
+    std::vector<std::string>    warnings;
+    int                         nodesExecuted = 0;      // 执行了多少个节点
+    double                      elapsedMs = 0.0;        // 执行耗时(毫秒)
+
+    // 获取最终的输出值（通过引脚ID）
+    std::unordered_map<PinId, Variant> outputValues;
+};
+
+// ============================================================================
+// 蓝图运行时执行器
+// ============================================================================
+
+class BlueprintRunner
+{
+public:
+    BlueprintRunner() = default;
+    ~BlueprintRunner() = default;
+
+    // ------------------------------------------------------------------
+    // 加载蓝图数据
+    // ------------------------------------------------------------------
+
+    // 从 BlueprintData 直接加载
+    bool Load(const BlueprintData& data);
+
+    // 从 JSON 字符串加载
+    bool LoadFromJson(const std::string& jsonContent);
+
+    // 从 JSON 文件加载
+    bool LoadFromFile(const std::string& filePath);
+
+    // 获取已加载的蓝图数据
+    const BlueprintData& GetBlueprintData() const { return m_blueprint; }
+
+    // 是否已加载
+    bool IsLoaded() const { return m_loaded; }
+
+    // ------------------------------------------------------------------
+    // 注册节点处理器
+    // ------------------------------------------------------------------
+
+    // 注册单个节点类型的处理器
+    void RegisterHandler(const std::string& definitionId, NodeHandler handler);
+
+    // 批量注册处理器
+    void RegisterHandlers(const std::unordered_map<std::string, NodeHandler>& handlers);
+
+    // 注销处理器
+    void UnregisterHandler(const std::string& definitionId);
+
+    // 检查处理器是否已注册
+    bool HasHandler(const std::string& definitionId) const;
+
+    // 设置默认处理器（用于没有注册处理器的节点）
+    void SetDefaultHandler(NodeHandler handler);
+
+    // ------------------------------------------------------------------
+    // 执行
+    // ------------------------------------------------------------------
+
+    // 执行整个蓝图（按拓扑排序）
+    ExecutionResult Execute();
+
+    // 执行指定节点（及其所有上游依赖节点）
+    ExecutionResult ExecuteNode(NodeId nodeId);
+
+    // 执行指定范围的节点
+    ExecutionResult ExecuteNodes(const std::vector<NodeId>& nodeIds);
+
+    // ------------------------------------------------------------------
+    // 变量操作
+    // ------------------------------------------------------------------
+
+    // 设置蓝图变量（在执行前预设输入值）
+    void SetVariable(const std::string& name, const Variant& value);
+
+    // 获取蓝图变量
+    Variant GetVariable(const std::string& name) const;
+
+    // 获取所有变量
+    const std::unordered_map<std::string, Variant>& GetAllVariables() const;
+
+    // ------------------------------------------------------------------
+    // 引脚值操作（执行后读取输出）
+    // ------------------------------------------------------------------
+
+    // 获取引脚的当前值
+    Variant GetPinValue(PinId pinId) const;
+
+    // 预设引脚值（可用于注入外部输入）
+    void SetPinValue(PinId pinId, const Variant& value);
+
+    // ------------------------------------------------------------------
+    // 工具方法
+    // ------------------------------------------------------------------
+
+    // 获取拓扑排序结果
+    std::vector<NodeId> GetTopologicalOrder() const;
+
+    // 获取上游依赖节点（递归）
+    std::vector<NodeId> GetUpstreamNodes(NodeId nodeId) const;
+
+    // 获取下游节点（递归）
+    std::vector<NodeId> GetDownstreamNodes(NodeId nodeId) const;
+
+    // 获取错误信息
+    const std::string& GetLastError() const { return m_lastError; }
+
+    // 设置日志回调
+    void SetLogCallback(std::function<void(const std::string&)> callback);
+
+    // 重置执行状态（保留蓝图数据和处理器注册）
+    void ResetState();
+
+private:
+    friend class ExecutionContext;
+
+    // 蓝图数据
+    BlueprintData                                       m_blueprint;
+    bool                                                m_loaded = false;
+
+    // 节点处理器注册表
+    std::unordered_map<std::string, NodeHandler>         m_handlers;
+    NodeHandler                                         m_defaultHandler;
+
+    // 执行上下文
+    ExecutionContext                                     m_context;
+
+    // 错误信息
+    std::string                                         m_lastError;
+
+    // 日志回调
+    std::function<void(const std::string&)>              m_logCallback;
+
+    // 缓存：拓扑排序结果
+    mutable std::vector<NodeId>                         m_topoCache;
+    mutable bool                                        m_topoCacheDirty = true;
+
+    // 内部方法
+    bool buildTopologicalOrder(std::vector<NodeId>& order) const;
+    void propagatePinValues(const NodeInstance& node);
+    void prepareNodeContext(const NodeInstance& node);
+    bool executeNodeInternal(const NodeInstance& node);
+
+    // 控制流：从指定输出引脚执行其连接的下游子图（拓扑序）
+    bool executeDownstreamFromPin(PinId outputPinId);
+
+    // 控制流已执行节点集合：记录被 ActivateOutputFlow 递归执行过的节点，
+    // 主循环跳过这些节点以避免重复执行
+    std::unordered_set<NodeId>                          m_flowExecutedNodes;
+
+    // 递归深度保护
+    int m_flowDepth = 0;
+    static const int kMaxFlowDepth = 256;
+};
+
+} // namespace Runtime
+} // namespace NodeEditor
