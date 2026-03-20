@@ -51,6 +51,7 @@ bool Application::Create(int width /*= -1*/, int height /*= -1*/)
 
     ImGuiIO& io = ImGui::GetIO();
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;        // Enable Docking (drag windows into tabs)
     io.IniFilename = m_IniFilename.c_str();
     io.LogFilename = nullptr;
 
@@ -117,28 +118,13 @@ void Application::Frame()
         m_Platform->AcknowledgeFramebufferScaleChanged();
     }
 
-    const float windowScale      = m_Platform->GetWindowScale();
-    const float framebufferScale = m_Platform->GetFramebufferScale();
-
-    if (io.WantSetMousePos)
-    {
-        io.MousePos.x *= windowScale;
-        io.MousePos.y *= windowScale;
-    }
+    // In newer ImGui (1.92+), the Win32 backend handles DPI scaling,
+    // display size, and mouse coordinates correctly via the input event
+    // queue (AddMousePosEvent). We must NOT manually rescale io.MousePos
+    // or io.DisplaySize here — doing so causes coordinate mismatches
+    // that lead to flickering, incorrect dragging, and broken child windows.
 
     m_Platform->NewFrame();
-
-    // Don't touch "uninitialized" mouse position
-    if (io.MousePos.x > -FLT_MAX && io.MousePos.y > -FLT_MAX)
-    {
-        io.MousePos.x    /= windowScale;
-        io.MousePos.y    /= windowScale;
-    }
-    io.DisplaySize.x /= windowScale;
-    io.DisplaySize.y /= windowScale;
-
-    io.DisplayFramebufferScale.x = framebufferScale;
-    io.DisplayFramebufferScale.y = framebufferScale;
 
     m_Renderer->NewFrame();
 
