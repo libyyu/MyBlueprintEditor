@@ -15,6 +15,7 @@
 #   BuiltinNodeDefs.cpp   - 内置节点定义注册
 #   BuiltinHandlers.cpp   - 内置节点运行时处理器注册
 #   ExecutionPanel.cpp    - 执行面板 UI
+#   FileOperations.cpp    - 文件操作（新建/打开/保存/另存为）
 #   utilities/builders.h/.cpp   - 节点构建辅助
 #   utilities/drawing.h/.cpp    - 绘制辅助
 #   utilities/widgets.h/.cpp    - 控件辅助

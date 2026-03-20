@@ -43,6 +43,11 @@ void BlueprintEditor::RegisterBuiltinNodeDefinitions()
         { MakeFlowPin("Enter"), MakePin("N", RTPinDataType::Integer), MakeFlowPin("Reset") },
         { MakeFlowPin("Exit"), MakePin("Counter", RTPinDataType::Integer) });
 
+    reg("ExecuteBlueprint", "Execute Blueprint", "Flow",
+        { MakeFlowPin(""), MakePin("File", RTPinDataType::String) },
+        { MakeFlowPin("Done"), MakePin("Success", RTPinDataType::Boolean), MakePin("Output", RTPinDataType::String) },
+        "FFA040");
+
     reg("Sequence", "Sequence", "Tree",
         { MakeFlowPin("") },
         { MakeFlowPin("") },

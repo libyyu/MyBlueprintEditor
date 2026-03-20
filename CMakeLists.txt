@@ -6,27 +6,14 @@ project(ImGuiNodeEditor VERSION 0.9.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 包含目录
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/Editor/Core
-    ${CMAKE_CURRENT_SOURCE_DIR}/Utils/Json
-    ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui
-    # 模块包含目录
-    ${CMAKE_CURRENT_SOURCE_DIR}/Runtime
-    ${CMAKE_CURRENT_SOURCE_DIR}/Utils
-    ${CMAKE_CURRENT_SOURCE_DIR}/UI
-    ${CMAKE_CURRENT_SOURCE_DIR}/Editor
-)
-
 # ============================================================================
-# 模块化源文件配置
+# BlueprintRuntime 库（独立于 ImGui，可提供给第三方）
 # ============================================================================
 
-# Runtime 模块（新增）
 set(RUNTIME_SOURCES
     Runtime/BlueprintExporter.cpp
     Runtime/BlueprintRunner.cpp
+    Utils/Json/crude_json.cpp
 )
 
 set(RUNTIME_HEADERS
@@ -35,9 +22,43 @@ set(RUNTIME_HEADERS
     Runtime/BlueprintData.h
     Runtime/BlueprintExporter.h
     Runtime/BlueprintRunner.h
+    Utils/Json/crude_json.h
 )
 
-# UI 模块（新增）
+add_library(BlueprintRuntime STATIC ${RUNTIME_SOURCES} ${RUNTIME_HEADERS})
+
+target_include_directories(BlueprintRuntime
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/Runtime
+        ${CMAKE_CURRENT_SOURCE_DIR}/Utils
+        ${CMAKE_CURRENT_SOURCE_DIR}/Utils/Json
+)
+
+set_target_properties(BlueprintRuntime PROPERTIES
+    CXX_STANDARD 14
+    CXX_STANDARD_REQUIRED ON
+    POSITION_INDEPENDENT_CODE ON
+)
+
+# 编译器警告设置
+if(MSVC)
+    target_compile_options(BlueprintRuntime PRIVATE /W4 /utf-8)
+else()
+    target_compile_options(BlueprintRuntime PRIVATE -Wall -Wextra)
+endif()
+
+# 发布模式优化
+if(MSVC)
+    target_compile_options(BlueprintRuntime PRIVATE $<$<CONFIG:Release>:/O2>)
+else()
+    target_compile_options(BlueprintRuntime PRIVATE $<$<CONFIG:Release>:-O3>)
+endif()
+
+# ============================================================================
+# ImGuiNodeEditor 库（编辑器核心，依赖 ImGui + BlueprintRuntime）
+# ============================================================================
+
+# UI 模块
 set(UI_SOURCES
     UI/Builders/NodeBuilder.cpp
 )
@@ -48,21 +69,12 @@ set(UI_HEADERS
     UI/Builders/NodeBuilder.h
 )
 
-# Editor 模块（新增包装层）
+# Editor 模块
 set(EDITOR_HEADERS
     Editor/API/NodeEditor.h
 )
 
-# JSON 工具源文件（位于 Utils/Json/ 目录）
-set(JSON_SOURCES
-    Utils/Json/crude_json.cpp
-)
-
-set(JSON_HEADERS
-    Utils/Json/crude_json.h
-)
-
-# 编辑器核心源文件（位于 Editor/Core/ 目录）
+# 编辑器核心
 set(CORE_SOURCES
     Editor/Core/imgui_node_editor.cpp
     Editor/Core/imgui_node_editor_api.cpp
@@ -80,26 +92,27 @@ set(CORE_HEADERS
     Editor/Core/imgui_extra_math.inl
 )
 
-# 合并所有源文件
 set(IMGUI_NODE_EDITOR_SOURCES
-    ${RUNTIME_SOURCES}
     ${UI_SOURCES}
-    ${JSON_SOURCES}
     ${CORE_SOURCES}
 )
 
 set(IMGUI_NODE_EDITOR_HEADERS
-    ${RUNTIME_HEADERS}
     ${UI_HEADERS}
     ${EDITOR_HEADERS}
-    ${JSON_HEADERS}
     ${CORE_HEADERS}
 )
 
-# 创建静态库
 add_library(ImGuiNodeEditor STATIC ${IMGUI_NODE_EDITOR_SOURCES} ${IMGUI_NODE_EDITOR_HEADERS})
 
-# 设置库属性
+target_include_directories(ImGuiNodeEditor
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Editor/Core
+        ${CMAKE_CURRENT_SOURCE_DIR}/Editor
+        ${CMAKE_CURRENT_SOURCE_DIR}/UI
+)
+
 set_target_properties(ImGuiNodeEditor PROPERTIES
     CXX_STANDARD 14
     CXX_STANDARD_REQUIRED ON
@@ -109,7 +122,7 @@ set_target_properties(ImGuiNodeEditor PROPERTIES
 # 启用 ImGui 数学运算符
 target_compile_definitions(ImGuiNodeEditor PRIVATE IMGUI_DEFINE_MATH_OPERATORS)
 
-# 查找ImGui库
+# 查找 ImGui 库
 find_path(IMGUI_INCLUDE_DIR imgui.h
     PATHS ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui
     NO_DEFAULT_PATH
@@ -118,7 +131,7 @@ find_path(IMGUI_INCLUDE_DIR imgui.h
 if(IMGUI_INCLUDE_DIR)
     message(STATUS "Found ImGui headers at: ${IMGUI_INCLUDE_DIR}")
     
-    # 添加ImGui源文件
+    # 添加 ImGui 源文件
     set(IMGUI_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_draw.cpp
@@ -126,14 +139,16 @@ if(IMGUI_INCLUDE_DIR)
         ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_widgets.cpp
     )
     
-    # 创建ImGui静态库
+    # 创建 ImGui 静态库
     add_library(imgui STATIC ${IMGUI_SOURCES})
     target_include_directories(imgui PUBLIC ${IMGUI_INCLUDE_DIR})
     
-    # 链接依赖
-    target_link_libraries(ImGuiNodeEditor PRIVATE imgui)
+    # ImGuiNodeEditor 链接 imgui + BlueprintRuntime
+    target_link_libraries(ImGuiNodeEditor PUBLIC imgui BlueprintRuntime)
 else()
     message(WARNING "ImGui headers not found, building without ImGui support")
+    # 即便没有 ImGui，仍然链接 BlueprintRuntime
+    target_link_libraries(ImGuiNodeEditor PUBLIC BlueprintRuntime)
 endif()
 
 # 编译器警告设置
@@ -150,14 +165,29 @@ else()
     target_compile_options(ImGuiNodeEditor PRIVATE $<$<CONFIG:Release>:-O3>)
 endif()
 
-# 安装配置（可选）
+# ============================================================================
+# 安装配置
+# ============================================================================
+
+# 安装 BlueprintRuntime
+install(TARGETS BlueprintRuntime
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+install(FILES ${RUNTIME_HEADERS}
+    DESTINATION include/BlueprintRuntime
+)
+
+# 安装 ImGuiNodeEditor
 install(TARGETS ImGuiNodeEditor
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
 
-install(FILES ${CORE_HEADERS} ${RUNTIME_HEADERS} ${UI_HEADERS} ${EDITOR_HEADERS} ${JSON_HEADERS}
+install(FILES ${CORE_HEADERS} ${UI_HEADERS} ${EDITOR_HEADERS}
     DESTINATION include/ImGuiNodeEditor
 )
 
@@ -172,6 +202,6 @@ if(BUILD_EXAMPLES)
     # 设置示例程序需要的变量
     set(IMGUI_NODE_EDITOR_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
     
-    # 添加示例程序（使用简化配置）
+    # 添加示例程序
     add_subdirectory(examples)
 endif()

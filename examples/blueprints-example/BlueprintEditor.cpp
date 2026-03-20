@@ -541,6 +541,9 @@ void BlueprintEditor::OnStart()
     m_HeaderBackground = LoadTexture("data/BlueprintBackground.png");
     m_SaveIcon         = LoadTexture("data/ic_save_white_24dp.png");
     m_RestoreIcon      = LoadTexture("data/ic_restore_white_24dp.png");
+
+    // 设置初始标题
+    SetTitle("Blueprint Editor - [New]");
 }
 
 void BlueprintEditor::OnStop()

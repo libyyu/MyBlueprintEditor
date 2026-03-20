@@ -1,6 +1,8 @@
 // BuiltinHandlers.cpp -- 内置节点运行时处理器注册
 #include "BlueprintEditor.h"
 #include <cstdlib>
+#include <fstream>
+#include <sstream>
 
 void BlueprintEditor::RegisterBuiltinHandlers()
 {
@@ -51,6 +53,95 @@ void BlueprintEditor::RegisterBuiltinHandlers()
 
     m_HandlerRegistry["InputAction Fire"] = [](RTContext& ctx) {
         ctx.Log("  [InputAction] Fire triggered");
+        return true;
+    };
+
+    // ==================================================================
+    // Execute Blueprint — 加载并执行另一个蓝图文件
+    // ==================================================================
+    m_HandlerRegistry["Execute Blueprint"] = [this](RTContext& ctx) {
+        auto filePath = ctx.GetInputValue("File").asString();
+        ctx.Log("  [ExecuteBlueprint] File: \"" + filePath + "\"");
+
+        if (filePath.empty())
+        {
+            ctx.Log("  [ExecuteBlueprint] ERROR: File path is empty");
+            ctx.SetOutputValue("Success", RTVariant(false));
+            ctx.SetOutputValue("Output", RTVariant(std::string("Error: empty file path")));
+            ctx.ActivateOutputFlow("Done");
+            return true;
+        }
+
+        // 如果路径是相对路径，基于当前文件路径解析
+        std::string resolvedPath = filePath;
+        if (!m_CurrentFilePath.empty() && 
+            filePath.find(':') == std::string::npos && 
+            filePath[0] != '/' && filePath[0] != '\\')
+        {
+            size_t lastSlash = m_CurrentFilePath.find_last_of("/\\");
+            if (lastSlash != std::string::npos)
+                resolvedPath = m_CurrentFilePath.substr(0, lastSlash + 1) + filePath;
+        }
+
+        ctx.Log("  [ExecuteBlueprint] Resolved: \"" + resolvedPath + "\"");
+
+        // 加载子蓝图
+        ::NodeEditor::Runtime::JsonBlueprintExporter exporter;
+        auto importResult = exporter.importRuntimeFromFile(resolvedPath);
+
+        if (!importResult.success)
+        {
+            ctx.Log("  [ExecuteBlueprint] ERROR: " + importResult.errorMessage);
+            ctx.SetOutputValue("Success", RTVariant(false));
+            ctx.SetOutputValue("Output", RTVariant(std::string("Load error: ") + importResult.errorMessage));
+            ctx.ActivateOutputFlow("Done");
+            return true;
+        }
+
+        ctx.Log("  [ExecuteBlueprint] Loaded " + std::to_string(importResult.data.nodes.size()) + " nodes");
+
+        // 创建子 Runner 执行
+        RTBlueprintRunner subRunner;
+        
+        // 收集子蓝图的执行日志
+        std::vector<std::string> subLog;
+        subRunner.SetLogCallback([&subLog, &ctx](const std::string& msg) {
+            subLog.push_back(msg);
+            ctx.Log("    | " + msg);
+        });
+
+        if (!subRunner.Load(importResult.data))
+        {
+            ctx.Log("  [ExecuteBlueprint] ERROR: Failed to load sub-blueprint");
+            ctx.SetOutputValue("Success", RTVariant(false));
+            ctx.SetOutputValue("Output", RTVariant(std::string("Load failed")));
+            ctx.ActivateOutputFlow("Done");
+            return true;
+        }
+
+        // 注册处理器（复用当前编辑器的所有处理器）
+        if (m_DefaultHandler)
+            subRunner.SetDefaultHandler(m_DefaultHandler);
+        subRunner.RegisterHandlers(m_HandlerRegistry);
+
+        // 执行
+        auto execResult = subRunner.Execute();
+
+        ctx.Log("  [ExecuteBlueprint] Result: " + std::string(execResult.success ? "SUCCESS" : "FAILED") +
+                " (" + std::to_string(execResult.nodesExecuted) + " nodes executed)");
+
+        ctx.SetOutputValue("Success", RTVariant(execResult.success));
+
+        // 合并子日志作为输出
+        std::string outputText;
+        for (const auto& line : subLog)
+        {
+            if (!outputText.empty()) outputText += "\n";
+            outputText += line;
+        }
+        ctx.SetOutputValue("Output", RTVariant(outputText));
+
+        ctx.ActivateOutputFlow("Done");
         return true;
     };
 

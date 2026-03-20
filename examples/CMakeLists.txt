@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.12)
 
 # 简化的示例构建配置
-# 直接使用主项目中已编译的 imgui 和 ImGuiNodeEditor 库
+# 直接使用主项目中已编译的库:
+#   - BlueprintRuntime: 独立运行时库（无 ImGui 依赖）
+#   - ImGuiNodeEditor:  编辑器库（依赖 ImGui + BlueprintRuntime）
+#   - imgui:            ImGui 库
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -91,8 +94,8 @@ endif()
 add_library(application STATIC ${APPLICATION_SOURCES})
 target_include_directories(application PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/application/include)
 
-# 链接库
-target_link_libraries(application PUBLIC imgui ImGuiNodeEditor)
+# application 链接 ImGuiNodeEditor（会传递链接 imgui 和 BlueprintRuntime）
+target_link_libraries(application PUBLIC ImGuiNodeEditor)
 if(WIN32)
     target_link_libraries(application PRIVATE d3d11.lib d3dcompiler.lib d3dx11 dxerr)
 endif()
@@ -169,7 +172,8 @@ macro(add_simple_example NAME)
         add_executable(${NAME} ${EXAMPLE_SOURCES})
     endif()
     
-    target_link_libraries(${NAME} PRIVATE application imgui ImGuiNodeEditor)
+    # 链接 application（传递 ImGuiNodeEditor -> imgui + BlueprintRuntime）
+    target_link_libraries(${NAME} PRIVATE application)
     
     set_target_properties(${NAME} PROPERTIES
         FOLDER "examples"
@@ -190,19 +194,15 @@ add_simple_example(basic-interaction-example)
 add_simple_example(blueprints-example)
 
 # ============================================================================
-# 运行时示例（纯控制台程序，不依赖 ImGui/编辑器）
+# 运行时示例（纯控制台程序，只依赖 BlueprintRuntime，不依赖 ImGui/编辑器）
 # ============================================================================
 
 project(runtime-example)
 add_executable(runtime-example
     ${CMAKE_CURRENT_SOURCE_DIR}/runtime-example/runtime-example.cpp
 )
-target_include_directories(runtime-example PRIVATE
-    ${IMGUI_NODE_EDITOR_ROOT_DIR}/Runtime
-    ${IMGUI_NODE_EDITOR_ROOT_DIR}/Utils/Json
-)
-# 只链接 ImGuiNodeEditor 库（内含 Runtime + JSON 模块）
-target_link_libraries(runtime-example PRIVATE ImGuiNodeEditor imgui)
+# 只链接 BlueprintRuntime（不需要 ImGui 和 ImGuiNodeEditor）
+target_link_libraries(runtime-example PRIVATE BlueprintRuntime)
 set_target_properties(runtime-example PROPERTIES
     FOLDER "examples"
     RUNTIME_OUTPUT_DIRECTORY "${EXAMPLE_OUTPUT_DIR}"

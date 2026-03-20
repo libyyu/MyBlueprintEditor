@@ -26,6 +26,7 @@
 #include <utility>
 #include <sstream>
 #include <chrono>
+#include <functional>
 
 namespace ed   = ax::NodeEditor;
 namespace util = ax::NodeEditor::Utilities;
@@ -143,6 +144,21 @@ struct BlueprintEditor : public Application
     void    ShowExecutionWindow(bool* p_open);         // 可浮动执行输出窗口
 
     // ------------------------------------------------------------------
+    // 文件操作
+    // ------------------------------------------------------------------
+    void    NewFile();                                  // 新建蓝图
+    void    OpenFile();                                 // 打开蓝图文件
+    void    SaveFile();                                 // 保存蓝图文件
+    void    SaveFileAs();                               // 另存为
+    void    DoSaveFile(const std::string& path);        // 执行保存
+    void    DoOpenFile(const std::string& path);        // 执行打开
+    void    ClearEditor();                              // 清空编辑器
+
+    // 编辑器数据序列化
+    RTBlueprintData BuildFullEditorData();              // 构建完整编辑器数据（含位置等）
+    void            LoadEditorData(const RTBlueprintData& data); // 从数据恢复编辑器状态
+
+    // ------------------------------------------------------------------
     // 蓝图执行
     // ------------------------------------------------------------------
     RTBlueprintData BuildRuntimeData();
@@ -184,6 +200,12 @@ struct BlueprintEditor : public Application
     bool                 m_ShowOrdinals = false;
     bool                 m_ShowNodeListWindow = true;     // 节点列表窗口可见
     bool                 m_ShowExecutionWindow = true;    // 执行输出窗口可见
+
+    // 文件操作状态
+    std::string          m_CurrentFilePath;                // 当前打开的文件路径（空=未保存的新文件）
+    bool                 m_IsDirty = false;                // 是否有未保存的修改
+    bool                 m_NeedSetNodePositions = false;   // 加载后需要设置节点位置
+    RTBlueprintData      m_PendingLoadData;                // 待设置位置的加载数据
 
     // 节点定义注册表 & 处理器注册表
     RTNodeRegistry                                          m_NodeRegistry;

@@ -341,6 +341,19 @@ void BlueprintEditor::OnFrame(float deltaTime)
     // 菜单栏
     if (ImGui::BeginMenuBar())
     {
+        if (ImGui::BeginMenu("File"))
+        {
+            if (ImGui::MenuItem("New", "Ctrl+N"))
+                NewFile();
+            if (ImGui::MenuItem("Open...", "Ctrl+O"))
+                OpenFile();
+            ImGui::Separator();
+            if (ImGui::MenuItem("Save", "Ctrl+S"))
+                SaveFile();
+            if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S"))
+                SaveFileAs();
+            ImGui::EndMenu();
+        }
         if (ImGui::BeginMenu("View"))
         {
             ImGui::MenuItem("Node List", nullptr, &m_ShowNodeListWindow);
@@ -349,11 +362,74 @@ void BlueprintEditor::OnFrame(float deltaTime)
             ImGui::EndMenu();
         }
         ImGui::Separator();
+
+        // 显示当前文件名
+        if (!m_CurrentFilePath.empty())
+        {
+            // 提取文件名
+            std::string displayName = m_CurrentFilePath;
+            size_t lastSlash = displayName.find_last_of("/\\");
+            if (lastSlash != std::string::npos)
+                displayName = displayName.substr(lastSlash + 1);
+            if (m_IsDirty)
+                displayName += " *";
+            ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "%s", displayName.c_str());
+            ImGui::Separator();
+        }
+        else
+        {
+            ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "[New]");
+            ImGui::Separator();
+        }
+
         ImGui::Text("FPS: %.2f (%.2gms)", io.Framerate, io.Framerate ? 1000.0f / io.Framerate : 0.0f);
         ImGui::EndMenuBar();
     }
 
+    // 键盘快捷键
+    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_N))
+        NewFile();
+    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_O))
+        OpenFile();
+    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_S))
+        SaveFile();
+    if (io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_S))
+        SaveFileAs();
+
     ed::SetCurrentEditor(s_Editor);
+
+    // 加载文件后延迟设置节点位置（需要在 ed::Begin/End 之间）
+    if (m_NeedSetNodePositions)
+    {
+        m_NeedSetNodePositions = false;
+
+        for (const auto& pendNode : m_PendingLoadData.nodes)
+        {
+            auto it = pendNode.customProperties.find("__newEditorId");
+            if (it != pendNode.customProperties.end())
+            {
+                int editorId = std::stoi(it->second);
+                ed::NodeId nodeId(editorId);
+
+                if (pendNode.position.x != 0.0f || pendNode.position.y != 0.0f)
+                    ed::SetNodePosition(nodeId, ImVec2(pendNode.position.x, pendNode.position.y));
+
+                // Comment 节点需要设置 Group 尺寸
+                if (pendNode.size.width > 0 && pendNode.size.height > 0)
+                {
+                    Node* node = FindNode(nodeId);
+                    if (node && node->Type == NodeType::Comment)
+                    {
+                        ed::SetGroupSize(nodeId, ImVec2(pendNode.size.width, pendNode.size.height));
+                        node->Size = ImVec2(pendNode.size.width, pendNode.size.height);
+                    }
+                }
+            }
+        }
+
+        m_PendingLoadData.clear();
+        ed::NavigateToContent();
+    }
 
     // 浮动面板窗口
     if (m_ShowNodeListWindow)
@@ -968,6 +1044,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
                                 m_Links.emplace_back(Link(GetNextId(), startPinId, endPinId));
                                 m_Links.back().Color = GetIconColor(startPin->Type);
+                                m_IsDirty = true;
                             }
                         }
                     }
@@ -1005,7 +1082,10 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     {
                         auto id = std::find_if(m_Nodes.begin(), m_Nodes.end(), [nodeId](auto& node) { return node.ID == nodeId; });
                         if (id != m_Nodes.end())
+                        {
                             m_Nodes.erase(id);
+                            m_IsDirty = true;
+                        }
                     }
                 }
 
@@ -1016,7 +1096,10 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     {
                         auto id = std::find_if(m_Links.begin(), m_Links.end(), [linkId](auto& link) { return link.ID == linkId; });
                         if (id != m_Links.end())
+                        {
                             m_Links.erase(id);
+                            m_IsDirty = true;
+                        }
                     }
                 }
             }
@@ -1125,6 +1208,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
             BuildNodes();
 
             createNewNode = false;
+            m_IsDirty = true;
 
             ed::SetNodePosition(node->ID, newNodePostion);
 
