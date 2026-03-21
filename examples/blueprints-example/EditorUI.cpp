@@ -337,7 +337,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
     UpdateTouch();
 
     // 驱动主线程计时器
-    m_TimerManager.Tick(deltaTime);
+    m_PersistentRunner.Tick(deltaTime);
 
     auto& io = ImGui::GetIO();
 
@@ -1629,24 +1629,25 @@ void BlueprintEditor::DrawTimerPanel()
     }
 
     // 工具栏
-    ImGui::Text("Active Timers: %d", m_TimerManager.GetActiveTimerCount());
+    auto& timerMgr = GetTimerManager();
+    ImGui::Text("Active Timers: %d", timerMgr.GetActiveTimerCount());
     ImGui::SameLine();
     ImGui::Text("  |  Time Scale: ");
     ImGui::SameLine();
-    float ts = m_TimerManager.GetTimeScale();
+    float ts = timerMgr.GetTimeScale();
     ImGui::SetNextItemWidth(100);
     if (ImGui::SliderFloat("##TimeScale", &ts, 0.0f, 5.0f, "%.2f"))
-        m_TimerManager.SetTimeScale(ts);
+        timerMgr.SetTimeScale(ts);
 
     ImGui::SameLine(0, 20);
     if (ImGui::Button("Clear All"))
-        m_TimerManager.ClearAllTimers();
+        timerMgr.ClearAllTimers();
     ImGui::SameLine();
     if (ImGui::Button("Pause All"))
-        m_TimerManager.PauseAll();
+        timerMgr.PauseAll();
     ImGui::SameLine();
     if (ImGui::Button("Resume All"))
-        m_TimerManager.ResumeAll();
+        timerMgr.ResumeAll();
 
     ImGui::Separator();
 
@@ -1668,7 +1669,7 @@ void BlueprintEditor::DrawTimerPanel()
     if (ImGui::Button("Add"))
     {
         std::string timerName(testName);
-        m_TimerManager.SetTimerByName(timerName, testInterval, testRepeat, [this, timerName]() {
+        GetTimerManager().SetTimerByName(timerName, testInterval, testRepeat, [this, timerName]() {
             m_ExecutionLog.push_back("[Timer:" + timerName + "] fired!");
             m_ExecutionLogDirty = true;
             return true;
@@ -1678,7 +1679,7 @@ void BlueprintEditor::DrawTimerPanel()
     ImGui::Separator();
 
     // 计时器列表表格
-    const auto& timers = m_TimerManager.GetAllTimers();
+    const auto& timers = timerMgr.GetAllTimers();
     if (timers.empty())
     {
         ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "No active timers");
@@ -1742,16 +1743,16 @@ void BlueprintEditor::DrawTimerPanel()
                 if (t.paused)
                 {
                     if (ImGui::SmallButton("Resume"))
-                        m_TimerManager.ResumeTimer(t.handle);
+                        timerMgr.ResumeTimer(t.handle);
                 }
                 else
                 {
                     if (ImGui::SmallButton("Pause"))
-                        m_TimerManager.PauseTimer(t.handle);
+                        timerMgr.PauseTimer(t.handle);
                 }
                 ImGui::SameLine();
                 if (ImGui::SmallButton("X"))
-                    m_TimerManager.ClearTimer(t.handle);
+                    timerMgr.ClearTimer(t.handle);
                 ImGui::PopID();
             }
 

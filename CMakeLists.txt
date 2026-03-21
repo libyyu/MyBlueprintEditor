@@ -13,6 +13,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(RUNTIME_SOURCES
     Runtime/BlueprintExporter.cpp
     Runtime/BlueprintRunner.cpp
+    Runtime/FrameTimerManager.cpp
     Utils/Json/crude_json.cpp
 )
 
@@ -22,6 +23,7 @@ set(RUNTIME_HEADERS
     Runtime/BlueprintData.h
     Runtime/BlueprintExporter.h
     Runtime/BlueprintRunner.h
+    Runtime/FrameTimerManager.h
     Utils/Json/crude_json.h
 )
 

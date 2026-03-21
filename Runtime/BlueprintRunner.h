@@ -11,6 +11,7 @@
 
 #include "BlueprintData.h"
 #include "NodeDefinition.h"
+#include "FrameTimerManager.h"
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -24,10 +25,6 @@
 
 namespace NodeEditor {
 namespace Runtime {
-
-
-// 异步等待函数签名
-using WaitTimeHandler = std::function<void(float seconds, const std::function<void()>& callback)>;
 
 // ============================================================================
 // 执行上下文 —— 节点处理函数可通过它读写引脚数据
@@ -104,18 +101,7 @@ public:
         if (OnLog) OnLog(message);
     }
 
-    WaitTimeHandler OnDelay;
-
-    void Delay(float seconds, const std::function<void()>& run) const
-    {
-        if (OnDelay) {
-            OnDelay(seconds, run); // 修复：调用 OnDelay 时传递参数
-        }
-        else {
-            std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(seconds * 1000)));
-            run();
-        }
-	}
+    void Delay(float seconds, const std::function<void()>& run) const;
 
     // ----------------------------------------------------------------
     // 控制流 API —— 允许 handler 触发指定输出 exec 引脚连接的下游子图
@@ -281,11 +267,19 @@ public:
     // 设置日志回调
     void SetLogCallback(std::function<void(const std::string&)> callback);
 
-	// 设置等待处理器（用于处理需要异步等待的节点，如延时、网络请求等）
-    void SetWaitTimeHandler(WaitTimeHandler&& handler);
-
     // 重置执行状态（保留蓝图数据和处理器注册）
     void ResetState();
+
+    // ------------------------------------------------------------------
+    // 主线程计时器（由外部每帧调用 Tick 驱动）
+    // ------------------------------------------------------------------
+
+    // 每帧调用，驱动计时器
+    void Tick(float deltaTime) { m_timerManager.Tick(deltaTime); }
+
+    // 获取计时器管理器（可读写）
+    FrameTimerManager&       GetTimerManager()       { return m_timerManager; }
+    const FrameTimerManager& GetTimerManager() const { return m_timerManager; }
 
 private:
     friend class ExecutionContext;
@@ -295,20 +289,20 @@ private:
     bool                                                m_loaded = false;
 
     // 节点处理器注册表
-    std::unordered_map<std::string, NodeHandler>         m_handlers;
+    std::unordered_map<std::string, NodeHandler>        m_handlers;
     NodeHandler                                         m_defaultHandler;
 
     // 执行上下文
-    ExecutionContext                                     m_context;
+    ExecutionContext                                    m_context;
 
     // 错误信息
     std::string                                         m_lastError;
 
     // 日志回调
-    std::function<void(const std::string&)>              m_logCallback;
+    std::function<void(const std::string&)>             m_logCallback;
 
-    // 等待
-    WaitTimeHandler                                     m_waitTimerHandler;
+    // 主线程计时器管理器
+    FrameTimerManager                                   m_timerManager;
 
     // 缓存：拓扑排序结果
     mutable std::vector<NodeId>                         m_topoCache;

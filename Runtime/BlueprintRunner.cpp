@@ -542,12 +542,6 @@ void BlueprintRunner::SetLogCallback(std::function<void(const std::string&)> cal
     m_context.OnLog = m_logCallback;
 }
 
-void BlueprintRunner::SetWaitTimeHandler(WaitTimeHandler&& handler) 
-{ 
-    m_waitTimerHandler = std::move(handler); 
-	m_context.OnDelay = m_waitTimerHandler;
-}
-
 void BlueprintRunner::ResetState()
 {
     m_context.m_pinValues.clear();
@@ -574,6 +568,18 @@ void BlueprintRunner::ResetState()
                 }
             }
         }
+    }
+}
+
+void ExecutionContext::Delay(float seconds, const std::function<void()>& run) const
+{
+    if (m_runner)
+    {
+        m_runner->GetTimerManager().SetTimer(seconds, [this, run]()->bool 
+        {
+            run();
+            return false;
+        });
     }
 }
 

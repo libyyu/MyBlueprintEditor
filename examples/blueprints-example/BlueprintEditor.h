@@ -17,8 +17,6 @@
 #include "BlueprintExporter.h"
 #include "NodeDefinition.h"
 
-#include "FrameTimerManager.h"
-
 #include <string>
 #include <vector>
 #include <map>
@@ -47,6 +45,10 @@ typedef NodeEditor::Runtime::PinDefinition      RTPinDef;
 typedef NodeEditor::Runtime::NodeCategory       RTNodeCategory;
 typedef NodeEditor::Runtime::DefaultNodeRegistry RTNodeRegistry;
 typedef NodeEditor::Runtime::NodeHandler        RTNodeHandler;
+typedef NodeEditor::Runtime::FrameTimerManager  RTFrameTimerManager;
+typedef NodeEditor::Runtime::FrameTimerEntry    RTFrameTimerEntry;
+typedef NodeEditor::Runtime::TimerHandle        RTTimerHandle;
+typedef NodeEditor::Runtime::TimerCallback      RTTimerCallback;
 
 using namespace ax;
 using ax::Widgets::IconType;
@@ -250,7 +252,11 @@ struct BlueprintEditor : public Application
     RTNodeHandler m_DefaultHandler;
 
     // ------------------------------------------------------------------
-    // 主线程计时器
+    // 持久 Runner（用于主线程计时器等持久功能）
     // ------------------------------------------------------------------
-    FrameTimerManager   m_TimerManager;
+    RTBlueprintRunner   m_PersistentRunner;
+
+    // 便捷访问计时器管理器
+    RTFrameTimerManager& GetTimerManager() { return m_PersistentRunner.GetTimerManager(); }
+    const RTFrameTimerManager& GetTimerManager() const { return m_PersistentRunner.GetTimerManager(); }
 };

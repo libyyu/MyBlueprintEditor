@@ -12,7 +12,7 @@ void BlueprintEditor::RegisterHandlers_Action()
         ctx.Log("  [SetTimer] interval=" + std::to_string(interval) + "s, looping=" + (looping ? "true" : "false"));
 
         // 用 FrameTimerManager 注册一个主线程计时器
-        m_TimerManager.SetTimerByName("SetTimer", interval, repeat, [this, looping]() {
+        GetTimerManager().SetTimerByName("SetTimer", interval, repeat, [this, looping]() {
             m_ExecutionLog.push_back("[Timer] fired! looping=" + std::string(looping ? "true" : "false"));
             m_ExecutionLogDirty = true;
             return true; // 返回 true 继续循环

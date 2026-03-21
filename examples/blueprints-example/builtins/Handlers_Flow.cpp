@@ -75,9 +75,6 @@ void BlueprintEditor::RegisterHandlers_Flow()
             subLog.push_back(msg);
             ctx.Log("    | " + msg);
         });
-        subRunner.SetWaitTimeHandler([&ctx](float seconds, const std::function<void()>& run) {
-            ctx.Delay(seconds, run);
-		});
 
         if (!subRunner.Load(importResult.data))
         {
@@ -150,14 +147,21 @@ void BlueprintEditor::RegisterHandlers_Flow()
     m_HandlerRegistry["Delay"] = [this](RTContext& ctx) {
         double dur = ctx.GetInputValue("Duration").asFloat();
         float duration = static_cast<float>(dur);
-        ctx.Log("  [Delay] " + std::to_string(duration) + "s; started:" + std::to_string(time_t()));
+        auto currentTime = RTFrameTimerManager::GetCurrentUnixTime();
+        ctx.Log("  [Delay] " + std::to_string(duration) + "s; started:" + std::to_string(currentTime));
+
+        // 先触发 "Exec" 输出流（同步执行）
         ctx.ActivateOutputFlow("Exec");
-        // 使用主线程计时器代替阻塞式 sleep
-        m_TimerManager.SetTimerByName("Delay", duration, 1, [this, &ctx]() {
-            m_ExecutionLog.push_back("[Delay] Completed; finished:" + std::to_string(time_t()));
-            m_ExecutionLogDirty = true;
+
+        // "Completed" 输出流需要延迟触发。
+        // 注意：runner 和 ctx 是 ExecuteBlueprint() 中的局部变量，
+        // handler 返回后就会被销毁，所以不能在 Timer 回调中使用 &ctx。
+        // 正确做法：使用 ctx.Delay() 让 runner 自己处理异步等待，
+        // 如果 runner 未设置 WaitTimeHandler，则回退到阻塞式 sleep。
+        ctx.Delay(duration, [&ctx]() {
+            auto currentTime = RTFrameTimerManager::GetCurrentUnixTime();
+            ctx.Log("  [Delay] Completed; finished:" + std::to_string(time_t()));
             ctx.ActivateOutputFlow("Completed");
-            return false;
         });
 
         return true;
