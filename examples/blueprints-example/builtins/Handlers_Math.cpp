@@ -12,13 +12,6 @@ void BlueprintEditor::RegisterHandlers_Math()
         return true;
     };
 
-    m_HandlerRegistry["AddInteger"] = [](RTContext& ctx) {
-        int64_t a = ctx.GetInputValue("A").asInt();
-        int64_t b = ctx.GetInputValue("B").asInt();
-        ctx.SetOutputValue("Result", RTVariant(a + b));
-        return true;
-    };
-
     m_HandlerRegistry["Subtract"] = [](RTContext& ctx) {
         double a = ctx.GetInputValue("A").asFloat();
         double b = ctx.GetInputValue("B").asFloat();
@@ -105,6 +98,18 @@ void BlueprintEditor::RegisterHandlers_Math()
     m_HandlerRegistry["FloatToInt"] = [](RTContext& ctx) {
         double v = ctx.GetInputValue("Value").asFloat();
         ctx.SetOutputValue("Result", RTVariant(static_cast<int64_t>(v)));
+        return true;
+    };
+
+    m_HandlerRegistry["FloatToBool"] = [](RTContext& ctx) {
+        double v = ctx.GetInputValue("Value").asBool();
+        ctx.SetOutputValue("Result", RTVariant(v));
+        return true;
+    };
+
+    m_HandlerRegistry["IntToString"] = [](RTContext& ctx) {
+        double v = ctx.GetInputValue("Value").asInt();
+        ctx.SetOutputValue("Result", RTVariant(std::to_string(v)));
         return true;
     };
 

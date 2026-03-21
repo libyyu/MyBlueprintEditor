@@ -34,11 +34,6 @@ void BlueprintEditor::RegisterNodeDefs_Math()
         { MakePin("Result", RTPinDataType::Float) },
         "80C3F8", "Simple");
 
-    reg("AddInteger", "+", "Math/Arithmetic",
-        { MakePin("A", RTPinDataType::Integer), MakePin("B", RTPinDataType::Integer) },
-        { MakePin("Result", RTPinDataType::Integer) },
-        "80C3F8", "Simple");
-
     reg("Subtract", "-", "Math/Arithmetic",
         { MakePin("A", RTPinDataType::Float), MakePin("B", RTPinDataType::Float) },
         { MakePin("Result", RTPinDataType::Float) },
@@ -48,6 +43,7 @@ void BlueprintEditor::RegisterNodeDefs_Math()
         { MakePin("A", RTPinDataType::Float), MakePin("B", RTPinDataType::Float) },
         { MakePin("Result", RTPinDataType::Float) },
         "80C3F8", "Simple");
+
 
     reg("Divide", "/", "Math/Arithmetic",
         { MakePin("A", RTPinDataType::Float), MakePin("B", RTPinDataType::Float) },
@@ -95,6 +91,16 @@ void BlueprintEditor::RegisterNodeDefs_Math()
     reg("FloatToInt", "Float to Int", "Math/Conversion",
         { MakePin("Value", RTPinDataType::Float) },
         { MakePin("Result", RTPinDataType::Integer) },
+        "80C3F8", "Simple");
+
+    reg("FloatToBool", "Float to Bool", "Math/Conversion",
+        { MakePin("Value", RTPinDataType::Float) },
+        { MakePin("Result", RTPinDataType::Boolean) },
+        "80C3F8", "Simple");
+
+    reg("IntToString", "Int to String", "Math/Conversion",
+        { MakePin("Value", RTPinDataType::Integer) },
+        { MakePin("Result", RTPinDataType::String) },
         "80C3F8", "Simple");
 
     reg("FloatToString", "Float to String", "Math/Conversion",
