@@ -17,6 +17,8 @@
 #include "BlueprintExporter.h"
 #include "NodeDefinition.h"
 
+#include "FrameTimerManager.h"
+
 #include <string>
 #include <vector>
 #include <map>
@@ -160,6 +162,7 @@ struct BlueprintEditor : public Application
     void    ShowLeftPane(float paneWidth);             // 旧版左侧面板（已不使用）
     void    DrawNodeListPanel();                       // 左侧节点列表面板（嵌入式）
     void    DrawExecutionPanel();                      // 底部执行输出面板（嵌入式）
+    void    DrawTimerPanel();                          // 计时器监控浮动面板
 
     // ------------------------------------------------------------------
     // 文件操作
@@ -218,6 +221,7 @@ struct BlueprintEditor : public Application
     bool                 m_ShowOrdinals = false;
     bool                 m_ShowNodeListWindow = true;     // 左侧面板可见
     bool                 m_ShowExecutionWindow = true;    // 底部面板可见
+    bool                 m_ShowTimerWindow = false;       // 计时器监控面板可见
 
     // VSCode 风格布局尺寸（可拖拽调整）
     float                m_LeftPanelWidth  = 250.0f;      // 左侧面板宽度
@@ -244,4 +248,9 @@ struct BlueprintEditor : public Application
 
     // Default handler
     RTNodeHandler m_DefaultHandler;
+
+    // ------------------------------------------------------------------
+    // 主线程计时器
+    // ------------------------------------------------------------------
+    FrameTimerManager   m_TimerManager;
 };

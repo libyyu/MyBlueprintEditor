@@ -14,6 +14,8 @@
 #   EditorUI.cpp          - UI 渲染
 #   ExecutionPanel.cpp    - 执行面板 UI
 #   FileOperations.cpp    - 文件操作（新建/打开/保存/另存为）
+#   FrameTimerManager.h   - 主线程计时器管理器声明
+#   FrameTimerManager.cpp - 主线程计时器管理器实现
 #
 #   --- 节点定义 & 处理器（按分类拆分到 builtins/ 子目录）---
 #   BuiltinNodeDefs.cpp           - 入口：注册分类 + 调用子注册

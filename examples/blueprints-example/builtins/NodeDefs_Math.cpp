@@ -44,7 +44,6 @@ void BlueprintEditor::RegisterNodeDefs_Math()
         { MakePin("Result", RTPinDataType::Float) },
         "80C3F8", "Simple");
 
-
     reg("Divide", "/", "Math/Arithmetic",
         { MakePin("A", RTPinDataType::Float), MakePin("B", RTPinDataType::Float) },
         { MakePin("Result", RTPinDataType::Float) },

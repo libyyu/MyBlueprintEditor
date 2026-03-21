@@ -147,14 +147,19 @@ void BlueprintEditor::RegisterHandlers_Flow()
         return true;
     };
 
-    m_HandlerRegistry["Delay"] = [](RTContext& ctx) {
+    m_HandlerRegistry["Delay"] = [this](RTContext& ctx) {
         double dur = ctx.GetInputValue("Duration").asFloat();
-        ctx.Log("  [Delay] " + std::to_string(dur) + "s. begin:" + std::to_string(time_t()));
-		ctx.ActivateOutputFlow("Exec");
-        ctx.Delay(static_cast<float>(dur), [&ctx]() {
-            ctx.Log("  [Delay] Completed. end:" + std::to_string(time_t()));
+        float duration = static_cast<float>(dur);
+        ctx.Log("  [Delay] " + std::to_string(duration) + "s; started:" + std::to_string(time_t()));
+        ctx.ActivateOutputFlow("Exec");
+        // 使用主线程计时器代替阻塞式 sleep
+        m_TimerManager.SetTimerByName("Delay", duration, 1, [this, &ctx]() {
+            m_ExecutionLog.push_back("[Delay] Completed; finished:" + std::to_string(time_t()));
+            m_ExecutionLogDirty = true;
             ctx.ActivateOutputFlow("Completed");
-		});
+            return false;
+        });
+
         return true;
     };
 

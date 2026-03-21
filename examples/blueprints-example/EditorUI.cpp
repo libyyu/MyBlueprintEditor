@@ -336,6 +336,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
 {
     UpdateTouch();
 
+    // 驱动主线程计时器
+    m_TimerManager.Tick(deltaTime);
+
     auto& io = ImGui::GetIO();
 
     // ================================================================
@@ -360,6 +363,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         {
             ImGui::MenuItem("Node List", nullptr, &m_ShowNodeListWindow);
             ImGui::MenuItem("Execution Output", nullptr, &m_ShowExecutionWindow);
+            ImGui::MenuItem("Timer Monitor", nullptr, &m_ShowTimerWindow);
             ImGui::MenuItem("Show Ordinals", nullptr, &m_ShowOrdinals);
             ImGui::EndMenu();
         }
@@ -1339,6 +1343,12 @@ void BlueprintEditor::OnFrame(float deltaTime)
         }
     }
     ImGui::EndGroup();
+
+    // ================================================================
+    // 计时器监控浮动窗口
+    // ================================================================
+    if (m_ShowTimerWindow)
+        DrawTimerPanel();
 }
 
 // ============================================================================
@@ -1603,4 +1613,151 @@ void BlueprintEditor::DrawExecutionPanel()
         m_ExecutionLogText.size() + 1,
         ImVec2(paneWidth, logHeight),
         ImGuiInputTextFlags_ReadOnly);
+}
+
+// ============================================================================
+// 计时器监控面板（浮动窗口）
+// ============================================================================
+
+void BlueprintEditor::DrawTimerPanel()
+{
+    ImGui::SetNextWindowSize(ImVec2(520, 340), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("Timer Monitor", &m_ShowTimerWindow))
+    {
+        ImGui::End();
+        return;
+    }
+
+    // 工具栏
+    ImGui::Text("Active Timers: %d", m_TimerManager.GetActiveTimerCount());
+    ImGui::SameLine();
+    ImGui::Text("  |  Time Scale: ");
+    ImGui::SameLine();
+    float ts = m_TimerManager.GetTimeScale();
+    ImGui::SetNextItemWidth(100);
+    if (ImGui::SliderFloat("##TimeScale", &ts, 0.0f, 5.0f, "%.2f"))
+        m_TimerManager.SetTimeScale(ts);
+
+    ImGui::SameLine(0, 20);
+    if (ImGui::Button("Clear All"))
+        m_TimerManager.ClearAllTimers();
+    ImGui::SameLine();
+    if (ImGui::Button("Pause All"))
+        m_TimerManager.PauseAll();
+    ImGui::SameLine();
+    if (ImGui::Button("Resume All"))
+        m_TimerManager.ResumeAll();
+
+    ImGui::Separator();
+
+    // 快速创建测试计时器
+    static float testInterval = 1.0f;
+    static int   testRepeat   = -1;
+    static char  testName[64] = "Test";
+    ImGui::Text("Quick Timer:");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(80);
+    ImGui::InputText("##Name", testName, sizeof(testName));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(60);
+    ImGui::InputFloat("##Interval", &testInterval, 0.0f, 0.0f, "%.1fs");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(50);
+    ImGui::InputInt("##Repeat", &testRepeat);
+    ImGui::SameLine();
+    if (ImGui::Button("Add"))
+    {
+        std::string timerName(testName);
+        m_TimerManager.SetTimerByName(timerName, testInterval, testRepeat, [this, timerName]() {
+            m_ExecutionLog.push_back("[Timer:" + timerName + "] fired!");
+            m_ExecutionLogDirty = true;
+            return true;
+        });
+    }
+
+    ImGui::Separator();
+
+    // 计时器列表表格
+    const auto& timers = m_TimerManager.GetAllTimers();
+    if (timers.empty())
+    {
+        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "No active timers");
+    }
+    else
+    {
+        if (ImGui::BeginTable("##Timers", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY))
+        {
+            ImGui::TableSetupColumn("Handle", ImGuiTableColumnFlags_WidthFixed, 50.0f);
+            ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+            ImGui::TableSetupColumn("Interval", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+            ImGui::TableSetupColumn("Remaining", ImGuiTableColumnFlags_WidthFixed, 70.0f);
+            ImGui::TableSetupColumn("Fired", ImGuiTableColumnFlags_WidthFixed, 45.0f);
+            ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+            ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableHeadersRow();
+
+            for (const auto& t : timers)
+            {
+                if (t.pendingKill) continue;
+
+                ImGui::TableNextRow();
+
+                // Handle
+                ImGui::TableNextColumn();
+                ImGui::Text("#%u", t.handle);
+
+                // Name
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(t.name.empty() ? "-" : t.name.c_str());
+
+                // Interval
+                ImGui::TableNextColumn();
+                ImGui::Text("%.2fs", t.interval);
+
+                // Remaining
+                ImGui::TableNextColumn();
+                float pct = t.interval > 0.0f ? (1.0f - t.remaining / t.interval) : 1.0f;
+                if (pct < 0.0f) pct = 0.0f;
+                if (pct > 1.0f) pct = 1.0f;
+                char overlay[32];
+                snprintf(overlay, sizeof(overlay), "%.2fs", t.remaining > 0.0f ? t.remaining : 0.0f);
+                ImGui::ProgressBar(pct, ImVec2(-1, 0), overlay);
+
+                // Fire count
+                ImGui::TableNextColumn();
+                ImGui::Text("%d", t.fireCount);
+
+                // State
+                ImGui::TableNextColumn();
+                if (t.paused)
+                    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.0f, 1.0f), "Paused");
+                else if (t.repeatCount == -1)
+                    ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "Loop");
+                else
+                    ImGui::TextColored(ImVec4(0.4f, 0.7f, 1.0f, 1.0f), "x%d", t.repeatCount);
+
+                // Actions
+                ImGui::TableNextColumn();
+                ImGui::PushID(t.handle);
+                if (t.paused)
+                {
+                    if (ImGui::SmallButton("Resume"))
+                        m_TimerManager.ResumeTimer(t.handle);
+                }
+                else
+                {
+                    if (ImGui::SmallButton("Pause"))
+                        m_TimerManager.PauseTimer(t.handle);
+                }
+                ImGui::SameLine();
+                if (ImGui::SmallButton("X"))
+                    m_TimerManager.ClearTimer(t.handle);
+                ImGui::PopID();
+            }
+
+            ImGui::EndTable();
+        }
+    }
+
+    ImGui::End();
 }
