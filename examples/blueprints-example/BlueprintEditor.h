@@ -128,6 +128,24 @@ struct BlueprintEditor : public Application
     void RegisterBuiltinNodeDefinitions();
     void RegisterBuiltinHandlers();
 
+    // 按分类注册节点定义
+    void RegisterNodeDefs_Flow();
+    void RegisterNodeDefs_Action();
+    void RegisterNodeDefs_Math();
+    void RegisterNodeDefs_Debug();
+    void RegisterNodeDefs_Tree();
+    void RegisterNodeDefs_Houdini();
+    void RegisterNodeDefs_Misc();
+
+    // 按分类注册处理器
+    void RegisterHandlers_Flow();
+    void RegisterHandlers_Action();
+    void RegisterHandlers_Math();
+    void RegisterHandlers_Debug();
+    void RegisterHandlers_Tree();
+    void RegisterHandlers_Houdini();
+    void RegisterHandlers_Misc();
+
     // ------------------------------------------------------------------
     // 右键菜单
     // ------------------------------------------------------------------

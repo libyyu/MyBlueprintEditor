@@ -1,5 +1,8 @@
 // BlueprintEditor.cpp -- 蓝图编辑器核心逻辑
 #include "BlueprintEditor.h"
+#include <map>
+#include <functional>
+#include <algorithm>
 
 // ============================================================================
 // ID 管理
@@ -299,26 +302,125 @@ void BlueprintEditor::FixupSpecialPinTypes(Node* node, const RTNodeDef* def)
 // 右键菜单
 // ============================================================================
 
+// 辅助：递归构建多级分类菜单
+// categoryTree 结构: map<子分类名, pair<子树, 该层直属节点列表>>
+struct CategoryMenuNode
+{
+    std::map<std::string, CategoryMenuNode>  children;     // 子分类
+    std::vector<RTNodeDef>                   directNodes;  // 直属该层的节点
+};
+
+// 将所有节点按 category 路径组织成树状结构
+static void BuildCategoryTree(const std::vector<RTNodeDef>& allDefs,
+                              const std::vector<RTNodeCategory>& categories,
+                              std::map<std::string, CategoryMenuNode>& rootChildren,
+                              std::vector<std::string>& rootOrder)
+{
+    // 收集已注册的顶级分类顺序
+    std::unordered_map<std::string, std::string> catIdToName; // id -> display name
+    for (const auto& cat : categories)
+    {
+        catIdToName[cat.id] = cat.name;
+        rootOrder.push_back(cat.id);
+    }
+
+    for (const auto& d : allDefs)
+    {
+        if (d.category.empty()) continue;
+
+        // 按 '/' 拆分 category 路径
+        std::vector<std::string> parts;
+        std::string seg;
+        for (char c : d.category)
+        {
+            if (c == '/')
+            {
+                if (!seg.empty()) parts.push_back(seg);
+                seg.clear();
+            }
+            else
+                seg += c;
+        }
+        if (!seg.empty()) parts.push_back(seg);
+        if (parts.empty()) continue;
+
+        // 确保顶级分类在 rootOrder 中
+        bool found = false;
+        for (const auto& r : rootOrder)
+            if (r == parts[0]) { found = true; break; }
+        if (!found)
+            rootOrder.push_back(parts[0]);
+
+        // 逐层插入树
+        CategoryMenuNode* node = &rootChildren[parts[0]];
+        for (size_t i = 1; i < parts.size(); ++i)
+            node = &node->children[parts[i]];
+
+        node->directNodes.push_back(d);
+    }
+}
+
 Node* BlueprintEditor::ShowCreateNodeMenu()
 {
     Node* result = nullptr;
 
-    // Show category sub-menus
+    // 构建分类树
+    auto allDefs = m_NodeRegistry.getAllNodeDefinitions();
     auto categories = m_NodeRegistry.getAllCategories();
+
+    std::map<std::string, CategoryMenuNode> rootChildren;
+    std::vector<std::string> rootOrder;
+    BuildCategoryTree(allDefs, categories, rootChildren, rootOrder);
+
+    // 分类 id -> 显示名
+    std::unordered_map<std::string, std::string> catIdToName;
     for (const auto& cat : categories)
+        catIdToName[cat.id] = cat.name;
+
+    // 递归渲染菜单的 lambda
+    std::function<void(const CategoryMenuNode&)> renderMenu;
+    renderMenu = [&](const CategoryMenuNode& menuNode)
     {
-        if (ImGui::BeginMenu(cat.name.c_str()))
+        // 先渲染子分类
+        for (const auto& child : menuNode.children)
         {
-            auto defs = m_NodeRegistry.getNodesByCategory(cat.id);
-            for (const auto& d : defs)
+            const std::string& subName = child.first;
+            if (ImGui::BeginMenu(subName.c_str()))
             {
-                if (ImGui::MenuItem(d.name.c_str()))
-                {
-                    result = SpawnNodeByDef(d.id);
-                    if (result)
-                        FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d.id));
-                }
+                renderMenu(child.second);
+                ImGui::EndMenu();
             }
+        }
+
+        // 如果同时有子分类和直属节点，加分隔线
+        if (!menuNode.children.empty() && !menuNode.directNodes.empty())
+            ImGui::Separator();
+
+        // 渲染直属节点
+        for (const auto& d : menuNode.directNodes)
+        {
+            if (ImGui::MenuItem(d.name.c_str()))
+            {
+                result = SpawnNodeByDef(d.id);
+                if (result)
+                    FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d.id));
+            }
+        }
+    };
+
+    // 按注册顺序渲染顶级菜单
+    for (const auto& rootId : rootOrder)
+    {
+        auto it = rootChildren.find(rootId);
+        if (it == rootChildren.end()) continue;
+
+        // 用显示名（如果已注册分类），否则用 id 本身
+        auto nameIt = catIdToName.find(rootId);
+        const char* displayName = (nameIt != catIdToName.end()) ? nameIt->second.c_str() : rootId.c_str();
+
+        if (ImGui::BeginMenu(displayName))
+        {
+            renderMenu(it->second);
             ImGui::EndMenu();
         }
     }
@@ -332,7 +434,6 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
 
     if (!filter.empty())
     {
-        auto allDefs = m_NodeRegistry.getAllNodeDefinitions();
         std::sort(allDefs.begin(), allDefs.end(),
             [](const RTNodeDef& a, const RTNodeDef& b) { return a.name < b.name; });
 

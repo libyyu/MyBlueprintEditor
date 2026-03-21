@@ -96,14 +96,22 @@ public:
     // 获取所有节点定义
     virtual std::vector<NodeDefinition> getAllNodeDefinitions() const = 0;
     
-    // 获取类别下的所有节点
+    // 获取类别下的所有节点（精确匹配 category 字段）
     virtual std::vector<NodeDefinition> getNodesByCategory(const std::string& categoryId) const = 0;
+    
+    // 获取类别下的所有节点（前缀匹配，含子分类）
+    // 例如 "Math" 会匹配 "Math", "Math/Arithmetic", "Math/Logic" 等
+    virtual std::vector<NodeDefinition> getNodesByCategoryPrefix(const std::string& prefix) const = 0;
     
     // 注册类别
     virtual bool registerCategory(const NodeCategory& category) = 0;
     
     // 获取所有类别
     virtual std::vector<NodeCategory> getAllCategories() const = 0;
+    
+    // 获取所有唯一的子分类路径（用于构建多级菜单）
+    // 返回所有出现过的 category 字段值（去重）
+    virtual std::vector<std::string> getAllCategoryPaths() const = 0;
 };
 
 // ============================================================================
@@ -159,6 +167,24 @@ public:
         return result;
     }
     
+    std::vector<NodeDefinition> getNodesByCategoryPrefix(const std::string& prefix) const override
+    {
+        std::vector<NodeDefinition> result;
+        for (const auto& pair : m_nodeDefinitions)
+        {
+            const auto& cat = pair.second.category;
+            // 精确匹配 或 前缀+/ 匹配
+            if (cat == prefix || 
+                (cat.size() > prefix.size() && 
+                 cat.compare(0, prefix.size(), prefix) == 0 && 
+                 cat[prefix.size()] == '/'))
+            {
+                result.push_back(pair.second);
+            }
+        }
+        return result;
+    }
+    
     bool registerCategory(const NodeCategory& category) override
     {
         if (category.id.empty()) return false;
@@ -173,6 +199,22 @@ public:
         for (const auto& pair : m_categories)
         {
             result.push_back(pair.second);
+        }
+        return result;
+    }
+    
+    std::vector<std::string> getAllCategoryPaths() const override
+    {
+        std::vector<std::string> result;
+        std::unordered_map<std::string, bool> seen;
+        for (const auto& pair : m_nodeDefinitions)
+        {
+            const auto& cat = pair.second.category;
+            if (!cat.empty() && seen.find(cat) == seen.end())
+            {
+                seen[cat] = true;
+                result.push_back(cat);
+            }
         }
         return result;
     }
