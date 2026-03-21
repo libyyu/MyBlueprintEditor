@@ -22,15 +22,15 @@ void BlueprintEditor::ExecuteBlueprint()
     m_ExecutionLog.push_back("Links: " + std::to_string(bp.links.size()));
     m_ExecutionLog.push_back("");
 
-    // 2. 创建 Runner 并加载
-    RTBlueprintRunner runner;
-    runner.SetLogCallback([this](const std::string& msg) {
+    // 2. 使用持久 Runner（这样 Delay 等异步操作注册的 timer 不会随局部变量销毁）
+    m_PersistentRunner.ResetState();
+    m_PersistentRunner.SetLogCallback([this](const std::string& msg) {
         m_ExecutionLog.push_back(msg);
     });
 
-    if (!runner.Load(bp))
+    if (!m_PersistentRunner.Load(bp))
     {
-        m_ExecutionLog.push_back("[ERROR] Failed to load: " + runner.GetLastError());
+        m_ExecutionLog.push_back("[ERROR] Failed to load: " + m_PersistentRunner.GetLastError());
         m_LastExecutionStatus = "Load Failed";
         m_IsExecuting = false;
         return;
@@ -38,12 +38,12 @@ void BlueprintEditor::ExecuteBlueprint()
 
     // 3. Register all handlers from the handler registry
     if (m_DefaultHandler)
-        runner.SetDefaultHandler(m_DefaultHandler);
-    runner.RegisterHandlers(m_HandlerRegistry);
+        m_PersistentRunner.SetDefaultHandler(m_DefaultHandler);
+    m_PersistentRunner.RegisterHandlers(m_HandlerRegistry);
 
     // 4. 执行
     auto startTime = std::chrono::high_resolution_clock::now();
-    auto result = runner.Execute();
+    auto result = m_PersistentRunner.Execute();
     auto endTime = std::chrono::high_resolution_clock::now();
     double elapsed = std::chrono::duration<double, std::milli>(endTime - startTime).count();
 

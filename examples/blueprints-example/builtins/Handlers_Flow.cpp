@@ -154,16 +154,34 @@ void BlueprintEditor::RegisterHandlers_Flow()
         ctx.ActivateOutputFlow("Exec");
 
         // "Completed" 输出流需要延迟触发。
-        // 注意：runner 和 ctx 是 ExecuteBlueprint() 中的局部变量，
-        // handler 返回后就会被销毁，所以不能在 Timer 回调中使用 &ctx。
-        // 正确做法：使用 ctx.Delay() 让 runner 自己处理异步等待，
-        // 如果 runner 未设置 WaitTimeHandler，则回退到阻塞式 sleep。
-        ctx.Delay(duration, [this, &ctx]() {
-            auto currentTime = RTFrameTimerManager::GetCurrentUnixTime();
-            ctx.Log("  [Delay] Completed; finished:" + std::to_string(currentTime));
+        // Timer 回调在未来帧的 Tick() 中触发，此时 ctx 的 m_pinNameToId/m_currentNode
+        // 已被其他节点覆盖，不能再用 ctx.ActivateOutputFlow("Completed")。
+        // 解决办法：提前捕获 Completed 引脚的 PinId，回调中直接用 PinId 激活。
+        auto* node = ctx.GetCurrentNode();
+        ::NodeEditor::Runtime::PinId completedPinId = 0;
+        if (node)
+        {
+            for (const auto& pin : node->pins)
+            {
+                if (pin.name == "Completed" && pin.kind == ::NodeEditor::Runtime::PinKind::Output)
+                {
+                    completedPinId = pin.id;
+                    break;
+                }
+            }
+        }
+
+        ctx.Delay(duration, [&ctx, completedPinId, this]() {
+            auto finishTime = RTFrameTimerManager::GetCurrentUnixTime();
+            m_ExecutionLog.push_back("  [Delay] Completed; finished:" + std::to_string(finishTime));
             m_ExecutionLogDirty = true;
-            ctx.ActivateOutputFlow("Completed");
+            if (completedPinId != 0)
+                ctx.ActivateOutputFlow(completedPinId);
         });
+
+        // 标记 Completed 引脚的下游节点为"已被控制流接管"，
+        // 防止 Execute() 主循环在 timer 回调之前就按拓扑序执行了它们
+        ctx.MarkDownstreamAsHandled("Completed");
 
         return true;
     };

@@ -114,6 +114,12 @@ public:
     // 按引脚 ID 激活输出流
     bool ActivateOutputFlow(PinId pinId);
 
+    // 标记指定输出引脚的所有下游节点为"已被控制流接管"，
+    // 主循环会跳过这些节点。用于异步节点（如 Delay）预先占位，
+    // 防止主循环在异步回调之前就执行了下游节点。
+    void MarkDownstreamAsHandled(const std::string& pinName);
+    void MarkDownstreamAsHandled(PinId pinId);
+
 private:
     friend class BlueprintRunner;
 

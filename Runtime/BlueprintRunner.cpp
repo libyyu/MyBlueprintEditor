@@ -575,9 +575,31 @@ void ExecutionContext::Delay(float seconds, const std::function<void()>& run) co
 {
     if (m_runner)
     {
-        m_runner->GetTimerManager().SetTimer(seconds, [this, run]()->bool 
+        // 保存当前节点的 context 状态，因为 timer 回调在未来帧触发时
+        // m_currentNode / m_pinNameToId / m_currentNodeData 已被其他节点覆盖
+        auto savedNode = m_currentNode;
+        auto savedPinNameToId = m_pinNameToId;
+        auto savedNodeData = m_currentNodeData;
+
+        m_runner->GetTimerManager().SetTimer(seconds, [this, run, savedNode, savedPinNameToId, savedNodeData]()->bool 
         {
+            // 恢复 Delay 节点的 context 状态
+            auto* mutableThis = const_cast<ExecutionContext*>(this);
+            auto prevNode = mutableThis->m_currentNode;
+            auto prevPinNameToId = mutableThis->m_pinNameToId;
+            auto prevNodeData = mutableThis->m_currentNodeData;
+
+            mutableThis->m_currentNode = savedNode;
+            mutableThis->m_pinNameToId = savedPinNameToId;
+            mutableThis->m_currentNodeData = savedNodeData;
+
             run();
+
+            // 恢复之前的状态
+            mutableThis->m_currentNode = prevNode;
+            mutableThis->m_pinNameToId = prevPinNameToId;
+            mutableThis->m_currentNodeData = prevNodeData;
+
             return false;
         });
     }
@@ -602,6 +624,40 @@ bool ExecutionContext::ActivateOutputFlow(PinId pinId)
 {
     if (!m_runner) return false;
     return m_runner->executeDownstreamFromPin(pinId);
+}
+
+void ExecutionContext::MarkDownstreamAsHandled(const std::string& pinName)
+{
+    auto it = m_pinNameToId.find(pinName);
+    if (it != m_pinNameToId.end())
+        MarkDownstreamAsHandled(it->second);
+}
+
+void ExecutionContext::MarkDownstreamAsHandled(PinId pinId)
+{
+    if (!m_runner) return;
+
+    // 找到通过该输出引脚连接的所有直接下游节点
+    std::vector<NodeId> directTargets;
+    for (const auto& link : m_runner->m_blueprint.links)
+    {
+        if (!link.isEnabled) continue;
+        if (link.startPinId == pinId)
+        {
+            const NodeInstance* targetNode = m_runner->m_blueprint.findNodeByPin(link.endPinId);
+            if (targetNode)
+                directTargets.push_back(targetNode->id);
+        }
+    }
+
+    // 标记直接目标及其所有下游为已执行
+    for (auto nodeId : directTargets)
+    {
+        m_runner->m_flowExecutedNodes.insert(nodeId);
+        auto downstream = m_runner->GetDownstreamNodes(nodeId);
+        for (auto id : downstream)
+            m_runner->m_flowExecutedNodes.insert(id);
+    }
 }
 
 bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
