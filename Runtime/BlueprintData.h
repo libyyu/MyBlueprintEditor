@@ -264,8 +264,8 @@ struct BlueprintData
             if (pin.kind == PinKind::Output)
             {
                 // 查找连接到此引脚的链接
-                auto links = findLinksByPin(pin.id);
-                for (const auto* link : links)
+                auto findLinks = findLinksByPin(pin.id);
+                for (const auto* link : findLinks)
                 {
                     const NodeInstance* targetNode = findNodeByPin(link->endPinId);
                     if (targetNode)

@@ -34,6 +34,11 @@ void BlueprintEditor::RegisterNodeDefs_Math()
         { MakePin("Result", RTPinDataType::Float) },
         "80C3F8", "Simple");
 
+    reg("AddInteger", "+", "Math/Arithmetic",
+        { MakePin("A", RTPinDataType::Integer), MakePin("B", RTPinDataType::Integer) },
+        { MakePin("Result", RTPinDataType::Integer) },
+        "80C3F8", "Simple");
+
     reg("Subtract", "-", "Math/Arithmetic",
         { MakePin("A", RTPinDataType::Float), MakePin("B", RTPinDataType::Float) },
         { MakePin("Result", RTPinDataType::Float) },

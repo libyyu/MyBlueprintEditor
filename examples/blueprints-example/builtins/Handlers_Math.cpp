@@ -12,6 +12,13 @@ void BlueprintEditor::RegisterHandlers_Math()
         return true;
     };
 
+    m_HandlerRegistry["AddInteger"] = [](RTContext& ctx) {
+        int64_t a = ctx.GetInputValue("A").asInt();
+        int64_t b = ctx.GetInputValue("B").asInt();
+        ctx.SetOutputValue("Result", RTVariant(a + b));
+        return true;
+    };
+
     m_HandlerRegistry["Subtract"] = [](RTContext& ctx) {
         double a = ctx.GetInputValue("A").asFloat();
         double b = ctx.GetInputValue("B").asFloat();
