@@ -19,9 +19,15 @@
 #include <queue>
 #include <algorithm>
 #include <unordered_set>
+#include <thread>
+#include <chrono>
 
 namespace NodeEditor {
 namespace Runtime {
+
+
+// 异步等待函数签名
+using WaitTimeHandler = std::function<void(float seconds, const std::function<void()>& callback)>;
 
 // ============================================================================
 // 执行上下文 —— 节点处理函数可通过它读写引脚数据
@@ -98,6 +104,19 @@ public:
         if (OnLog) OnLog(message);
     }
 
+    WaitTimeHandler OnDelay;
+
+    void Delay(float seconds, const std::function<void()>& run) const
+    {
+        if (OnDelay) {
+            OnDelay(seconds, run); // 修复：调用 OnDelay 时传递参数
+        }
+        else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(seconds * 1000)));
+            run();
+        }
+	}
+
     // ----------------------------------------------------------------
     // 控制流 API —— 允许 handler 触发指定输出 exec 引脚连接的下游子图
     // ----------------------------------------------------------------
@@ -166,6 +185,8 @@ class BlueprintRunner
 public:
     BlueprintRunner() = default;
     ~BlueprintRunner() = default;
+
+    bool IsWithEditor() const;
 
     // ------------------------------------------------------------------
     // 加载蓝图数据
@@ -260,6 +281,9 @@ public:
     // 设置日志回调
     void SetLogCallback(std::function<void(const std::string&)> callback);
 
+	// 设置等待处理器（用于处理需要异步等待的节点，如延时、网络请求等）
+    void SetWaitTimeHandler(WaitTimeHandler&& handler);
+
     // 重置执行状态（保留蓝图数据和处理器注册）
     void ResetState();
 
@@ -282,6 +306,9 @@ private:
 
     // 日志回调
     std::function<void(const std::string&)>              m_logCallback;
+
+    // 等待
+    WaitTimeHandler                                     m_waitTimerHandler;
 
     // 缓存：拓扑排序结果
     mutable std::vector<NodeId>                         m_topoCache;

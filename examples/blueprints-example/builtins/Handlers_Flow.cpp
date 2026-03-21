@@ -75,6 +75,9 @@ void BlueprintEditor::RegisterHandlers_Flow()
             subLog.push_back(msg);
             ctx.Log("    | " + msg);
         });
+        subRunner.SetWaitTimeHandler([&ctx](float seconds, const std::function<void()>& run) {
+            ctx.Delay(seconds, run);
+		});
 
         if (!subRunner.Load(importResult.data))
         {
@@ -146,7 +149,12 @@ void BlueprintEditor::RegisterHandlers_Flow()
 
     m_HandlerRegistry["Delay"] = [](RTContext& ctx) {
         double dur = ctx.GetInputValue("Duration").asFloat();
-        ctx.Log("  [Delay] " + std::to_string(dur) + "s");
+        ctx.Log("  [Delay] " + std::to_string(dur) + "s. begin:" + std::to_string(time_t()));
+		ctx.ActivateOutputFlow("Exec");
+        ctx.Delay(static_cast<float>(dur), [&ctx]() {
+            ctx.Log("  [Delay] Completed. end:" + std::to_string(time_t()));
+            ctx.ActivateOutputFlow("Completed");
+		});
         return true;
     };
 

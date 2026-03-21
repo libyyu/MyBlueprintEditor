@@ -108,7 +108,7 @@ void BlueprintEditor::RegisterHandlers_Math()
     };
 
     m_HandlerRegistry["IntToString"] = [](RTContext& ctx) {
-        double v = ctx.GetInputValue("Value").asInt();
+        int64_t v = ctx.GetInputValue("Value").asInt();
         ctx.SetOutputValue("Result", RTVariant(std::to_string(v)));
         return true;
     };

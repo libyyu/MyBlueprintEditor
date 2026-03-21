@@ -16,6 +16,11 @@ namespace Runtime {
 // 加载
 // ============================================================================
 
+bool BlueprintRunner::IsWithEditor() const
+{
+    return false;
+}
+
 bool BlueprintRunner::Load(const BlueprintData& data)
 {
     m_blueprint = data;
@@ -535,6 +540,12 @@ void BlueprintRunner::SetLogCallback(std::function<void(const std::string&)> cal
 {
     m_logCallback = std::move(callback);
     m_context.OnLog = m_logCallback;
+}
+
+void BlueprintRunner::SetWaitTimeHandler(WaitTimeHandler&& handler) 
+{ 
+    m_waitTimerHandler = std::move(handler); 
+	m_context.OnDelay = m_waitTimerHandler;
 }
 
 void BlueprintRunner::ResetState()
