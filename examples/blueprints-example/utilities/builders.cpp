@@ -193,18 +193,10 @@ bool util::BlueprintNodeBuilder::SetStage(Stage stage)
             ImGui::Spring(1, 0);
             ImGui::EndVertical();
 
-            // #debug
-            // ImGui::GetWindowDrawList()->AddRect(
-            //     ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), IM_COL32(255, 0, 0, 255));
-
             break;
 
         case Stage::Middle:
             ImGui::EndVertical();
-
-            // #debug
-            // ImGui::GetWindowDrawList()->AddRect(
-            //     ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), IM_COL32(255, 0, 0, 255));
 
             break;
 
@@ -212,11 +204,8 @@ bool util::BlueprintNodeBuilder::SetStage(Stage stage)
             ed::PopStyleVar(2);
 
             ImGui::Spring(1, 0);
-            ImGui::EndVertical();
 
-            // #debug
-            // ImGui::GetWindowDrawList()->AddRect(
-            //     ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), IM_COL32(255, 0, 0, 255));
+            ImGui::EndVertical();
 
             break;
 
@@ -230,7 +219,7 @@ bool util::BlueprintNodeBuilder::SetStage(Stage stage)
     switch (stage)
     {
         case Stage::Begin:
-            ImGui::BeginVertical("node");
+            ImGui::BeginVertical("node", ImVec2(0, 0), 0.0f);
             break;
 
         case Stage::Header:
@@ -243,7 +232,7 @@ bool util::BlueprintNodeBuilder::SetStage(Stage stage)
             if (oldStage == Stage::Begin)
                 ImGui::Spring(0);
 
-            ImGui::BeginHorizontal("content");
+            ImGui::BeginHorizontal("content", ImVec2(0, 0), 0.0f);
             ImGui::Spring(0, 0);
             break;
 
@@ -267,6 +256,7 @@ bool util::BlueprintNodeBuilder::SetStage(Stage stage)
                 ImGui::Spring(1);
             else
                 ImGui::Spring(1, 0);
+
             ImGui::BeginVertical("outputs", ImVec2(0, 0), 1.0f);
 
             ed::PushStyleVar(ed::StyleVar_PivotAlignment, ImVec2(1.0f, 0.5f));
@@ -279,6 +269,7 @@ bool util::BlueprintNodeBuilder::SetStage(Stage stage)
         case Stage::End:
             if (oldStage == Stage::Input)
                 ImGui::Spring(1, 0);
+
             if (oldStage != Stage::Begin)
                 ImGui::EndHorizontal();
             ContentMin = ImGui::GetItemRectMin();
@@ -288,6 +279,7 @@ bool util::BlueprintNodeBuilder::SetStage(Stage stage)
             ImGui::EndVertical();
             NodeMin = ImGui::GetItemRectMin();
             NodeMax = ImGui::GetItemRectMax();
+
             break;
 
         case Stage::Invalid:
@@ -305,8 +297,4 @@ void util::BlueprintNodeBuilder::Pin(ed::PinId id, ed::PinKind kind)
 void util::BlueprintNodeBuilder::EndPin()
 {
     ed::EndPin();
-
-    // #debug
-    // ImGui::GetWindowDrawList()->AddRectFilled(
-    //     ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), IM_COL32(255, 0, 0, 64));
 }

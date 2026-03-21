@@ -12548,6 +12548,13 @@ static void ImGui::BeginLayout(ImGuiID id, ImGuiLayoutType type, ImVec2 size, fl
 
     if (type == ImGuiLayoutType_Vertical)
     {
+        // Reset same-line state before the Dummy call. When a vertical layout begins
+        // inside a horizontal layout, IsSameLine may be true and CurrLineSize.y may carry
+        // the height of the previous item. The Dummy(0,0) below would then erroneously
+        // advance the cursor by that height, causing child content to be offset.
+        window->DC.IsSameLine = false;
+        window->DC.CurrLineSize = ImVec2(0.0f, 0.0f);
+
         // Push empty item to recalculate cursor position.
         PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
         Dummy(ImVec2(0.0f, 0.0f));
@@ -12559,6 +12566,19 @@ static void ImGui::BeginLayout(ImGuiID id, ImGuiLayoutType type, ImVec2 size, fl
     }
 
     BeginLayoutItem(*layout);
+}
+
+static bool HasAnyNonZeroSpring(ImGuiLayout& layout)
+{
+    for (int i = 0; i < layout.Items.Size; ++i)
+    {
+        ImGuiLayoutItem& item = layout.Items[i];
+        if (item.Type != ImGuiLayoutItemType_Spring)
+            continue;
+        if (item.SpringWeight > 0)
+            return true;
+    }
+    return false;
 }
 
 static void ImGui::EndLayout(ImGuiLayoutType type)
@@ -12618,7 +12638,13 @@ static void ImGui::EndLayout(ImGuiLayoutType type)
 
         BalanceLayoutSprings(*layout);
 
-        measured_size = layout->CurrentSize;
+        // Only use expanded measured_size if the layout has springs that can
+        // actually use the extra space.  Without springs the expanded size
+        // propagates into MeasuredBounds and causes alignment to oscillate
+        // on subsequent frames (the parent sees item_extent == layout_extent
+        // and calculates zero offset).
+        if (HasAnyNonZeroSpring(*layout))
+            measured_size = layout->CurrentSize;
     }
 
     layout->CurrentSize = new_size;
@@ -12845,31 +12871,26 @@ static void ImGui::BalanceLayoutItemsAlignment(ImGuiLayout& layout)
     }
 }
 
-static bool HasAnyNonZeroSpring(ImGuiLayout& layout)
-{
-    for (int i = 0; i < layout.Items.Size; ++i)
-    {
-        ImGuiLayoutItem& item = layout.Items[i];
-        if (item.Type != ImGuiLayoutItemType_Spring)
-            continue;
-        if (item.SpringWeight > 0)
-            return true;
-    }
-    return false;
-}
-
 static void ImGui::BalanceChildLayouts(ImGuiLayout& layout)
 {
     for (ImGuiLayout* child = layout.FirstChild; child != NULL; child = child->NextSibling)
     {
-        if (child->Type == ImGuiLayoutType_Horizontal && child->Size.x <= 0.0f)
-            child->CurrentSize.x = layout.CurrentSize.x;
-        else if (child->Type == ImGuiLayoutType_Vertical && child->Size.y <= 0.0f)
-            child->CurrentSize.y = layout.CurrentSize.y;
+        bool child_has_springs = HasAnyNonZeroSpring(*child);
+
+        // Only expand child CurrentSize if the child has springs that can use the extra space.
+        // Without springs, expanding CurrentSize would inflate the child's output size on the
+        // next frame, causing the parent's alignment calculation to oscillate.
+        if (child_has_springs)
+        {
+            if (child->Type == ImGuiLayoutType_Horizontal && child->Size.x <= 0.0f)
+                child->CurrentSize.x = layout.CurrentSize.x;
+            else if (child->Type == ImGuiLayoutType_Vertical && child->Size.y <= 0.0f)
+                child->CurrentSize.y = layout.CurrentSize.y;
+        }
 
         BalanceChildLayouts(*child);
 
-        if (HasAnyNonZeroSpring(*child))
+        if (child_has_springs)
         {
             // Expand item measured bounds to make alignment correct.
             ImGuiLayoutItem& item = layout.Items[child->ParentItemIndex];
@@ -12918,7 +12939,10 @@ static float ImGui::CalculateLayoutItemAlignmentOffset(ImGuiLayout& layout, ImGu
     float layout_extent = (layout.Type == ImGuiLayoutType_Horizontal) ? layout.CurrentSize.y : layout.CurrentSize.x;
     float item_extent   = (layout.Type == ImGuiLayoutType_Horizontal) ? item_size.y : item_size.x;
 
-    if (item_extent <= 0/* || layout_extent <= item_extent*/)
+    if (item_extent <= 0)
+        return 0.0f;
+
+    if (layout_extent <= item_extent)
         return 0.0f;
 
     float align_offset = ImFloor(item.CurrentAlign * (layout_extent - item_extent));
