@@ -158,9 +158,10 @@ void BlueprintEditor::RegisterHandlers_Flow()
         // handler 返回后就会被销毁，所以不能在 Timer 回调中使用 &ctx。
         // 正确做法：使用 ctx.Delay() 让 runner 自己处理异步等待，
         // 如果 runner 未设置 WaitTimeHandler，则回退到阻塞式 sleep。
-        ctx.Delay(duration, [&ctx]() {
+        ctx.Delay(duration, [this, &ctx]() {
             auto currentTime = RTFrameTimerManager::GetCurrentUnixTime();
-            ctx.Log("  [Delay] Completed; finished:" + std::to_string(time_t()));
+            ctx.Log("  [Delay] Completed; finished:" + std::to_string(currentTime));
+            m_ExecutionLogDirty = true;
             ctx.ActivateOutputFlow("Completed");
         });
 
