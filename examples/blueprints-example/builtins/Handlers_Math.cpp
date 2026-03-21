@@ -102,7 +102,7 @@ void BlueprintEditor::RegisterHandlers_Math()
     };
 
     m_HandlerRegistry["FloatToBool"] = [](RTContext& ctx) {
-        double v = ctx.GetInputValue("Value").asBool();
+        bool v = ctx.GetInputValue("Value").asBool();
         ctx.SetOutputValue("Result", RTVariant(v));
         return true;
     };
