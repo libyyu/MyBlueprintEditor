@@ -24,20 +24,20 @@ void BlueprintEditor::RegisterBuiltinHandlers()
         return true;
     };
 
-    m_HandlerRegistry["Do N"] = [](RTContext& ctx) {
+    m_HandlerRegistry["DoN"] = [](RTContext& ctx) {
         int64_t n = ctx.GetInputValue("N").asInt();
         ctx.Log("  N = " + std::to_string(n));
         ctx.SetOutputValue("Counter", RTVariant(n));
         return true;
     };
 
-    m_HandlerRegistry["Print String"] = [](RTContext& ctx) {
+    m_HandlerRegistry["PrintString"] = [](RTContext& ctx) {
         auto str = ctx.GetInputValue("In String").asString();
         ctx.Log("  >>> Print: \"" + str + "\"");
         return true;
     };
 
-    m_HandlerRegistry["Set Timer"] = [](RTContext& ctx) {
+    m_HandlerRegistry["SetTimer"] = [](RTContext& ctx) {
         double time = ctx.GetInputValue("Time").asFloat();
         bool looping = ctx.GetInputValue("Looping").asBool();
         ctx.Log("  Timer: " + std::to_string(time) + "s, Looping=" + (looping ? "true" : "false"));
@@ -51,7 +51,7 @@ void BlueprintEditor::RegisterBuiltinHandlers()
         return true;
     };
 
-    m_HandlerRegistry["InputAction Fire"] = [](RTContext& ctx) {
+    m_HandlerRegistry["InputActionFire"] = [](RTContext& ctx) {
         ctx.Log("  [InputAction] Fire triggered");
         return true;
     };
@@ -59,7 +59,7 @@ void BlueprintEditor::RegisterBuiltinHandlers()
     // ==================================================================
     // Execute Blueprint — 加载并执行另一个蓝图文件
     // ==================================================================
-    m_HandlerRegistry["Execute Blueprint"] = [this](RTContext& ctx) {
+    m_HandlerRegistry["ExecuteBlueprint"] = [this](RTContext& ctx) {
         auto filePath = ctx.GetInputValue("File").asString();
         ctx.Log("  [ExecuteBlueprint] File: \"" + filePath + "\"");
 
@@ -146,7 +146,7 @@ void BlueprintEditor::RegisterBuiltinHandlers()
     };
 
     // Comparison operators
-    m_HandlerRegistry["<"] = [](RTContext& ctx) {
+    m_HandlerRegistry["Less"] = [](RTContext& ctx) {
         auto node = ctx.GetCurrentNode();
         if (node && node->pins.size() >= 3)
         {
@@ -159,7 +159,7 @@ void BlueprintEditor::RegisterBuiltinHandlers()
         return true;
     };
 
-    m_HandlerRegistry[">"] = [](RTContext& ctx) {
+    m_HandlerRegistry["Greater"] = [](RTContext& ctx) {
         auto node = ctx.GetCurrentNode();
         if (node && node->pins.size() >= 3)
         {
@@ -171,7 +171,7 @@ void BlueprintEditor::RegisterBuiltinHandlers()
         return true;
     };
 
-    m_HandlerRegistry["o.O"] = [](RTContext& ctx) {
+    m_HandlerRegistry["Weird"] = [](RTContext& ctx) {
         auto node = ctx.GetCurrentNode();
         if (node && node->pins.size() >= 3)
         {
@@ -183,28 +183,28 @@ void BlueprintEditor::RegisterBuiltinHandlers()
     };
 
     // Math operators
-    m_HandlerRegistry["+"] = [](RTContext& ctx) {
+    m_HandlerRegistry["Add"] = [](RTContext& ctx) {
         double a = ctx.GetInputValue("A").asFloat();
         double b = ctx.GetInputValue("B").asFloat();
         ctx.SetOutputValue("Result", RTVariant(a + b));
         return true;
     };
 
-    m_HandlerRegistry["-"] = [](RTContext& ctx) {
+    m_HandlerRegistry["Subtract"] = [](RTContext& ctx) {
         double a = ctx.GetInputValue("A").asFloat();
         double b = ctx.GetInputValue("B").asFloat();
         ctx.SetOutputValue("Result", RTVariant(a - b));
         return true;
     };
 
-    m_HandlerRegistry["*"] = [](RTContext& ctx) {
+    m_HandlerRegistry["Multiply"] = [](RTContext& ctx) {
         double a = ctx.GetInputValue("A").asFloat();
         double b = ctx.GetInputValue("B").asFloat();
         ctx.SetOutputValue("Result", RTVariant(a * b));
         return true;
     };
 
-    m_HandlerRegistry["/"] = [](RTContext& ctx) {
+    m_HandlerRegistry["Divide"] = [](RTContext& ctx) {
         double a = ctx.GetInputValue("A").asFloat();
         double b = ctx.GetInputValue("B").asFloat();
         if (b == 0.0) { ctx.Log("  [WARN] Division by zero!"); b = 1.0; }
@@ -212,7 +212,7 @@ void BlueprintEditor::RegisterBuiltinHandlers()
         return true;
     };
 
-    m_HandlerRegistry["=="] = [](RTContext& ctx) {
+    m_HandlerRegistry["Equal"] = [](RTContext& ctx) {
         double a = ctx.GetInputValue("A").asFloat();
         double b = ctx.GetInputValue("B").asFloat();
         ctx.SetOutputValue("Result", RTVariant(a == b));
@@ -220,40 +220,40 @@ void BlueprintEditor::RegisterBuiltinHandlers()
     };
 
     // Logic operators
-    m_HandlerRegistry["AND"] = [](RTContext& ctx) {
+    m_HandlerRegistry["And"] = [](RTContext& ctx) {
         bool a = ctx.GetInputValue("A").asBool();
         bool b = ctx.GetInputValue("B").asBool();
         ctx.SetOutputValue("Result", RTVariant(a && b));
         return true;
     };
 
-    m_HandlerRegistry["OR"] = [](RTContext& ctx) {
+    m_HandlerRegistry["Or"] = [](RTContext& ctx) {
         bool a = ctx.GetInputValue("A").asBool();
         bool b = ctx.GetInputValue("B").asBool();
         ctx.SetOutputValue("Result", RTVariant(a || b));
         return true;
     };
 
-    m_HandlerRegistry["NOT"] = [](RTContext& ctx) {
+    m_HandlerRegistry["Not"] = [](RTContext& ctx) {
         bool v = ctx.GetInputValue("Value").asBool();
         ctx.SetOutputValue("Result", RTVariant(!v));
         return true;
     };
 
     // Type conversion
-    m_HandlerRegistry["Int to Float"] = [](RTContext& ctx) {
+    m_HandlerRegistry["IntToFloat"] = [](RTContext& ctx) {
         int64_t v = ctx.GetInputValue("Value").asInt();
         ctx.SetOutputValue("Result", RTVariant(static_cast<double>(v)));
         return true;
     };
 
-    m_HandlerRegistry["Float to Int"] = [](RTContext& ctx) {
+    m_HandlerRegistry["FloatToInt"] = [](RTContext& ctx) {
         double v = ctx.GetInputValue("Value").asFloat();
         ctx.SetOutputValue("Result", RTVariant(static_cast<int64_t>(v)));
         return true;
     };
 
-    m_HandlerRegistry["Float to String"] = [](RTContext& ctx) {
+    m_HandlerRegistry["FloatToString"] = [](RTContext& ctx) {
         double v = ctx.GetInputValue("Value").asFloat();
         ctx.SetOutputValue("Result", RTVariant(std::to_string(v)));
         return true;
@@ -291,20 +291,20 @@ void BlueprintEditor::RegisterBuiltinHandlers()
     };
 
     // String operations
-    m_HandlerRegistry["Append String"] = [](RTContext& ctx) {
+    m_HandlerRegistry["AppendString"] = [](RTContext& ctx) {
         auto a = ctx.GetInputValue("A").asString();
         auto b = ctx.GetInputValue("B").asString();
         ctx.SetOutputValue("Result", RTVariant(a + b));
         return true;
     };
 
-    m_HandlerRegistry["String Length"] = [](RTContext& ctx) {
+    m_HandlerRegistry["StringLength"] = [](RTContext& ctx) {
         auto s = ctx.GetInputValue("String").asString();
         ctx.SetOutputValue("Length", RTVariant(static_cast<int64_t>(s.size())));
         return true;
     };
 
-    m_HandlerRegistry["Make String"] = [](RTContext& ctx) {
+    m_HandlerRegistry["MakeString"] = [](RTContext& ctx) {
         auto v = ctx.GetInputValue("Value").asString();
         ctx.SetOutputValue("String", RTVariant(v));
         return true;
@@ -317,13 +317,13 @@ void BlueprintEditor::RegisterBuiltinHandlers()
     };
 
     // Variable access
-    m_HandlerRegistry["Get Variable"] = [](RTContext& ctx) {
+    m_HandlerRegistry["GetVariable"] = [](RTContext& ctx) {
         auto name = ctx.GetInputValue("Name").asString();
         ctx.SetOutputValue("Value", ctx.GetVariable(name));
         return true;
     };
 
-    m_HandlerRegistry["Set Variable"] = [](RTContext& ctx) {
+    m_HandlerRegistry["SetVariable"] = [](RTContext& ctx) {
         auto name = ctx.GetInputValue("Name").asString();
         auto val = ctx.GetInputValue("Value");
         ctx.SetVariable(name, val);
@@ -337,36 +337,36 @@ void BlueprintEditor::RegisterBuiltinHandlers()
         return true;
     };
 
-    m_HandlerRegistry["Move To"] = [](RTContext& ctx) {
+    m_HandlerRegistry["MoveTo"] = [](RTContext& ctx) {
         ctx.Log("  [Task] Moving to target...");
         return true;
     };
 
-    m_HandlerRegistry["Random Wait"] = [](RTContext& ctx) {
+    m_HandlerRegistry["RandomWait"] = [](RTContext& ctx) {
         ctx.Log("  [Task] Waiting random time...");
         return true;
     };
 
     // Houdini
-    m_HandlerRegistry["Transform"] = [](RTContext& ctx) {
+    m_HandlerRegistry["HoudiniTransform"] = [](RTContext& ctx) {
         ctx.Log("  [Houdini] Transform applied");
         return true;
     };
 
-    m_HandlerRegistry["Group"] = [](RTContext& ctx) {
+    m_HandlerRegistry["HoudiniGroup"] = [](RTContext& ctx) {
         ctx.Log("  [Houdini] Group created");
         return true;
     };
 
     // Single Line Trace by Channel
-    m_HandlerRegistry["Single Line Trace by Channel"] = [](RTContext& ctx) {
+    m_HandlerRegistry["TraceByChannel"] = [](RTContext& ctx) {
         ctx.Log("  [Trace] Line trace performed");
         ctx.SetOutputValue("Return Value", RTVariant(true));
         return true;
     };
 
     // For Loop
-    m_HandlerRegistry["For Loop"] = [](RTContext& ctx) {
+    m_HandlerRegistry["ForLoop"] = [](RTContext& ctx) {
         int64_t first = ctx.GetInputValue("First Index").asInt();
         int64_t last = ctx.GetInputValue("Last Index").asInt();
         ctx.Log("  [ForLoop] " + std::to_string(first) + " to " + std::to_string(last));
@@ -381,7 +381,7 @@ void BlueprintEditor::RegisterBuiltinHandlers()
     };
 
     // While Loop
-    m_HandlerRegistry["While Loop"] = [](RTContext& ctx) {
+    m_HandlerRegistry["WhileLoop"] = [](RTContext& ctx) {
         ctx.Log("  [WhileLoop] Starting");
         int iterations = 0;
         const int maxIterations = 10000; // 安全上限
@@ -408,7 +408,7 @@ void BlueprintEditor::RegisterBuiltinHandlers()
     };
 
     // Flip Flop
-    m_HandlerRegistry["Flip Flop"] = [](RTContext& ctx) {
+    m_HandlerRegistry["FlipFlop"] = [](RTContext& ctx) {
         bool isA = !ctx.GetVariable("__flipflop_state").asBool();
         ctx.SetVariable("__flipflop_state", RTVariant(isA));
         ctx.SetOutputValue("Is A", RTVariant(isA));
@@ -427,14 +427,14 @@ void BlueprintEditor::RegisterBuiltinHandlers()
     };
 
     // Random Float
-    m_HandlerRegistry["Random Float"] = [](RTContext& ctx) {
+    m_HandlerRegistry["Random"] = [](RTContext& ctx) {
         double v = static_cast<double>(rand()) / RAND_MAX;
         ctx.SetOutputValue("Value", RTVariant(v));
         return true;
     };
 
     // Random In Range
-    m_HandlerRegistry["Random In Range"] = [](RTContext& ctx) {
+    m_HandlerRegistry["RandomInRange"] = [](RTContext& ctx) {
         double lo = ctx.GetInputValue("Min").asFloat();
         double hi = ctx.GetInputValue("B").asFloat();
         double v = lo + (static_cast<double>(rand()) / RAND_MAX) * (hi - lo);

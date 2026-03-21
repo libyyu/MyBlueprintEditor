@@ -57,6 +57,7 @@ struct Node
 {
     ed::NodeId ID;
     std::string Name;
+    std::string DefinitionId;   // 注册表中的定义 ID（用于序列化）
     std::vector<Pin> Inputs;
     std::vector<Pin> Outputs;
     ImColor Color;

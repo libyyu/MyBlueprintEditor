@@ -68,16 +68,16 @@ static inline ImRect ImRect_Expanded(const ImRect& rect, float x, float y)
     return result;
 }
 
-static bool Splitter(bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size = -1.0f)
+static bool Splitter(const char* str_id, bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size = -1.0f)
 {
     using namespace ImGui;
     ImGuiContext& g = *GImGui;
     ImGuiWindow* window = g.CurrentWindow;
-    ImGuiID id = window->GetID("##Splitter");
+    ImGuiID id = window->GetID(str_id);
     ImRect bb;
     bb.Min = window->DC.CursorPos + (split_vertically ? ImVec2(*size1, 0.0f) : ImVec2(0.0f, *size1));
     bb.Max = bb.Min + CalcItemSize(split_vertically ? ImVec2(thickness, splitter_long_axis_size) : ImVec2(splitter_long_axis_size, thickness), 0.0f, 0.0f);
-    return SplitterBehavior(bb, id, split_vertically ? ImGuiAxis_X : ImGuiAxis_Y, size1, size2, min_size1, min_size2, 0.0f);
+    return SplitterBehavior(bb, id, split_vertically ? ImGuiAxis_X : ImGuiAxis_Y, size1, size2, min_size1, min_size2, 4.0f);
 }
 
 // ============================================================================
@@ -140,8 +140,8 @@ struct BlueprintEditor : public Application
     void    DrawPinIcon(const Pin& pin, bool connected, int alpha);
     void    ShowStyleEditor(bool* show = nullptr);
     void    ShowLeftPane(float paneWidth);             // 旧版左侧面板（已不使用）
-    void    ShowNodeListWindow(bool* p_open);          // 可浮动节点列表窗口
-    void    ShowExecutionWindow(bool* p_open);         // 可浮动执行输出窗口
+    void    DrawNodeListPanel();                       // 左侧节点列表面板（嵌入式）
+    void    DrawExecutionPanel();                      // 底部执行输出面板（嵌入式）
 
     // ------------------------------------------------------------------
     // 文件操作
@@ -198,8 +198,12 @@ struct BlueprintEditor : public Application
     const float          m_TouchTime = 1.0f;
     std::map<ed::NodeId, float, NodeIdLess> m_NodeTouchTime;
     bool                 m_ShowOrdinals = false;
-    bool                 m_ShowNodeListWindow = true;     // 节点列表窗口可见
-    bool                 m_ShowExecutionWindow = true;    // 执行输出窗口可见
+    bool                 m_ShowNodeListWindow = true;     // 左侧面板可见
+    bool                 m_ShowExecutionWindow = true;    // 底部面板可见
+
+    // VSCode 风格布局尺寸（可拖拽调整）
+    float                m_LeftPanelWidth  = 250.0f;      // 左侧面板宽度
+    float                m_BottomPanelHeight = 200.0f;    // 底部面板高度
 
     // 文件操作状态
     std::string          m_CurrentFilePath;                // 当前打开的文件路径（空=未保存的新文件）

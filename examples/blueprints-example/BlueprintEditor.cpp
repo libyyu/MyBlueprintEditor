@@ -236,6 +236,7 @@ Node* BlueprintEditor::SpawnNodeByDef(const std::string& defId)
     m_Nodes.emplace_back(GetNextId(), def->name.c_str(), color);
     auto& node = m_Nodes.back();
     node.Type = ntype;
+    node.DefinitionId = defId;
 
     if (ntype == NodeType::Comment && def->defaultSize.width > 0)
         node.Size = ImVec2(def->defaultSize.width, def->defaultSize.height);
@@ -371,7 +372,7 @@ RTBlueprintData BlueprintEditor::BuildRuntimeData()
     {
         RTNodeInstance ni;
         ni.id = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(node.ID.AsPointer()));
-        ni.definitionId = node.Name;
+        ni.definitionId = node.DefinitionId.empty() ? node.Name : node.DefinitionId;
         ni.name = node.Name;
         ni.isEnabled = true;
 
@@ -578,5 +579,6 @@ ImGuiWindowFlags BlueprintEditor::GetWindowFlags() const
         ImGuiWindowFlags_NoScrollWithMouse |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_NoBringToFrontOnFocus |
+        ImGuiWindowFlags_NoDocking |
         ImGuiWindowFlags_MenuBar;
 }

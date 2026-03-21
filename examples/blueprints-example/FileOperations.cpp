@@ -123,7 +123,7 @@ void BlueprintEditor::NewFile()
 void BlueprintEditor::OpenFile()
 {
     std::string path = OpenFileDialog(
-        "Blueprint Files (*.json)\0*.json\0All Files (*.*)\0*.*\0",
+        "Blueprint Files (*.json)\0*.json\0Editor Files (*.editor.json)\0*.editor.json\0All Files (*.*)\0*.*\0",
         "Open Blueprint"
     );
     
@@ -136,44 +136,73 @@ void BlueprintEditor::OpenFile()
 void BlueprintEditor::DoOpenFile(const std::string& path)
 {
     ::NodeEditor::Runtime::JsonBlueprintExporter exporter;
-    
-    std::string editorPath = GetEditorFilePath(path);
-    
-    // 尝试加载 Runtime + Editor 双文件
     ::NodeEditor::Runtime::ImportResult result;
     
-    // 检查 editor 文件是否存在
-    std::ifstream editorCheck(editorPath);
-    bool hasEditorFile = editorCheck.good();
-    editorCheck.close();
+    // 判断用户选择的是 .editor.json 还是 .json
+    bool isEditorFile = (path.size() > 12 && path.substr(path.size() - 12) == ".editor.json");
     
-    if (hasEditorFile)
+    if (isEditorFile)
     {
-        result = exporter.importEditorFromFiles(path, editorPath);
+        // 直接从 .editor.json 加载（包含嵌入的 runtime 数据）
+        result = exporter.importFromEditorFile(path);
+        
+        if (!result.success)
+        {
+            m_ExecutionLog.push_back("[ERROR] Failed to open editor file: " + result.errorMessage);
+            m_ExecutionLogDirty = true;
+            return;
+        }
+        
+        // 清空当前编辑器
+        ClearEditor();
+        
+        // 加载数据到编辑器
+        LoadEditorData(result.data);
+        
+        // 保存对应的 runtime 文件路径（去掉 .editor 部分）
+        // e.g. "NLoop.editor.json" -> "NLoop.json"
+        std::string runtimePath = path.substr(0, path.size() - 12) + ".json";
+        m_CurrentFilePath = runtimePath;
     }
     else
     {
-        // 只有 Runtime 文件
-        result = exporter.importRuntimeFromFile(path);
+        // 传统逻辑：从 .json 加载，可选合并 .editor.json
+        std::string editorPath = GetEditorFilePath(path);
+        
+        // 检查 editor 文件是否存在
+        std::ifstream editorCheck(editorPath);
+        bool hasEditorFile = editorCheck.good();
+        editorCheck.close();
+        
+        if (hasEditorFile)
+        {
+            result = exporter.importEditorFromFiles(path, editorPath);
+        }
+        else
+        {
+            // 只有 Runtime 文件
+            result = exporter.importRuntimeFromFile(path);
+        }
+        
+        if (!result.success)
+        {
+            m_ExecutionLog.push_back("[ERROR] Failed to open: " + result.errorMessage);
+            m_ExecutionLogDirty = true;
+            return;
+        }
+        
+        // 清空当前编辑器
+        ClearEditor();
+        
+        // 加载数据到编辑器
+        LoadEditorData(result.data);
+        
+        m_CurrentFilePath = path;
     }
     
-    if (!result.success)
-    {
-        m_ExecutionLog.push_back("[ERROR] Failed to open: " + result.errorMessage);
-        m_ExecutionLogDirty = true;
-        return;
-    }
-    
-    // 清空当前编辑器
-    ClearEditor();
-    
-    // 加载数据到编辑器
-    LoadEditorData(result.data);
-    
-    m_CurrentFilePath = path;
     m_IsDirty = false;
     
-    std::string title = "Blueprint Editor - " + GetFileBaseName(path);
+    std::string title = "Blueprint Editor - " + GetFileBaseName(m_CurrentFilePath);
     SetTitle(title.c_str());
     
     m_ExecutionLog.push_back("[INFO] Opened: " + path);
@@ -291,6 +320,23 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
         // 尝试通过 definitionId 创建节点
         auto* def = m_NodeRegistry.getNodeDefinition(rtNode.definitionId);
         
+        // 如果 definitionId 找不到，可能是旧文件用了显示名（如 "For Loop" 而非 "ForLoop"）
+        // 尝试按 name 在注册表中反查
+        std::string resolvedDefId = rtNode.definitionId;
+        if (!def)
+        {
+            auto allDefs = m_NodeRegistry.getAllNodeDefinitions();
+            for (const auto& d : allDefs)
+            {
+                if (d.name == rtNode.definitionId || d.name == rtNode.name)
+                {
+                    def = m_NodeRegistry.getNodeDefinition(d.id);
+                    resolvedDefId = d.id;
+                    break;
+                }
+            }
+        }
+        
         int newNodeId = GetNextId();
         nodeIdMap[rtNode.id] = newNodeId;
         
@@ -334,6 +380,7 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
             m_Nodes.emplace_back(newNodeId, rtNode.name.c_str(), color);
             auto& node = m_Nodes.back();
             node.Type = ntype;
+            node.DefinitionId = resolvedDefId;
             
             if (ntype == NodeType::Comment && def->defaultSize.width > 0)
                 node.Size = ImVec2(def->defaultSize.width, def->defaultSize.height);
@@ -343,6 +390,7 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
             // 定义未找到，创建一个通用节点
             m_Nodes.emplace_back(newNodeId, rtNode.name.c_str());
             auto& node = m_Nodes.back();
+            node.DefinitionId = rtNode.definitionId;
             
             // 检查是否是 Execute Blueprint 节点
             if (rtNode.definitionId == "ExecuteBlueprint")

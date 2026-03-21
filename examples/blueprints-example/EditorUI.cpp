@@ -338,7 +338,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
     auto& io = ImGui::GetIO();
 
+    // ================================================================
     // 菜单栏
+    // ================================================================
     if (ImGui::BeginMenuBar())
     {
         if (ImGui::BeginMenu("File"))
@@ -366,7 +368,6 @@ void BlueprintEditor::OnFrame(float deltaTime)
         // 显示当前文件名
         if (!m_CurrentFilePath.empty())
         {
-            // 提取文件名
             std::string displayName = m_CurrentFilePath;
             size_t lastSlash = displayName.find_last_of("/\\");
             if (lastSlash != std::string::npos)
@@ -398,45 +399,71 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
     ed::SetCurrentEditor(s_Editor);
 
-    // 加载文件后延迟设置节点位置（需要在 ed::Begin/End 之间）
-    if (m_NeedSetNodePositions)
+    // ================================================================
+    // VSCode 风格固定面板布局
+    // ================================================================
+    //
+    //  ┌──────────┬──────────────────────────┐
+    //  │          │                           │
+    //  │ 左侧面板  │    中间 Node Editor       │
+    //  │(NodeList)│                           │
+    //  │          ├──────────────────────────┤
+    //  │          │    底部面板                │
+    //  │          │  (Execution Output)       │
+    //  └──────────┴──────────────────────────┘
+    //
+
+    ImVec2 contentRegion = ImGui::GetContentRegionAvail();
+    float totalWidth  = contentRegion.x;
+    float totalHeight = contentRegion.y;
+    float splitterThickness = 4.0f;
+
+    // --- 左侧面板 + 右侧区域 水平分割 ---
+    float rightWidth = totalWidth;
+    if (m_ShowNodeListWindow)
     {
-        m_NeedSetNodePositions = false;
+        // 约束左侧面板宽度
+        if (m_LeftPanelWidth < 150.0f) m_LeftPanelWidth = 150.0f;
+        if (m_LeftPanelWidth > totalWidth * 0.4f) m_LeftPanelWidth = totalWidth * 0.4f;
 
-        for (const auto& pendNode : m_PendingLoadData.nodes)
-        {
-            auto it = pendNode.customProperties.find("__newEditorId");
-            if (it != pendNode.customProperties.end())
-            {
-                int editorId = std::stoi(it->second);
-                ed::NodeId nodeId(editorId);
+        rightWidth = totalWidth - m_LeftPanelWidth - splitterThickness;
+        if (rightWidth < 200.0f) rightWidth = 200.0f;
 
-                if (pendNode.position.x != 0.0f || pendNode.position.y != 0.0f)
-                    ed::SetNodePosition(nodeId, ImVec2(pendNode.position.x, pendNode.position.y));
+        Splitter("##HorizontalSplitter", true, splitterThickness, &m_LeftPanelWidth, &rightWidth, 150.0f, 200.0f, totalHeight);
 
-                // Comment 节点需要设置 Group 尺寸
-                if (pendNode.size.width > 0 && pendNode.size.height > 0)
-                {
-                    Node* node = FindNode(nodeId);
-                    if (node && node->Type == NodeType::Comment)
-                    {
-                        ed::SetGroupSize(nodeId, ImVec2(pendNode.size.width, pendNode.size.height));
-                        node->Size = ImVec2(pendNode.size.width, pendNode.size.height);
-                    }
-                }
-            }
-        }
+        // 绘制左侧面板
+        ImGui::BeginChild("##LeftPanel", ImVec2(m_LeftPanelWidth, totalHeight), true);
+        DrawNodeListPanel();
+        ImGui::EndChild();
 
-        m_PendingLoadData.clear();
-        ed::NavigateToContent();
+        ImGui::SameLine();
     }
 
-    // 浮动面板窗口
-    if (m_ShowNodeListWindow)
-        ShowNodeListWindow(&m_ShowNodeListWindow);
-    if (m_ShowExecutionWindow)
-        ShowExecutionWindow(&m_ShowExecutionWindow);
+    // --- 右侧区域：上部编辑器 + 下部执行输出 垂直分割 ---
+    ImGui::BeginGroup();
+    {
+        float editorHeight = totalHeight;
+        float bottomHeight = 0.0f;
 
+        if (m_ShowExecutionWindow)
+        {
+            // 约束底部面板高度
+            if (m_BottomPanelHeight < 100.0f) m_BottomPanelHeight = 100.0f;
+            if (m_BottomPanelHeight > totalHeight * 0.6f) m_BottomPanelHeight = totalHeight * 0.6f;
+
+            editorHeight = totalHeight - m_BottomPanelHeight - splitterThickness;
+            if (editorHeight < 200.0f) editorHeight = 200.0f;
+            bottomHeight = totalHeight - editorHeight - splitterThickness;
+
+            Splitter("##VerticalSplitter", false, splitterThickness, &editorHeight, &bottomHeight, 200.0f, 100.0f, rightWidth);
+
+            // 将 Splitter 拖动的结果写回成员变量，否则下一帧会被还原
+            m_BottomPanelHeight = bottomHeight;
+        }
+
+        // --- 中间 Node Editor 区域 ---
+        // 直接通过 ed::Begin 的 size 参数限制编辑器区域，不使用额外的 BeginChild
+        {
     static ed::NodeId contextNodeId      = 0;
     static ed::LinkId contextLinkId      = 0;
     static ed::PinId  contextPinId       = 0;
@@ -444,8 +471,40 @@ void BlueprintEditor::OnFrame(float deltaTime)
     static Pin* newNodeLinkPin = nullptr;
     static Pin* newLinkPin     = nullptr;
 
-    ed::Begin("Node editor");
+    ed::Begin("Node editor", ImVec2(rightWidth, editorHeight));
     {
+        // 加载文件后延迟设置节点位置（必须在 ed::Begin/End 之间）
+        if (m_NeedSetNodePositions)
+        {
+            m_NeedSetNodePositions = false;
+
+            for (const auto& pendNode : m_PendingLoadData.nodes)
+            {
+                auto it = pendNode.customProperties.find("__newEditorId");
+                if (it != pendNode.customProperties.end())
+                {
+                    int editorId = std::stoi(it->second);
+                    ed::NodeId nodeId(editorId);
+
+                    if (pendNode.position.x != 0.0f || pendNode.position.y != 0.0f)
+                        ed::SetNodePosition(nodeId, ImVec2(pendNode.position.x, pendNode.position.y));
+
+                    if (pendNode.size.width > 0 && pendNode.size.height > 0)
+                    {
+                        Node* node = FindNode(nodeId);
+                        if (node && node->Type == NodeType::Comment)
+                        {
+                            ed::SetGroupSize(nodeId, ImVec2(pendNode.size.width, pendNode.size.height));
+                            node->Size = ImVec2(pendNode.size.width, pendNode.size.height);
+                        }
+                    }
+                }
+            }
+
+            m_PendingLoadData.clear();
+            ed::NavigateToContent();
+        }
+
         auto cursorTopLeft = ImGui::GetCursorScreenPos();
 
         util::BlueprintNodeBuilder builder(m_HeaderBackground, GetTextureWidth(m_HeaderBackground), GetTextureHeight(m_HeaderBackground));
@@ -1268,23 +1327,26 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
         drawList->PopClipRect();
     }
+
+        } // end ed::Begin scope
+
+        // --- 底部执行输出面板 ---
+        if (m_ShowExecutionWindow)
+        {
+            ImGui::BeginChild("##BottomPanel", ImVec2(rightWidth, bottomHeight), true);
+            DrawExecutionPanel();
+            ImGui::EndChild();
+        }
+    }
+    ImGui::EndGroup();
 }
 
 // ============================================================================
-// 可浮动节点列表窗口
+// 左侧节点列表面板（嵌入式）
 // ============================================================================
 
-void BlueprintEditor::ShowNodeListWindow(bool* p_open)
+void BlueprintEditor::DrawNodeListPanel()
 {
-    ImGui::SetNextWindowSize(ImVec2(350, 500), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(20, 50), ImGuiCond_FirstUseEver);
-
-    if (!ImGui::Begin("Node List", p_open))
-    {
-        ImGui::End();
-        return;
-    }
-
     auto& io = ImGui::GetIO();
     float paneWidth = ImGui::GetContentRegionAvail().x;
 
@@ -1472,25 +1534,14 @@ void BlueprintEditor::ShowNodeListWindow(bool* p_open)
 
     if (ed::HasSelectionChanged())
         ++changeCount;
-
-    ImGui::End();
 }
 
 // ============================================================================
-// 可浮动执行输出窗口
+// 底部执行输出面板（嵌入式）
 // ============================================================================
 
-void BlueprintEditor::ShowExecutionWindow(bool* p_open)
+void BlueprintEditor::DrawExecutionPanel()
 {
-    ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(20, 560), ImGuiCond_FirstUseEver);
-
-    if (!ImGui::Begin("Execution Output", p_open))
-    {
-        ImGui::End();
-        return;
-    }
-
     float paneWidth = ImGui::GetContentRegionAvail().x;
 
     // 执行按钮栏
@@ -1552,6 +1603,4 @@ void BlueprintEditor::ShowExecutionWindow(bool* p_open)
         m_ExecutionLogText.size() + 1,
         ImVec2(paneWidth, logHeight),
         ImGuiInputTextFlags_ReadOnly);
-
-    ImGui::End();
 }

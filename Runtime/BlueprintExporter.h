@@ -172,6 +172,9 @@ public:
     ImportResult importEditorFromStrings(const std::string& runtimeContent, const std::string& editorContent, const ImportOptions& options = ImportOptions()) const override;
     ImportResult importEditorFromFiles(const std::string& runtimeFilePath, const std::string& editorFilePath, const ImportOptions& options = ImportOptions()) const override;
     
+    // 从单个 .editor.json 文件加载完整数据（包含内嵌的 runtime 数据）
+    ImportResult importFromEditorFile(const std::string& editorFilePath, const ImportOptions& options = ImportOptions()) const;
+    
     // 通用
     bool validate(const BlueprintData& data, std::vector<std::string>& errors) const override;
     std::vector<ExportFormat> getSupportedFormats() const override;
