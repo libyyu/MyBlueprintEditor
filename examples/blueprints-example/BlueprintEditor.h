@@ -19,6 +19,7 @@
 
 #include <string>
 #include <vector>
+#include <deque>
 #include <map>
 #include <unordered_map>
 #include <array>
@@ -137,6 +138,8 @@ struct BlueprintEditor : public Application
     void RegisterNodeDefs_Action();
     void RegisterNodeDefs_Math();
     void RegisterNodeDefs_Debug();
+    void RegisterNodeDefs_String();
+    void RegisterNodeDefs_Array();
     void RegisterNodeDefs_Tree();
     void RegisterNodeDefs_Houdini();
     void RegisterNodeDefs_Misc();
@@ -146,6 +149,8 @@ struct BlueprintEditor : public Application
     void RegisterHandlers_Action();
     void RegisterHandlers_Math();
     void RegisterHandlers_Debug();
+    void RegisterHandlers_String();
+    void RegisterHandlers_Array();
     void RegisterHandlers_Tree();
     void RegisterHandlers_Houdini();
     void RegisterHandlers_Misc();
@@ -213,8 +218,8 @@ struct BlueprintEditor : public Application
     // ------------------------------------------------------------------
     int                  m_NextId = 1;
     const int            m_PinIconSize = 24;
-    std::vector<Node>    m_Nodes;
-    std::vector<Link>    m_Links;
+    std::deque<Node>     m_Nodes;
+    std::deque<Link>     m_Links;
     ImTextureID          m_HeaderBackground = ImTextureID_Invalid;
     ImTextureID          m_SaveIcon = ImTextureID_Invalid;
     ImTextureID          m_RestoreIcon = ImTextureID_Invalid;

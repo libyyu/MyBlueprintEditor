@@ -43,7 +43,7 @@ void BlueprintEditor::RegisterNodeDefs_Flow()
 
     reg("Delay", "Delay", "Flow",
         { MakeFlowPin(""), MakePin("Duration", RTPinDataType::Float) },
-        { MakeFlowPin("Exec"), MakeFlowPin("Completed") });
+        { MakeFlowPin("Exec"), MakeFlowPin("Completed"), MakePin("TimerHandle", RTPinDataType::Integer) });
 
     reg("FlipFlop", "Flip Flop", "Flow",
         { MakeFlowPin("") },

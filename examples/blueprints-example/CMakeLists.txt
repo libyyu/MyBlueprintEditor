@@ -21,14 +21,18 @@
 #   builtins/NodeDefs_Flow.cpp    - Flow Control 节点定义
 #   builtins/NodeDefs_Action.cpp  - Action 节点定义
 #   builtins/NodeDefs_Math.cpp    - Math 节点定义
-#   builtins/NodeDefs_Debug.cpp   - Debug 节点定义
+#   builtins/NodeDefs_Debug.cpp   - Debug 节点定义（PrintString, Log）
+#   builtins/NodeDefs_String.cpp  - Misc/String 节点定义（MakeString, AppendString, StringSplit, ...）
+#   builtins/NodeDefs_Array.cpp   - Misc/Array 节点定义（ArrayLength, ArrayGet, ForEachLoop）
 #   builtins/NodeDefs_Tree.cpp    - Behavior Tree 节点定义
 #   builtins/NodeDefs_Houdini.cpp - Houdini 节点定义
 #   builtins/NodeDefs_Misc.cpp    - Misc 节点定义
 #   builtins/Handlers_Flow.cpp    - Flow Control 处理器
 #   builtins/Handlers_Action.cpp  - Action 处理器
 #   builtins/Handlers_Math.cpp    - Math 处理器
-#   builtins/Handlers_Debug.cpp   - Debug 处理器
+#   builtins/Handlers_Debug.cpp   - Debug 处理器（PrintString, Log）
+#   builtins/Handlers_String.cpp  - Misc/String 处理器
+#   builtins/Handlers_Array.cpp   - Misc/Array 处理器
 #   builtins/Handlers_Tree.cpp    - Behavior Tree 处理器
 #   builtins/Handlers_Houdini.cpp - Houdini 处理器
 #   builtins/Handlers_Misc.cpp    - Misc 处理器

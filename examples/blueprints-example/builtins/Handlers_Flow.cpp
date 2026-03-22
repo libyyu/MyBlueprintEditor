@@ -171,13 +171,16 @@ void BlueprintEditor::RegisterHandlers_Flow()
             }
         }
 
-        ctx.Delay(duration, [&ctx, completedPinId, this]() {
+        auto timerHandle = ctx.Delay(duration, [&ctx, completedPinId, this]() {
             auto finishTime = RTFrameTimerManager::GetCurrentUnixTime();
             m_ExecutionLog.push_back("  [Delay] Completed; finished:" + std::to_string(finishTime));
             m_ExecutionLogDirty = true;
             if (completedPinId != 0)
                 ctx.ActivateOutputFlow(completedPinId);
         });
+
+        // 输出 TimerHandle，供 RemoveTimer/PauseTimer 使用
+        ctx.SetOutputValue("TimerHandle", RTVariant(static_cast<int64_t>(timerHandle)));
 
         // 标记 Completed 引脚的下游节点为"已被控制流接管"，
         // 防止 Execute() 主循环在 timer 回调之前就按拓扑序执行了它们

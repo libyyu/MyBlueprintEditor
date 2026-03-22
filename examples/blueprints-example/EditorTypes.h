@@ -29,6 +29,8 @@ enum class PinType
     Object,
     Function,
     Delegate,
+    Array,
+    Any,        // 通配类型：可与任何数据类型连接（用于 ArrayGet 等泛型节点）
 };
 
 struct Node;

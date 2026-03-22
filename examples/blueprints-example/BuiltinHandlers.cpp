@@ -4,7 +4,9 @@
 //   builtins/Handlers_Flow.cpp     - Flow Control（Branch, DoN, ForLoop, WhileLoop, ...）
 //   builtins/Handlers_Action.cpp   - Actions（SetTimer, OutputAction, InputActionFire, TraceByChannel）
 //   builtins/Handlers_Math.cpp     - Math（+, -, *, /, <, >, ==, AND, OR, IntToFloat, Abs, Clamp, ...）
-//   builtins/Handlers_Debug.cpp    - Debug（PrintString, AppendString, StringLength, MakeString, Log）
+//   builtins/Handlers_Debug.cpp    - Debug（PrintString, Log）
+//   builtins/Handlers_String.cpp   - Misc/String（MakeString, AppendString, StringLength, StringSplit, ...）
+//   builtins/Handlers_Array.cpp    - Misc/Array（ArrayLength, ArrayGet, ForEachLoop）
 //   builtins/Handlers_Tree.cpp     - Behavior Tree（Sequence, MoveTo, RandomWait）
 //   builtins/Handlers_Houdini.cpp  - Houdini（HoudiniTransform, HoudiniGroup）
 //   builtins/Handlers_Misc.cpp     - Misc（GetVariable, SetVariable）
@@ -26,6 +28,8 @@ void BlueprintEditor::RegisterBuiltinHandlers()
     RegisterHandlers_Action();
     RegisterHandlers_Math();
     RegisterHandlers_Debug();
+    RegisterHandlers_String();
+    RegisterHandlers_Array();
     RegisterHandlers_Tree();
     RegisterHandlers_Houdini();
     RegisterHandlers_Misc();

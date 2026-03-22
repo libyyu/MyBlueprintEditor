@@ -101,7 +101,16 @@ bool BlueprintEditor::IsPinLinked(ed::PinId id)
 
 bool BlueprintEditor::CanCreateLink(Pin* a, Pin* b)
 {
-    if (!a || !b || a == b || a->Kind == b->Kind || a->Type != b->Type || a->Node == b->Node)
+    if (!a || !b || a == b || a->Kind == b->Kind || a->Node == b->Node)
+        return false;
+
+    // Any 类型可以与任何非 Flow 的数据类型连接
+    if (a->Type == PinType::Any && b->Type != PinType::Flow)
+        return true;
+    if (b->Type == PinType::Any && a->Type != PinType::Flow)
+        return true;
+
+    if (a->Type != b->Type)
         return false;
 
     return true;
@@ -146,6 +155,8 @@ PinType BlueprintEditor::MapRTPinDataType(RTPinDataType dt, bool isExec)
     case RTPinDataType::Float:   return PinType::Float;
     case RTPinDataType::String:  return PinType::String;
     case RTPinDataType::Object:  return PinType::Object;
+    case RTPinDataType::Array:   return PinType::Array;
+    case RTPinDataType::Any:     return PinType::Any;
     default:                     return PinType::Flow;
     }
 }
@@ -160,6 +171,8 @@ RTPinDataType BlueprintEditor::MapPinType(PinType type)
     case PinType::Float:    return RTPinDataType::Float;
     case PinType::String:   return RTPinDataType::String;
     case PinType::Object:   return RTPinDataType::Object;
+    case PinType::Array:    return RTPinDataType::Array;
+    case PinType::Any:      return RTPinDataType::Any;
     case PinType::Function: return RTPinDataType::Custom;
     case PinType::Delegate: return RTPinDataType::Custom;
     default:                return RTPinDataType::Unknown;

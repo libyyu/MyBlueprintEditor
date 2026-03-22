@@ -20,6 +20,8 @@ ImColor BlueprintEditor::GetIconColor(PinType type)
         case PinType::Object:   return ImColor( 51, 150, 215);
         case PinType::Function: return ImColor(218,   0, 183);
         case PinType::Delegate: return ImColor(255,  48,  48);
+        case PinType::Array:    return ImColor(255, 165,   0);
+        case PinType::Any:      return ImColor(180, 180, 180);
     }
 };
 
@@ -42,6 +44,8 @@ void BlueprintEditor::DrawPinIcon(const Pin& pin, bool connected, int alpha)
         case PinType::Object:   iconType = IconType::Circle; break;
         case PinType::Function: iconType = IconType::Circle; break;
         case PinType::Delegate: iconType = IconType::Square; break;
+        case PinType::Array:    iconType = IconType::Grid;   break;
+        case PinType::Any:      iconType = IconType::Diamond; break;
         default:
             return;
     }
@@ -1109,7 +1113,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
                     newLinkPin = startPin ? startPin : endPin;
 
-                    if (startPin->Kind == PinKind::Input)
+                    if (startPin && startPin->Kind == PinKind::Input)
                     {
                         std::swap(startPin, endPin);
                         std::swap(startPinId, endPinId);

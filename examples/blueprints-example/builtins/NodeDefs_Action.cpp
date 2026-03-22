@@ -42,13 +42,28 @@ void BlueprintEditor::RegisterNodeDefs_Action()
         { MakeFlowPin(""), MakePin("Object", RTPinDataType::Object),
           MakePin("Function Name", RTPinDataType::Custom, false),
           MakePin("Time", RTPinDataType::Float), MakePin("Looping", RTPinDataType::Boolean) },
-        { MakeFlowPin("Exec") },
+        { MakeFlowPin("Exec"), MakePin("TimerHandle", RTPinDataType::Integer) },
         "80C3F8");
     {
         auto* d = const_cast<RTNodeDef*>(m_NodeRegistry.getNodeDefinition("SetTimer"));
         if (d && d->inputPins.size() >= 3)
             d->inputPins[2].customProperties["pinType"] = "Function";
     }
+
+    reg("RemoveTimer", "Remove Timer", "Action",
+        { MakeFlowPin(""), MakePin("TimerHandle", RTPinDataType::Integer) },
+        { MakeFlowPin("Exec"), MakePin("Success", RTPinDataType::Boolean) },
+        "FF6060");
+
+    reg("PauseTimer", "Pause Timer", "Action",
+        { MakeFlowPin(""), MakePin("TimerHandle", RTPinDataType::Integer) },
+        { MakeFlowPin("Exec"), MakePin("Success", RTPinDataType::Boolean) },
+        "FFA040");
+
+    reg("ResumeTimer", "Resume Timer", "Action",
+        { MakeFlowPin(""), MakePin("TimerHandle", RTPinDataType::Integer) },
+        { MakeFlowPin("Exec"), MakePin("Success", RTPinDataType::Boolean) },
+        "40C080");
 
     reg("CustomEvent", "Custom Event", "Action",
         {},

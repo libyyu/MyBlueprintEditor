@@ -17,7 +17,7 @@ void BlueprintEditor::RegisterHandlers_Action()
         ctx.Log("  [SetTimer] interval=" + std::to_string(interval) + "s, looping=" + (looping ? "true" : "false"));
 
         // Register a main-thread timer via FrameTimerManager
-        ctx.SetTimer(interval, repeat, [this, funcPinId, looping]() {
+        auto timerHandle = ctx.SetTimer(interval, repeat, [this, funcPinId, looping]() {
             m_ExecutionLog.push_back("[Timer] fired! looping=" + std::string(looping ? "true" : "false"));
             m_ExecutionLogDirty = true;
 
@@ -29,9 +29,74 @@ void BlueprintEditor::RegisterHandlers_Action()
             return looping; // return true to keep looping
         });
 
+        // 输出 TimerHandle，供 RemoveTimer/PauseTimer/ResumeTimer 使用
+        ctx.SetOutputValue("TimerHandle", RTVariant(static_cast<int64_t>(timerHandle)));
+
+        ctx.Log("  [SetTimer] TimerHandle=" + std::to_string(timerHandle));
+
         // Activate the output flow pin to continue downstream execution
         ctx.ActivateOutputFlow("Exec");
 
+        return true;
+    };
+
+    // ==================================================================
+    // RemoveTimer — 取消指定的计时器
+    // ==================================================================
+    m_HandlerRegistry["RemoveTimer"] = [this](RTContext& ctx) {
+        int64_t handleVal = ctx.GetInputValue("TimerHandle").asInt();
+        auto handle = static_cast<RTTimerHandle>(handleVal);
+
+        ctx.Log("  [RemoveTimer] TimerHandle=" + std::to_string(handle));
+
+        bool success = false;
+        if (handle != 0)
+            success = m_PersistentRunner.GetTimerManager().ClearTimer(handle);
+
+        ctx.SetOutputValue("Success", RTVariant(success));
+        ctx.Log("  [RemoveTimer] " + std::string(success ? "Removed" : "Not found or invalid"));
+
+        ctx.ActivateOutputFlow("Exec");
+        return true;
+    };
+
+    // ==================================================================
+    // PauseTimer — 暂停指定的计时器
+    // ==================================================================
+    m_HandlerRegistry["PauseTimer"] = [this](RTContext& ctx) {
+        int64_t handleVal = ctx.GetInputValue("TimerHandle").asInt();
+        auto handle = static_cast<RTTimerHandle>(handleVal);
+
+        ctx.Log("  [PauseTimer] TimerHandle=" + std::to_string(handle));
+
+        bool success = false;
+        if (handle != 0)
+            success = m_PersistentRunner.GetTimerManager().PauseTimer(handle);
+
+        ctx.SetOutputValue("Success", RTVariant(success));
+        ctx.Log("  [PauseTimer] " + std::string(success ? "Paused" : "Not found or invalid"));
+
+        ctx.ActivateOutputFlow("Exec");
+        return true;
+    };
+
+    // ==================================================================
+    // ResumeTimer — 恢复指定的计时器
+    // ==================================================================
+    m_HandlerRegistry["ResumeTimer"] = [this](RTContext& ctx) {
+        int64_t handleVal = ctx.GetInputValue("TimerHandle").asInt();
+        auto handle = static_cast<RTTimerHandle>(handleVal);
+
+        ctx.Log("  [ResumeTimer] TimerHandle=" + std::to_string(handle));
+
+        bool success = false;
+        if (handle != 0)
+            success = m_PersistentRunner.GetTimerManager().ResumeTimer(handle);
+
+        ctx.SetOutputValue("Success", RTVariant(success));
+        ctx.Log("  [ResumeTimer] " + std::string(success ? "Resumed" : "Not found or invalid"));
+
+        ctx.ActivateOutputFlow("Exec");
         return true;
     };
 

@@ -78,6 +78,8 @@ struct Variant
     };
     // std::string 含非平凡析构，不能放入 union，单独存储
     std::string stringValue;
+    // Array 值 —— 用于 PinDataType::Array
+    std::vector<Variant> arrayValue;
 
     // 默认构造
     Variant() : intValue(0) {}
@@ -95,6 +97,7 @@ struct Variant
         case PinDataType::Integer: intValue   = other.intValue;   break;
         case PinDataType::Float:   floatValue = other.floatValue; break;
         case PinDataType::String:  stringValue = other.stringValue; break;
+        case PinDataType::Array:   arrayValue = other.arrayValue; break;
         default: break;
         }
     }
@@ -109,6 +112,7 @@ struct Variant
         case PinDataType::Integer: intValue   = other.intValue;   break;
         case PinDataType::Float:   floatValue = other.floatValue; break;
         case PinDataType::String:  stringValue = std::move(other.stringValue); break;
+        case PinDataType::Array:   arrayValue = std::move(other.arrayValue); break;
         default: break;
         }
     }
@@ -121,6 +125,8 @@ struct Variant
             // 如果旧类型是 string 但新类型不是，清空 stringValue
             if (type == PinDataType::String && other.type != PinDataType::String)
                 stringValue.clear();
+            if (type == PinDataType::Array && other.type != PinDataType::Array)
+                arrayValue.clear();
             type = other.type;
             switch (type)
             {
@@ -128,6 +134,7 @@ struct Variant
             case PinDataType::Integer: intValue   = other.intValue;   break;
             case PinDataType::Float:   floatValue = other.floatValue; break;
             case PinDataType::String:  stringValue = other.stringValue; break;
+            case PinDataType::Array:   arrayValue = other.arrayValue; break;
             default: intValue = 0; break;
             }
         }
@@ -141,6 +148,8 @@ struct Variant
         {
             if (type == PinDataType::String && other.type != PinDataType::String)
                 stringValue.clear();
+            if (type == PinDataType::Array && other.type != PinDataType::Array)
+                arrayValue.clear();
             type = other.type;
             switch (type)
             {
@@ -148,6 +157,7 @@ struct Variant
             case PinDataType::Integer: intValue   = other.intValue;   break;
             case PinDataType::Float:   floatValue = other.floatValue; break;
             case PinDataType::String:  stringValue = std::move(other.stringValue); break;
+            case PinDataType::Array:   arrayValue = std::move(other.arrayValue); break;
             default: intValue = 0; break;
             }
         }
@@ -162,6 +172,7 @@ struct Variant
     explicit Variant(double v)             : type(PinDataType::Float),   floatValue(v) {}
     explicit Variant(const char* v)        : type(PinDataType::String),  intValue(0), stringValue(v) {}
     explicit Variant(const std::string& v) : type(PinDataType::String),  intValue(0), stringValue(v) {}
+    explicit Variant(std::vector<Variant> v) : type(PinDataType::Array), intValue(0), arrayValue(std::move(v)) {}
 
     // 获取值（带自动类型转换）
     bool asBool() const
@@ -172,6 +183,7 @@ struct Variant
         case PinDataType::Integer: return intValue != 0;
         case PinDataType::Float:   return floatValue != 0.0;
         case PinDataType::String:  return !stringValue.empty();
+        case PinDataType::Array:   return !arrayValue.empty();
         default:                   return false;
         }
     }
@@ -186,6 +198,7 @@ struct Variant
         case PinDataType::String:
             try { return std::stoll(stringValue); }
             catch (...) { return 0; }
+        case PinDataType::Array:   return static_cast<int64_t>(arrayValue.size());
         default: return 0;
         }
     }
@@ -212,8 +225,28 @@ struct Variant
         case PinDataType::Boolean: return boolValue ? "True" : "False";
         case PinDataType::Integer: return std::to_string(intValue);
         case PinDataType::Float:   return std::to_string(floatValue);
+        case PinDataType::Array:
+        {
+            std::string result = "[";
+            for (size_t i = 0; i < arrayValue.size(); ++i)
+            {
+                if (i > 0) result += ", ";
+                result += arrayValue[i].asString();
+            }
+            result += "]";
+            return result;
+        }
         default:                   return std::string();
         }
+    }
+
+    // Array 访问方法
+    const std::vector<Variant>& asArray() const { return arrayValue; }
+    size_t arraySize() const { return arrayValue.size(); }
+    const Variant& arrayGet(size_t index) const
+    {
+        static Variant empty;
+        return (index < arrayValue.size()) ? arrayValue[index] : empty;
     }
 };
 

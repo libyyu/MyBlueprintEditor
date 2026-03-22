@@ -4,7 +4,9 @@
 //   builtins/NodeDefs_Flow.cpp     - Flow Control（Branch, DoN, ForLoop, WhileLoop, ...）
 //   builtins/NodeDefs_Action.cpp   - Actions（InputActionFire, SetTimer, TraceByChannel, ...）
 //   builtins/NodeDefs_Math.cpp     - Math（+, -, *, /, <, >, ==, AND, OR, IntToFloat, Abs, Clamp, ...）
-//   builtins/NodeDefs_Debug.cpp    - Debug（PrintString, MakeString, AppendString, StringLength, Log）
+//   builtins/NodeDefs_Debug.cpp    - Debug（PrintString, Log）
+//   builtins/NodeDefs_String.cpp   - Misc/String（MakeString, AppendString, StringLength, StringSplit, ...）
+//   builtins/NodeDefs_Array.cpp    - Misc/Array（ArrayLength, ArrayGet, ForEachLoop）
 //   builtins/NodeDefs_Tree.cpp     - Behavior Tree（Sequence, MoveTo, RandomWait）
 //   builtins/NodeDefs_Houdini.cpp  - Houdini（HoudiniTransform, HoudiniGroup）
 //   builtins/NodeDefs_Misc.cpp     - Misc（Message, Comment, GetVariable, SetVariable）
@@ -33,6 +35,8 @@ void BlueprintEditor::RegisterBuiltinNodeDefinitions()
     RegisterNodeDefs_Action();
     RegisterNodeDefs_Math();
     RegisterNodeDefs_Debug();
+    RegisterNodeDefs_String();
+    RegisterNodeDefs_Array();
     RegisterNodeDefs_Tree();
     RegisterNodeDefs_Houdini();
     RegisterNodeDefs_Misc();
