@@ -120,6 +120,13 @@ public:
     void MarkDownstreamAsHandled(const std::string& pinName);
     void MarkDownstreamAsHandled(PinId pinId);
 
+    // 获取当前节点指定引脚名对应的 PinId（用于在异步回调中捕获引脚ID）
+    PinId GetPinId(const std::string& pinName) const
+    {
+        auto it = m_pinNameToId.find(pinName);
+        return (it != m_pinNameToId.end()) ? it->second : InvalidPinId;
+    }
+
 private:
     friend class BlueprintRunner;
 
@@ -286,6 +293,10 @@ public:
     // 获取计时器管理器（可读写）
     FrameTimerManager&       GetTimerManager()       { return m_timerManager; }
     const FrameTimerManager& GetTimerManager() const { return m_timerManager; }
+
+    // 通过输入引脚ID找到连接的源节点并执行（用于 Function/Delegate 引脚的异步回调触发）
+    // 例如 SetTimer 的 Function Name 引脚连接了一个回调节点，timer 触发时调用此方法
+    bool FireConnectedNode(PinId inputPinId);
 
 private:
     friend class ExecutionContext;

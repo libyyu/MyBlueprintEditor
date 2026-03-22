@@ -792,5 +792,51 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     return ok;
 }
 
+// ============================================================================
+// FireConnectedNode: 通过输入引脚ID找到连接的源节点并执行
+// 用于 SetTimer 等节点在 timer 回调中触发 Function Name 引脚连接的回调节点
+// ============================================================================
+
+bool BlueprintRunner::FireConnectedNode(PinId inputPinId)
+{
+    if (!m_loaded || inputPinId == InvalidPinId) return false;
+
+    // 找到连接到该输入引脚的链接（startPin -> inputPinId）
+    for (const auto& link : m_blueprint.links)
+    {
+        if (!link.isEnabled) continue;
+        if (link.endPinId != inputPinId) continue;
+
+        // 找到源节点（连接到该输入引脚的输出端节点）
+        const NodeInstance* sourceNode = m_blueprint.findNodeByPin(link.startPinId);
+        if (!sourceNode) continue;
+
+        if (m_logCallback)
+        {
+            m_logCallback("[FIRE] Node '" + sourceNode->name +
+                "' (id=" + std::to_string(sourceNode->id) +
+                ", def=" + sourceNode->definitionId + ")");
+        }
+
+        // 执行该节点及其下游
+        if (!executeNodeInternal(*sourceNode))
+            return false;
+
+        // 传播输出值
+        propagatePinValues(*sourceNode);
+
+        // 激活该节点的所有输出 exec 引脚
+        for (const auto& pin : sourceNode->pins)
+        {
+            if (pin.kind == PinKind::Output && pin.isExec)
+            {
+                executeDownstreamFromPin(pin.id);
+            }
+        }
+    }
+
+    return true;
+}
+
 } // namespace Runtime
 } // namespace NodeEditor

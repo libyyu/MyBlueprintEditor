@@ -42,12 +42,22 @@ void BlueprintEditor::RegisterNodeDefs_Action()
         { MakeFlowPin(""), MakePin("Object", RTPinDataType::Object),
           MakePin("Function Name", RTPinDataType::Custom, false),
           MakePin("Time", RTPinDataType::Float), MakePin("Looping", RTPinDataType::Boolean) },
-        { MakeFlowPin("") },
+        { MakeFlowPin("Exec") },
         "80C3F8");
     {
         auto* d = const_cast<RTNodeDef*>(m_NodeRegistry.getNodeDefinition("SetTimer"));
         if (d && d->inputPins.size() >= 3)
             d->inputPins[2].customProperties["pinType"] = "Function";
+    }
+
+    reg("CustomEvent", "Custom Event", "Action",
+        {},
+        { MakePin("Event", RTPinDataType::Custom, false), MakeFlowPin("Exec") },
+        "A080F8");
+    {
+        auto* d = const_cast<RTNodeDef*>(m_NodeRegistry.getNodeDefinition("CustomEvent"));
+        if (d && !d->outputPins.empty())
+            d->outputPins[0].customProperties["pinType"] = "Function";
     }
 
     reg("TraceByChannel", "Single Line Trace by Channel", "Action",
