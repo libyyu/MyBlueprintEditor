@@ -637,8 +637,46 @@ void BlueprintEditor::OnFrame(float deltaTime)
                         ImGui::Spring(0);
                     }
 
+                    // [-] button for dynamic (removable) input pins
+                    if (node.HasDynamicInputs)
+                    {
+                        // Determine the index of this pin in Inputs
+                        int pinIdx = static_cast<int>(&input - node.Inputs.data());
+                        if (pinIdx >= node.DynamicInputFixedCount)
+                        {
+                            ImGui::Spring(0);
+                            ImGui::PushID(input.ID.AsPointer());
+                            ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.6f, 0.1f, 0.1f, 0.6f));
+                            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.2f, 0.2f, 0.8f));
+                            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+                            if (ImGui::SmallButton("-"))
+                            {
+                                // Remove all links connected to this pin
+                                ed::PinId pinId = input.ID;
+                                m_Links.erase(std::remove_if(m_Links.begin(), m_Links.end(),
+                                    [pinId](const Link& l) { return l.StartPinID == pinId || l.EndPinID == pinId; }),
+                                    m_Links.end());
+                                // Mark for removal (can't erase during iteration)
+                                // We'll handle it after builder.EndInput()
+                                node.Inputs[pinIdx].StringValue = "\x01REMOVE";
+                                m_IsDirty = true;
+                            }
+                            ImGui::PopStyleColor(3);
+                            ImGui::PopID();
+                        }
+                    }
+
                     ImGui::PopStyleVar();
                     builder.EndInput();
+                }
+
+                // Process pending removals for dynamic pins
+                if (node.HasDynamicInputs)
+                {
+                    node.Inputs.erase(std::remove_if(node.Inputs.begin(), node.Inputs.end(),
+                        [](const Pin& p) { return p.StringValue == "\x01REMOVE"; }),
+                        node.Inputs.end());
+                    BuildNode(&node);
                 }
 
                 if (isSimple)
@@ -648,6 +686,32 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     ImGui::Spring(1, 0);
                     ImGui::TextUnformatted(node.Name.c_str());
                     ImGui::Spring(1, 0);
+                }
+                else if (node.HasDynamicInputs)
+                {
+                    // For Blueprint nodes with dynamic inputs, use Middle() to place the [+] button
+                    builder.Middle();
+
+                    ImGui::PushID(node.ID.AsPointer());
+                    ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.1f, 0.4f, 0.1f, 0.6f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.6f, 0.2f, 0.8f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.3f, 0.8f, 0.3f, 1.0f));
+                    if (ImGui::SmallButton("+"))
+                    {
+                        // Generate next pin name: A, B, C, ... Z, AA, AB, ...
+                        int dynCount = static_cast<int>(node.Inputs.size());
+                        std::string pinName;
+                        int idx = dynCount;
+                        do {
+                            pinName = std::string(1, 'A' + (idx % 26)) + pinName;
+                            idx = idx / 26 - 1;
+                        } while (idx >= 0);
+                        node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
+                        BuildNode(&node);
+                        m_IsDirty = true;
+                    }
+                    ImGui::PopStyleColor(3);
+                    ImGui::PopID();
                 }
 
                 for (auto& output : node.Outputs)

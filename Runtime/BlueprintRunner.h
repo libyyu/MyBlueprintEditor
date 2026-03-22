@@ -101,7 +101,15 @@ public:
         if (OnLog) OnLog(message);
     }
 
-    void Delay(float seconds, const std::function<void()>& run) const;
+    TimerHandle Delay(float seconds, const std::function<void()>& callback);
+
+    TimerHandle SetTimer(float delay, TimerCallback callback);
+
+    // 完整版：指定间隔、重复次数（-1=无限循环）
+    TimerHandle SetTimer(float interval, int repeatCount, TimerCallback callback);
+
+    // 带名称版：可通过名称查找/取消
+    TimerHandle SetTimerByName(const std::string& name, float interval, int repeatCount, TimerCallback callback);
 
     // ----------------------------------------------------------------
     // 控制流 API —— 允许 handler 触发指定输出 exec 引脚连接的下游子图

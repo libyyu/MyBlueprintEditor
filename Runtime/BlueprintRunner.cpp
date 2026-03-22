@@ -571,7 +571,7 @@ void BlueprintRunner::ResetState()
     }
 }
 
-void ExecutionContext::Delay(float seconds, const std::function<void()>& run) const
+TimerHandle ExecutionContext::Delay(float seconds, const std::function<void()>& callback)
 {
     if (m_runner)
     {
@@ -581,10 +581,10 @@ void ExecutionContext::Delay(float seconds, const std::function<void()>& run) co
         auto savedPinNameToId = m_pinNameToId;
         auto savedNodeData = m_currentNodeData;
 
-        m_runner->GetTimerManager().SetTimer(seconds, [this, run, savedNode, savedPinNameToId, savedNodeData]()->bool 
+        return m_runner->GetTimerManager().SetTimer(seconds, [this, callback, savedNode, savedPinNameToId, savedNodeData]()->bool 
         {
             // 恢复 Delay 节点的 context 状态
-            auto* mutableThis = const_cast<ExecutionContext*>(this);
+            auto* mutableThis = this;
             auto prevNode = mutableThis->m_currentNode;
             auto prevPinNameToId = mutableThis->m_pinNameToId;
             auto prevNodeData = mutableThis->m_currentNodeData;
@@ -593,7 +593,7 @@ void ExecutionContext::Delay(float seconds, const std::function<void()>& run) co
             mutableThis->m_pinNameToId = savedPinNameToId;
             mutableThis->m_currentNodeData = savedNodeData;
 
-            run();
+            callback();
 
             // 恢复之前的状态
             mutableThis->m_currentNode = prevNode;
@@ -603,7 +603,120 @@ void ExecutionContext::Delay(float seconds, const std::function<void()>& run) co
             return false;
         });
     }
+
+    return  InvalidTimerHandle;
 }
+
+TimerHandle ExecutionContext::SetTimer(float seconds, TimerCallback callback)
+{
+    if (m_runner)
+    {
+        // 保存当前节点的 context 状态，因为 timer 回调在未来帧触发时
+        // m_currentNode / m_pinNameToId / m_currentNodeData 已被其他节点覆盖
+        auto savedNode = m_currentNode;
+        auto savedPinNameToId = m_pinNameToId;
+        auto savedNodeData = m_currentNodeData;
+
+        return m_runner->GetTimerManager().SetTimer(seconds, [this, callback, savedNode, savedPinNameToId, savedNodeData]()->bool 
+        {
+            // 恢复 Delay 节点的 context 状态
+            auto* mutableThis = this;
+            auto prevNode = mutableThis->m_currentNode;
+            auto prevPinNameToId = mutableThis->m_pinNameToId;
+            auto prevNodeData = mutableThis->m_currentNodeData;
+
+            mutableThis->m_currentNode = savedNode;
+            mutableThis->m_pinNameToId = savedPinNameToId;
+            mutableThis->m_currentNodeData = savedNodeData;
+
+            const bool ret = callback();
+
+            // 恢复之前的状态
+            mutableThis->m_currentNode = prevNode;
+            mutableThis->m_pinNameToId = prevPinNameToId;
+            mutableThis->m_currentNodeData = prevNodeData;
+
+            return ret;
+        });
+    }
+
+    return  InvalidTimerHandle;
+}
+
+// 完整版：指定间隔、重复次数（-1=无限循环）
+TimerHandle ExecutionContext::SetTimer(float seconds, int repeatCount, TimerCallback callback)
+{
+    if (m_runner)
+    {
+        // 保存当前节点的 context 状态，因为 timer 回调在未来帧触发时
+        // m_currentNode / m_pinNameToId / m_currentNodeData 已被其他节点覆盖
+        auto savedNode = m_currentNode;
+        auto savedPinNameToId = m_pinNameToId;
+        auto savedNodeData = m_currentNodeData;
+
+        return m_runner->GetTimerManager().SetTimer(seconds, repeatCount, [this, callback, savedNode, savedPinNameToId, savedNodeData]()->bool 
+        {
+            // 恢复 Delay 节点的 context 状态
+            auto* mutableThis = this;
+            auto prevNode = mutableThis->m_currentNode;
+            auto prevPinNameToId = mutableThis->m_pinNameToId;
+            auto prevNodeData = mutableThis->m_currentNodeData;
+
+            mutableThis->m_currentNode = savedNode;
+            mutableThis->m_pinNameToId = savedPinNameToId;
+            mutableThis->m_currentNodeData = savedNodeData;
+
+            const bool ret = callback();
+
+            // 恢复之前的状态
+            mutableThis->m_currentNode = prevNode;
+            mutableThis->m_pinNameToId = prevPinNameToId;
+            mutableThis->m_currentNodeData = prevNodeData;
+
+            return ret;
+        });
+    }
+
+    return  InvalidTimerHandle;
+}
+
+// 带名称版：可通过名称查找/取消
+TimerHandle ExecutionContext::SetTimerByName(const std::string& name, float seconds, int repeatCount, TimerCallback callback)
+{
+    if (m_runner)
+    {
+        // 保存当前节点的 context 状态，因为 timer 回调在未来帧触发时
+        // m_currentNode / m_pinNameToId / m_currentNodeData 已被其他节点覆盖
+        auto savedNode = m_currentNode;
+        auto savedPinNameToId = m_pinNameToId;
+        auto savedNodeData = m_currentNodeData;
+
+        return m_runner->GetTimerManager().SetTimerByName(name, seconds, repeatCount, [this, callback, savedNode, savedPinNameToId, savedNodeData]()->bool 
+        {
+            // 恢复 Delay 节点的 context 状态
+            auto* mutableThis = this;
+            auto prevNode = mutableThis->m_currentNode;
+            auto prevPinNameToId = mutableThis->m_pinNameToId;
+            auto prevNodeData = mutableThis->m_currentNodeData;
+
+            mutableThis->m_currentNode = savedNode;
+            mutableThis->m_pinNameToId = savedPinNameToId;
+            mutableThis->m_currentNodeData = savedNodeData;
+
+            const bool ret = callback();
+
+            // 恢复之前的状态
+            mutableThis->m_currentNode = prevNode;
+            mutableThis->m_pinNameToId = prevPinNameToId;
+            mutableThis->m_currentNodeData = prevNodeData;
+
+            return ret;
+        });
+    }
+
+    return  InvalidTimerHandle;
+}
+
 
 // ============================================================================
 // 控制流：ActivateOutputFlow

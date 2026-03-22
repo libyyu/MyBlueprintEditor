@@ -67,6 +67,13 @@ struct Node
     std::string State;
     std::string SavedState;
 
+    // Dynamic input pins support (like UE's Append node)
+    // When non-empty, the node supports adding/removing input pins of this type.
+    // The first N pins (defined in the node definition) are fixed; extra ones are dynamic.
+    PinType     DynamicInputPinType = PinType::Flow;  // type of dynamic pins
+    int         DynamicInputFixedCount = 0;           // number of fixed (non-removable) input pins
+    bool        HasDynamicInputs = false;             // whether dynamic inputs are enabled
+
     Node(int id, const char* name, ImColor color = ImColor(255, 255, 255)):
         ID(id), Name(name), Color(color), Type(NodeType::Blueprint), Size(0, 0)
     {

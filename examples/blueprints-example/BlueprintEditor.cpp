@@ -270,6 +270,23 @@ Node* BlueprintEditor::SpawnNodeByDef(const std::string& defId)
     }
 
     BuildNode(&node);
+
+    // Check for dynamic input pins support
+    auto dynIt = def->customProperties.find("dynamicInputs");
+    if (dynIt != def->customProperties.end() && !dynIt->second.empty())
+    {
+        node.HasDynamicInputs = true;
+        node.DynamicInputFixedCount = static_cast<int>(node.Inputs.size());
+        // Parse pin type from the property value (e.g. "String", "Float", "Int", "Bool")
+        const std::string& dynType = dynIt->second;
+        if (dynType == "String")       node.DynamicInputPinType = PinType::String;
+        else if (dynType == "Float")   node.DynamicInputPinType = PinType::Float;
+        else if (dynType == "Int")     node.DynamicInputPinType = PinType::Int;
+        else if (dynType == "Bool")    node.DynamicInputPinType = PinType::Bool;
+        else if (dynType == "Object")  node.DynamicInputPinType = PinType::Object;
+        else                           node.DynamicInputPinType = PinType::String;
+    }
+
     return &node;
 }
 

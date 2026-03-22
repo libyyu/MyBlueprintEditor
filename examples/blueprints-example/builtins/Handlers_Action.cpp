@@ -17,7 +17,7 @@ void BlueprintEditor::RegisterHandlers_Action()
         ctx.Log("  [SetTimer] interval=" + std::to_string(interval) + "s, looping=" + (looping ? "true" : "false"));
 
         // Register a main-thread timer via FrameTimerManager
-        GetTimerManager().SetTimer(interval, repeat, [this, funcPinId, looping]() {
+        ctx.SetTimer(interval, repeat, [this, funcPinId, looping]() {
             m_ExecutionLog.push_back("[Timer] fired! looping=" + std::string(looping ? "true" : "false"));
             m_ExecutionLogDirty = true;
 

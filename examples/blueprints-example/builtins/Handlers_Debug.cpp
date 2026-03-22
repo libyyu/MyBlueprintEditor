@@ -10,9 +10,24 @@ void BlueprintEditor::RegisterHandlers_Debug()
     };
 
     m_HandlerRegistry["AppendString"] = [](RTContext& ctx) {
-        auto a = ctx.GetInputValue("A").asString();
-        auto b = ctx.GetInputValue("B").asString();
-        ctx.SetOutputValue("Result", RTVariant(a + b));
+        // Iterate all input pins of the current node and concatenate their string values.
+        // This supports dynamic pins (A, B, C, D, ...) added at edit time.
+        std::string result;
+        const auto* node = ctx.GetCurrentNode();
+        if (node)
+        {
+            for (const auto& pin : node->pins)
+            {
+                if (pin.kind == PinKind::Input && !pin.isExec)
+                    result += ctx.GetInputValue(pin.id).asString();
+            }
+        }
+        else
+        {
+            // Fallback: read A and B only
+            result = ctx.GetInputValue("A").asString() + ctx.GetInputValue("B").asString();
+        }
+        ctx.SetOutputValue("Result", RTVariant(result));
         return true;
     };
 
