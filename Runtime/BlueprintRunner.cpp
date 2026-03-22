@@ -321,10 +321,19 @@ ExecutionResult BlueprintRunner::Execute()
 
     // 按拓扑顺序执行
     m_flowExecutedNodes.clear(); // 清空控制流已执行记录
+
+    // 收集所有事件源节点及其 exec 下游子图（如 CustomEvent → Print String）
+    // 这些节点不在主循环中执行，只在被外部触发（如 Timer 回调）时执行
+    auto eventSubgraph = m_blueprint.collectEventSubgraphs();
+
     for (NodeId nodeId : order)
     {
         // 跳过已被控制流（ActivateOutputFlow）递归执行过的节点
         if (m_flowExecutedNodes.count(nodeId))
+            continue;
+
+        // 跳过事件子图中的节点（它们只在被外部触发时执行）
+        if (eventSubgraph.count(nodeId))
             continue;
 
         const NodeInstance* node = m_blueprint.findNode(nodeId);
@@ -824,20 +833,45 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     std::sort(directTargets.begin(), directTargets.end());
     directTargets.erase(std::unique(directTargets.begin(), directTargets.end()), directTargets.end());
 
-    // 收集所有需要执行的节点：
-    //   1. 直接目标节点（exec连接的下游）
-    //   2. 它们的全部下游依赖
-    //   3. 目标节点的数据上游依赖（非exec连接的上游纯数据节点，如类型转换节点）
-    // 然后按拓扑序执行
+    // 收集需要执行的节点：
+    //   从直接目标开始，沿 exec 链展开下游节点。但遇到"多 exec 输出引脚"
+    //   的控制流节点（如 Branch、ForLoop）时，收集该节点本身但**不继续展开**
+    //   它的 exec 下游，因为这些节点的 handler 会通过 ActivateOutputFlow 自行
+    //   管理其子图的执行。
+    //   最后，为所有收集到的节点补充数据上游依赖。
     std::unordered_set<NodeId> targetSet(directTargets.begin(), directTargets.end());
-    for (auto nodeId : directTargets)
+
+    // 沿 exec 链展开
     {
-        auto downstream = GetDownstreamNodes(nodeId);
-        for (auto id : downstream)
-            targetSet.insert(id);
+        std::queue<NodeId> expandQueue;
+        for (auto id : directTargets) expandQueue.push(id);
+        while (!expandQueue.empty())
+        {
+            NodeId cur = expandQueue.front();
+            expandQueue.pop();
+
+            int execOutCount = m_blueprint.countExecOutputPins(cur);
+
+            // 如果该节点有多个已连接的 exec 输出引脚，说明是控制流节点
+            // 不继续展开其 exec 下游（由其 handler 管理）
+            if (execOutCount > 1)
+                continue;
+
+            // 单 exec 输出（或无 exec 输出）的普通节点，继续沿 exec 链展开
+            auto execDownstream = m_blueprint.getExecOutputNodes(cur);
+            for (auto id : execDownstream)
+            {
+                if (targetSet.insert(id).second)
+                {
+                    expandQueue.push(id);
+                }
+            }
+        }
     }
 
-    // 递归收集目标节点的数据上游依赖（排除触发当前流的源节点自身）
+    // 递归收集所有目标节点的数据上游依赖（排除触发当前流的源节点自身）
+    // 同时排除事件源节点（无 exec 输入、有 exec 输出的节点，如 CustomEvent）
+    // 它们虽然通过数据连接（Function/Delegate引脚）被引用，但不应作为数据依赖执行
     {
         NodeId sourceNodeId = savedNode ? savedNode->id : 0;
         std::queue<NodeId> depQueue;
@@ -849,10 +883,11 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
             auto dataInputs = m_blueprint.getDataInputNodes(cur);
             for (auto depId : dataInputs)
             {
-                if (depId == sourceNodeId) continue; // 不重新执行触发流的源节点
+                if (depId == sourceNodeId) continue;
+                if (m_blueprint.isEventSourceNode(depId)) continue;
                 if (targetSet.insert(depId).second)
                 {
-                    depQueue.push(depId); // 新加入的节点也要递归查找其数据依赖
+                    depQueue.push(depId);
                 }
             }
         }
@@ -870,10 +905,22 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
         return false; // cycle
     }
 
+    // executedHere: 追踪在本次执行循环中，被内层 ActivateOutputFlow 递归执行过的节点
+    // 用于防止"单 exec 输出节点的 handler 调用 ActivateOutputFlow 后，
+    // 其下游在当前循环中又被重复执行"的问题。
+    // 注意：不能用全局 m_flowExecutedNodes 做此判断，因为 ForLoop 等控制流节点
+    // 会多次调用 ActivateOutputFlow 重复执行同一批循环体节点，全局集合会导致
+    // 第二次迭代开始所有节点被误跳过。
+    std::unordered_set<NodeId> executedHere;
+
     bool ok = true;
     for (NodeId id : fullOrder)
     {
         if (targetSet.find(id) == targetSet.end())
+            continue;
+
+        // 跳过在本次循环中已被内层 ActivateOutputFlow 递归执行过的节点
+        if (executedHere.count(id))
             continue;
 
         const NodeInstance* node = m_blueprint.findNode(id);
@@ -886,14 +933,28 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
                 ", def=" + node->definitionId + ")");
         }
 
+        // 记录执行前 m_flowExecutedNodes 的快照，用于检测内层递归新增的节点
+        auto snapshotBefore = m_flowExecutedNodes;
+
         if (!executeNodeInternal(*node))
         {
             ok = false;
             break;
         }
 
-        // 记录已被控制流递归执行过的节点，主循环将跳过它们
+        // 标记为全局已执行（供主循环 execute() 使用）
         m_flowExecutedNodes.insert(id);
+
+        // 如果该节点的 handler 通过 ActivateOutputFlow 递归执行了更多节点，
+        // 把这些新增节点加入 executedHere，在当前循环中跳过（防止重复执行）
+        if (m_flowExecutedNodes.size() > snapshotBefore.size() + 1)
+        {
+            for (auto flowId : m_flowExecutedNodes)
+            {
+                if (flowId != id && !snapshotBefore.count(flowId))
+                    executedHere.insert(flowId);
+            }
+        }
     }
 
     // 恢复 context 状态
@@ -931,21 +992,12 @@ bool BlueprintRunner::FireConnectedNode(PinId inputPinId)
                 ", def=" + sourceNode->definitionId + ")");
         }
 
-        // 执行该节点及其下游
+        // 执行该节点（handler 内部会通过 ActivateOutputFlow 自行管理下游执行）
         if (!executeNodeInternal(*sourceNode))
             return false;
 
         // 传播输出值
         propagatePinValues(*sourceNode);
-
-        // 激活该节点的所有输出 exec 引脚
-        for (const auto& pin : sourceNode->pins)
-        {
-            if (pin.kind == PinKind::Output && pin.isExec)
-            {
-                executeDownstreamFromPin(pin.id);
-            }
-        }
     }
 
     return true;

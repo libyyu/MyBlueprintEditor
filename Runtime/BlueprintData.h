@@ -7,6 +7,8 @@
 #include "NodeDefinition.h"
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
+#include <queue>
 #include <string>
 
 namespace NodeEditor {
@@ -245,6 +247,92 @@ struct BlueprintData
                     {
                         result.push_back(sourceNode->id);
                     }
+                }
+            }
+        }
+        return result;
+    }
+    
+    // 辅助方法：获取通过 exec 输出引脚连接的下游节点列表
+    std::vector<NodeId> getExecOutputNodes(NodeId nodeId) const
+    {
+        std::vector<NodeId> result;
+        const NodeInstance* node = findNode(nodeId);
+        if (!node) return result;
+        
+        for (const auto& pin : node->pins)
+        {
+            if (pin.kind == PinKind::Output && pin.isExec)
+            {
+                auto findLinks = findLinksByPin(pin.id);
+                for (const auto* link : findLinks)
+                {
+                    const NodeInstance* targetNode = findNodeByPin(link->endPinId);
+                    if (targetNode)
+                        result.push_back(targetNode->id);
+                }
+            }
+        }
+        return result;
+    }
+    
+    // 辅助方法：计算节点的 exec 输出引脚总数（不论是否有连接）
+    // 用于判断该节点是否为控制流节点（>=2 说明有分支语义，如 Branch 的 True/False）
+    int countExecOutputPins(NodeId nodeId) const
+    {
+        int count = 0;
+        const NodeInstance* node = findNode(nodeId);
+        if (!node) return 0;
+        
+        for (const auto& pin : node->pins)
+        {
+            if (pin.kind == PinKind::Output && pin.isExec)
+                ++count;
+        }
+        return count;
+    }
+    
+    // 辅助方法：判断节点是否为"事件源"节点
+    // 事件源节点没有 exec 输入引脚，但有 exec 输出引脚（如 CustomEvent、InputActionFire）
+    // 这类节点不应在主循环中执行，只在被外部触发（如 Timer、输入事件）时执行
+    bool isEventSourceNode(NodeId nodeId) const
+    {
+        const NodeInstance* node = findNode(nodeId);
+        if (!node) return false;
+        
+        bool hasExecInput = false;
+        bool hasExecOutput = false;
+        for (const auto& pin : node->pins)
+        {
+            if (pin.kind == PinKind::Input && pin.isExec)
+                hasExecInput = true;
+            if (pin.kind == PinKind::Output && pin.isExec)
+                hasExecOutput = true;
+        }
+        return !hasExecInput && hasExecOutput;
+    }
+    
+    // 辅助方法：收集所有事件源节点及其 exec 下游子图的节点集合
+    // 这些节点在主执行循环中应被跳过
+    std::unordered_set<NodeId> collectEventSubgraphs() const
+    {
+        std::unordered_set<NodeId> result;
+        for (const auto& node : nodes)
+        {
+            if (!isEventSourceNode(node.id)) continue;
+            // BFS 沿 exec 链收集事件子图
+            std::queue<NodeId> q;
+            q.push(node.id);
+            result.insert(node.id);
+            while (!q.empty())
+            {
+                NodeId cur = q.front();
+                q.pop();
+                auto downstream = getExecOutputNodes(cur);
+                for (auto downId : downstream)
+                {
+                    if (result.insert(downId).second)
+                        q.push(downId);
                 }
             }
         }

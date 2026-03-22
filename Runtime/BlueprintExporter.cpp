@@ -754,6 +754,17 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
 
     auto& rootObj = root;
 
+    // 自动检测 .editor.json 格式：如果包含 "runtime" 子对象，
+    // 说明这是 editor 文件，真正的 runtime 数据嵌套在 "runtime" 字段中。
+    // 递归调用自身来解析内嵌的 runtime 数据。
+    if (rootObj.contains("runtime") && rootObj["runtime"].type() == crude_json::type_t::object)
+    {
+        std::string runtimeJson = rootObj["runtime"].dump();
+        result = importRuntimeFromString(runtimeJson, options);
+        result.bytesRead = content.size();
+        return result;
+    }
+
     // ---- 辅助 lambda ----
     auto getNumber = [](const crude_json::value& obj, const char* key, double defaultVal = 0.0) -> double {
         if (obj.contains(key) && obj[key].type() == crude_json::type_t::number)
