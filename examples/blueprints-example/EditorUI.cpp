@@ -582,6 +582,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     auto alpha = ImGui::GetStyle().Alpha;
                     if (newLinkPin && !CanCreateLink(newLinkPin, &input) && &input != newLinkPin)
                         alpha = alpha * (48.0f / 255.0f);
+                    // 孤立引脚整体半透明
+                    if (input.IsOrphaned)
+                        alpha = alpha * 0.5f;
 
                     builder.Input(input.ID);
                     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
@@ -589,7 +592,31 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     ImGui::Spring(0);
                     if (!input.Name.empty())
                     {
-                        ImGui::TextUnformatted(input.Name.c_str());
+                        if (input.IsOrphaned)
+                        {
+                            // 孤立引脚：红色 + 删除线
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.3f, alpha));
+                            auto cursorBefore = ImGui::GetCursorScreenPos();
+                            ImGui::TextUnformatted(input.Name.c_str());
+                            auto textSize = ImGui::CalcTextSize(input.Name.c_str());
+                            float lineY = cursorBefore.y + textSize.y * 0.5f;
+                            ImGui::GetWindowDrawList()->AddLine(
+                                ImVec2(cursorBefore.x, lineY),
+                                ImVec2(cursorBefore.x + textSize.x, lineY),
+                                IM_COL32(255, 80, 80, (int)(alpha * 255)), 1.0f);
+                            ImGui::PopStyleColor();
+                        }
+                        else if (input.IsRequired && !IsPinLinked(input.ID))
+                        {
+                            // 必须连接但未连线：橙色警告
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.6f, 0.0f, 1.0f));
+                            ImGui::TextUnformatted(input.Name.c_str());
+                            ImGui::PopStyleColor();
+                        }
+                        else
+                        {
+                            ImGui::TextUnformatted(input.Name.c_str());
+                        }
                         ImGui::Spring(0);
                     }
 
@@ -726,13 +753,31 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     auto alpha = ImGui::GetStyle().Alpha;
                     if (newLinkPin && !CanCreateLink(newLinkPin, &output) && &output != newLinkPin)
                         alpha = alpha * (48.0f / 255.0f);
+                    if (output.IsOrphaned)
+                        alpha = alpha * 0.5f;
 
                     builder.Output(output.ID);
                     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
                     if (!output.Name.empty())
                     {
                         ImGui::Spring(0);
-                        ImGui::TextUnformatted(output.Name.c_str());
+                        if (output.IsOrphaned)
+                        {
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.3f, alpha));
+                            auto cursorBefore = ImGui::GetCursorScreenPos();
+                            ImGui::TextUnformatted(output.Name.c_str());
+                            auto textSize = ImGui::CalcTextSize(output.Name.c_str());
+                            float lineY = cursorBefore.y + textSize.y * 0.5f;
+                            ImGui::GetWindowDrawList()->AddLine(
+                                ImVec2(cursorBefore.x, lineY),
+                                ImVec2(cursorBefore.x + textSize.x, lineY),
+                                IM_COL32(255, 80, 80, (int)(alpha * 255)), 1.0f);
+                            ImGui::PopStyleColor();
+                        }
+                        else
+                        {
+                            ImGui::TextUnformatted(output.Name.c_str());
+                        }
                     }
                     ImGui::Spring(0);
                     DrawPinIcon(output, IsPinLinked(output.ID), (int)(alpha * 255));
@@ -741,6 +786,38 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 }
 
             builder.End();
+
+            // ---- 错误节点视觉反馈（UE4 风格）----
+            if (node.HasError)
+            {
+                auto drawList = ed::GetNodeBackgroundDrawList(node.ID);
+                auto nodeMin = ed::GetNodePosition(node.ID);
+                auto nodeSize = ed::GetNodeSize(node.ID);
+                auto nodeMax = ImVec2(nodeMin.x + nodeSize.x, nodeMin.y + nodeSize.y);
+                // 将画布坐标转换为屏幕坐标
+                auto screenMin = ed::CanvasToScreen(nodeMin);
+                auto screenMax = ed::CanvasToScreen(nodeMax);
+
+                // 红色边框
+                drawList->AddRect(
+                    screenMin - ImVec2(2, 2),
+                    screenMax + ImVec2(2, 2),
+                    IM_COL32(255, 40, 40, 200), 6.0f, 0, 2.5f);
+
+                // 错误信息：在节点底部渲染红色文字
+                if (!node.ErrorMessage.empty())
+                {
+                    auto textSize = ImGui::CalcTextSize(node.ErrorMessage.c_str());
+                    auto textPos = ImVec2(
+                        screenMin.x + (screenMax.x - screenMin.x - textSize.x) * 0.5f,
+                        screenMax.y + 2.0f);
+                    drawList->AddRectFilled(
+                        textPos - ImVec2(4, 1),
+                        textPos + textSize + ImVec2(4, 1),
+                        IM_COL32(80, 0, 0, 200), 3.0f);
+                    drawList->AddText(textPos, IM_COL32(255, 100, 100, 255), node.ErrorMessage.c_str());
+                }
+            }
         }
 
         // ================================================================

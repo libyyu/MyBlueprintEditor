@@ -49,6 +49,10 @@ struct Pin
     float       FloatValue  = 0.0f;
     std::string StringValue;
 
+    // 错误状态（UE4 风格）
+    bool        IsOrphaned  = false;   // 孤立引脚：NodeDef 中已删除但旧 JSON 中仍存在
+    bool        IsRequired  = false;   // 必须连接的引脚（如 Delegate 类型）
+
     Pin(int id, const char* name, PinType type):
         ID(id), Node(nullptr), Name(name), Type(type), Kind(PinKind::Input)
     {
@@ -75,6 +79,10 @@ struct Node
     PinType     DynamicInputPinType = PinType::Flow;  // type of dynamic pins
     int         DynamicInputFixedCount = 0;           // number of fixed (non-removable) input pins
     bool        HasDynamicInputs = false;             // whether dynamic inputs are enabled
+
+    // 错误状态（UE4 风格）
+    bool        HasError = false;                     // 节点是否有错误
+    std::string ErrorMessage;                         // 错误描述信息
 
     Node(int id, const char* name, ImColor color = ImColor(255, 255, 255)):
         ID(id), Name(name), Color(color), Type(NodeType::Blueprint), Size(0, 0)

@@ -387,17 +387,13 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
         }
         else
         {
-            // 定义未找到，创建一个通用节点
+            // 定义未找到 → 标记为错误节点（UE4 风格）
             m_Nodes.emplace_back(newNodeId, rtNode.name.c_str());
             auto& node = m_Nodes.back();
             node.DefinitionId = rtNode.definitionId;
-            
-            // 检查是否是 Execute Blueprint 节点
-            if (rtNode.definitionId == "ExecuteBlueprint")
-            {
-                ImColor color(255, 165, 0); // 橙色
-                node.Color = color;
-            }
+            node.HasError = true;
+            node.ErrorMessage = "Node definition '" + rtNode.definitionId + "' not found";
+            node.Color = ImColor(180, 0, 0); // 深红色表示错误
         }
         
         auto& node = m_Nodes.back();
@@ -434,6 +430,212 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
                 node.Outputs.emplace_back(newPinId, rtPin.name.c_str(), pt);
             }
         }
+        
+        // ============================================================
+        // 引脚调和（Reconcile）—— UE4 风格
+        // 1) 标记孤立引脚（JSON 有但 NodeDef 没有）→ 不删除，保留但标记
+        // 2) 补全新增引脚（NodeDef 有但 JSON 没有）→ 追加
+        // 3) 标记必须连接的引脚（Delegate 类型等）
+        // 4) 如果发生任何变化 → m_IsDirty = true
+        // ============================================================
+        bool reconcileChanged = false;
+        
+        if (def)
+        {
+            // ---- 辅助 lambda：判断引脚名是否存在于 PinDef 列表中 ----
+            auto pinExistsInDef = [](const std::string& pinName, PinType pinType,
+                                     const std::vector<::NodeEditor::Runtime::PinDefinition>& pinDefs) -> bool
+            {
+                if (!pinName.empty())
+                {
+                    for (const auto& pd : pinDefs)
+                    {
+                        if (pd.name == pinName)
+                            return true;
+                    }
+                    return false;
+                }
+                // 无名 exec 引脚：只要 def 中还有任何无名 exec 引脚，就视为存在
+                if (pinType == PinType::Flow)
+                {
+                    for (const auto& pd : pinDefs)
+                    {
+                        if (pd.name.empty() && pd.isExec)
+                            return true;
+                    }
+                }
+                return false;
+            };
+
+            // --- 1) 标记孤立输入引脚（NodeDef 中已不存在的引脚）---
+            {
+                size_t fixedCount = node.HasDynamicInputs
+                    ? (size_t)node.DynamicInputFixedCount
+                    : node.Inputs.size();
+                for (size_t i = 0; i < fixedCount && i < node.Inputs.size(); ++i)
+                {
+                    if (!pinExistsInDef(node.Inputs[i].Name, node.Inputs[i].Type, def->inputPins))
+                    {
+                        node.Inputs[i].IsOrphaned = true;
+                        reconcileChanged = true;
+                    }
+                }
+            }
+
+            // --- 2) 标记孤立输出引脚 ---
+            for (size_t i = 0; i < node.Outputs.size(); ++i)
+            {
+                if (!pinExistsInDef(node.Outputs[i].Name, node.Outputs[i].Type, def->outputPins))
+                {
+                    node.Outputs[i].IsOrphaned = true;
+                    reconcileChanged = true;
+                }
+            }
+
+            // --- 3) 补全缺失的输入引脚 ---
+            for (size_t di = 0; di < def->inputPins.size(); ++di)
+            {
+                const auto& pinDef = def->inputPins[di];
+                bool found = false;
+                for (const auto& existingPin : node.Inputs)
+                {
+                    if (!existingPin.IsOrphaned && existingPin.Name == pinDef.name)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found && pinDef.name.empty())
+                {
+                    size_t emptyNameIdx = 0;
+                    for (size_t k = 0; k <= di; ++k)
+                    {
+                        if (def->inputPins[k].name.empty() && def->inputPins[k].isExec)
+                            ++emptyNameIdx;
+                    }
+                    size_t existingEmptyCount = 0;
+                    for (const auto& existingPin : node.Inputs)
+                    {
+                        if (!existingPin.IsOrphaned && existingPin.Name.empty() && existingPin.Type == PinType::Flow)
+                            ++existingEmptyCount;
+                    }
+                    if (emptyNameIdx <= existingEmptyCount)
+                        found = true;
+                }
+                if (!found)
+                {
+                    PinType pt = MapRTPinDataType(pinDef.dataType, pinDef.isExec);
+                    int newPinId = GetNextId();
+                    // 计算插入位置：跳过孤立引脚，按 def 顺序插入
+                    size_t insertPos = 0;
+                    size_t defIdx = 0;
+                    for (size_t j = 0; j < node.Inputs.size() && defIdx < di; ++j)
+                    {
+                        if (!node.Inputs[j].IsOrphaned)
+                            ++defIdx;
+                        insertPos = j + 1;
+                    }
+                    if (insertPos > node.Inputs.size())
+                        insertPos = node.Inputs.size();
+                    node.Inputs.emplace(node.Inputs.begin() + insertPos, newPinId, pinDef.name.c_str(), pt);
+                    auto& pin = node.Inputs[insertPos];
+                    if (pinDef.dataType == RTPinDataType::Boolean)
+                        pin.BoolValue = pinDef.defaultValue.asBool();
+                    else if (pinDef.dataType == RTPinDataType::Integer)
+                        pin.IntValue = static_cast<int>(pinDef.defaultValue.asInt());
+                    else if (pinDef.dataType == RTPinDataType::Float)
+                        pin.FloatValue = static_cast<float>(pinDef.defaultValue.asFloat());
+                    else if (pinDef.dataType == RTPinDataType::String)
+                        pin.StringValue = pinDef.defaultValue.asString();
+                    reconcileChanged = true;
+                }
+            }
+            
+            // --- 4) 补全缺失的输出引脚 ---
+            for (size_t di = 0; di < def->outputPins.size(); ++di)
+            {
+                const auto& pinDef = def->outputPins[di];
+                bool found = false;
+                for (const auto& existingPin : node.Outputs)
+                {
+                    if (!existingPin.IsOrphaned && existingPin.Name == pinDef.name)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found && pinDef.name.empty())
+                {
+                    size_t emptyNameIdx = 0;
+                    for (size_t k = 0; k <= di; ++k)
+                    {
+                        if (def->outputPins[k].name.empty() && def->outputPins[k].isExec)
+                            ++emptyNameIdx;
+                    }
+                    size_t existingEmptyCount = 0;
+                    for (const auto& existingPin : node.Outputs)
+                    {
+                        if (!existingPin.IsOrphaned && existingPin.Name.empty() && existingPin.Type == PinType::Flow)
+                            ++existingEmptyCount;
+                    }
+                    if (emptyNameIdx <= existingEmptyCount)
+                        found = true;
+                }
+                if (!found)
+                {
+                    PinType pt = MapRTPinDataType(pinDef.dataType, pinDef.isExec);
+                    int newPinId = GetNextId();
+                    size_t insertPos = 0;
+                    size_t defIdx = 0;
+                    for (size_t j = 0; j < node.Outputs.size() && defIdx < di; ++j)
+                    {
+                        if (!node.Outputs[j].IsOrphaned)
+                            ++defIdx;
+                        insertPos = j + 1;
+                    }
+                    if (insertPos > node.Outputs.size())
+                        insertPos = node.Outputs.size();
+                    node.Outputs.emplace(node.Outputs.begin() + insertPos, newPinId, pinDef.name.c_str(), pt);
+                    reconcileChanged = true;
+                }
+            }
+
+            // --- 5) 标记必须连接的引脚（Delegate/Function 类型输入引脚）---
+            for (size_t i = 0; i < def->inputPins.size() && i < node.Inputs.size(); ++i)
+            {
+                auto pinTypeIt = def->inputPins[i].customProperties.find("pinType");
+                if (pinTypeIt != def->inputPins[i].customProperties.end() &&
+                    (pinTypeIt->second == "Delegate" || pinTypeIt->second == "Function"))
+                {
+                    // 找到对应的编辑器引脚（按名称匹配）
+                    for (auto& edPin : node.Inputs)
+                    {
+                        if (edPin.Name == def->inputPins[i].name && !edPin.IsOrphaned)
+                        {
+                            edPin.IsRequired = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // --- 如果有孤立引脚，标记节点有警告 ---
+            bool hasOrphaned = false;
+            for (const auto& p : node.Inputs)
+                if (p.IsOrphaned) { hasOrphaned = true; break; }
+            if (!hasOrphaned)
+                for (const auto& p : node.Outputs)
+                    if (p.IsOrphaned) { hasOrphaned = true; break; }
+            if (hasOrphaned)
+            {
+                node.HasError = true;
+                node.ErrorMessage = "Node has orphaned pins (removed from definition)";
+            }
+        }
+        
+        // 如果引脚调和发生了变化，标记文件为"未保存"
+        if (reconcileChanged)
+            m_IsDirty = true;
         
         // 应用特殊引脚类型
         if (def)
