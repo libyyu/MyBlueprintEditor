@@ -211,6 +211,9 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
     
     std::string title = "Blueprint Editor - " + GetFileBaseName(m_CurrentFilePath);
     SetTitle(title.c_str());
+
+    // 添加到最近文件列表
+    AddRecentFile(path);
     
     m_ExecutionLog.push_back("[INFO] Opened: " + path);
     if (!result.warnings.empty())
@@ -266,6 +269,9 @@ void BlueprintEditor::DoSaveFile(const std::string& path)
         m_IsDirty = false;
         std::string title = "Blueprint Editor - " + GetFileBaseName(path);
         SetTitle(title.c_str());
+
+        // 添加到最近文件列表
+        AddRecentFile(path);
         
         m_ExecutionLog.push_back("[INFO] Saved: " + path + " (" + 
             std::to_string(result.runtimeBytes) + " + " + 
@@ -732,4 +738,105 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
             }
         }
     }
+}
+
+// ============================================================================
+// 最近文件列表
+// ============================================================================
+
+void BlueprintEditor::AddRecentFile(const std::string& path)
+{
+    // 如果已存在，移到最前面
+    auto it = std::find(m_RecentFiles.begin(), m_RecentFiles.end(), path);
+    if (it != m_RecentFiles.end())
+        m_RecentFiles.erase(it);
+
+    m_RecentFiles.insert(m_RecentFiles.begin(), path);
+
+    // 保持最大数量
+    while (static_cast<int>(m_RecentFiles.size()) > MaxRecentFiles)
+        m_RecentFiles.pop_back();
+
+    // 持久化到磁盘
+    SaveRecentFiles();
+}
+
+// ============================================================================
+// 最近文件列表持久化
+// ============================================================================
+
+static const char* kRecentFilesName = "Blueprint Editor.recent.txt";
+
+void BlueprintEditor::SaveRecentFiles()
+{
+    std::ofstream ofs(kRecentFilesName);
+    if (!ofs.is_open())
+        return;
+    for (const auto& path : m_RecentFiles)
+        ofs << path << "\n";
+}
+
+void BlueprintEditor::LoadRecentFiles()
+{
+    std::ifstream ifs(kRecentFilesName);
+    if (!ifs.is_open())
+        return;
+
+    m_RecentFiles.clear();
+    std::string line;
+    while (std::getline(ifs, line))
+    {
+        // 去除尾部的 \r（跨平台兼容）
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+        if (!line.empty())
+            m_RecentFiles.push_back(line);
+    }
+
+    // 确保不超过最大数量
+    while (static_cast<int>(m_RecentFiles.size()) > MaxRecentFiles)
+        m_RecentFiles.pop_back();
+}
+
+void BlueprintEditor::DrawRecentFilesMenu()
+{
+    if (m_RecentFiles.empty())
+    {
+        ImGui::MenuItem("(No Recent Files)", nullptr, false, false);
+        return;
+    }
+
+    for (int i = 0; i < static_cast<int>(m_RecentFiles.size()); ++i)
+    {
+        const auto& path = m_RecentFiles[i];
+        // 显示文件名 + 完整路径作为 tooltip
+        size_t lastSlash = path.find_last_of("/\\");
+        std::string displayName = (lastSlash != std::string::npos) ? path.substr(lastSlash + 1) : path;
+        std::string label = std::to_string(i + 1) + ". " + displayName;
+
+        if (ImGui::MenuItem(label.c_str()))
+        {
+            // 检查是否已在某个标签页中打开
+            bool alreadyOpen = false;
+            for (int j = 0; j < static_cast<int>(m_Documents.size()); ++j)
+            {
+                if (m_Documents[j]->filePath == path)
+                {
+                    m_ActiveDocIndex = j;
+                    ed::SetCurrentEditor(ActiveDoc()->editorContext);
+                    m_NeedNavigateToContent = 1;
+                    alreadyOpen = true;
+                    break;
+                }
+            }
+            if (!alreadyOpen)
+                DoOpenFile(path);
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", path.c_str());
+    }
+
+    ImGui::Separator();
+    if (ImGui::MenuItem("Clear Recent Files"))
+        m_RecentFiles.clear();
 }

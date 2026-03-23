@@ -20,6 +20,7 @@
 #include <cctype>
 #include <fstream>
 #include <sstream>
+#include <cmath>
 
 namespace NodeEditor {
 namespace Runtime {
@@ -386,6 +387,79 @@ static void RegisterHandlers_Flow(
             ctx.ActivateOutputFlow("Exit");
         return true;
     };
+
+    handlers["DoOnce"] = [](ExecutionContext& ctx) {
+        auto* node = ctx.GetCurrentNode();
+        std::string nodeIdStr = node ? std::to_string(node->id) : "0";
+        std::string stateKey = "__doonce_fired_" + nodeIdStr;
+
+        std::string activatedPin = ctx.GetActivatedInputPinName();
+
+        if (activatedPin == "Reset")
+        {
+            ctx.SetVariable(stateKey, Variant(false));
+            ctx.Log("  [DoOnce] Reset");
+            return true;
+        }
+
+        bool hasFired = ctx.GetVariable(stateKey).asBool();
+        if (!hasFired)
+        {
+            ctx.SetVariable(stateKey, Variant(true));
+            ctx.Log("  [DoOnce] First trigger -> Completed");
+            ctx.ActivateOutputFlow("Completed");
+        }
+        else
+        {
+            ctx.Log("  [DoOnce] Already fired, blocked");
+        }
+        return true;
+    };
+
+    handlers["FlowSequence"] = [](ExecutionContext& ctx) {
+        ctx.Log("  [Sequence] Executing all outputs in order");
+        auto* node = ctx.GetCurrentNode();
+        if (node)
+        {
+            for (const auto& pin : node->pins)
+            {
+                if (pin.kind == PinKind::Output && pin.isExec)
+                    ctx.ActivateOutputFlow(pin.id);
+            }
+        }
+        return true;
+    };
+
+    handlers["Select"] = [](ExecutionContext& ctx) {
+        bool cond = ctx.GetInputValue("Condition").asBool();
+        auto a = ctx.GetInputValue("A");
+        auto b = ctx.GetInputValue("B");
+        ctx.SetOutputValue("Result", cond ? a : b);
+        return true;
+    };
+
+    handlers["SwitchOnInt"] = [](ExecutionContext& ctx) {
+        int64_t sel = ctx.GetInputValue("Selection").asInt();
+        ctx.Log("  [SwitchOnInt] Selection=" + std::to_string(sel));
+        std::string pinName = std::to_string(sel);
+        auto* node = ctx.GetCurrentNode();
+        bool found = false;
+        if (node)
+        {
+            for (const auto& pin : node->pins)
+            {
+                if (pin.kind == PinKind::Output && pin.isExec && pin.name == pinName)
+                {
+                    ctx.ActivateOutputFlow(pin.id);
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (!found)
+            ctx.ActivateOutputFlow("Default");
+        return true;
+    };
 }
 
 // ============================================================================
@@ -681,6 +755,193 @@ static void RegisterHandlers_Math(std::unordered_map<std::string, NodeHandler>& 
         }
         return true;
     };
+
+    // --- More Arithmetic ---
+    handlers["Modulo"] = [](ExecutionContext& ctx) {
+        double a = ctx.GetInputValue("A").asFloat();
+        double b = ctx.GetInputValue("B").asFloat();
+        if (b == 0.0) { ctx.Log("  [WARN] Modulo by zero!"); b = 1.0; }
+        ctx.SetOutputValue("Result", Variant(std::fmod(a, b)));
+        return true;
+    };
+
+    handlers["Power"] = [](ExecutionContext& ctx) {
+        double base = ctx.GetInputValue("Base").asFloat();
+        double exp = ctx.GetInputValue("Exponent").asFloat();
+        ctx.SetOutputValue("Result", Variant(std::pow(base, exp)));
+        return true;
+    };
+
+    handlers["Negate"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value").asFloat();
+        ctx.SetOutputValue("Result", Variant(-v));
+        return true;
+    };
+
+    // --- More Comparison ---
+    handlers["NotEqual"] = [](ExecutionContext& ctx) {
+        double a = ctx.GetInputValue("A").asFloat();
+        double b = ctx.GetInputValue("B").asFloat();
+        ctx.SetOutputValue("Result", Variant(a != b));
+        return true;
+    };
+
+    handlers["LessEqual"] = [](ExecutionContext& ctx) {
+        double a = ctx.GetInputValue("A").asFloat();
+        double b = ctx.GetInputValue("B").asFloat();
+        ctx.SetOutputValue("Result", Variant(a <= b));
+        return true;
+    };
+
+    handlers["GreaterEqual"] = [](ExecutionContext& ctx) {
+        double a = ctx.GetInputValue("A").asFloat();
+        double b = ctx.GetInputValue("B").asFloat();
+        ctx.SetOutputValue("Result", Variant(a >= b));
+        return true;
+    };
+
+    // --- More Logic ---
+    handlers["Nand"] = [](ExecutionContext& ctx) {
+        bool a = ctx.GetInputValue("A").asBool();
+        bool b = ctx.GetInputValue("B").asBool();
+        ctx.SetOutputValue("Result", Variant(!(a && b)));
+        return true;
+    };
+
+    handlers["Nor"] = [](ExecutionContext& ctx) {
+        bool a = ctx.GetInputValue("A").asBool();
+        bool b = ctx.GetInputValue("B").asBool();
+        ctx.SetOutputValue("Result", Variant(!(a || b)));
+        return true;
+    };
+
+    handlers["Xor"] = [](ExecutionContext& ctx) {
+        bool a = ctx.GetInputValue("A").asBool();
+        bool b = ctx.GetInputValue("B").asBool();
+        ctx.SetOutputValue("Result", Variant(a != b));
+        return true;
+    };
+
+    // --- More Conversion ---
+    handlers["StringToInt"] = [](ExecutionContext& ctx) {
+        auto str = ctx.GetInputValue("Value").asString();
+        bool valid = false;
+        int64_t result = 0;
+        try { result = std::stoll(str); valid = true; }
+        catch (...) {}
+        ctx.SetOutputValue("Result", Variant(result));
+        ctx.SetOutputValue("Valid", Variant(valid));
+        return true;
+    };
+
+    handlers["StringToFloat"] = [](ExecutionContext& ctx) {
+        auto str = ctx.GetInputValue("Value").asString();
+        bool valid = false;
+        double result = 0.0;
+        try { result = std::stod(str); valid = true; }
+        catch (...) {}
+        ctx.SetOutputValue("Result", Variant(result));
+        ctx.SetOutputValue("Valid", Variant(valid));
+        return true;
+    };
+
+    handlers["BoolToString"] = [](ExecutionContext& ctx) {
+        bool v = ctx.GetInputValue("Value").asBool();
+        ctx.SetOutputValue("Result", Variant(std::string(v ? "True" : "False")));
+        return true;
+    };
+
+    // --- More Functions ---
+    handlers["Sqrt"] = [](ExecutionContext& ctx) {
+        auto* node = ctx.GetCurrentNode();
+        double v = 0.0;
+        if (node && !node->pins.empty())
+            v = ctx.GetInputValue(node->pins[0].id).asFloat();
+        ctx.SetOutputValue("Result", Variant(std::sqrt(std::abs(v))));
+        return true;
+    };
+
+    handlers["Sin"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value (Rad)").asFloat();
+        ctx.SetOutputValue("Result", Variant(std::sin(v)));
+        return true;
+    };
+
+    handlers["Cos"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value (Rad)").asFloat();
+        ctx.SetOutputValue("Result", Variant(std::cos(v)));
+        return true;
+    };
+
+    handlers["Tan"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value (Rad)").asFloat();
+        ctx.SetOutputValue("Result", Variant(std::tan(v)));
+        return true;
+    };
+
+    handlers["Atan2"] = [](ExecutionContext& ctx) {
+        double y = ctx.GetInputValue("Y").asFloat();
+        double x = ctx.GetInputValue("X").asFloat();
+        ctx.SetOutputValue("Result (Rad)", Variant(std::atan2(y, x)));
+        return true;
+    };
+
+    handlers["Lerp"] = [](ExecutionContext& ctx) {
+        double a = ctx.GetInputValue("A").asFloat();
+        double b = ctx.GetInputValue("B").asFloat();
+        double alpha = ctx.GetInputValue("Alpha").asFloat();
+        ctx.SetOutputValue("Result", Variant(a + (b - a) * alpha));
+        return true;
+    };
+
+    handlers["MapRange"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value").asFloat();
+        double inMin = ctx.GetInputValue("InMin").asFloat();
+        double inMax = ctx.GetInputValue("InMax").asFloat();
+        double outMin = ctx.GetInputValue("OutMin").asFloat();
+        double outMax = ctx.GetInputValue("OutMax").asFloat();
+        double range = inMax - inMin;
+        if (range == 0.0) range = 1.0;
+        double t = (v - inMin) / range;
+        ctx.SetOutputValue("Result", Variant(outMin + (outMax - outMin) * t));
+        return true;
+    };
+
+    handlers["Ceil"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value").asFloat();
+        ctx.SetOutputValue("Result", Variant(std::ceil(v)));
+        return true;
+    };
+
+    handlers["Floor"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value").asFloat();
+        ctx.SetOutputValue("Result", Variant(std::floor(v)));
+        return true;
+    };
+
+    handlers["Round"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value").asFloat();
+        ctx.SetOutputValue("Result", Variant(std::round(v)));
+        return true;
+    };
+
+    handlers["Sign"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value").asFloat();
+        double result = (v > 0.0) ? 1.0 : (v < 0.0 ? -1.0 : 0.0);
+        ctx.SetOutputValue("Result", Variant(result));
+        return true;
+    };
+
+    // --- Constants ---
+    handlers["PI"] = [](ExecutionContext& ctx) {
+        ctx.SetOutputValue("Value", Variant(3.14159265358979323846));
+        return true;
+    };
+
+    handlers["E"] = [](ExecutionContext& ctx) {
+        ctx.SetOutputValue("Value", Variant(2.71828182845904523536));
+        return true;
+    };
 }
 
 // ============================================================================
@@ -882,6 +1143,40 @@ static void RegisterHandlers_String(std::unordered_map<std::string, NodeHandler>
         ctx.SetOutputValue("Result", Variant(str.substr(start, end - start)));
         return true;
     };
+
+    // FormatString — 用 {0}, {1}, ... 替换参数
+    handlers["FormatString"] = [](ExecutionContext& ctx) {
+        std::string fmt = ctx.GetInputValue("Format").asString();
+        const auto* node = ctx.GetCurrentNode();
+        if (node)
+        {
+            // 收集除 "Format" 外的所有输入引脚值
+            std::vector<std::string> args;
+            bool skipFirst = true;
+            for (const auto& pin : node->pins)
+            {
+                if (pin.kind == PinKind::Input && !pin.isExec)
+                {
+                    if (skipFirst) { skipFirst = false; continue; } // 跳过 "Format"
+                    args.push_back(ctx.GetInputValue(pin.id).asString());
+                }
+            }
+
+            // 替换 {0}, {1}, ...
+            for (size_t i = 0; i < args.size(); ++i)
+            {
+                std::string placeholder = "{" + std::to_string(i) + "}";
+                size_t pos = 0;
+                while ((pos = fmt.find(placeholder, pos)) != std::string::npos)
+                {
+                    fmt.replace(pos, placeholder.size(), args[i]);
+                    pos += args[i].size();
+                }
+            }
+        }
+        ctx.SetOutputValue("Result", Variant(fmt));
+        return true;
+    };
 }
 
 // ============================================================================
@@ -967,6 +1262,87 @@ static void RegisterHandlers_Array(std::unordered_map<std::string, NodeHandler>&
         ctx.ActivateOutputFlow("Completed");
         return true;
     };
+
+    handlers["ArrayAdd"] = [](ExecutionContext& ctx) {
+        auto arr = ctx.GetInputValue("Array");
+        auto element = ctx.GetInputValue("Element");
+        // 确保是数组类型
+        if (arr.type != PinDataType::Array)
+        {
+            arr.type = PinDataType::Array;
+            arr.arrayValue.clear();
+        }
+        arr.arrayValue.push_back(element);
+        ctx.SetOutputValue("Array", arr);
+        ctx.SetOutputValue("New Length", Variant(static_cast<int64_t>(arr.arraySize())));
+        ctx.Log("  [ArrayAdd] New size = " + std::to_string(arr.arraySize()));
+        return true;
+    };
+
+    handlers["ArrayInsert"] = [](ExecutionContext& ctx) {
+        auto arr = ctx.GetInputValue("Array");
+        int64_t index = ctx.GetInputValue("Index").asInt();
+        auto element = ctx.GetInputValue("Element");
+
+        if (arr.type != PinDataType::Array)
+        {
+            arr.type = PinDataType::Array;
+            arr.arrayValue.clear();
+        }
+
+        if (index < 0) index = 0;
+        if (static_cast<size_t>(index) > arr.arrayValue.size())
+            index = static_cast<int64_t>(arr.arrayValue.size());
+
+        arr.arrayValue.insert(arr.arrayValue.begin() + static_cast<std::ptrdiff_t>(index), element);
+        ctx.SetOutputValue("Array", arr);
+        ctx.Log("  [ArrayInsert] Inserted at " + std::to_string(index) + ", new size = " + std::to_string(arr.arraySize()));
+        return true;
+    };
+
+    handlers["ArrayContains"] = [](ExecutionContext& ctx) {
+        auto arr = ctx.GetInputValue("Array");
+        auto element = ctx.GetInputValue("Element");
+        std::string searchStr = element.asString();
+        bool found = false;
+        int64_t foundIndex = -1;
+        for (size_t i = 0; i < arr.arraySize(); ++i)
+        {
+            if (arr.arrayGet(i).asString() == searchStr)
+            {
+                found = true;
+                foundIndex = static_cast<int64_t>(i);
+                break;
+            }
+        }
+        ctx.SetOutputValue("Found", Variant(found));
+        ctx.SetOutputValue("Index", Variant(foundIndex));
+        return true;
+    };
+
+    handlers["ArrayReverse"] = [](ExecutionContext& ctx) {
+        auto arr = ctx.GetInputValue("Array");
+        if (arr.type == PinDataType::Array)
+            std::reverse(arr.arrayValue.begin(), arr.arrayValue.end());
+        ctx.SetOutputValue("Array", arr);
+        ctx.Log("  [ArrayReverse] Reversed array of size " + std::to_string(arr.arraySize()));
+        return true;
+    };
+
+    handlers["MakeArray"] = [](ExecutionContext& ctx) {
+        const auto* node = ctx.GetCurrentNode();
+        std::vector<Variant> elements;
+        if (node)
+        {
+            for (const auto& pin : node->pins)
+            {
+                if (pin.kind == PinKind::Input && !pin.isExec)
+                    elements.push_back(ctx.GetInputValue(pin.id));
+            }
+        }
+        ctx.SetOutputValue("Array", Variant(std::move(elements)));
+        return true;
+    };
 }
 
 // ============================================================================
@@ -1025,6 +1401,43 @@ static void RegisterHandlers_Misc(std::unordered_map<std::string, NodeHandler>& 
         auto val = ctx.GetInputValue("Value");
         ctx.SetVariable(name, val);
         ctx.Log("  Set '" + name + "' = '" + val.asString() + "'");
+        return true;
+    };
+
+    handlers["IsValid"] = [](ExecutionContext& ctx) {
+        auto val = ctx.GetInputValue("Value");
+        bool isValid = false;
+        switch (val.type)
+        {
+        case PinDataType::String:  isValid = !val.stringValue.empty(); break;
+        case PinDataType::Object:  isValid = !val.stringValue.empty(); break;
+        case PinDataType::Array:   isValid = !val.arrayValue.empty(); break;
+        case PinDataType::Integer: isValid = val.intValue != 0; break;
+        case PinDataType::Float:   isValid = val.floatValue != 0.0; break;
+        case PinDataType::Boolean: isValid = val.boolValue; break;
+        default: break;
+        }
+        ctx.SetOutputValue("Is Valid", Variant(isValid));
+        return true;
+    };
+
+    handlers["MakeLiteralBool"] = [](ExecutionContext& ctx) {
+        ctx.SetOutputValue("Result", Variant(ctx.GetInputValue("Value").asBool()));
+        return true;
+    };
+
+    handlers["MakeLiteralInt"] = [](ExecutionContext& ctx) {
+        ctx.SetOutputValue("Result", Variant(ctx.GetInputValue("Value").asInt()));
+        return true;
+    };
+
+    handlers["MakeLiteralFloat"] = [](ExecutionContext& ctx) {
+        ctx.SetOutputValue("Result", Variant(ctx.GetInputValue("Value").asFloat()));
+        return true;
+    };
+
+    handlers["MakeLiteralString"] = [](ExecutionContext& ctx) {
+        ctx.SetOutputValue("Result", Variant(ctx.GetInputValue("Value").asString()));
         return true;
     };
 }

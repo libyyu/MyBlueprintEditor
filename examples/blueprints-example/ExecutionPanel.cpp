@@ -134,7 +134,18 @@ void BlueprintEditor::ExecuteBlueprint()
     m_ExecutionLog.push_back("  Elapsed: " + std::to_string(elapsed) + " ms");
     m_ExecutionLog.push_back("========================================");
 
-    // 5. 触发 Flow 动画 —— 让已执行的链接显示流动效果
+    // 5. 执行可视化 —— 高亮已执行的节点 & 触发 Flow 动画
+    // 将所有节点标记为高亮（实际运行器会执行拓扑排序后的节点）
+    if (result.success)
+    {
+        ActiveDoc()->executedNodeHighlight.clear();
+        for (const auto& node : m_Nodes)
+        {
+            uint64_t nid = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(node.ID.AsPointer()));
+            ActiveDoc()->executedNodeHighlight[nid] = 3.0f;  // 3 秒高亮
+        }
+    }
+
     for (const auto& link : m_Links)
     {
         m_FlowLinks.push_back(link.ID);

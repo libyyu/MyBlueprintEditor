@@ -106,6 +106,8 @@ struct BlueprintDocument
     std::string          filePath;                         // 文件路径（空=未保存的新文件）
     bool                 isDirty = false;                  // 是否有未保存的修改
     bool                 needSetNodePositions = false;     // 加载后需要设置节点位置
+    int                  needNavigateToContent = 0;       // >0 时倒计帧数，到 0 时触发居中
+    ImRect               pendingContentBounds;             // 从加载数据计算的节点包围盒
     RTBlueprintData      pendingLoadData;                  // 待设置位置的加载数据
 
     // 运行时执行状态
@@ -115,6 +117,12 @@ struct BlueprintDocument
     bool                        isExecuting = false;
     std::string                 lastExecutionStatus;
     std::vector<ed::LinkId>     flowLinks;
+
+    // 节点位置追踪（用于检测拖拽移动，标记 dirty）
+    std::map<ed::NodeId, ImVec2, NodeIdLess> lastNodePositions;
+
+    // 执行可视化（高亮已执行的节点）
+    std::unordered_map<uint64_t, float> executedNodeHighlight;  // nodeId -> 剩余高亮时间(秒)
 
     // 持久 Runner
     RTBlueprintRunner           persistentRunner;
@@ -171,6 +179,101 @@ struct BlueprintEditor : public Application
     // 延迟打开文件（双击节点时使用，不能在 ed::Begin/End 内部调用 DoOpenFile）
     std::string m_PendingOpenFilePath;
     int         m_PendingSwitchTabIndex = -1;
+
+    // ------------------------------------------------------------------
+    // 剪贴板（Copy/Paste/Duplicate）
+    // ------------------------------------------------------------------
+    struct ClipboardNode
+    {
+        std::string definitionId;
+        std::string name;
+        ImVec2      position;              // 原始位置（用于计算粘贴偏移）
+        ImColor     color;
+        NodeType    type;
+        ImVec2      size;                  // Comment 节点尺寸
+        bool        hasDynamicInputs = false;
+        PinType     dynamicInputPinType = PinType::Flow;
+        int         dynamicInputFixedCount = 0;
+
+        struct ClipboardPin
+        {
+            std::string name;
+            PinType     type;
+            PinKind     kind;
+            bool        boolValue   = false;
+            int64_t     intValue    = 0;
+            float       floatValue  = 0.0f;
+            std::string stringValue;
+            std::string objectValue;
+            std::string hiddenWhen;
+            int         originalLocalIndex = 0;  // 在原节点引脚列表中的索引
+        };
+        std::vector<ClipboardPin> inputs;
+        std::vector<ClipboardPin> outputs;
+    };
+
+    struct ClipboardLink
+    {
+        int srcNodeIdx;     // 在 clipboardNodes 中的索引
+        int srcPinIdx;      // 在该节点 outputs 中的索引
+        int dstNodeIdx;     // 在 clipboardNodes 中的索引
+        int dstPinIdx;      // 在该节点 inputs 中的索引
+    };
+
+    std::vector<ClipboardNode> m_ClipboardNodes;
+    std::vector<ClipboardLink> m_ClipboardLinks;
+    ImVec2                     m_ClipboardCenter;  // 剪贴板中所有节点的质心
+
+    void CopySelectedNodes();
+    void PasteNodes(ImVec2 pastePosition);
+    void DuplicateSelectedNodes();
+    void CutSelectedNodes();
+
+    // ------------------------------------------------------------------
+    // 画布节点搜索（Ctrl+F）
+    // ------------------------------------------------------------------
+    bool  m_ShowSearchOverlay  = false;
+    char  m_SearchBuffer[256]  = {};
+    int   m_SearchResultIndex  = -1;
+    std::vector<ed::NodeId> m_SearchResults;
+
+    void  OpenSearchOverlay();
+    void  UpdateSearchResults();
+    void  NavigateToSearchResult(int index);
+    void  DrawSearchOverlay();
+
+    // ------------------------------------------------------------------
+    // 小地图（Minimap）
+    // ------------------------------------------------------------------
+    bool  m_ShowMinimap = true;
+    float m_MinimapSize = 180.0f;   // 小地图边长（像素）
+
+    void  DrawMinimap(ImVec2 editorMin, ImVec2 editorMax);
+
+    // ------------------------------------------------------------------
+    // 未保存确认对话框
+    // ------------------------------------------------------------------
+    bool  m_ShowUnsavedDialog = false;
+    int   m_PendingCloseTabIndex = -1;    // 待关闭的标签索引
+    bool  m_PendingQuitApp = false;       // 待退出应用
+
+    void  ShowUnsavedChangesDialog();
+
+    // ------------------------------------------------------------------
+    // 最近打开文件（持久化到磁盘）
+    // ------------------------------------------------------------------
+    static const int MaxRecentFiles = 10;
+    std::vector<std::string> m_RecentFiles;
+    void  AddRecentFile(const std::string& path);
+    void  DrawRecentFilesMenu();
+    void  SaveRecentFiles();
+    void  LoadRecentFiles();
+
+    // ------------------------------------------------------------------
+    // 节点对齐（Align Selected Nodes）
+    // ------------------------------------------------------------------
+    enum class AlignMode { Left, Right, Top, Bottom, CenterH, CenterV };
+    void  AlignSelectedNodes(AlignMode mode);
 
     BlueprintDocument* ActiveDoc()
     {
@@ -287,6 +390,7 @@ struct BlueprintEditor : public Application
     bool                 m_ShowNodeListWindow = true;     // 左侧面板可见
     bool                 m_ShowExecutionWindow = true;    // 底部面板可见
     bool                 m_ShowTimerWindow = false;       // 计时器监控面板可见
+    bool                 m_ShowStyleEditorWindow = false; // 样式编辑器窗口可见
 
     // VSCode 风格布局尺寸（可拖拽调整）
     float                m_LeftPanelWidth  = 250.0f;
@@ -308,6 +412,8 @@ struct BlueprintEditor : public Application
     #define m_CurrentFilePath (ActiveDoc()->filePath)
     #define m_IsDirty        (ActiveDoc()->isDirty)
     #define m_NeedSetNodePositions (ActiveDoc()->needSetNodePositions)
+    #define m_NeedNavigateToContent (ActiveDoc()->needNavigateToContent)
+    #define m_PendingContentBounds (ActiveDoc()->pendingContentBounds)
     #define m_PendingLoadData (ActiveDoc()->pendingLoadData)
     #define m_ExecutionLog   (ActiveDoc()->executionLog)
     #define m_ExecutionLogText (ActiveDoc()->executionLogText)

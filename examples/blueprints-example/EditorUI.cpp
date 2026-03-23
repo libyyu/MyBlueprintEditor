@@ -340,9 +340,42 @@ void BlueprintEditor::OnFrame(float deltaTime)
     for (auto& doc : m_Documents)
         doc->persistentRunner.Tick(deltaTime);
 
+    // 衰减执行高亮
+    for (auto& doc : m_Documents)
+    {
+        for (auto it = doc->executedNodeHighlight.begin(); it != doc->executedNodeHighlight.end();)
+        {
+            it->second -= deltaTime;
+            if (it->second <= 0.0f)
+                it = doc->executedNodeHighlight.erase(it);
+            else
+                ++it;
+        }
+    }
+
     // 当前活跃文档的 UpdateTouch
     if (ActiveDoc())
         UpdateTouch();
+
+    // 动态更新 OS 窗口标题（反映 dirty 状态）
+    if (ActiveDoc())
+    {
+        std::string baseName;
+        if (m_CurrentFilePath.empty())
+            baseName = "[New]";
+        else
+        {
+            size_t lastSlash = m_CurrentFilePath.find_last_of("/\\");
+            baseName = (lastSlash != std::string::npos) ? m_CurrentFilePath.substr(lastSlash + 1) : m_CurrentFilePath;
+            size_t lastDot = baseName.find_last_of('.');
+            if (lastDot != std::string::npos)
+                baseName = baseName.substr(0, lastDot);
+        }
+        std::string windowTitle = "Blueprint Editor - " + baseName;
+        if (m_IsDirty)
+            windowTitle += " *";
+        SetTitle(windowTitle.c_str());
+    }
 
     auto& io = ImGui::GetIO();
 
@@ -357,6 +390,11 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 NewFile();
             if (ImGui::MenuItem("Open...", "Ctrl+O"))
                 OpenFile();
+            if (ImGui::BeginMenu("Recent Files"))
+            {
+                DrawRecentFilesMenu();
+                ImGui::EndMenu();
+            }
             ImGui::Separator();
             if (ImGui::MenuItem("Save", "Ctrl+S"))
                 SaveFile();
@@ -366,8 +404,52 @@ void BlueprintEditor::OnFrame(float deltaTime)
             if (ImGui::MenuItem("Close Tab", "Ctrl+W"))
             {
                 if (!m_Documents.empty())
-                    CloseDocument(m_ActiveDocIndex);
+                {
+                    if (ActiveDoc() && ActiveDoc()->isDirty)
+                    {
+                        m_PendingCloseTabIndex = m_ActiveDocIndex;
+                        m_ShowUnsavedDialog = true;
+                    }
+                    else
+                        CloseDocument(m_ActiveDocIndex);
+                }
             }
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Edit"))
+        {
+            if (ImGui::MenuItem("Copy", "Ctrl+C"))
+                CopySelectedNodes();
+            if (ImGui::MenuItem("Paste", "Ctrl+V"))
+            {
+                ImVec2 canvasPos = ed::ScreenToCanvas(ImGui::GetMousePos());
+                PasteNodes(canvasPos);
+            }
+            if (ImGui::MenuItem("Cut", "Ctrl+X"))
+                CutSelectedNodes();
+            if (ImGui::MenuItem("Duplicate", "Ctrl+D"))
+                DuplicateSelectedNodes();
+            ImGui::Separator();
+            if (ImGui::MenuItem("Select All", "Ctrl+A"))
+            {
+                for (auto& node : m_Nodes)
+                    ed::SelectNode(node.ID, true);
+            }
+            ImGui::Separator();
+            if (ImGui::BeginMenu("Align Selected"))
+            {
+                if (ImGui::MenuItem("Align Left"))    AlignSelectedNodes(AlignMode::Left);
+                if (ImGui::MenuItem("Align Right"))   AlignSelectedNodes(AlignMode::Right);
+                if (ImGui::MenuItem("Align Top"))     AlignSelectedNodes(AlignMode::Top);
+                if (ImGui::MenuItem("Align Bottom"))  AlignSelectedNodes(AlignMode::Bottom);
+                ImGui::Separator();
+                if (ImGui::MenuItem("Center Horizontally"))  AlignSelectedNodes(AlignMode::CenterH);
+                if (ImGui::MenuItem("Center Vertically"))    AlignSelectedNodes(AlignMode::CenterV);
+                ImGui::EndMenu();
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Find...", "Ctrl+F"))
+                OpenSearchOverlay();
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("View"))
@@ -375,7 +457,26 @@ void BlueprintEditor::OnFrame(float deltaTime)
             ImGui::MenuItem("Node List", nullptr, &m_ShowNodeListWindow);
             ImGui::MenuItem("Execution Output", nullptr, &m_ShowExecutionWindow);
             ImGui::MenuItem("Timer Monitor", nullptr, &m_ShowTimerWindow);
+            ImGui::MenuItem("Minimap", nullptr, &m_ShowMinimap);
             ImGui::MenuItem("Show Ordinals", nullptr, &m_ShowOrdinals);
+            ImGui::Separator();
+            if (ImGui::MenuItem("Zoom to Content"))
+                ed::NavigateToContent();
+            if (ImGui::MenuItem("Style Editor"))
+                m_ShowStyleEditorWindow = true;
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Run"))
+        {
+            if (ImGui::MenuItem("Execute Blueprint", "F5"))
+                ExecuteBlueprint();
+            ImGui::Separator();
+            ImGui::MenuItem("Timer Monitor", nullptr, &m_ShowTimerWindow);
+            if (ImGui::MenuItem("Clear Execution Highlight"))
+            {
+                if (ActiveDoc())
+                    ActiveDoc()->executedNodeHighlight.clear();
+            }
             ImGui::EndMenu();
         }
         ImGui::Separator();
@@ -402,10 +503,19 @@ void BlueprintEditor::OnFrame(float deltaTime)
         }
 
         ImGui::Text("FPS: %.2f (%.2gms)", io.Framerate, io.Framerate ? 1000.0f / io.Framerate : 0.0f);
+
+        // 节点/链接统计
+        if (ActiveDoc())
+        {
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(0.5f, 0.7f, 0.5f, 1.0f), "Nodes:%d  Links:%d",
+                               static_cast<int>(m_Nodes.size()), static_cast<int>(m_Links.size()));
+        }
+
         ImGui::EndMenuBar();
     }
 
-    // 键盘快捷键
+    // 键盘快捷键 - 文件操作
     if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_N))
         NewFile();
     if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_O))
@@ -417,8 +527,43 @@ void BlueprintEditor::OnFrame(float deltaTime)
     if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_W))
     {
         if (!m_Documents.empty())
-            CloseDocument(m_ActiveDocIndex);
+        {
+            if (ActiveDoc() && ActiveDoc()->isDirty)
+            {
+                m_PendingCloseTabIndex = m_ActiveDocIndex;
+                m_ShowUnsavedDialog = true;
+            }
+            else
+                CloseDocument(m_ActiveDocIndex);
+        }
     }
+
+    // 键盘快捷键 - 编辑操作
+    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_C))
+        CopySelectedNodes();
+    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_V))
+    {
+        ImVec2 canvasPos = ed::ScreenToCanvas(ImGui::GetMousePos());
+        PasteNodes(canvasPos);
+    }
+    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_X))
+        CutSelectedNodes();
+    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_D))
+        DuplicateSelectedNodes();
+    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_F))
+        OpenSearchOverlay();
+    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A))
+    {
+        if (ActiveDoc())
+        {
+            for (auto& node : m_Nodes)
+                ed::SelectNode(node.ID, true);
+        }
+    }
+
+    // F5: 执行蓝图
+    if (ImGui::IsKeyPressed(ImGuiKey_F5))
+        ExecuteBlueprint();
 
     // ================================================================
     // 标签栏（Tab Bar）
@@ -441,7 +586,16 @@ void BlueprintEditor::OnFrame(float deltaTime)
             }
 
             if (!isOpen)
-                tabToClose = i;
+            {
+                // 检查是否有未保存的修改
+                if (doc->isDirty)
+                {
+                    m_PendingCloseTabIndex = i;
+                    m_ShowUnsavedDialog = true;
+                }
+                else
+                    tabToClose = i;
+            }
         }
 
         // "+" 按钮：新建标签页
@@ -505,6 +659,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
     }
 
     // --- 右侧区域：上部编辑器 + 下部执行输出 垂直分割 ---
+    ImVec2 editorMin(0, 0), editorMax(0, 0);  // 编辑器区域的屏幕坐标（供小地图等使用）
     ImGui::BeginGroup();
     {
         float editorHeight = totalHeight;
@@ -545,6 +700,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
         {
             m_NeedSetNodePositions = false;
 
+            // 从加载数据计算所有节点的包围盒
+            ImRect contentBounds(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
+
             for (const auto& pendNode : m_PendingLoadData.nodes)
             {
                 auto it = pendNode.customProperties.find("__newEditorId");
@@ -565,11 +723,37 @@ void BlueprintEditor::OnFrame(float deltaTime)
                             node->Size = ImVec2(pendNode.size.width, pendNode.size.height);
                         }
                     }
+
+                    // 用位置和尺寸计算包围盒（尺寸默认给 200x100）
+                    float w = pendNode.size.width > 0 ? pendNode.size.width : 200.0f;
+                    float h = pendNode.size.height > 0 ? pendNode.size.height : 100.0f;
+                    contentBounds.Add(ImRect(
+                        ImVec2(pendNode.position.x, pendNode.position.y),
+                        ImVec2(pendNode.position.x + w, pendNode.position.y + h)
+                    ));
                 }
             }
 
             m_PendingLoadData.clear();
-            ed::NavigateToContent();
+            m_PendingContentBounds = contentBounds;
+            m_NeedNavigateToContent = 1;
+        }
+
+        // 延迟居中显示（倒计帧数，到 0 时触发）
+        if (m_NeedNavigateToContent > 0)
+        {
+            m_NeedNavigateToContent--;
+            if (m_NeedNavigateToContent == 0)
+            {
+                // 如果有预计算的 bounds（加载文件时），直接用它导航
+                if (m_PendingContentBounds.Min.x < m_PendingContentBounds.Max.x)
+                {
+                    ed::NavigateToRect(m_PendingContentBounds.Min, m_PendingContentBounds.Max, true, 0);
+                    m_PendingContentBounds = ImRect();  // 清除
+                }
+                else
+                    ed::NavigateToContent();
+            }
         }
 
         auto cursorTopLeft = ImGui::GetCursorScreenPos();
@@ -746,19 +930,24 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
                         if (input.Type == PinType::Bool)
                         {
-                            ImGui::Checkbox("##value", &input.BoolValue);
+                            if (ImGui::Checkbox("##value", &input.BoolValue))
+                                m_IsDirty = true;
                         }
                         else if (input.Type == PinType::Int)
                         {
                             ImGui::SetNextItemWidth(80.0f);
                             ImS64 v = static_cast<ImS64>(input.IntValue);
                             if (ImGui::DragScalar("##value", ImGuiDataType_S64, &v, 1.0f))
+                            {
                                 input.IntValue = static_cast<int64_t>(v);
+                                m_IsDirty = true;
+                            }
                         }
                         else if (input.Type == PinType::Float)
                         {
                             ImGui::SetNextItemWidth(80.0f);
-                            ImGui::DragFloat("##value", &input.FloatValue, 0.01f);
+                            if (ImGui::DragFloat("##value", &input.FloatValue, 0.01f))
+                                m_IsDirty = true;
                         }
                         else if (input.Type == PinType::String)
                         {
@@ -768,7 +957,10 @@ void BlueprintEditor::OnFrame(float deltaTime)
                                 snprintf(buf.data(), buf.size(), "%s", input.StringValue.c_str());
                             ImGui::SetNextItemWidth(100.0f);
                             if (ImGui::InputText("##value", buf.data(), buf.size()))
+                            {
                                 input.StringValue = buf.data();
+                                m_IsDirty = true;
+                            }
                         }
                         else if (input.Type == PinType::Object)
                         {
@@ -779,7 +971,10 @@ void BlueprintEditor::OnFrame(float deltaTime)
                                 snprintf(buf.data(), buf.size(), "%s", input.ObjectValue.c_str());
                             ImGui::SetNextItemWidth(100.0f);
                             if (ImGui::InputText("##value", buf.data(), buf.size()))
+                            {
                                 input.ObjectValue = buf.data();
+                                m_IsDirty = true;
+                            }
                         }
                         else if (input.Type == PinType::Function)
                         {
@@ -948,6 +1143,36 @@ void BlueprintEditor::OnFrame(float deltaTime)
                         textPos + textSize + ImVec2(4, 1),
                         IM_COL32(80, 0, 0, 200), 3.0f);
                     drawList->AddText(textPos, IM_COL32(255, 100, 100, 255), node.ErrorMessage.c_str());
+                }
+            }
+
+            // ---- 执行可视化：绿色发光边框高亮已执行节点 ----
+            {
+                uint64_t nid = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(node.ID.AsPointer()));
+                auto hlIt = ActiveDoc()->executedNodeHighlight.find(nid);
+                if (hlIt != ActiveDoc()->executedNodeHighlight.end() && hlIt->second > 0.0f)
+                {
+                    float alpha = hlIt->second / 3.0f;  // 淡出效果
+                    if (alpha > 1.0f) alpha = 1.0f;
+                    int a = static_cast<int>(alpha * 200);
+
+                    auto drawList = ed::GetNodeBackgroundDrawList(node.ID);
+                    auto nodeMin = ed::GetNodePosition(node.ID);
+                    auto nodeSize = ed::GetNodeSize(node.ID);
+                    auto nodeMax = ImVec2(nodeMin.x + nodeSize.x, nodeMin.y + nodeSize.y);
+                    auto screenMin = ed::CanvasToScreen(nodeMin);
+                    auto screenMax = ed::CanvasToScreen(nodeMax);
+
+                    // 绿色发光边框
+                    drawList->AddRect(
+                        screenMin - ImVec2(3, 3),
+                        screenMax + ImVec2(3, 3),
+                        IM_COL32(50, 255, 100, a), 8.0f, 0, 3.0f);
+                    // 外层淡光晕
+                    drawList->AddRect(
+                        screenMin - ImVec2(6, 6),
+                        screenMax + ImVec2(6, 6),
+                        IM_COL32(50, 255, 100, a / 3), 10.0f, 0, 2.0f);
                 }
             }
         }
@@ -1348,8 +1573,35 @@ void BlueprintEditor::OnFrame(float deltaTime)
                         }
                         else if (endPin->Type != startPin->Type)
                         {
-                            showLabel("x Incompatible Pin Type", ImColor(45, 32, 32, 180));
-                            ed::RejectNewItem(ImColor(255, 128, 128), 1.0f);
+                            // 检查是否是兼容的隐式转换类型
+                            if (CanCreateLink(startPin, endPin))
+                            {
+                                showLabel("+ Create Link (implicit cast)", ImColor(32, 45, 45, 180));
+                                if (ed::AcceptNewItem(ImColor(128, 255, 200), 4.0f))
+                                {
+                                    // Flow 类型输出引脚只允许一对一连接
+                                    if (startPin->Type == PinType::Flow)
+                                    {
+                                        auto sid = startPinId;
+                                        for (auto it = m_Links.begin(); it != m_Links.end();)
+                                        {
+                                            if (it->StartPinID == sid)
+                                                it = m_Links.erase(it);
+                                            else
+                                                ++it;
+                                        }
+                                    }
+
+                                    m_Links.emplace_back(Link(GetNextId(), startPinId, endPinId));
+                                    m_Links.back().Color = GetIconColor(startPin->Type);
+                                    m_IsDirty = true;
+                                }
+                            }
+                            else
+                            {
+                                showLabel("x Incompatible Pin Type", ImColor(45, 32, 32, 180));
+                                ed::RejectNewItem(ImColor(255, 128, 128), 1.0f);
+                            }
                         }
                         else
                         {
@@ -1469,9 +1721,67 @@ void BlueprintEditor::OnFrame(float deltaTime)
             ImGui::Text("Type: %s", node->Type == NodeType::Blueprint ? "Blueprint" : (node->Type == NodeType::Tree ? "Tree" : "Comment"));
             ImGui::Text("Inputs: %d", (int)node->Inputs.size());
             ImGui::Text("Outputs: %d", (int)node->Outputs.size());
+            if (!node->DefinitionId.empty())
+            {
+                ImGui::Text("Definition: %s", node->DefinitionId.c_str());
+                auto* def = m_NodeRegistry.getNodeDefinition(node->DefinitionId);
+                if (def && !def->description.empty())
+                {
+                    ImGui::Separator();
+                    ImGui::TextWrapped("%s", def->description.c_str());
+                }
+                if (def && !def->category.empty())
+                    ImGui::TextColored(ImVec4(0.5f, 0.7f, 1.0f, 1.0f), "Category: %s", def->category.c_str());
+            }
         }
         else
             ImGui::Text("Unknown node: %p", contextNodeId.AsPointer());
+        ImGui::Separator();
+        if (ImGui::MenuItem("Copy", "Ctrl+C"))
+        {
+            ed::SelectNode(contextNodeId, false);
+            CopySelectedNodes();
+        }
+        if (ImGui::MenuItem("Duplicate", "Ctrl+D"))
+        {
+            ed::SelectNode(contextNodeId, false);
+            DuplicateSelectedNodes();
+        }
+        if (ImGui::MenuItem("Cut", "Ctrl+X"))
+        {
+            ed::SelectNode(contextNodeId, false);
+            CutSelectedNodes();
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Select Connected"))
+        {
+            // 选中与此节点直接连接的所有节点
+            if (node)
+            {
+                ed::SelectNode(contextNodeId, false);
+                for (const auto& link : m_Links)
+                {
+                    for (const auto& pin : node->Inputs)
+                    {
+                        if (link.EndPinID == pin.ID)
+                        {
+                            auto* srcPin = FindPin(link.StartPinID);
+                            if (srcPin && srcPin->Node)
+                                ed::SelectNode(srcPin->Node->ID, true);
+                        }
+                    }
+                    for (const auto& pin : node->Outputs)
+                    {
+                        if (link.StartPinID == pin.ID)
+                        {
+                            auto* dstPin = FindPin(link.EndPinID);
+                            if (dstPin && dstPin->Node)
+                                ed::SelectNode(dstPin->Node->ID, true);
+                        }
+                    }
+                }
+            }
+        }
         ImGui::Separator();
         if (ImGui::MenuItem("Delete"))
             ed::DeleteNode(contextNodeId);
@@ -1500,6 +1810,31 @@ void BlueprintEditor::OnFrame(float deltaTime)
             if (ImGui::MenuItem("Break Link(s)"))
                 ed::BreakLinks(contextPinId);
         }
+        if (pin && pin->Node)
+        {
+            if (ImGui::MenuItem("Break All Links on Node"))
+            {
+                // 断开该节点上所有引脚的所有链接
+                auto* node = pin->Node;
+                for (auto& p : node->Inputs)
+                    ed::BreakLinks(p.ID);
+                for (auto& p : node->Outputs)
+                    ed::BreakLinks(p.ID);
+            }
+        }
+        // 重置引脚值
+        if (pin && pin->Kind == PinKind::Input && pin->Type != PinType::Flow)
+        {
+            if (ImGui::MenuItem("Reset Value"))
+            {
+                pin->BoolValue = false;
+                pin->IntValue = 0;
+                pin->FloatValue = 0.0f;
+                pin->StringValue.clear();
+                pin->ObjectValue.clear();
+                m_IsDirty = true;
+            }
+        }
 
         ImGui::EndPopup();
     }
@@ -1527,6 +1862,17 @@ void BlueprintEditor::OnFrame(float deltaTime)
     if (ImGui::BeginPopup("Create New Node"))
     {
         auto newNodePostion = openPopupPosition;
+
+        // 如果剪贴板中有节点，提供 Paste Here 选项
+        if (!m_ClipboardNodes.empty())
+        {
+            if (ImGui::MenuItem("Paste Here", "Ctrl+V"))
+            {
+                ImVec2 canvasPos = ed::ScreenToCanvas(newNodePostion);
+                PasteNodes(canvasPos);
+            }
+            ImGui::Separator();
+        }
 
         Node* node = ShowCreateNodeMenu();
 
@@ -1656,12 +2002,42 @@ void BlueprintEditor::OnFrame(float deltaTime)
     ed::End();
 
     // ================================================================
+    // 检测节点位置变化（拖拽移动节点 → 标记 dirty）
+    // ================================================================
+    if (ActiveDoc() && !m_IsDirty)
+    {
+        auto& lastPositions = ActiveDoc()->lastNodePositions;
+        for (const auto& node : m_Nodes)
+        {
+            ImVec2 curPos = ed::GetNodePosition(node.ID);
+            auto it = lastPositions.find(node.ID);
+            if (it != lastPositions.end())
+            {
+                if (it->second.x != curPos.x || it->second.y != curPos.y)
+                {
+                    m_IsDirty = true;
+                    break;
+                }
+            }
+        }
+    }
+    // 更新上一帧节点位置快照
+    if (ActiveDoc())
+    {
+        auto& lastPositions = ActiveDoc()->lastNodePositions;
+        lastPositions.clear();
+        for (const auto& node : m_Nodes)
+            lastPositions[node.ID] = ed::GetNodePosition(node.ID);
+    }
+
+    // ================================================================
     // 延迟处理双击打开文件（必须在 ed::End() 之后执行）
     // ================================================================
     if (m_PendingSwitchTabIndex >= 0)
     {
         m_ActiveDocIndex = m_PendingSwitchTabIndex;
         ed::SetCurrentEditor(ActiveDoc()->editorContext);
+        m_NeedNavigateToContent = 1;
         m_PendingSwitchTabIndex = -1;
     }
     else if (!m_PendingOpenFilePath.empty())
@@ -1671,8 +2047,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
         DoOpenFile(pathToOpen);
     }
 
-    auto editorMin = ImGui::GetItemRectMin();
-    auto editorMax = ImGui::GetItemRectMax();
+    editorMin = ImGui::GetItemRectMin();
+    editorMax = ImGui::GetItemRectMax();
 
     if (m_ShowOrdinals)
     {
@@ -1726,6 +2102,104 @@ void BlueprintEditor::OnFrame(float deltaTime)
     // ================================================================
     if (m_ShowTimerWindow)
         DrawTimerPanel();
+
+    // ================================================================
+    // 小地图
+    // ================================================================
+    if (m_ShowMinimap && ActiveDoc())
+        DrawMinimap(editorMin, editorMax);
+
+    // ================================================================
+    // 画布节点搜索覆盖层（Ctrl+F）
+    // ================================================================
+    DrawSearchOverlay();
+
+    // ================================================================
+    // 未保存修改确认对话框
+    // ================================================================
+    ShowUnsavedChangesDialog();
+
+    // ================================================================
+    // 样式编辑器浮动窗口
+    // ================================================================
+    if (m_ShowStyleEditorWindow)
+        ShowStyleEditor(&m_ShowStyleEditorWindow);
+}
+
+// ============================================================================
+// 未保存修改确认对话框
+// ============================================================================
+
+void BlueprintEditor::ShowUnsavedChangesDialog()
+{
+    if (!m_ShowUnsavedDialog) return;
+
+    ImGui::OpenPopup("Unsaved Changes###UnsavedDlg");
+    m_ShowUnsavedDialog = false;  // 只触发一次 OpenPopup
+
+    // 保持 popup 持续显示
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+    if (ImGui::BeginPopupModal("Unsaved Changes###UnsavedDlg", nullptr,
+        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+    {
+        std::string docName = "New";
+        if (m_PendingCloseTabIndex >= 0 && m_PendingCloseTabIndex < static_cast<int>(m_Documents.size()))
+            docName = m_Documents[m_PendingCloseTabIndex]->GetTabName();
+
+        ImGui::Text("Document \"%s\" has unsaved changes.", docName.c_str());
+        ImGui::Text("Do you want to save before closing?");
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        float buttonWidth = 100.0f;
+        float totalWidth = buttonWidth * 3 + ImGui::GetStyle().ItemSpacing.x * 2;
+        float startX = (ImGui::GetContentRegionAvail().x - totalWidth) * 0.5f;
+        if (startX > 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + startX);
+
+        if (ImGui::Button("Save", ImVec2(buttonWidth, 0)))
+        {
+            // 切换到待关闭的文档并保存
+            if (m_PendingCloseTabIndex >= 0)
+            {
+                int oldActiveIdx = m_ActiveDocIndex;
+                m_ActiveDocIndex = m_PendingCloseTabIndex;
+                ed::SetCurrentEditor(ActiveDoc()->editorContext);
+                SaveFile();
+                // 保存后关闭
+                CloseDocument(m_PendingCloseTabIndex);
+                m_PendingCloseTabIndex = -1;
+                // 恢复活跃索引
+                if (oldActiveIdx >= static_cast<int>(m_Documents.size()))
+                    m_ActiveDocIndex = static_cast<int>(m_Documents.size()) - 1;
+            }
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Don't Save", ImVec2(buttonWidth, 0)))
+        {
+            // 不保存直接关闭
+            if (m_PendingCloseTabIndex >= 0)
+            {
+                CloseDocument(m_PendingCloseTabIndex);
+                m_PendingCloseTabIndex = -1;
+            }
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(buttonWidth, 0)))
+        {
+            m_PendingCloseTabIndex = -1;
+            m_PendingQuitApp = false;
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
 }
 
 // ============================================================================

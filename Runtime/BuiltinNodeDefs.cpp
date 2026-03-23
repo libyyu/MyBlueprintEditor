@@ -95,6 +95,38 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
         { MakeFlowPin("Enter"), MakeFlowPin("Open"), MakeFlowPin("Close"),
           MakeFlowPin("Toggle") },
         { MakeFlowPin("Exit") });
+
+    reg("DoOnce", "Do Once", "Flow",
+        { MakeFlowPin(""), MakeFlowPin("Reset") },
+        { MakeFlowPin("Completed") });
+
+    // Sequence (Flow) — 按顺序执行多个 exec 输出
+    {
+        NodeDefinition d;
+        d.id = "FlowSequence";
+        d.name = "Sequence";
+        d.category = "Flow";
+        d.inputPins = { MakeFlowPin("") };
+        d.outputPins = { MakeFlowPin("Then 0"), MakeFlowPin("Then 1"), MakeFlowPin("Then 2"), MakeFlowPin("Then 3") };
+        registry.registerNode(d);
+    }
+
+    // Select — 三元选择节点
+    reg("Select", "Select", "Flow",
+        { MakePin("Condition", PinDataType::Boolean), MakePin("A", PinDataType::Any), MakePin("B", PinDataType::Any) },
+        { MakePin("Result", PinDataType::Any) },
+        "80C3F8", "Simple");
+
+    // Switch on Int — 多分支选择
+    {
+        NodeDefinition d;
+        d.id = "SwitchOnInt";
+        d.name = "Switch on Int";
+        d.category = "Flow";
+        d.inputPins = { MakeFlowPin(""), MakePin("Selection", PinDataType::Integer) };
+        d.outputPins = { MakeFlowPin("Default"), MakeFlowPin("0"), MakeFlowPin("1"), MakeFlowPin("2"), MakeFlowPin("3") };
+        registry.registerNode(d);
+    }
 }
 
 static void RegisterNodeDefs_Action(INodeRegistry& registry)
@@ -308,6 +340,138 @@ static void RegisterNodeDefs_Math(INodeRegistry& registry)
         { MakePin("Value", PinDataType::Float) },
         "80C3F8", "Simple");
 
+    // --- More Arithmetic ---
+    reg("Modulo", "%", "Math/Arithmetic",
+        { MakePin("A", PinDataType::Float), MakePin("B", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Power", "Power", "Math/Arithmetic",
+        { MakePin("Base", PinDataType::Float), MakePin("Exponent", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Negate", "Negate", "Math/Arithmetic",
+        { MakePin("Value", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    // --- More Comparison ---
+    reg("NotEqual", "!=", "Math/Comparison",
+        { MakePin("A", PinDataType::Float), MakePin("B", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Boolean) },
+        "80C3F8", "Simple");
+
+    reg("LessEqual", "<=", "Math/Comparison",
+        { MakePin("A", PinDataType::Float), MakePin("B", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Boolean) },
+        "80C3F8", "Simple");
+
+    reg("GreaterEqual", ">=", "Math/Comparison",
+        { MakePin("A", PinDataType::Float), MakePin("B", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Boolean) },
+        "80C3F8", "Simple");
+
+    // --- More Logic ---
+    reg("Nand", "NAND", "Math/Logic",
+        { MakePin("A", PinDataType::Boolean), MakePin("B", PinDataType::Boolean) },
+        { MakePin("Result", PinDataType::Boolean) },
+        "80C3F8", "Simple");
+
+    reg("Nor", "NOR", "Math/Logic",
+        { MakePin("A", PinDataType::Boolean), MakePin("B", PinDataType::Boolean) },
+        { MakePin("Result", PinDataType::Boolean) },
+        "80C3F8", "Simple");
+
+    reg("Xor", "XOR", "Math/Logic",
+        { MakePin("A", PinDataType::Boolean), MakePin("B", PinDataType::Boolean) },
+        { MakePin("Result", PinDataType::Boolean) },
+        "80C3F8", "Simple");
+
+    // --- More Conversion ---
+    reg("StringToInt", "String to Int", "Math/Conversion",
+        { MakePin("Value", PinDataType::String) },
+        { MakePin("Result", PinDataType::Integer), MakePin("Valid", PinDataType::Boolean) },
+        "80C3F8", "Simple");
+
+    reg("StringToFloat", "String to Float", "Math/Conversion",
+        { MakePin("Value", PinDataType::String) },
+        { MakePin("Result", PinDataType::Float), MakePin("Valid", PinDataType::Boolean) },
+        "80C3F8", "Simple");
+
+    reg("BoolToString", "Bool to String", "Math/Conversion",
+        { MakePin("Value", PinDataType::Boolean) },
+        { MakePin("Result", PinDataType::String) },
+        "80C3F8", "Simple");
+
+    // --- More Functions ---
+    reg("Sqrt", "Sqrt", "Math/Functions",
+        { MakePin("Value", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Sin", "Sin", "Math/Functions",
+        { MakePin("Value (Rad)", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Cos", "Cos", "Math/Functions",
+        { MakePin("Value (Rad)", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Tan", "Tan", "Math/Functions",
+        { MakePin("Value (Rad)", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Atan2", "Atan2", "Math/Functions",
+        { MakePin("Y", PinDataType::Float), MakePin("X", PinDataType::Float) },
+        { MakePin("Result (Rad)", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Lerp", "Lerp", "Math/Functions",
+        { MakePin("A", PinDataType::Float), MakePin("B", PinDataType::Float), MakePin("Alpha", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("MapRange", "Map Range", "Math/Functions",
+        { MakePin("Value", PinDataType::Float), MakePin("InMin", PinDataType::Float), MakePin("InMax", PinDataType::Float),
+          MakePin("OutMin", PinDataType::Float), MakePin("OutMax", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Ceil", "Ceil", "Math/Functions",
+        { MakePin("Value", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Floor", "Floor", "Math/Functions",
+        { MakePin("Value", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Round", "Round", "Math/Functions",
+        { MakePin("Value", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Sign", "Sign", "Math/Functions",
+        { MakePin("Value", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    // --- Constants (Math/Constants) ---
+    reg("PI", "PI", "Math/Constants",
+        {},
+        { MakePin("Value", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("E", "E", "Math/Constants",
+        {},
+        { MakePin("Value", PinDataType::Float) },
+        "80C3F8", "Simple");
+
     // --- Misc (直接在 Math 顶级) ---
     reg("Weird", "o.O", "Math",
         { MakePin("", PinDataType::Float) },
@@ -438,6 +602,16 @@ static void RegisterNodeDefs_String(INodeRegistry& registry)
         { MakePin("String", PinDataType::String) },
         { MakePin("Result", PinDataType::String) },
         "", "Simple");
+
+    // FormatString — 格式化字符串 ({0}, {1}, ... 占位符)
+    reg("FormatString", "Format String", "Misc/String",
+        { MakePin("Format", PinDataType::String), MakePin("Arg 0", PinDataType::Any), MakePin("Arg 1", PinDataType::Any) },
+        { MakePin("Result", PinDataType::String) },
+        "", "Simple");
+    {
+        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("FormatString"));
+        if (d) d->customProperties["dynamicInputs"] = "Any";
+    }
 }
 
 static void RegisterNodeDefs_Array(INodeRegistry& registry)
@@ -483,6 +657,32 @@ static void RegisterNodeDefs_Array(INodeRegistry& registry)
         { MakeFlowPin(""), MakePin("Array", PinDataType::Array) },
         { MakeFlowPin("Loop Body"), MakePin("Array Element", PinDataType::Any),
           MakePin("Array Index", PinDataType::Integer), MakeFlowPin("Completed") });
+
+    reg("ArrayAdd", "Array Add", "Misc/Array",
+        { MakeFlowPin(""), MakePin("Array", PinDataType::Array), MakePin("Element", PinDataType::Any) },
+        { MakeFlowPin(""), MakePin("Array", PinDataType::Array), MakePin("New Length", PinDataType::Integer) });
+
+    reg("ArrayInsert", "Array Insert", "Misc/Array",
+        { MakeFlowPin(""), MakePin("Array", PinDataType::Array), MakePin("Index", PinDataType::Integer), MakePin("Element", PinDataType::Any) },
+        { MakeFlowPin(""), MakePin("Array", PinDataType::Array) });
+
+    reg("ArrayContains", "Array Contains", "Misc/Array",
+        { MakePin("Array", PinDataType::Array), MakePin("Element", PinDataType::Any) },
+        { MakePin("Found", PinDataType::Boolean), MakePin("Index", PinDataType::Integer) },
+        "", "Simple");
+
+    reg("ArrayReverse", "Array Reverse", "Misc/Array",
+        { MakeFlowPin(""), MakePin("Array", PinDataType::Array) },
+        { MakeFlowPin(""), MakePin("Array", PinDataType::Array) });
+
+    reg("MakeArray", "Make Array", "Misc/Array",
+        { MakePin("Element 0", PinDataType::Any), MakePin("Element 1", PinDataType::Any) },
+        { MakePin("Array", PinDataType::Array) },
+        "", "Simple");
+    {
+        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("MakeArray"));
+        if (d) d->customProperties["dynamicInputs"] = "Any";
+    }
 }
 
 static void RegisterNodeDefs_Tree(INodeRegistry& registry)
@@ -586,6 +786,31 @@ static void RegisterNodeDefs_Misc(INodeRegistry& registry)
         { MakeFlowPin(""), MakePin("Name", PinDataType::String),
           MakePin("Value", PinDataType::String) },
         { MakeFlowPin("") });
+
+    reg("IsValid", "Is Valid", "Misc",
+        { MakePin("Value", PinDataType::Any) },
+        { MakePin("Is Valid", PinDataType::Boolean) },
+        "", "Simple");
+
+    reg("MakeLiteralBool", "Make Literal Bool", "Misc",
+        { MakePin("Value", PinDataType::Boolean) },
+        { MakePin("Result", PinDataType::Boolean) },
+        "", "Simple");
+
+    reg("MakeLiteralInt", "Make Literal Int", "Misc",
+        { MakePin("Value", PinDataType::Integer) },
+        { MakePin("Result", PinDataType::Integer) },
+        "", "Simple");
+
+    reg("MakeLiteralFloat", "Make Literal Float", "Misc",
+        { MakePin("Value", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "", "Simple");
+
+    reg("MakeLiteralString", "Make Literal String", "Misc",
+        { MakePin("Value", PinDataType::String) },
+        { MakePin("Result", PinDataType::String) },
+        "", "Simple");
 }
 
 // ============================================================================

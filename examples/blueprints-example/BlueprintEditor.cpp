@@ -110,10 +110,27 @@ bool BlueprintEditor::CanCreateLink(Pin* a, Pin* b)
     if (b->Type == PinType::Any && a->Type != PinType::Flow)
         return true;
 
-    if (a->Type != b->Type)
-        return false;
+    // 完全匹配
+    if (a->Type == b->Type)
+        return true;
 
-    return true;
+    // 兼容类型之间允许隐式连接
+    // Int ↔ Float (自动转换)
+    if ((a->Type == PinType::Int && b->Type == PinType::Float) ||
+        (a->Type == PinType::Float && b->Type == PinType::Int))
+        return true;
+
+    // Bool ↔ Int (0/1)
+    if ((a->Type == PinType::Bool && b->Type == PinType::Int) ||
+        (a->Type == PinType::Int && b->Type == PinType::Bool))
+        return true;
+
+    // Bool ↔ Float (0.0/1.0)
+    if ((a->Type == PinType::Bool && b->Type == PinType::Float) ||
+        (a->Type == PinType::Float && b->Type == PinType::Bool))
+        return true;
+
+    return false;
 }
 
 // ============================================================================
@@ -641,6 +658,9 @@ void BlueprintEditor::OnStart()
     m_HeaderBackground = LoadTexture("data/BlueprintBackground.png");
     m_SaveIcon         = LoadTexture("data/ic_save_white_24dp.png");
     m_RestoreIcon      = LoadTexture("data/ic_restore_white_24dp.png");
+
+    // 加载最近文件列表
+    LoadRecentFiles();
 
     // 设置初始标题
     SetTitle("Blueprint Editor - [New]");
