@@ -250,11 +250,13 @@ Node* BlueprintEditor::SpawnNodeByDef(const std::string& defId)
         if (pd.dataType == RTPinDataType::Boolean)
             pin.BoolValue = pd.defaultValue.asBool();
         else if (pd.dataType == RTPinDataType::Integer)
-            pin.IntValue = static_cast<int>(pd.defaultValue.asInt());
+            pin.IntValue = pd.defaultValue.asInt();
         else if (pd.dataType == RTPinDataType::Float)
             pin.FloatValue = static_cast<float>(pd.defaultValue.asFloat());
         else if (pd.dataType == RTPinDataType::String)
             pin.StringValue = pd.defaultValue.asString();
+        else if (pd.dataType == RTPinDataType::Object)
+            pin.ObjectValue = pd.defaultValue.asObjectId();
 
         // 传递声明式 hiddenWhen 规则
         auto hwIt = pd.customProperties.find("hiddenWhen");
@@ -512,9 +514,10 @@ RTBlueprintData BlueprintEditor::BuildRuntimeData()
             switch (pin.Type)
             {
             case PinType::Bool:   pi.defaultValue = RTVariant(pin.BoolValue); break;
-            case PinType::Int:    pi.defaultValue = RTVariant(static_cast<int64_t>(pin.IntValue)); break;
+            case PinType::Int:    pi.defaultValue = RTVariant(pin.IntValue); break;
             case PinType::Float:  pi.defaultValue = RTVariant(static_cast<double>(pin.FloatValue)); break;
             case PinType::String: pi.defaultValue = RTVariant(pin.StringValue); break;
+            case PinType::Object: pi.defaultValue = RTVariant::MakeObject(pin.ObjectValue); break;
             default: break;
             }
 
@@ -552,27 +555,25 @@ RTBlueprintData BlueprintEditor::BuildRuntimeData()
 }
 
 // ============================================================================
-// Application 生命周期
+// 多文档管理
 // ============================================================================
 
-ed::EditorContext* s_Editor = nullptr;
-
-void BlueprintEditor::OnStart()
+BlueprintDocument* BlueprintEditor::CreateNewDocument()
 {
-    ed::Config config;
+    auto doc = std::make_unique<BlueprintDocument>();
 
-    config.SettingsFile = "Blueprints.json";
+    // 为每个文档创建独立的节点编辑器上下文
+    ed::Config config;
+    config.SettingsFile = nullptr;  // 内存模式，不写文件
 
     config.UserPointer = this;
 
     config.LoadNodeSettings = [](ed::NodeId nodeId, char* data, void* userPointer) -> size_t
     {
         auto self = static_cast<BlueprintEditor*>(userPointer);
-
         auto node = self->FindNode(nodeId);
         if (!node)
             return 0;
-
         if (data != nullptr)
             memcpy(data, node->State.data(), node->State.size());
         return node->State.size();
@@ -581,87 +582,62 @@ void BlueprintEditor::OnStart()
     config.SaveNodeSettings = [](ed::NodeId nodeId, const char* data, size_t size, ed::SaveReasonFlags reason, void* userPointer) -> bool
     {
         auto self = static_cast<BlueprintEditor*>(userPointer);
-
         auto node = self->FindNode(nodeId);
         if (!node)
             return false;
-
         node->State.assign(data, size);
-
         self->TouchNode(nodeId);
-
         return true;
     };
 
-    s_Editor = ed::CreateEditor(&config);
-    ed::SetCurrentEditor(s_Editor);
+    doc->editorContext = ed::CreateEditor(&config);
 
-    // Initialize node definition registry
+    m_Documents.push_back(std::move(doc));
+    m_ActiveDocIndex = static_cast<int>(m_Documents.size()) - 1;
+
+    return m_Documents.back().get();
+}
+
+void BlueprintEditor::CloseDocument(int index)
+{
+    if (index < 0 || index >= (int)m_Documents.size())
+        return;
+
+    // 销毁该文档的编辑器上下文
+    auto& doc = m_Documents[index];
+    if (doc->editorContext)
+    {
+        ed::DestroyEditor(doc->editorContext);
+        doc->editorContext = nullptr;
+    }
+
+    m_Documents.erase(m_Documents.begin() + index);
+
+    // 调整活跃索引
+    if (m_ActiveDocIndex >= (int)m_Documents.size())
+        m_ActiveDocIndex = (int)m_Documents.size() - 1;
+    if (m_ActiveDocIndex < 0)
+        m_ActiveDocIndex = 0;
+
+    // 如果关闭了所有文档，自动创建一个新的
+    if (m_Documents.empty())
+        CreateNewDocument();
+}
+
+// ============================================================================
+// Application 生命周期
+// ============================================================================
+
+void BlueprintEditor::OnStart()
+{
+    // Initialize node definition registry (全局共享)
     RegisterBuiltinNodeDefinitions();
     RegisterBuiltinHandlers();
-    /*
-    // Spawn some initial nodes for demo
-    Node* node;
-    node = SpawnNodeByDef("InputActionFire");
-    if (node) { FixupSpecialPinTypes(node, m_NodeRegistry.getNodeDefinition("InputActionFire")); ed::SetNodePosition(node->ID, ImVec2(-252, 220)); }
 
-    node = SpawnNodeByDef("Branch");
-    if (node) ed::SetNodePosition(node->ID, ImVec2(-300, 351));
+    // 创建第一个空白文档
+    CreateNewDocument();
 
-    node = SpawnNodeByDef("DoN");
-    if (node) ed::SetNodePosition(node->ID, ImVec2(-238, 504));
-
-    node = SpawnNodeByDef("OutputAction");
-    if (node) { FixupSpecialPinTypes(node, m_NodeRegistry.getNodeDefinition("OutputAction")); ed::SetNodePosition(node->ID, ImVec2(71, 80)); }
-
-    node = SpawnNodeByDef("SetTimer");
-    if (node) { FixupSpecialPinTypes(node, m_NodeRegistry.getNodeDefinition("SetTimer")); ed::SetNodePosition(node->ID, ImVec2(168, 316)); }
-
-    node = SpawnNodeByDef("Sequence");
-    if (node) ed::SetNodePosition(node->ID, ImVec2(1028, 329));
-
-    node = SpawnNodeByDef("MoveTo");
-    if (node) ed::SetNodePosition(node->ID, ImVec2(1204, 458));
-
-    node = SpawnNodeByDef("RandomWait");
-    if (node) ed::SetNodePosition(node->ID, ImVec2(868, 538));
-
-    node = SpawnNodeByDef("Comment");
-    if (node) { ed::SetNodePosition(node->ID, ImVec2(112, 576)); ed::SetGroupSize(node->ID, ImVec2(384, 154)); }
-
-    node = SpawnNodeByDef("Comment");
-    if (node) { ed::SetNodePosition(node->ID, ImVec2(800, 224)); ed::SetGroupSize(node->ID, ImVec2(640, 400)); }
-
-    node = SpawnNodeByDef("Less");
-    if (node) ed::SetNodePosition(node->ID, ImVec2(366, 652));
-
-    node = SpawnNodeByDef("Weird");
-    if (node) ed::SetNodePosition(node->ID, ImVec2(144, 652));
-
-    node = SpawnNodeByDef("Message");
-    if (node) ed::SetNodePosition(node->ID, ImVec2(-348, 698));
-
-    node = SpawnNodeByDef("PrintString");
-    if (node) ed::SetNodePosition(node->ID, ImVec2(-69, 652));
-
-    node = SpawnNodeByDef("HoudiniTransform");
-    if (node) ed::SetNodePosition(node->ID, ImVec2(500, -70));
-
-    node = SpawnNodeByDef("HoudiniGroup");
-    if (node) ed::SetNodePosition(node->ID, ImVec2(500, 42));
-    */
-    ed::NavigateToContent();
-
-    BuildNodes();
-
-    /*
-    // Demo links (require demo nodes above to be spawned first)
-    m_Links.push_back(Link(GetNextLinkId(), m_Nodes[5].Outputs[0].ID, m_Nodes[6].Inputs[0].ID));
-    m_Links.push_back(Link(GetNextLinkId(), m_Nodes[5].Outputs[0].ID, m_Nodes[7].Inputs[0].ID));
-
-    m_Links.push_back(Link(GetNextLinkId(), m_Nodes[14].Outputs[0].ID, m_Nodes[15].Inputs[0].ID));
-    */
-
+    // 加载纹理资源
     m_HeaderBackground = LoadTexture("data/BlueprintBackground.png");
     m_SaveIcon         = LoadTexture("data/ic_save_white_24dp.png");
     m_RestoreIcon      = LoadTexture("data/ic_restore_white_24dp.png");
@@ -685,11 +661,16 @@ void BlueprintEditor::OnStop()
     releaseTexture(m_SaveIcon);
     releaseTexture(m_HeaderBackground);
 
-    if (s_Editor)
+    // 销毁所有文档的编辑器上下文
+    for (auto& doc : m_Documents)
     {
-        ed::DestroyEditor(s_Editor);
-        s_Editor = nullptr;
+        if (doc->editorContext)
+        {
+            ed::DestroyEditor(doc->editorContext);
+            doc->editorContext = nullptr;
+        }
     }
+    m_Documents.clear();
 }
 
 ImGuiWindowFlags BlueprintEditor::GetWindowFlags() const

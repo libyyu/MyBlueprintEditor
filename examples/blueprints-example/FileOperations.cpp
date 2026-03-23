@@ -83,11 +83,12 @@ std::string GetEditorFilePath(const std::string& runtimePath)
 } // anonymous namespace
 
 // ============================================================================
-// 清空编辑器
+// 清空编辑器（清空当前活跃文档）
 // ============================================================================
 
 void BlueprintEditor::ClearEditor()
 {
+    if (!ActiveDoc()) return;
     m_Nodes.clear();
     m_Links.clear();
     m_NodeTouchTime.clear();
@@ -101,19 +102,18 @@ void BlueprintEditor::ClearEditor()
 }
 
 // ============================================================================
-// 新建蓝图
+// 新建蓝图（创建新标签页）
 // ============================================================================
 
 void BlueprintEditor::NewFile()
 {
-    ClearEditor();
-    m_CurrentFilePath.clear();
-    m_IsDirty = false;
-    
-    // 重新设置编辑器标题
+    CreateNewDocument();
+
+    // 切换到新文档的编辑器上下文
+    ed::SetCurrentEditor(ActiveDoc()->editorContext);
+
+    // 更新窗口标题
     SetTitle("Blueprint Editor - [New]");
-    
-    ed::NavigateToContent();
 }
 
 // ============================================================================
@@ -148,19 +148,22 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
         
         if (!result.success)
         {
-            m_ExecutionLog.push_back("[ERROR] Failed to open editor file: " + result.errorMessage);
-            m_ExecutionLogDirty = true;
+            if (ActiveDoc())
+            {
+                m_ExecutionLog.push_back("[ERROR] Failed to open editor file: " + result.errorMessage);
+                m_ExecutionLogDirty = true;
+            }
             return;
         }
         
-        // 清空当前编辑器
-        ClearEditor();
+        // 创建新标签页
+        CreateNewDocument();
+        ed::SetCurrentEditor(ActiveDoc()->editorContext);
         
         // 加载数据到编辑器
         LoadEditorData(result.data);
         
         // 保存对应的 runtime 文件路径（去掉 .editor 部分）
-        // e.g. "NLoop.editor.json" -> "NLoop.json"
         std::string runtimePath = path.substr(0, path.size() - 12) + ".json";
         m_CurrentFilePath = runtimePath;
     }
@@ -186,13 +189,17 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
         
         if (!result.success)
         {
-            m_ExecutionLog.push_back("[ERROR] Failed to open: " + result.errorMessage);
-            m_ExecutionLogDirty = true;
+            if (ActiveDoc())
+            {
+                m_ExecutionLog.push_back("[ERROR] Failed to open: " + result.errorMessage);
+                m_ExecutionLogDirty = true;
+            }
             return;
         }
         
-        // 清空当前编辑器
-        ClearEditor();
+        // 创建新标签页
+        CreateNewDocument();
+        ed::SetCurrentEditor(ActiveDoc()->editorContext);
         
         // 加载数据到编辑器
         LoadEditorData(result.data);
@@ -424,6 +431,8 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
                     pin.FloatValue = static_cast<float>(rtPin.defaultValue.asFloat());
                 else if (rtPin.dataType == RTPinDataType::String)
                     pin.StringValue = rtPin.defaultValue.asString();
+                else if (rtPin.dataType == RTPinDataType::Object)
+                    pin.ObjectValue = rtPin.defaultValue.asObjectId();
             }
             else
             {
@@ -542,11 +551,13 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
                     if (pinDef.dataType == RTPinDataType::Boolean)
                         pin.BoolValue = pinDef.defaultValue.asBool();
                     else if (pinDef.dataType == RTPinDataType::Integer)
-                        pin.IntValue = static_cast<int>(pinDef.defaultValue.asInt());
+                        pin.IntValue = pinDef.defaultValue.asInt();
                     else if (pinDef.dataType == RTPinDataType::Float)
                         pin.FloatValue = static_cast<float>(pinDef.defaultValue.asFloat());
                     else if (pinDef.dataType == RTPinDataType::String)
                         pin.StringValue = pinDef.defaultValue.asString();
+                    else if (pinDef.dataType == RTPinDataType::Object)
+                        pin.ObjectValue = pinDef.defaultValue.asObjectId();
                     reconcileChanged = true;
                 }
             }

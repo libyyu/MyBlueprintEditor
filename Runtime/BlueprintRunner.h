@@ -18,6 +18,9 @@
 #include <functional>
 #include <memory>
 #include <queue>
+
+// 前置声明（编辑器类在全局命名空间）
+struct BlueprintEditor;
 #include <algorithm>
 #include <unordered_set>
 #include <thread>
@@ -351,6 +354,10 @@ public:
 
 private:
     friend class ExecutionContext;
+    friend struct ::BlueprintEditor;  // 仅编辑器可设置 m_withEditor
+
+    // 是否在编辑器环境下运行
+    bool                                                m_withEditor = false;
 
     // 蓝图数据
     BlueprintData                                       m_blueprint;

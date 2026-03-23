@@ -45,9 +45,10 @@ struct Pin
 
     // 引脚默认值（未连线时可在节点上直接编辑）
     bool        BoolValue   = false;
-    int         IntValue    = 0;
+    int64_t     IntValue    = 0;
     float       FloatValue  = 0.0f;
     std::string StringValue;
+    std::string ObjectValue;    // Object 类型引脚的对象引用 ID
 
     // 错误状态（UE4 风格）
     bool        IsOrphaned  = false;   // 孤立引脚：NodeDef 中已删除但旧 JSON 中仍存在

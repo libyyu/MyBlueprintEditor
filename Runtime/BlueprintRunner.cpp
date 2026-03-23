@@ -18,7 +18,7 @@ namespace Runtime {
 
 bool BlueprintRunner::IsWithEditor() const
 {
-    return false;
+    return m_withEditor;
 }
 
 bool BlueprintRunner::Load(const BlueprintData& data)

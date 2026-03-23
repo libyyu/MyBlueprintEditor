@@ -92,6 +92,7 @@ void BlueprintEditor::ExecuteBlueprint()
 
     // 2. 使用持久 Runner（这样 Delay 等异步操作注册的 timer 不会随局部变量销毁）
     m_PersistentRunner.ResetState();
+    m_PersistentRunner.m_withEditor = true;  // friend 权限：标记在编辑器环境下运行
     m_PersistentRunner.SetLogCallback([this](const std::string& msg) {
         m_ExecutionLog.push_back(msg);
         m_ExecutionLogDirty = true;

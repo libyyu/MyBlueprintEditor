@@ -97,6 +97,7 @@ struct Variant
         case PinDataType::Integer: intValue   = other.intValue;   break;
         case PinDataType::Float:   floatValue = other.floatValue; break;
         case PinDataType::String:  stringValue = other.stringValue; break;
+        case PinDataType::Object:  stringValue = other.stringValue; break;
         case PinDataType::Array:   arrayValue = other.arrayValue; break;
         default: break;
         }
@@ -112,6 +113,7 @@ struct Variant
         case PinDataType::Integer: intValue   = other.intValue;   break;
         case PinDataType::Float:   floatValue = other.floatValue; break;
         case PinDataType::String:  stringValue = std::move(other.stringValue); break;
+        case PinDataType::Object:  stringValue = std::move(other.stringValue); break;
         case PinDataType::Array:   arrayValue = std::move(other.arrayValue); break;
         default: break;
         }
@@ -122,8 +124,9 @@ struct Variant
     {
         if (this != &other)
         {
-            // 如果旧类型是 string 但新类型不是，清空 stringValue
-            if (type == PinDataType::String && other.type != PinDataType::String)
+            // 如果旧类型使用 stringValue 但新类型不使用，清空 stringValue
+            if ((type == PinDataType::String || type == PinDataType::Object)
+                && other.type != PinDataType::String && other.type != PinDataType::Object)
                 stringValue.clear();
             if (type == PinDataType::Array && other.type != PinDataType::Array)
                 arrayValue.clear();
@@ -134,6 +137,7 @@ struct Variant
             case PinDataType::Integer: intValue   = other.intValue;   break;
             case PinDataType::Float:   floatValue = other.floatValue; break;
             case PinDataType::String:  stringValue = other.stringValue; break;
+            case PinDataType::Object:  stringValue = other.stringValue; break;
             case PinDataType::Array:   arrayValue = other.arrayValue; break;
             default: intValue = 0; break;
             }
@@ -146,7 +150,8 @@ struct Variant
     {
         if (this != &other)
         {
-            if (type == PinDataType::String && other.type != PinDataType::String)
+            if ((type == PinDataType::String || type == PinDataType::Object)
+                && other.type != PinDataType::String && other.type != PinDataType::Object)
                 stringValue.clear();
             if (type == PinDataType::Array && other.type != PinDataType::Array)
                 arrayValue.clear();
@@ -157,6 +162,7 @@ struct Variant
             case PinDataType::Integer: intValue   = other.intValue;   break;
             case PinDataType::Float:   floatValue = other.floatValue; break;
             case PinDataType::String:  stringValue = std::move(other.stringValue); break;
+            case PinDataType::Object:  stringValue = std::move(other.stringValue); break;
             case PinDataType::Array:   arrayValue = std::move(other.arrayValue); break;
             default: intValue = 0; break;
             }
@@ -174,6 +180,23 @@ struct Variant
     explicit Variant(const std::string& v) : type(PinDataType::String),  intValue(0), stringValue(v) {}
     explicit Variant(std::vector<Variant> v) : type(PinDataType::Array), intValue(0), arrayValue(std::move(v)) {}
 
+    // Object 工厂方法（用字符串 ID 表示对象引用）
+    static Variant MakeObject(const std::string& objectId)
+    {
+        Variant v;
+        v.type = PinDataType::Object;
+        v.stringValue = objectId;
+        return v;
+    }
+
+    // 获取对象引用 ID
+    std::string asObjectId() const
+    {
+        if (type == PinDataType::Object) return stringValue;
+        if (type == PinDataType::String) return stringValue;
+        return "";
+    }
+
     // 获取值（带自动类型转换）
     bool asBool() const
     {
@@ -183,6 +206,7 @@ struct Variant
         case PinDataType::Integer: return intValue != 0;
         case PinDataType::Float:   return floatValue != 0.0;
         case PinDataType::String:  return !stringValue.empty();
+        case PinDataType::Object:  return !stringValue.empty();
         case PinDataType::Array:   return !arrayValue.empty();
         default:                   return false;
         }
@@ -225,6 +249,7 @@ struct Variant
         case PinDataType::Boolean: return boolValue ? "True" : "False";
         case PinDataType::Integer: return std::to_string(intValue);
         case PinDataType::Float:   return std::to_string(floatValue);
+        case PinDataType::Object:  return stringValue.empty() ? "(none)" : stringValue;
         case PinDataType::Array:
         {
             std::string result = "[";

@@ -86,6 +86,75 @@ static bool Splitter(const char* str_id, bool split_vertically, float thickness,
 }
 
 // ============================================================================
+// 蓝图文档（每个标签页一个实例）
+// ============================================================================
+
+struct BlueprintDocument
+{
+    // 编辑器上下文（每个文档独立的节点编辑器画布）
+    ed::EditorContext*  editorContext = nullptr;
+
+    // 蓝图数据
+    int                  nextId = 1;
+    std::deque<Node>     nodes;
+    std::deque<Link>     links;
+
+    // 触摸追踪
+    std::map<ed::NodeId, float, NodeIdLess> nodeTouchTime;
+
+    // 文件状态
+    std::string          filePath;                         // 文件路径（空=未保存的新文件）
+    bool                 isDirty = false;                  // 是否有未保存的修改
+    bool                 needSetNodePositions = false;     // 加载后需要设置节点位置
+    RTBlueprintData      pendingLoadData;                  // 待设置位置的加载数据
+
+    // 运行时执行状态
+    std::vector<std::string>    executionLog;
+    std::string                 executionLogText;          // 合并后的日志文本
+    bool                        executionLogDirty = false;
+    bool                        isExecuting = false;
+    std::string                 lastExecutionStatus;
+    std::vector<ed::LinkId>     flowLinks;
+
+    // 持久 Runner
+    RTBlueprintRunner           persistentRunner;
+
+    // 节点编辑器 UI 状态（原先的 static 变量）
+    ed::NodeId contextNodeId      = 0;
+    ed::LinkId contextLinkId      = 0;
+    ed::PinId  contextPinId       = 0;
+    bool       createNewNode      = false;
+    Pin*       newNodeLinkPin     = nullptr;
+    Pin*       newLinkPin         = nullptr;
+
+    // 标签页显示名
+    std::string GetTabName() const
+    {
+        if (filePath.empty())
+            return "New";
+        size_t lastSlash = filePath.find_last_of("/\\");
+        std::string name = (lastSlash != std::string::npos) ? filePath.substr(lastSlash + 1) : filePath;
+        size_t lastDot = name.find_last_of('.');
+        if (lastDot != std::string::npos)
+            name = name.substr(0, lastDot);
+        return name;
+    }
+
+    // 标签页标题（含修改标记）
+    std::string GetTabTitle() const
+    {
+        std::string title = GetTabName();
+        if (isDirty)
+            title += " *";
+        return title;
+    }
+
+    // 便捷访问计时器管理器
+    RTFrameTimerManager& GetTimerManager() { return persistentRunner.GetTimerManager(); }
+    const RTFrameTimerManager& GetTimerManager() const { return persistentRunner.GetTimerManager(); }
+};
+
+// ============================================================================
 // 蓝图编辑器主类
 // ============================================================================
 
@@ -94,7 +163,28 @@ struct BlueprintEditor : public Application
     using Application::Application;
 
     // ------------------------------------------------------------------
-    // ID 管理
+    // 多文档管理
+    // ------------------------------------------------------------------
+    std::vector<std::unique_ptr<BlueprintDocument>> m_Documents;
+    int  m_ActiveDocIndex = 0;
+
+    // 延迟打开文件（双击节点时使用，不能在 ed::Begin/End 内部调用 DoOpenFile）
+    std::string m_PendingOpenFilePath;
+    int         m_PendingSwitchTabIndex = -1;
+
+    BlueprintDocument* ActiveDoc()
+    {
+        if (m_Documents.empty()) return nullptr;
+        if (m_ActiveDocIndex < 0 || m_ActiveDocIndex >= (int)m_Documents.size())
+            m_ActiveDocIndex = 0;
+        return m_Documents[m_ActiveDocIndex].get();
+    }
+
+    BlueprintDocument* CreateNewDocument();               // 创建新的空白文档
+    void CloseDocument(int index);                        // 关闭指定文档
+
+    // ------------------------------------------------------------------
+    // ID 管理（操作当前活跃文档）
     // ------------------------------------------------------------------
     int GetNextId();
     ed::LinkId GetNextLinkId();
@@ -129,9 +219,6 @@ struct BlueprintEditor : public Application
 
     // ------------------------------------------------------------------
     // 节点定义 & 运行时处理器 注册
-    // 实际定义和处理器实现在 Runtime/BuiltinNodeDefs.cpp 和
-    // Runtime/BuiltinHandlers.cpp 中，以下两个函数仅做委托调用，
-    // 并在 Editor 层覆盖少量需要 m_ExecutionLog 的处理器。
     // ------------------------------------------------------------------
     void RegisterBuiltinNodeDefinitions();
     void RegisterBuiltinHandlers();
@@ -155,17 +242,17 @@ struct BlueprintEditor : public Application
     // ------------------------------------------------------------------
     // 文件操作
     // ------------------------------------------------------------------
-    void    NewFile();                                  // 新建蓝图
-    void    OpenFile();                                 // 打开蓝图文件
-    void    SaveFile();                                 // 保存蓝图文件
+    void    NewFile();                                  // 新建蓝图（新标签页）
+    void    OpenFile();                                 // 打开蓝图文件（新标签页）
+    void    SaveFile();                                 // 保存当前标签页
     void    SaveFileAs();                               // 另存为
     void    DoSaveFile(const std::string& path);        // 执行保存
     void    DoOpenFile(const std::string& path);        // 执行打开
-    void    ClearEditor();                              // 清空编辑器
+    void    ClearEditor();                              // 清空当前文档
 
     // 编辑器数据序列化
-    RTBlueprintData BuildFullEditorData();              // 构建完整编辑器数据（含位置等）
-    void            LoadEditorData(const RTBlueprintData& data); // 从数据恢复编辑器状态
+    RTBlueprintData BuildFullEditorData();
+    void            LoadEditorData(const RTBlueprintData& data);
 
     // ------------------------------------------------------------------
     // 蓝图执行
@@ -189,54 +276,44 @@ struct BlueprintEditor : public Application
     ImGuiWindowFlags GetWindowFlags() const override;
 
     // ------------------------------------------------------------------
-    // 成员变量
+    // 成员变量（全局共享，不随文档变化）
     // ------------------------------------------------------------------
-    int                  m_NextId = 1;
     const int            m_PinIconSize = 24;
-    std::deque<Node>     m_Nodes;
-    std::deque<Link>     m_Links;
     ImTextureID          m_HeaderBackground = ImTextureID_Invalid;
     ImTextureID          m_SaveIcon = ImTextureID_Invalid;
     ImTextureID          m_RestoreIcon = ImTextureID_Invalid;
     const float          m_TouchTime = 1.0f;
-    std::map<ed::NodeId, float, NodeIdLess> m_NodeTouchTime;
     bool                 m_ShowOrdinals = false;
     bool                 m_ShowNodeListWindow = true;     // 左侧面板可见
     bool                 m_ShowExecutionWindow = true;    // 底部面板可见
     bool                 m_ShowTimerWindow = false;       // 计时器监控面板可见
 
     // VSCode 风格布局尺寸（可拖拽调整）
-    float                m_LeftPanelWidth  = 250.0f;      // 左侧面板宽度
-    float                m_BottomPanelHeight = 200.0f;    // 底部面板高度
+    float                m_LeftPanelWidth  = 250.0f;
+    float                m_BottomPanelHeight = 200.0f;
 
-    // 文件操作状态
-    std::string          m_CurrentFilePath;                // 当前打开的文件路径（空=未保存的新文件）
-    bool                 m_IsDirty = false;                // 是否有未保存的修改
-    bool                 m_NeedSetNodePositions = false;   // 加载后需要设置节点位置
-    RTBlueprintData      m_PendingLoadData;                // 待设置位置的加载数据
-
-    // 节点定义注册表 & 处理器注册表
+    // 节点定义注册表 & 处理器注册表（全局共享）
     RTNodeRegistry                                          m_NodeRegistry;
     std::unordered_map<std::string, RTNodeHandler>          m_HandlerRegistry;
-
-    // 运行时执行状态
-    std::vector<std::string>    m_ExecutionLog;
-    std::string                 m_ExecutionLogText;     // 合并后的日志文本（供选词拷贝）
-    bool                        m_ExecutionLogDirty = false; // 日志是否有更新
-    bool                        m_ShowExecutionPanel = true;
-    bool                        m_IsExecuting = false;
-    std::string                 m_LastExecutionStatus;
-    std::vector<ed::LinkId>     m_FlowLinks;
 
     // Default handler
     RTNodeHandler m_DefaultHandler;
 
-    // ------------------------------------------------------------------
-    // 持久 Runner（用于主线程计时器等持久功能）
-    // ------------------------------------------------------------------
-    RTBlueprintRunner   m_PersistentRunner;
-
-    // 便捷访问计时器管理器
-    RTFrameTimerManager& GetTimerManager() { return m_PersistentRunner.GetTimerManager(); }
-    const RTFrameTimerManager& GetTimerManager() const { return m_PersistentRunner.GetTimerManager(); }
+    // ---- 以下为兼容性别名，代理到 ActiveDoc() ----
+    // 让旧代码中 m_Nodes / m_Links 等访问透明转发（仅在有活跃文档时有效）
+    #define m_Nodes          (ActiveDoc()->nodes)
+    #define m_Links          (ActiveDoc()->links)
+    #define m_NextId         (ActiveDoc()->nextId)
+    #define m_NodeTouchTime  (ActiveDoc()->nodeTouchTime)
+    #define m_CurrentFilePath (ActiveDoc()->filePath)
+    #define m_IsDirty        (ActiveDoc()->isDirty)
+    #define m_NeedSetNodePositions (ActiveDoc()->needSetNodePositions)
+    #define m_PendingLoadData (ActiveDoc()->pendingLoadData)
+    #define m_ExecutionLog   (ActiveDoc()->executionLog)
+    #define m_ExecutionLogText (ActiveDoc()->executionLogText)
+    #define m_ExecutionLogDirty (ActiveDoc()->executionLogDirty)
+    #define m_IsExecuting    (ActiveDoc()->isExecuting)
+    #define m_LastExecutionStatus (ActiveDoc()->lastExecutionStatus)
+    #define m_FlowLinks      (ActiveDoc()->flowLinks)
+    #define m_PersistentRunner (ActiveDoc()->persistentRunner)
 };

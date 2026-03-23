@@ -1393,6 +1393,8 @@ std::string JsonBlueprintExporter::variantToJson(const Variant& value) const
         return std::to_string(value.floatValue);
     case PinDataType::String:
         return "\"" + escapeJson(value.stringValue) + "\"";
+    case PinDataType::Object:
+        return "\"" + escapeJson(value.stringValue) + "\"";
     default:
         return "null";
     }
@@ -1422,6 +1424,10 @@ Variant JsonBlueprintExporter::jsonToVariant(const std::string& json, PinDataTyp
             result.floatValue = val.get<double>();
         break;
     case PinDataType::String:
+        if (val.type() == crude_json::type_t::string)
+            result.stringValue = val.get<std::string>();
+        break;
+    case PinDataType::Object:
         if (val.type() == crude_json::type_t::string)
             result.stringValue = val.get<std::string>();
         break;

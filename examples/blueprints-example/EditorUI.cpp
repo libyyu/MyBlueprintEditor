@@ -1,8 +1,6 @@
 // EditorUI.cpp -- 蓝图编辑器 UI 渲染
 #include "BlueprintEditor.h"
 
-extern ed::EditorContext* s_Editor; // defined in BlueprintEditor.cpp
-
 // ============================================================================
 // 引脚图标颜色
 // ============================================================================
@@ -338,10 +336,13 @@ void BlueprintEditor::ShowLeftPane(float paneWidth)
 
 void BlueprintEditor::OnFrame(float deltaTime)
 {
-    UpdateTouch();
+    // 驱动所有文档的计时器
+    for (auto& doc : m_Documents)
+        doc->persistentRunner.Tick(deltaTime);
 
-    // 驱动主线程计时器
-    m_PersistentRunner.Tick(deltaTime);
+    // 当前活跃文档的 UpdateTouch
+    if (ActiveDoc())
+        UpdateTouch();
 
     auto& io = ImGui::GetIO();
 
@@ -361,6 +362,12 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 SaveFile();
             if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S"))
                 SaveFileAs();
+            ImGui::Separator();
+            if (ImGui::MenuItem("Close Tab", "Ctrl+W"))
+            {
+                if (!m_Documents.empty())
+                    CloseDocument(m_ActiveDocIndex);
+            }
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("View"))
@@ -374,21 +381,24 @@ void BlueprintEditor::OnFrame(float deltaTime)
         ImGui::Separator();
 
         // 显示当前文件名
-        if (!m_CurrentFilePath.empty())
+        if (ActiveDoc())
         {
-            std::string displayName = m_CurrentFilePath;
-            size_t lastSlash = displayName.find_last_of("/\\");
-            if (lastSlash != std::string::npos)
-                displayName = displayName.substr(lastSlash + 1);
-            if (m_IsDirty)
-                displayName += " *";
-            ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "%s", displayName.c_str());
-            ImGui::Separator();
-        }
-        else
-        {
-            ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "[New]");
-            ImGui::Separator();
+            if (!m_CurrentFilePath.empty())
+            {
+                std::string displayName = m_CurrentFilePath;
+                size_t lastSlash = displayName.find_last_of("/\\");
+                if (lastSlash != std::string::npos)
+                    displayName = displayName.substr(lastSlash + 1);
+                if (m_IsDirty)
+                    displayName += " *";
+                ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "%s", displayName.c_str());
+                ImGui::Separator();
+            }
+            else
+            {
+                ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "[New]");
+                ImGui::Separator();
+            }
         }
 
         ImGui::Text("FPS: %.2f (%.2gms)", io.Framerate, io.Framerate ? 1000.0f / io.Framerate : 0.0f);
@@ -404,8 +414,55 @@ void BlueprintEditor::OnFrame(float deltaTime)
         SaveFile();
     if (io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_S))
         SaveFileAs();
+    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_W))
+    {
+        if (!m_Documents.empty())
+            CloseDocument(m_ActiveDocIndex);
+    }
 
-    ed::SetCurrentEditor(s_Editor);
+    // ================================================================
+    // 标签栏（Tab Bar）
+    // ================================================================
+    int tabToClose = -1;
+    if (ImGui::BeginTabBar("##BlueprintTabs", ImGuiTabBarFlags_Reorderable | ImGuiTabBarFlags_AutoSelectNewTabs | ImGuiTabBarFlags_FittingPolicyScroll))
+    {
+        for (int i = 0; i < (int)m_Documents.size(); ++i)
+        {
+            auto& doc = m_Documents[i];
+            std::string tabTitle = doc->GetTabTitle();
+
+            bool isOpen = true;
+            ImGuiTabItemFlags flags = 0;
+
+            if (ImGui::BeginTabItem((tabTitle + "###tab" + std::to_string(i)).c_str(), &isOpen, flags))
+            {
+                m_ActiveDocIndex = i;
+                ImGui::EndTabItem();
+            }
+
+            if (!isOpen)
+                tabToClose = i;
+        }
+
+        // "+" 按钮：新建标签页
+        if (ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing | ImGuiTabItemFlags_NoTooltip))
+        {
+            CreateNewDocument();
+        }
+
+        ImGui::EndTabBar();
+    }
+
+    // 延迟关闭标签
+    if (tabToClose >= 0)
+        CloseDocument(tabToClose);
+
+    // 确保有活跃文档
+    if (!ActiveDoc())
+        return;
+
+    // 切换到当前活跃文档的编辑器上下文
+    ed::SetCurrentEditor(ActiveDoc()->editorContext);
 
     // ================================================================
     // VSCode 风格固定面板布局
@@ -472,12 +529,14 @@ void BlueprintEditor::OnFrame(float deltaTime)
         // --- 中间 Node Editor 区域 ---
         // 直接通过 ed::Begin 的 size 参数限制编辑器区域，不使用额外的 BeginChild
         {
-    static ed::NodeId contextNodeId      = 0;
-    static ed::LinkId contextLinkId      = 0;
-    static ed::PinId  contextPinId       = 0;
-    static bool createNewNode  = false;
-    static Pin* newNodeLinkPin = nullptr;
-    static Pin* newLinkPin     = nullptr;
+    // 使用当前文档的 UI 状态（而非 static，支持多标签页）
+    auto* _doc = ActiveDoc();
+    auto& contextNodeId  = _doc->contextNodeId;
+    auto& contextLinkId  = _doc->contextLinkId;
+    auto& contextPinId   = _doc->contextPinId;
+    auto& createNewNode  = _doc->createNewNode;
+    auto& newNodeLinkPin = _doc->newNodeLinkPin;
+    auto& newLinkPin     = _doc->newLinkPin;
 
     ed::Begin("Node editor", ImVec2(rightWidth, editorHeight));
     {
@@ -692,7 +751,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
                         else if (input.Type == PinType::Int)
                         {
                             ImGui::SetNextItemWidth(80.0f);
-                            ImGui::DragInt("##value", &input.IntValue, 1.0f);
+                            ImS64 v = static_cast<ImS64>(input.IntValue);
+                            if (ImGui::DragScalar("##value", ImGuiDataType_S64, &v, 1.0f))
+                                input.IntValue = static_cast<int64_t>(v);
                         }
                         else if (input.Type == PinType::Float)
                         {
@@ -709,7 +770,18 @@ void BlueprintEditor::OnFrame(float deltaTime)
                             if (ImGui::InputText("##value", buf.data(), buf.size()))
                                 input.StringValue = buf.data();
                         }
-                        else if (input.Type == PinType::Object || input.Type == PinType::Function)
+                        else if (input.Type == PinType::Object)
+                        {
+                            static std::unordered_map<uintptr_t, std::array<char, 128>> s_ObjectBuffers;
+                            auto key = reinterpret_cast<uintptr_t>(input.ID.AsPointer());
+                            auto& buf = s_ObjectBuffers[key];
+                            if (buf[0] == '\0' && !input.ObjectValue.empty())
+                                snprintf(buf.data(), buf.size(), "%s", input.ObjectValue.c_str());
+                            ImGui::SetNextItemWidth(100.0f);
+                            if (ImGui::InputText("##value", buf.data(), buf.size()))
+                                input.ObjectValue = buf.data();
+                        }
+                        else if (input.Type == PinType::Function)
                         {
                             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
                             ImGui::TextUnformatted("(none)");
@@ -1496,6 +1568,83 @@ void BlueprintEditor::OnFrame(float deltaTime)
     ed::Resume();
 # endif
 
+    // ================================================================
+    // 双击节点处理：Execute Blueprint → 延迟打开对应蓝图文件
+    // 注意：不能在 ed::Begin/End 块内部调用 DoOpenFile 或切换 EditorContext，
+    //       否则会导致 imgui-node-editor 内部状态混乱而崩溃。
+    //       这里只记录要打开的路径，在 ed::End() 之后再执行。
+    // ================================================================
+    {
+        auto doubleClickedNodeId = ed::GetDoubleClickedNode();
+        if (doubleClickedNodeId)
+        {
+            auto* node = FindNode(doubleClickedNodeId);
+            if (node && node->DefinitionId == "ExecuteBlueprint")
+            {
+                // 查找 "File" 输入引脚的值
+                std::string filePath;
+                for (const auto& pin : node->Inputs)
+                {
+                    if (pin.Name == "File")
+                    {
+                        filePath = pin.StringValue;
+                        break;
+                    }
+                }
+
+                if (!filePath.empty())
+                {
+                    // 如果是相对路径，基于当前文档所在目录解析
+                    bool isAbsolute = false;
+#ifdef _WIN32
+                    isAbsolute = (filePath.size() >= 2 && filePath[1] == ':') ||
+                                 (filePath.size() >= 2 && filePath[0] == '\\' && filePath[1] == '\\');
+#else
+                    isAbsolute = (!filePath.empty() && filePath[0] == '/');
+#endif
+                    if (!isAbsolute && !m_CurrentFilePath.empty())
+                    {
+                        std::string dir = m_CurrentFilePath;
+                        size_t lastSlash = dir.find_last_of("/\\");
+                        if (lastSlash != std::string::npos)
+                            dir = dir.substr(0, lastSlash + 1);
+                        else
+                            dir.clear();
+                        filePath = dir + filePath;
+                    }
+
+                    // 检查文件是否已在某个标签页中打开
+                    bool alreadyOpen = false;
+                    for (int i = 0; i < (int)m_Documents.size(); ++i)
+                    {
+                        if (m_Documents[i]->filePath == filePath)
+                        {
+                            // 延迟切换到已有标签页
+                            m_PendingSwitchTabIndex = i;
+                            alreadyOpen = true;
+                            break;
+                        }
+                    }
+
+                    if (!alreadyOpen)
+                    {
+                        // 延迟打开文件（在 ed::End() 之后执行）
+                        m_PendingOpenFilePath = filePath;
+                    }
+                }
+                else
+                {
+                    // File 引脚为空，在执行日志中提示
+                    if (ActiveDoc())
+                    {
+                        m_ExecutionLog.push_back("[INFO] Double-clicked Execute Blueprint node, but File pin is empty.");
+                        m_ExecutionLogDirty = true;
+                    }
+                }
+            }
+        }
+    }
+
     // 触发执行后的 Flow 动画
     if (!m_FlowLinks.empty())
     {
@@ -1505,6 +1654,22 @@ void BlueprintEditor::OnFrame(float deltaTime)
     }
 
     ed::End();
+
+    // ================================================================
+    // 延迟处理双击打开文件（必须在 ed::End() 之后执行）
+    // ================================================================
+    if (m_PendingSwitchTabIndex >= 0)
+    {
+        m_ActiveDocIndex = m_PendingSwitchTabIndex;
+        ed::SetCurrentEditor(ActiveDoc()->editorContext);
+        m_PendingSwitchTabIndex = -1;
+    }
+    else if (!m_PendingOpenFilePath.empty())
+    {
+        std::string pathToOpen = m_PendingOpenFilePath;
+        m_PendingOpenFilePath.clear();
+        DoOpenFile(pathToOpen);
+    }
 
     auto editorMin = ImGui::GetItemRectMin();
     auto editorMax = ImGui::GetItemRectMax();
@@ -1841,7 +2006,7 @@ void BlueprintEditor::DrawTimerPanel()
     }
 
     // 工具栏
-    auto& timerMgr = GetTimerManager();
+    auto& timerMgr = ActiveDoc()->GetTimerManager();
     ImGui::Text("Active Timers: %d", timerMgr.GetActiveTimerCount());
     ImGui::SameLine();
     ImGui::Text("  |  Time Scale: ");
@@ -1881,7 +2046,7 @@ void BlueprintEditor::DrawTimerPanel()
     if (ImGui::Button("Add"))
     {
         std::string timerName(testName);
-        GetTimerManager().SetTimerByName(timerName, testInterval, testRepeat, [this, timerName]() {
+        ActiveDoc()->GetTimerManager().SetTimerByName(timerName, testInterval, testRepeat, [this, timerName]() {
             m_ExecutionLog.push_back("[Timer:" + timerName + "] fired!");
             m_ExecutionLogDirty = true;
             return true;
