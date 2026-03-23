@@ -24,10 +24,15 @@ void BlueprintEditor::RegisterHandlers_Flow()
 
     // ==================================================================
     // Execute Blueprint — 加载并执行另一个蓝图文件
+    // 支持同步/异步两种模式（通过 Sync 引脚控制）：
+    //   Sync = true  → 同步执行：等待子蓝图执行完毕后触发 Done
+    //   Sync = false → 异步执行（默认）：立即触发 Done，子蓝图在后续帧中完成，
+    //                   完成后触发 Completed 输出流并更新 Success/Output
     // ==================================================================
     m_HandlerRegistry["ExecuteBlueprint"] = [this](RTContext& ctx) {
         auto filePath = ctx.GetInputValue("File").asString();
-        ctx.Log("  [ExecuteBlueprint] File: \"" + filePath + "\"");
+        bool isSync = ctx.GetInputValue("Sync").asBool();
+        ctx.Log("  [ExecuteBlueprint] File: \"" + filePath + "\"  Sync: " + (isSync ? "true" : "false"));
 
         if (filePath.empty())
         {
@@ -66,48 +71,141 @@ void BlueprintEditor::RegisterHandlers_Flow()
 
         ctx.Log("  [ExecuteBlueprint] Loaded " + std::to_string(importResult.data.nodes.size()) + " nodes");
 
-        // 创建子 Runner 执行
-        RTBlueprintRunner subRunner;
-        
-        // 收集子蓝图的执行日志
-        std::vector<std::string> subLog;
-        subRunner.SetLogCallback([&subLog, &ctx](const std::string& msg) {
-            subLog.push_back(msg);
-            ctx.Log("    | " + msg);
-        });
-
-        if (!subRunner.Load(importResult.data))
+        // ================================================================
+        // 同步模式：等待子蓝图执行完毕
+        // ================================================================
+        if (isSync)
         {
-            ctx.Log("  [ExecuteBlueprint] ERROR: Failed to load sub-blueprint");
-            ctx.SetOutputValue("Success", RTVariant(false));
-            ctx.SetOutputValue("Output", RTVariant(std::string("Load failed")));
+            RTBlueprintRunner subRunner;
+            
+            std::vector<std::string> subLog;
+            subRunner.SetLogCallback([&subLog, &ctx](const std::string& msg) {
+                subLog.push_back(msg);
+                ctx.Log("    | " + msg);
+            });
+
+            if (!subRunner.Load(importResult.data))
+            {
+                ctx.Log("  [ExecuteBlueprint] ERROR: Failed to load sub-blueprint");
+                ctx.SetOutputValue("Success", RTVariant(false));
+                ctx.SetOutputValue("Output", RTVariant(std::string("Load failed")));
+                ctx.ActivateOutputFlow("Done");
+                return true;
+            }
+
+            if (m_DefaultHandler)
+                subRunner.SetDefaultHandler(m_DefaultHandler);
+            subRunner.RegisterHandlers(m_HandlerRegistry);
+
+            auto execResult = subRunner.Execute();
+
+            ctx.Log("  [ExecuteBlueprint] Sync result: " + std::string(execResult.success ? "SUCCESS" : "FAILED") +
+                    " (" + std::to_string(execResult.nodesExecuted) + " nodes executed)");
+
+            ctx.SetOutputValue("Success", RTVariant(execResult.success));
+
+            std::string outputText;
+            for (const auto& line : subLog)
+            {
+                if (!outputText.empty()) outputText += "\n";
+                outputText += line;
+            }
+            ctx.SetOutputValue("Output", RTVariant(outputText));
+
+            // 同步模式：只触发 Done（Completed 引脚在同步模式下被隐藏）
             ctx.ActivateOutputFlow("Done");
             return true;
         }
 
-        // 注册处理器（复用当前编辑器的所有处理器）
-        if (m_DefaultHandler)
-            subRunner.SetDefaultHandler(m_DefaultHandler);
-        subRunner.RegisterHandlers(m_HandlerRegistry);
+        // ================================================================
+        // 异步模式（默认）：立即触发 Done，子蓝图延迟到下一帧执行
+        // ================================================================
+        ctx.Log("  [ExecuteBlueprint] Async: scheduling sub-blueprint for next frame...");
 
-        // 执行
-        auto execResult = subRunner.Execute();
+        // 先设置初始输出值（异步模式下 Done 立即触发时还没有结果）
+        ctx.SetOutputValue("Success", RTVariant(true));    // 乐观初始值
+        ctx.SetOutputValue("Output", RTVariant(std::string("(async: pending...)")));
 
-        ctx.Log("  [ExecuteBlueprint] Result: " + std::string(execResult.success ? "SUCCESS" : "FAILED") +
-                " (" + std::to_string(execResult.nodesExecuted) + " nodes executed)");
-
-        ctx.SetOutputValue("Success", RTVariant(execResult.success));
-
-        // 合并子日志作为输出
-        std::string outputText;
-        for (const auto& line : subLog)
+        // 提前捕获 Completed 引脚 ID（参考 Delay 节点的做法）
+        auto* node = ctx.GetCurrentNode();
+        ::NodeEditor::Runtime::PinId completedPinId = 0;
+        if (node)
         {
-            if (!outputText.empty()) outputText += "\n";
-            outputText += line;
+            for (const auto& pin : node->pins)
+            {
+                if (pin.name == "Completed" && pin.kind == ::NodeEditor::Runtime::PinKind::Output)
+                {
+                    completedPinId = pin.id;
+                    break;
+                }
+            }
         }
-        ctx.SetOutputValue("Output", RTVariant(outputText));
 
+        // 标记 Completed 引脚的下游节点为"已被控制流接管"，
+        // 防止 Execute() 主循环在异步回调之前就执行了它们
+        ctx.MarkDownstreamAsHandled("Completed");
+
+        // 立即触发 Done（不等待子蓝图完成）
         ctx.ActivateOutputFlow("Done");
+
+        // 将子蓝图数据移入共享指针，供 Timer 回调在后续帧中使用
+        auto sharedData = std::make_shared<RTBlueprintData>(std::move(importResult.data));
+        auto handlersCopy = m_HandlerRegistry;
+        auto defaultHandlerCopy = m_DefaultHandler;
+
+        // 使用 Timer 在下一帧（延迟 0 秒）执行子蓝图
+        ctx.Delay(0.0f, [this, &ctx, sharedData, handlersCopy, defaultHandlerCopy, completedPinId, resolvedPath]() {
+            m_ExecutionLog.push_back("  [ExecuteBlueprint] Async: executing \"" + resolvedPath + "\"...");
+            m_ExecutionLogDirty = true;
+
+            auto subRunner = std::make_shared<RTBlueprintRunner>();
+            
+            std::vector<std::string> subLog;
+            subRunner->SetLogCallback([this, &subLog](const std::string& msg) {
+                subLog.push_back(msg);
+                m_ExecutionLog.push_back("    | " + msg);
+                m_ExecutionLogDirty = true;
+            });
+
+            if (!subRunner->Load(*sharedData))
+            {
+                m_ExecutionLog.push_back("  [ExecuteBlueprint] Async ERROR: Failed to load sub-blueprint");
+                m_ExecutionLogDirty = true;
+                // 更新输出值
+                ctx.SetOutputValue("Success", RTVariant(false));
+                ctx.SetOutputValue("Output", RTVariant(std::string("Async load failed")));
+                if (completedPinId != 0)
+                    ctx.ActivateOutputFlow(completedPinId);
+                return;
+            }
+
+            if (defaultHandlerCopy)
+                subRunner->SetDefaultHandler(defaultHandlerCopy);
+            subRunner->RegisterHandlers(handlersCopy);
+
+            auto execResult = subRunner->Execute();
+
+            std::string outputText;
+            for (const auto& line : subLog)
+            {
+                if (!outputText.empty()) outputText += "\n";
+                outputText += line;
+            }
+
+            m_ExecutionLog.push_back("  [ExecuteBlueprint] Async result: " +
+                std::string(execResult.success ? "SUCCESS" : "FAILED") +
+                " (" + std::to_string(execResult.nodesExecuted) + " nodes executed)");
+            m_ExecutionLogDirty = true;
+
+            // 更新输出引脚值
+            ctx.SetOutputValue("Success", RTVariant(execResult.success));
+            ctx.SetOutputValue("Output", RTVariant(outputText));
+
+            // 触发 Completed 输出流
+            if (completedPinId != 0)
+                ctx.ActivateOutputFlow(completedPinId);
+        });
+
         return true;
     };
 

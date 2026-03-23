@@ -619,6 +619,38 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
                 }
             }
 
+            // --- 6) 恢复 hiddenWhen 声明式可见性规则 ---
+            for (size_t i = 0; i < def->inputPins.size(); ++i)
+            {
+                auto hwIt = def->inputPins[i].customProperties.find("hiddenWhen");
+                if (hwIt != def->inputPins[i].customProperties.end())
+                {
+                    for (auto& edPin : node.Inputs)
+                    {
+                        if (edPin.Name == def->inputPins[i].name && !edPin.IsOrphaned)
+                        {
+                            edPin.HiddenWhen = hwIt->second;
+                            break;
+                        }
+                    }
+                }
+            }
+            for (size_t i = 0; i < def->outputPins.size(); ++i)
+            {
+                auto hwIt = def->outputPins[i].customProperties.find("hiddenWhen");
+                if (hwIt != def->outputPins[i].customProperties.end())
+                {
+                    for (auto& edPin : node.Outputs)
+                    {
+                        if (edPin.Name == def->outputPins[i].name && !edPin.IsOrphaned)
+                        {
+                            edPin.HiddenWhen = hwIt->second;
+                            break;
+                        }
+                    }
+                }
+            }
+
             // --- 如果有孤立引脚，标记节点有警告 ---
             bool hasOrphaned = false;
             for (const auto& p : node.Inputs)

@@ -522,6 +522,61 @@ void BlueprintEditor::OnFrame(float deltaTime)
             if (node.Type != NodeType::Blueprint && node.Type != NodeType::Simple)
                 continue;
 
+            // ---- 通用引脚可见性：根据 HiddenWhen 声明式规则动态隐藏/显示引脚 ----
+            // 格式: "引脚名==值" — 当同节点指定输入引脚的值等于给定值时隐藏此引脚
+            // 被引用的引脚若被连线，则条件不满足（保守显示）
+            auto evaluateHiddenWhen = [this](Pin& pin, Node& ownerNode)
+            {
+                if (pin.HiddenWhen.empty())
+                    return;
+
+                // 解析 "PinName==Value"
+                auto eqPos = pin.HiddenWhen.find("==");
+                if (eqPos == std::string::npos)
+                    return;
+
+                std::string refPinName = pin.HiddenWhen.substr(0, eqPos);
+                std::string refValue   = pin.HiddenWhen.substr(eqPos + 2);
+
+                // 在同节点的输入引脚中查找引用的引脚
+                bool shouldHide = false;
+                for (const auto& input : ownerNode.Inputs)
+                {
+                    if (input.Name == refPinName)
+                    {
+                        // 被连线时无法确定运行时值，保守显示
+                        if (IsPinLinked(input.ID))
+                            break;
+
+                        // 根据引脚类型比较值
+                        if (input.Type == PinType::Bool)
+                            shouldHide = (input.BoolValue ? "true" : "false") == refValue;
+                        else if (input.Type == PinType::Int)
+                            shouldHide = std::to_string(input.IntValue) == refValue;
+                        else if (input.Type == PinType::Float)
+                            shouldHide = std::to_string(input.FloatValue) == refValue;
+                        else if (input.Type == PinType::String)
+                            shouldHide = input.StringValue == refValue;
+                        break;
+                    }
+                }
+
+                // 从"显示"变为"隐藏"时，自动断开该引脚上的所有连线
+                if (shouldHide && !pin.IsHidden)
+                {
+                    ed::PinId pinId = pin.ID;
+                    m_Links.erase(std::remove_if(m_Links.begin(), m_Links.end(),
+                        [pinId](const Link& l) { return l.StartPinID == pinId || l.EndPinID == pinId; }),
+                        m_Links.end());
+                }
+                pin.IsHidden = shouldHide;
+            };
+
+            for (auto& input : node.Inputs)
+                evaluateHiddenWhen(input, node);
+            for (auto& output : node.Outputs)
+                evaluateHiddenWhen(output, node);
+
             const auto isSimple = node.Type == NodeType::Simple;
 
             bool hasOutputDelegates = false;
@@ -579,6 +634,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
                 for (auto& input : node.Inputs)
                 {
+                    if (input.IsHidden)
+                        continue;
+
                     auto alpha = ImGui::GetStyle().Alpha;
                     if (newLinkPin && !CanCreateLink(newLinkPin, &input) && &input != newLinkPin)
                         alpha = alpha * (48.0f / 255.0f);
@@ -748,6 +806,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 for (auto& output : node.Outputs)
                 {
                     if (!isSimple && output.Type == PinType::Delegate)
+                        continue;
+                    if (output.IsHidden)
                         continue;
 
                     auto alpha = ImGui::GetStyle().Alpha;
@@ -1155,7 +1215,14 @@ void BlueprintEditor::OnFrame(float deltaTime)
         // 链接
         // ================================================================
         for (auto& link : m_Links)
+        {
+            // 跳过连接到隐藏引脚的 link（双重保险，正常情况下隐藏时已移除 link）
+            auto* startPin = FindPin(link.StartPinID);
+            auto* endPin   = FindPin(link.EndPinID);
+            if ((startPin && startPin->IsHidden) || (endPin && endPin->IsHidden))
+                continue;
             ed::Link(link.ID, link.StartPinID, link.EndPinID, link.Color, 2.0f);
+        }
 
         // ================================================================
         // 创建 / 删除 交互

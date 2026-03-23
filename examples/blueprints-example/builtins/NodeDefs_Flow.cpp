@@ -26,10 +26,21 @@ void BlueprintEditor::RegisterNodeDefs_Flow()
         { MakeFlowPin("Enter"), MakePin("N", RTPinDataType::Integer), MakeFlowPin("Reset") },
         { MakeFlowPin("Exit"), MakePin("Counter", RTPinDataType::Integer) });
 
-    reg("ExecuteBlueprint", "Execute Blueprint", "Flow",
-        { MakeFlowPin(""), MakePin("File", RTPinDataType::String) },
-        { MakeFlowPin("Done"), MakePin("Success", RTPinDataType::Boolean), MakePin("Output", RTPinDataType::String) },
-        "FFA040");
+    // ExecuteBlueprint: Completed 引脚在同步模式下隐藏
+    {
+        RTNodeDef d;
+        d.id = "ExecuteBlueprint";
+        d.name = "Execute Blueprint";
+        d.category = "Flow";
+        d.inputPins = { MakeFlowPin(""), MakePin("File", RTPinDataType::String), MakePin("Sync", RTPinDataType::Boolean) };
+
+        auto completedPin = MakeFlowPin("Completed");
+        completedPin.customProperties["hiddenWhen"] = "Sync==true";
+
+        d.outputPins = { MakeFlowPin("Done"), completedPin, MakePin("Success", RTPinDataType::Boolean), MakePin("Output", RTPinDataType::String) };
+        d.color = "FFA040";
+        m_NodeRegistry.registerNode(d);
+    }
 
     reg("ForLoop", "For Loop", "Flow",
         { MakeFlowPin(""), MakePin("First Index", RTPinDataType::Integer),

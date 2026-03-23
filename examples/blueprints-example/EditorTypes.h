@@ -52,6 +52,12 @@ struct Pin
     // 错误状态（UE4 风格）
     bool        IsOrphaned  = false;   // 孤立引脚：NodeDef 中已删除但旧 JSON 中仍存在
     bool        IsRequired  = false;   // 必须连接的引脚（如 Delegate 类型）
+    bool        IsHidden    = false;   // 隐藏引脚：不渲染，不参与连线交互（仍存在于数据中）
+
+    // 声明式可见性规则（来自 PinDefinition::customProperties["hiddenWhen"]）
+    // 格式: "<引脚名>==<值>"  例: "Sync==true" 表示当同节点的 Sync 引脚值为 true 时隐藏此引脚
+    //        被引用的引脚若被连线，则视为条件不满足（保守显示）
+    std::string HiddenWhen;
 
     Pin(int id, const char* name, PinType type):
         ID(id), Node(nullptr), Name(name), Type(type), Kind(PinKind::Input)

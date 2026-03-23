@@ -273,6 +273,11 @@ Node* BlueprintEditor::SpawnNodeByDef(const std::string& defId)
             pin.FloatValue = static_cast<float>(pd.defaultValue.asFloat());
         else if (pd.dataType == RTPinDataType::String)
             pin.StringValue = pd.defaultValue.asString();
+
+        // 传递声明式 hiddenWhen 规则
+        auto hwIt = pd.customProperties.find("hiddenWhen");
+        if (hwIt != pd.customProperties.end())
+            pin.HiddenWhen = hwIt->second;
     }
 
     // Output pins
@@ -280,6 +285,11 @@ Node* BlueprintEditor::SpawnNodeByDef(const std::string& defId)
     {
         PinType pt = MapRTPinDataType(pd.dataType, pd.isExec);
         node.Outputs.emplace_back(GetNextId(), pd.name.c_str(), pt);
+
+        // 传递声明式 hiddenWhen 规则
+        auto hwIt = pd.customProperties.find("hiddenWhen");
+        if (hwIt != pd.customProperties.end())
+            node.Outputs.back().HiddenWhen = hwIt->second;
     }
 
     BuildNode(&node);
