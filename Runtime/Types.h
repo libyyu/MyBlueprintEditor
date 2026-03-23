@@ -248,6 +248,34 @@ struct Variant
         static Variant empty;
         return (index < arrayValue.size()) ? arrayValue[index] : empty;
     }
+
+    // 设置数组指定索引处的元素，索引越界时自动扩展
+    void arraySet(size_t index, const Variant& value)
+    {
+        if (type != PinDataType::Array)
+        {
+            type = PinDataType::Array;
+            arrayValue.clear();
+        }
+        if (index >= arrayValue.size())
+            arrayValue.resize(index + 1);
+        arrayValue[index] = value;
+    }
+
+    // 移除数组指定索引处的元素，返回是否成功
+    bool arrayRemoveAt(size_t index)
+    {
+        if (index >= arrayValue.size())
+            return false;
+        arrayValue.erase(arrayValue.begin() + static_cast<std::ptrdiff_t>(index));
+        return true;
+    }
+
+    // 清空数组
+    void arrayClear()
+    {
+        arrayValue.clear();
+    }
 };
 
 // ============================================================================

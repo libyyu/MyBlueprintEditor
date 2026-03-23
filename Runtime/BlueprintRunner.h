@@ -135,6 +135,30 @@ public:
         return (it != m_pinNameToId.end()) ? it->second : InvalidPinId;
     }
 
+    // 获取触发当前节点执行的输入引脚 ID
+    // 用于有多个 exec 输入引脚的节点（如 DoN 的 Enter/Reset, Gate 的 Enter/Open/Close/Toggle）
+    // 区分是从哪个输入引脚触发的
+    PinId GetActivatedInputPinId() const { return m_activatedInputPinId; }
+
+    // 获取触发当前节点的输入引脚名称
+    std::string GetActivatedInputPinName() const
+    {
+        if (m_activatedInputPinId == InvalidPinId) return "";
+        if (!m_currentNode) return "";
+        for (const auto& pin : m_currentNode->pins)
+        {
+            if (pin.id == m_activatedInputPinId)
+                return pin.name;
+        }
+        return "";
+    }
+
+    // 通过输入引脚 ID 找到连接的源节点并执行
+    // 用于 SetTimer 等节点在 timer 回调中触发 Function Name 引脚连接的回调节点
+    // 内部转发到当前 runner（而非注册 handler 时捕获的 runner），
+    // 这样在子蓝图中使用时也能正确找到子蓝图的节点
+    bool FireConnectedNode(PinId inputPinId);
+
 private:
     friend class BlueprintRunner;
 
@@ -152,6 +176,10 @@ private:
 
     // 当前正在执行的节点指针
     const NodeInstance*                             m_currentNode = nullptr;
+
+    // 触发当前节点执行的输入引脚 ID（由 executeDownstreamFromPin 设置）
+    // 用于区分 DoN 的 Enter/Reset、Gate 的 Enter/Open/Close/Toggle 等
+    PinId                                           m_activatedInputPinId = InvalidPinId;
 
     // 蓝图元数据
     BlueprintMetadata                               m_metadata;
@@ -230,6 +258,9 @@ public:
     // 检查处理器是否已注册
     bool HasHandler(const std::string& definitionId) const;
 
+    // 获取所有已注册的处理器映射表（用于传递给子蓝图）
+    const std::unordered_map<std::string, NodeHandler>& GetHandlers() const { return m_handlers; }
+
     // 设置默认处理器（用于没有注册处理器的节点）
     void SetDefaultHandler(NodeHandler handler);
 
@@ -299,12 +330,24 @@ public:
     void Tick(float deltaTime) { m_timerManager.Tick(deltaTime); }
 
     // 获取计时器管理器（可读写）
-    FrameTimerManager&       GetTimerManager()       { return m_timerManager; }
-    const FrameTimerManager& GetTimerManager() const { return m_timerManager; }
+    // 如果设置了父 timer manager，则使用父级的（子蓝图场景）
+    FrameTimerManager&       GetTimerManager()       { return m_parentTimerManager ? *m_parentTimerManager : m_timerManager; }
+    const FrameTimerManager& GetTimerManager() const { return m_parentTimerManager ? *m_parentTimerManager : m_timerManager; }
+
+    // 设置父级 timer manager（用于子蓝图场景：子蓝图的 timer 注册到父 runner 的 manager 中）
+    void SetParentTimerManager(FrameTimerManager* parent) { m_parentTimerManager = parent; }
 
     // 通过输入引脚ID找到连接的源节点并执行（用于 Function/Delegate 引脚的异步回调触发）
     // 例如 SetTimer 的 Function Name 引脚连接了一个回调节点，timer 触发时调用此方法
     bool FireConnectedNode(PinId inputPinId);
+
+    // 保持子蓝图 runner 存活（直到其所有异步 timer 完成）
+    // 子蓝图的 Delay/SetTimer 回调引用了 subRunner 的 context，
+    // 需要确保 subRunner 在回调期间不被销毁
+    void KeepAlive(std::shared_ptr<BlueprintRunner> subRunner)
+    {
+        m_keepAliveRunners.push_back(std::move(subRunner));
+    }
 
 private:
     friend class ExecutionContext;
@@ -328,6 +371,12 @@ private:
 
     // 主线程计时器管理器
     FrameTimerManager                                   m_timerManager;
+
+    // 父级 timer manager（子蓝图场景）
+    FrameTimerManager*                                  m_parentTimerManager = nullptr;
+
+    // 保持子蓝图 runner 存活的容器
+    std::vector<std::shared_ptr<BlueprintRunner>>       m_keepAliveRunners;
 
     // 缓存：拓扑排序结果
     mutable std::vector<NodeId>                         m_topoCache;

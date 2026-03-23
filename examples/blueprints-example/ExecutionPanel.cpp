@@ -94,6 +94,7 @@ void BlueprintEditor::ExecuteBlueprint()
     m_PersistentRunner.ResetState();
     m_PersistentRunner.SetLogCallback([this](const std::string& msg) {
         m_ExecutionLog.push_back(msg);
+        m_ExecutionLogDirty = true;
     });
 
     if (!m_PersistentRunner.Load(bp))

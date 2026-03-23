@@ -14,6 +14,8 @@ set(RUNTIME_SOURCES
     Runtime/BlueprintExporter.cpp
     Runtime/BlueprintRunner.cpp
     Runtime/FrameTimerManager.cpp
+    Runtime/BuiltinNodeDefs.cpp
+    Runtime/BuiltinHandlers.cpp
     Utils/Json/crude_json.cpp
 )
 
@@ -24,6 +26,8 @@ set(RUNTIME_HEADERS
     Runtime/BlueprintExporter.h
     Runtime/BlueprintRunner.h
     Runtime/FrameTimerManager.h
+    Runtime/BuiltinNodeDefs.h
+    Runtime/BuiltinHandlers.h
     Utils/Json/crude_json.h
 )
 

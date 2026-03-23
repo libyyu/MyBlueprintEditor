@@ -129,31 +129,12 @@ struct BlueprintEditor : public Application
 
     // ------------------------------------------------------------------
     // 节点定义 & 运行时处理器 注册
+    // 实际定义和处理器实现在 Runtime/BuiltinNodeDefs.cpp 和
+    // Runtime/BuiltinHandlers.cpp 中，以下两个函数仅做委托调用，
+    // 并在 Editor 层覆盖少量需要 m_ExecutionLog 的处理器。
     // ------------------------------------------------------------------
     void RegisterBuiltinNodeDefinitions();
     void RegisterBuiltinHandlers();
-
-    // 按分类注册节点定义
-    void RegisterNodeDefs_Flow();
-    void RegisterNodeDefs_Action();
-    void RegisterNodeDefs_Math();
-    void RegisterNodeDefs_Debug();
-    void RegisterNodeDefs_String();
-    void RegisterNodeDefs_Array();
-    void RegisterNodeDefs_Tree();
-    void RegisterNodeDefs_Houdini();
-    void RegisterNodeDefs_Misc();
-
-    // 按分类注册处理器
-    void RegisterHandlers_Flow();
-    void RegisterHandlers_Action();
-    void RegisterHandlers_Math();
-    void RegisterHandlers_Debug();
-    void RegisterHandlers_String();
-    void RegisterHandlers_Array();
-    void RegisterHandlers_Tree();
-    void RegisterHandlers_Houdini();
-    void RegisterHandlers_Misc();
 
     // ------------------------------------------------------------------
     // 右键菜单
@@ -198,12 +179,6 @@ struct BlueprintEditor : public Application
     // ------------------------------------------------------------------
     static RTPinDataType MapPinType(PinType type);
     static PinType       MapRTPinDataType(RTPinDataType dt, bool isExec);
-
-    // ------------------------------------------------------------------
-    // 引脚定义辅助
-    // ------------------------------------------------------------------
-    static RTPinDef MakePin(const char* name, RTPinDataType dt, bool isExec = false);
-    static RTPinDef MakeFlowPin(const char* name = "");
 
     // ------------------------------------------------------------------
     // Application 生命周期

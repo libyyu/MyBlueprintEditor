@@ -213,24 +213,6 @@ static NodeType ParseNodeType(const std::string& s)
 }
 
 // ============================================================================
-// 引脚定义辅助
-// ============================================================================
-
-RTPinDef BlueprintEditor::MakePin(const char* name, RTPinDataType dt, bool isExec)
-{
-    RTPinDef p;
-    p.name = name;
-    p.dataType = dt;
-    p.isExec = isExec;
-    return p;
-}
-
-RTPinDef BlueprintEditor::MakeFlowPin(const char* name)
-{
-    return MakePin(name, RTPinDataType::Unknown, true);
-}
-
-// ============================================================================
 // 节点创建
 // ============================================================================
 

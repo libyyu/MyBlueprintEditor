@@ -205,6 +205,8 @@ add_executable(runtime-example
 target_link_libraries(runtime-example PRIVATE BlueprintRuntime)
 set_target_properties(runtime-example PROPERTIES
     FOLDER "examples"
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
     RUNTIME_OUTPUT_DIRECTORY "${EXAMPLE_OUTPUT_DIR}"
     RUNTIME_OUTPUT_DIRECTORY_DEBUG "${EXAMPLE_OUTPUT_DIR}"
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${EXAMPLE_OUTPUT_DIR}"

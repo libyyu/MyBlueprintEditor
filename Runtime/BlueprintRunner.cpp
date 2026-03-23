@@ -556,9 +556,13 @@ void BlueprintRunner::ResetState()
     m_context.m_pinValues.clear();
     m_context.m_variables.clear();
     m_context.m_currentNode = nullptr;
+    m_context.m_activatedInputPinId = InvalidPinId;
     m_context.m_currentNodeData.clear();
     m_context.m_pinNameToId.clear();
     m_flowDepth = 0;
+
+    // 清理保持存活的子蓝图 runner
+    m_keepAliveRunners.clear();
 
     // 重新初始化默认值
     if (m_loaded)
@@ -578,6 +582,13 @@ void BlueprintRunner::ResetState()
             }
         }
     }
+}
+
+bool ExecutionContext::FireConnectedNode(PinId inputPinId)
+{
+    if (m_runner)
+        return m_runner->FireConnectedNode(inputPinId);
+    return false;
 }
 
 TimerHandle ExecutionContext::Delay(float seconds, const std::function<void()>& callback)
@@ -796,6 +807,7 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     auto savedNode = m_context.m_currentNode;
     auto savedPinNameToId = m_context.m_pinNameToId;
     auto savedNodeData = m_context.m_currentNodeData;
+    auto savedActivatedInputPinId = m_context.m_activatedInputPinId;
 
     // 传播当前节点的所有输出引脚值到下游（不仅是触发的 exec 引脚）
     if (savedNode)
@@ -803,6 +815,9 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
 
     // 找到通过该输出引脚连接的所有直接下游节点
     std::vector<NodeId> directTargets;
+    // 记录直接目标节点对应的被激活输入引脚 ID
+    // （用于 DoN 的 Enter/Reset、Gate 的 Enter/Open/Close/Toggle 等多 exec 输入引脚节点）
+    std::unordered_map<NodeId, PinId> nodeToActivatedInputPin;
     // 预先拷贝引脚值，避免下方 operator[] 插入新 key 触发 rehash 导致迭代器失效
     Variant outputPinValue;
     bool hasOutputPinValue = false;
@@ -825,7 +840,11 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
 
             const NodeInstance* targetNode = m_blueprint.findNodeByPin(link.endPinId);
             if (targetNode)
+            {
                 directTargets.push_back(targetNode->id);
+                // 记录该目标节点是通过哪个输入引脚被激活的
+                nodeToActivatedInputPin[targetNode->id] = link.endPinId;
+            }
         }
     }
 
@@ -901,6 +920,7 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
         m_context.m_currentNode = savedNode;
         m_context.m_pinNameToId = savedPinNameToId;
         m_context.m_currentNodeData = savedNodeData;
+        m_context.m_activatedInputPinId = savedActivatedInputPinId;
         --m_flowDepth;
         return false; // cycle
     }
@@ -936,11 +956,19 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
         // 记录执行前 m_flowExecutedNodes 的快照，用于检测内层递归新增的节点
         auto snapshotBefore = m_flowExecutedNodes;
 
+        // 设置触发该节点的输入引脚 ID（仅直接目标节点有此信息）
+        auto activatedIt = nodeToActivatedInputPin.find(id);
+        m_context.m_activatedInputPinId = (activatedIt != nodeToActivatedInputPin.end())
+            ? activatedIt->second : InvalidPinId;
+
         if (!executeNodeInternal(*node))
         {
             ok = false;
             break;
         }
+
+        // 清除已用完的激活引脚信息
+        m_context.m_activatedInputPinId = InvalidPinId;
 
         // 标记为全局已执行（供主循环 execute() 使用）
         m_flowExecutedNodes.insert(id);
@@ -961,6 +989,7 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     m_context.m_currentNode = savedNode;
     m_context.m_pinNameToId = savedPinNameToId;
     m_context.m_currentNodeData = savedNodeData;
+    m_context.m_activatedInputPinId = savedActivatedInputPinId;
 
     --m_flowDepth;
     return ok;

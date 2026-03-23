@@ -1,36 +1,16 @@
 // BuiltinHandlers.cpp -- 内置节点运行时处理器注册（入口）
 //
-// 按分类拆分到 builtins/ 子目录：
-//   builtins/Handlers_Flow.cpp     - Flow Control（Branch, DoN, ForLoop, WhileLoop, ...）
-//   builtins/Handlers_Action.cpp   - Actions（SetTimer, OutputAction, InputActionFire, TraceByChannel）
-//   builtins/Handlers_Math.cpp     - Math（+, -, *, /, <, >, ==, AND, OR, IntToFloat, Abs, Clamp, ...）
-//   builtins/Handlers_Debug.cpp    - Debug（PrintString, Log）
-//   builtins/Handlers_String.cpp   - Misc/String（MakeString, AppendString, StringLength, StringSplit, ...）
-//   builtins/Handlers_Array.cpp    - Misc/Array（ArrayLength, ArrayGet, ForEachLoop）
-//   builtins/Handlers_Tree.cpp     - Behavior Tree（Sequence, MoveTo, RandomWait）
-//   builtins/Handlers_Houdini.cpp  - Houdini（HoudiniTransform, HoudiniGroup）
-//   builtins/Handlers_Misc.cpp     - Misc（GetVariable, SetVariable）
+// 委托给 Runtime 层的独立函数 RegisterBuiltinHandlers()，
+// Editor 通过 SetLogCallback 接管 Runtime 的日志输出，
+// 无需覆盖任何处理器。
 //
 #include "BlueprintEditor.h"
+#include "BuiltinHandlers.h"
 
 void BlueprintEditor::RegisterBuiltinHandlers()
 {
-    // Default handler: pass-through
-    m_DefaultHandler = [this](RTContext& ctx) {
-        auto node = ctx.GetCurrentNode();
-        if (!node) return true;
-        ctx.Log("  [Default Handler] pass-through");
-        return true;
-    };
-
-    // --- 注册各分类的处理器 ---
-    RegisterHandlers_Flow();
-    RegisterHandlers_Action();
-    RegisterHandlers_Math();
-    RegisterHandlers_Debug();
-    RegisterHandlers_String();
-    RegisterHandlers_Array();
-    RegisterHandlers_Tree();
-    RegisterHandlers_Houdini();
-    RegisterHandlers_Misc();
+    // 委托给 Runtime 层注册所有内置处理器
+    // 第三个参数接收处理器映射表，供子蓝图继承
+    ::NodeEditor::Runtime::RegisterBuiltinHandlers(
+        m_PersistentRunner, m_CurrentFilePath, &m_HandlerRegistry);
 }

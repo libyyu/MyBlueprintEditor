@@ -20,11 +20,16 @@ void FrameTimerManager::Tick(float deltaTime)
     if (scaledDt <= 0.0f)
         return;
 
-    // 标记正在 tick，防止回调中增删计时器导致迭代器失效
+    // 标记正在 tick，防止回调中直接修改 m_timers 导致迭代器失效
+    // 在 ticking 期间新增的 timer 会被放入 m_pendingTimers，Tick 结束后合并
     m_ticking = true;
 
-    for (auto& timer : m_timers)
+    // 只遍历当前已有的 timer（用索引遍历，避免 range-for 迭代器失效问题）
+    const size_t count = m_timers.size();
+    for (size_t i = 0; i < count; ++i)
     {
+        auto& timer = m_timers[i];
+
         if (timer.pendingKill || timer.paused || timer.repeatCount == 0)
             continue;
 
@@ -73,6 +78,15 @@ void FrameTimerManager::Tick(float deltaTime)
 
     m_ticking = false;
 
+    // 合并 ticking 期间新增的 timer
+    if (!m_pendingTimers.empty())
+    {
+        m_timers.insert(m_timers.end(),
+            std::make_move_iterator(m_pendingTimers.begin()),
+            std::make_move_iterator(m_pendingTimers.end()));
+        m_pendingTimers.clear();
+    }
+
     // 清理已完成/已取消的计时器
     m_timers.erase(
         std::remove_if(m_timers.begin(), m_timers.end(),
@@ -108,8 +122,16 @@ TimerHandle FrameTimerManager::SetTimerByName(const std::string& name, float int
     entry.fireCount   = 0;
     entry.totalElapsed = 0.0f;
 
-    m_timers.push_back(std::move(entry));
-    return m_timers.back().handle;
+    TimerHandle handle = entry.handle;
+
+    // 在 Tick 遍历期间不能直接修改 m_timers（会导致迭代器/索引失效），
+    // 将新 timer 暂存到 m_pendingTimers，Tick 结束后再合并
+    if (m_ticking)
+        m_pendingTimers.push_back(std::move(entry));
+    else
+        m_timers.push_back(std::move(entry));
+
+    return handle;
 }
 
 // ============================================================================
@@ -141,6 +163,8 @@ int FrameTimerManager::ClearTimerByName(const std::string& name)
 void FrameTimerManager::ClearAllTimers()
 {
     for (auto& t : m_timers)
+        t.pendingKill = true;
+    for (auto& t : m_pendingTimers)
         t.pendingKill = true;
 }
 
@@ -239,6 +263,12 @@ int FrameTimerManager::GetActiveTimerCount() const
 {
     int count = 0;
     for (const auto& t : m_timers)
+    {
+        if (!t.pendingKill && t.repeatCount != 0)
+            ++count;
+    }
+    // 也计入 ticking 期间新增的待合并 timer
+    for (const auto& t : m_pendingTimers)
     {
         if (!t.pendingKill && t.repeatCount != 0)
             ++count;

@@ -142,6 +142,7 @@ private:
     const FrameTimerEntry* FindEntry(TimerHandle handle) const;
 
     std::vector<FrameTimerEntry>    m_timers;
+    std::vector<FrameTimerEntry>    m_pendingTimers; // Tick 遍历期间新增的 timer 暂存区
     uint32_t                        m_nextHandle = 1;
     float                           m_timeScale  = 1.0f;
     bool                            m_globalPause = false;

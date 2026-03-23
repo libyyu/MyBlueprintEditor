@@ -1,5 +1,12 @@
 // runtime-example.cpp
-// 演示蓝图数据的双文件导出架构
+// 蓝图运行时执行器 — 支持命令行传入蓝图文件执行
+//
+// 用法:
+//   runtime-example.exe                           — 运行内置示例蓝图
+//   runtime-example.exe <file.json>               — 加载并执行指定蓝图文件
+//   runtime-example.exe <file.editor.json>         — 加载并执行指定蓝图文件
+//   runtime-example.exe <file> --max-time <secs>   — 设置最大等待异步 timer 的时间（默认 30 秒）
+//   runtime-example.exe <file> --tick-rate <ms>     — 设置帧循环 tick 间隔（默认 16ms ≈ 60fps）
 //
 // 设计理念:
 //   - Runtime 文件 (.json):          只包含执行所需的最小数据集
@@ -11,10 +18,12 @@
 #include <fstream>
 #include <string>
 #include <cmath>
+#include <filesystem>
 
 // 只需要 Runtime 模块，不需要 ImGui
 #include "BlueprintRunner.h"
 #include "BlueprintExporter.h"
+#include "BuiltinHandlers.h"
 
 using namespace NodeEditor::Runtime;
 
@@ -209,12 +218,208 @@ bool handler_OutputDisplay(ExecutionContext& ctx)
 }
 
 // ============================================================================
+// 命令行模式: 加载并执行指定蓝图文件
+// ============================================================================
+
+static int runBlueprintFromFile(const std::string& filePath, float maxTimeSec, int tickRateMs)
+{
+    namespace fs = std::filesystem;
+
+    // 检查文件是否存在
+    if (!fs::exists(filePath))
+    {
+        std::cerr << "ERROR: File not found: " << filePath << std::endl;
+        return 1;
+    }
+
+    // 获取文件所在目录作为 basePath（用于解析 ExecuteBlueprint 等节点的相对路径）
+    std::string basePath = fs::path(filePath).parent_path().string();
+    std::string fileName = fs::path(filePath).filename().string();
+
+    std::cout << "========================================" << std::endl;
+    std::cout << "  Blueprint Runtime Executor" << std::endl;
+    std::cout << "========================================" << std::endl;
+    std::cout << "File:      " << filePath << std::endl;
+    std::cout << "BasePath:  " << basePath << std::endl;
+    std::cout << "MaxTime:   " << maxTimeSec << "s" << std::endl;
+    std::cout << "TickRate:  " << tickRateMs << "ms" << std::endl;
+    std::cout << std::endl;
+
+    // 加载蓝图
+    // 支持两种格式：
+    //   1. .editor.json — 编辑器导出的完整文件（通过 importEditorFromFile 加载合并）
+    //   2. .json        — 纯运行时文件（直接 LoadFromFile）
+    BlueprintRunner runner;
+    runner.SetLogCallback([](const std::string& msg) {
+        std::cout << msg << std::endl;
+    });
+
+    bool isEditorFile = (fileName.size() > 12 && fileName.substr(fileName.size() - 12) == ".editor.json");
+
+    if (isEditorFile)
+    {
+        // .editor.json 文件：通过 exporter 加载完整编辑器数据（包含内嵌的 runtime 数据）
+        JsonBlueprintExporter exporter;
+        auto importResult = exporter.importFromEditorFile(filePath);
+        if (!importResult.success)
+        {
+            std::cerr << "ERROR: Failed to load editor file: " << importResult.errorMessage << std::endl;
+            return 1;
+        }
+
+        if (!runner.Load(importResult.data))
+        {
+            std::cerr << "ERROR: Failed to load blueprint data: " << runner.GetLastError() << std::endl;
+            return 1;
+        }
+    }
+    else
+    {
+        // 普通 .json 文件：直接加载
+        if (!runner.LoadFromFile(filePath))
+        {
+            std::cerr << "ERROR: " << runner.GetLastError() << std::endl;
+            return 1;
+        }
+    }
+
+    const auto& bp = runner.GetBlueprintData();
+    std::cout << "Blueprint: " << (bp.metadata.name.empty() ? "(unnamed)" : bp.metadata.name) << std::endl;
+    std::cout << "Nodes:     " << bp.nodes.size() << std::endl;
+    std::cout << "Links:     " << bp.links.size() << std::endl;
+    std::cout << std::endl;
+
+    // 注册所有内置处理器
+    RegisterBuiltinHandlers(runner, basePath);
+
+    // 设置默认处理器（未注册的节点类型会走 pass-through）
+    runner.SetDefaultHandler([](ExecutionContext& ctx) {
+        auto node = ctx.GetCurrentNode();
+        std::string nodeName = node ? node->name : "(unknown)";
+        ctx.Log("  [Default Handler] pass-through for: " + nodeName);
+        return true;
+    });
+
+    // 同步执行蓝图
+    std::cout << "========================================" << std::endl;
+    std::cout << "  Execution Started" << std::endl;
+    std::cout << "========================================" << std::endl;
+
+    auto startTime = std::chrono::high_resolution_clock::now();
+    auto result = runner.Execute();
+    auto endTime = std::chrono::high_resolution_clock::now();
+    double elapsed = std::chrono::duration<double, std::milli>(endTime - startTime).count();
+
+    std::cout << std::endl;
+    std::cout << "========================================" << std::endl;
+    std::cout << "  Execution " << (result.success ? "Completed Successfully!" : "FAILED!") << std::endl;
+    std::cout << "  Nodes executed: " << result.nodesExecuted << std::endl;
+    std::cout << "  Elapsed: " << elapsed << " ms" << std::endl;
+    std::cout << "========================================" << std::endl;
+
+    // 帧循环：驱动异步 timer（Delay、SetTimer 等）
+    // 持续 tick 直到没有活跃 timer 或超过最大等待时间
+    if (runner.GetTimerManager().GetActiveTimerCount() > 0)
+    {
+        std::cout << std::endl;
+        std::cout << "[Timer Loop] Active timers: " << runner.GetTimerManager().GetActiveTimerCount()
+                  << ", entering frame loop..." << std::endl;
+
+        auto loopStart = std::chrono::high_resolution_clock::now();
+        auto lastTick  = loopStart;
+
+        while (runner.GetTimerManager().GetActiveTimerCount() > 0)
+        {
+            auto now = std::chrono::high_resolution_clock::now();
+
+            // 检查超时
+            double totalElapsed = std::chrono::duration<double>(now - loopStart).count();
+            if (totalElapsed > maxTimeSec)
+            {
+                std::cout << "[Timer Loop] Max time (" << maxTimeSec << "s) exceeded, stopping." << std::endl;
+                break;
+            }
+
+            // 计算 deltaTime
+            float deltaTime = std::chrono::duration<float>(now - lastTick).count();
+            lastTick = now;
+
+            // Tick timer manager
+            runner.Tick(deltaTime);
+
+            // Sleep 到下一帧
+            std::this_thread::sleep_for(std::chrono::milliseconds(tickRateMs));
+        }
+
+        auto loopEnd = std::chrono::high_resolution_clock::now();
+        double loopElapsed = std::chrono::duration<double, std::milli>(loopEnd - loopStart).count();
+
+        std::cout << "[Timer Loop] Finished. Loop time: " << loopElapsed << " ms" << std::endl;
+        std::cout << "  Remaining active timers: " << runner.GetTimerManager().GetActiveTimerCount() << std::endl;
+    }
+
+    std::cout << std::endl;
+    std::cout << "=== Done ===" << std::endl;
+    return result.success ? 0 : 1;
+}
+
+// ============================================================================
 // main
 // ============================================================================
 
-int main()
+int main(int argc, char* argv[])
 {
+    // ----------------------------------------------------------------
+    // 命令行模式：传入蓝图文件路径
+    // ----------------------------------------------------------------
+    if (argc >= 2)
+    {
+        std::string firstArg = argv[1];
+
+        // --help 可以出现在任意位置
+        if (firstArg == "--help" || firstArg == "-h")
+        {
+            std::cout << "Usage: runtime-example [<blueprint-file>] [options]" << std::endl;
+            std::cout << "  <blueprint-file>         Path to .json or .editor.json blueprint file" << std::endl;
+            std::cout << "  --max-time <seconds>     Max time to wait for async timers (default: 30)" << std::endl;
+            std::cout << "  --tick-rate <ms>         Frame tick interval in ms (default: 16)" << std::endl;
+            std::cout << std::endl;
+            std::cout << "If no file is provided, runs the built-in sample blueprint." << std::endl;
+            return 0;
+        }
+
+        std::string filePath = firstArg;
+        float  maxTimeSec = 30.0f;  // 默认最大等待异步 timer 30 秒
+        int    tickRateMs = 16;     // 默认 ~60fps
+
+        // 解析可选参数
+        for (int i = 2; i < argc; ++i)
+        {
+            std::string arg = argv[i];
+            if (arg == "--max-time" && i + 1 < argc)
+            {
+                maxTimeSec = std::stof(argv[++i]);
+            }
+            else if (arg == "--tick-rate" && i + 1 < argc)
+            {
+                tickRateMs = std::stoi(argv[++i]);
+            }
+            else
+            {
+                std::cerr << "Unknown option: " << arg << std::endl;
+                std::cerr << "Use --help for usage information." << std::endl;
+                return 1;
+            }
+        }
+
+        return runBlueprintFromFile(filePath, maxTimeSec, tickRateMs);
+    }
+
+    // ----------------------------------------------------------------
+    // 无参数模式：运行内置示例蓝图
+    // ----------------------------------------------------------------
     std::cout << "=== Blueprint Dual-File Export Example ===" << std::endl;
+    std::cout << "(Use 'runtime-example <file>' to execute a blueprint file)" << std::endl;
     std::cout << std::endl;
 
     BlueprintData blueprint = createSampleBlueprint();
