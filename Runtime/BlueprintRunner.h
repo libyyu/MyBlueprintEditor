@@ -12,6 +12,7 @@
 #include "BlueprintData.h"
 #include "NodeDefinition.h"
 #include "FrameTimerManager.h"
+#include "FileSystem.h"
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -221,8 +222,14 @@ struct ExecutionResult
 class BlueprintRunner
 {
 public:
-    BlueprintRunner() = default;
+    BlueprintRunner() : m_fileSystem(GetDefaultFileSystem()) {}
+    explicit BlueprintRunner(std::shared_ptr<IFileSystem> fs)
+        : m_fileSystem(fs ? std::move(fs) : GetDefaultFileSystem()) {}
     ~BlueprintRunner() = default;
+
+    // 获取/设置文件系统
+    std::shared_ptr<IFileSystem> GetFileSystem() const { return m_fileSystem; }
+    void SetFileSystem(std::shared_ptr<IFileSystem> fs) { m_fileSystem = fs ? std::move(fs) : GetDefaultFileSystem(); }
 
     bool IsWithEditor() const;
 
@@ -358,6 +365,9 @@ private:
 
     // 是否在编辑器环境下运行
     bool                                                m_withEditor = false;
+
+    // 文件系统抽象（用于文件读写）
+    std::shared_ptr<IFileSystem>                        m_fileSystem;
 
     // 蓝图数据
     BlueprintData                                       m_blueprint;

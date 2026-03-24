@@ -114,7 +114,7 @@ static void RegisterHandlers_Flow(
         ctx.Log("  [ExecuteBlueprint] Resolved: \"" + resolvedPath + "\"");
 
         // 加载子蓝图
-        JsonBlueprintExporter exporter;
+        JsonBlueprintExporter exporter(runner.GetFileSystem());
         auto importResult = exporter.importRuntimeFromFile(resolvedPath);
 
         if (!importResult.success)
@@ -134,7 +134,7 @@ static void RegisterHandlers_Flow(
         // 同步模式
         if (isSync)
         {
-            BlueprintRunner subRunner;
+            BlueprintRunner subRunner(runner.GetFileSystem());
             
             // 子蓝图的 timer 注册到父 runner 的 TimerManager 中
             // 这样子蓝图的 Delay/SetTimer 回调能被父 runner 的帧循环正确 tick
@@ -209,7 +209,7 @@ static void RegisterHandlers_Flow(
         ctx.Delay(0.0f, [&ctx, &runner, sharedData, currentHandlers, completedPinId, resolvedPath]() {
             ctx.Log("  [ExecuteBlueprint] Async: executing \"" + resolvedPath + "\"...");
 
-            auto subRunner = std::make_shared<BlueprintRunner>();
+            auto subRunner = std::make_shared<BlueprintRunner>(runner.GetFileSystem());
             
             // 子蓝图的 timer 注册到父 runner 的 TimerManager 中
             // 这样子蓝图的 Delay/SetTimer 回调能被父 runner 的帧循环正确 tick

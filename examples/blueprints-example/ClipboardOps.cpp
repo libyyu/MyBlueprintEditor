@@ -259,10 +259,11 @@ void BlueprintEditor::PasteNodes(ImVec2 pastePosition)
 
         m_Links.emplace_back(Link(GetNextId(), startPinId, endPinId));
 
-        // 设置链接颜色
+        // 设置链接颜色（Any 引脚使用对端类型颜色）
         auto* startPin = FindPin(startPinId);
+        auto* endPin   = FindPin(endPinId);
         if (startPin)
-            m_Links.back().Color = GetIconColor(startPin->Type);
+            m_Links.back().Color = GetIconColor(GetLinkColor(startPin, endPin));
     }
 
     m_IsDirty = true;

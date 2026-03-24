@@ -23,16 +23,142 @@ ImColor BlueprintEditor::GetIconColor(PinType type)
     }
 };
 
+// 辅助：获取链接颜色使用的引脚类型（Any 引脚时优先使用对端的实际类型）
+PinType BlueprintEditor::GetLinkColor(const Pin* startPin, const Pin* endPin)
+{
+    if (!startPin || !endPin) return PinType::Flow;
+    // 如果起始端是 Any 而终端不是，使用终端类型
+    if (startPin->Type == PinType::Any && endPin->Type != PinType::Any)
+        return endPin->Type;
+    // 如果终端是 Any 而起始端不是，使用起始端类型
+    if (endPin->Type == PinType::Any && startPin->Type != PinType::Any)
+        return startPin->Type;
+    // 两端都是 Any 或都不是 Any，使用起始端类型
+    return startPin->Type;
+}
+
+// ============================================================================
+// 创建链接 + UE4 Flow 自动重连
+// ============================================================================
+// 当 Flow 输出引脚已有链接时：
+//   1. 断开旧链接
+//   2. 创建新链接
+//   3. 自动把新目标节点的第一个空闲 Flow 输出连到被断开的旧下游节点
+void BlueprintEditor::CreateLinkWithFlowReconnect(
+    Pin* startPin, ed::PinId startPinId,
+    Pin* endPin,   ed::PinId endPinId)
+{
+    ed::PinId disconnectedPinId = 0;  // 被断开的对端引脚
+
+    // Flow 输出引脚只允许一对一连接：删除旧链接，记录被断开的对端
+    if (startPin->Type == PinType::Flow)
+    {
+        for (auto it = m_Links.begin(); it != m_Links.end();)
+        {
+            // 检查此链接是否涉及当前 Flow 输出引脚（可能在 Start 或 End 端）
+            if (it->StartPinID == startPinId)
+            {
+                disconnectedPinId = it->EndPinID;
+                it = m_Links.erase(it);
+            }
+            else if (it->EndPinID == startPinId)
+            {
+                disconnectedPinId = it->StartPinID;
+                it = m_Links.erase(it);
+            }
+            else
+                ++it;
+        }
+    }
+
+    // Flow 输入引脚也只允许一对一连接
+    if (endPin->Type == PinType::Flow)
+    {
+        for (auto it = m_Links.begin(); it != m_Links.end();)
+        {
+            if (it->StartPinID == endPinId || it->EndPinID == endPinId)
+                it = m_Links.erase(it);
+            else
+                ++it;
+        }
+    }
+
+    // 创建新链接
+    m_Links.emplace_back(Link(GetNextId(), startPinId, endPinId));
+    m_Links.back().Color = GetIconColor(GetLinkColor(startPin, endPin));
+    m_IsDirty = true;
+
+    // UE4 行为：自动将新目标节点的 Flow 输出连到被断开的旧下游节点
+    if (disconnectedPinId && endPin->Node)
+    {
+        // 确保被断开的引脚不是 endPin 自己（避免循环）
+        if (disconnectedPinId != endPinId)
+        {
+            for (auto& outPin : endPin->Node->Outputs)
+            {
+                if (outPin.Type == PinType::Flow)
+                {
+                    // 检查该 Flow 输出引脚是否空闲
+                    bool hasExistingLink = false;
+                    for (const auto& lnk : m_Links)
+                    {
+                        if (lnk.StartPinID == outPin.ID || lnk.EndPinID == outPin.ID)
+                        {
+                            hasExistingLink = true;
+                            break;
+                        }
+                    }
+                    if (!hasExistingLink)
+                    {
+                        auto* disconnectedPin = FindPin(disconnectedPinId);
+                        if (disconnectedPin)
+                        {
+                            m_Links.emplace_back(Link(GetNextId(), outPin.ID, disconnectedPinId));
+                            m_Links.back().Color = GetIconColor(PinType::Flow);
+                        }
+                    }
+                    break;  // 只尝试第一个 Flow 输出
+                }
+            }
+        }
+    }
+}
+
 // ============================================================================
 // 引脚图标绘制
 // ============================================================================
 
+// 辅助：查找 Any 引脚连线后对端的实际类型（UE4 通配引脚行为）
+PinType BlueprintEditor::GetResolvedPinType(const Pin& pin)
+{
+    if (pin.Type != PinType::Any)
+        return pin.Type;
+
+    // 查找与此 Any 引脚相连的对端引脚
+    for (const auto& link : m_Links)
+    {
+        Pin* otherPin = nullptr;
+        if (link.StartPinID == pin.ID)
+            otherPin = FindPin(link.EndPinID);
+        else if (link.EndPinID == pin.ID)
+            otherPin = FindPin(link.StartPinID);
+
+        if (otherPin && otherPin->Type != PinType::Any)
+            return otherPin->Type;
+    }
+
+    return PinType::Any;  // 未连线或对端也是 Any
+}
+
 void BlueprintEditor::DrawPinIcon(const Pin& pin, bool connected, int alpha)
 {
+    // Any 引脚连线后显示为对端的实际类型（颜色 + 形状）
+    PinType displayType = GetResolvedPinType(pin);
+
     IconType iconType;
-    ImColor  color = GetIconColor(pin.Type);
+    ImColor  color = GetIconColor(displayType);
     color.Value.w = alpha / 255.0f;
-    switch (pin.Type)
+    switch (displayType)
     {
         case PinType::Flow:     iconType = IconType::Flow;   break;
         case PinType::Bool:     iconType = IconType::Circle; break;
@@ -1054,14 +1180,29 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.3f, 0.8f, 0.3f, 1.0f));
                     if (ImGui::SmallButton("+"))
                     {
-                        // Generate next pin name: A, B, C, ... Z, AA, AB, ...
-                        int dynCount = static_cast<int>(node.Inputs.size());
+                        // 根据节点类型生成引脚名称
+                        int dynCount = static_cast<int>(node.Inputs.size()) - node.DynamicInputFixedCount;
                         std::string pinName;
-                        int idx = dynCount;
-                        do {
-                            pinName = std::string(1, 'A' + (idx % 26)) + pinName;
-                            idx = idx / 26 - 1;
-                        } while (idx >= 0);
+
+                        if (node.DefinitionId == "FormatString")
+                        {
+                            // FormatString: "Arg 0", "Arg 1", "Arg 2", ...
+                            pinName = "Arg " + std::to_string(dynCount);
+                        }
+                        else if (node.DefinitionId == "MakeArray")
+                        {
+                            // MakeArray: "Element 0", "Element 1", ...
+                            pinName = "Element " + std::to_string(dynCount);
+                        }
+                        else
+                        {
+                            // 默认命名: A, B, C, ... Z, AA, AB, ...
+                            int idx = static_cast<int>(node.Inputs.size());
+                            do {
+                                pinName = std::string(1, 'A' + (idx % 26)) + pinName;
+                                idx = idx / 26 - 1;
+                            } while (idx >= 0);
+                        }
                         node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
                         BuildNode(&node);
                         m_IsDirty = true;
@@ -1518,7 +1659,15 @@ void BlueprintEditor::OnFrame(float deltaTime)
             auto* endPin   = FindPin(link.EndPinID);
             if ((startPin && startPin->IsHidden) || (endPin && endPin->IsHidden))
                 continue;
-            ed::Link(link.ID, link.StartPinID, link.EndPinID, link.Color, 2.0f);
+
+            // Any 引脚参与的链接：动态计算颜色（使用非 Any 端的类型颜色）
+            ImColor linkColor = link.Color;
+            if (startPin && endPin &&
+                (startPin->Type == PinType::Any || endPin->Type == PinType::Any))
+            {
+                linkColor = GetIconColor(GetLinkColor(startPin, endPin));
+            }
+            ed::Link(link.ID, link.StartPinID, link.EndPinID, linkColor, 2.0f);
         }
 
         // ================================================================
@@ -1579,22 +1728,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                                 showLabel("+ Create Link (implicit cast)", ImColor(32, 45, 45, 180));
                                 if (ed::AcceptNewItem(ImColor(128, 255, 200), 4.0f))
                                 {
-                                    // Flow 类型输出引脚只允许一对一连接
-                                    if (startPin->Type == PinType::Flow)
-                                    {
-                                        auto sid = startPinId;
-                                        for (auto it = m_Links.begin(); it != m_Links.end();)
-                                        {
-                                            if (it->StartPinID == sid)
-                                                it = m_Links.erase(it);
-                                            else
-                                                ++it;
-                                        }
-                                    }
-
-                                    m_Links.emplace_back(Link(GetNextId(), startPinId, endPinId));
-                                    m_Links.back().Color = GetIconColor(startPin->Type);
-                                    m_IsDirty = true;
+                                    CreateLinkWithFlowReconnect(startPin, startPinId, endPin, endPinId);
                                 }
                             }
                             else
@@ -1608,22 +1742,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                             showLabel("+ Create Link", ImColor(32, 45, 32, 180));
                             if (ed::AcceptNewItem(ImColor(128, 255, 128), 4.0f))
                             {
-                                // Flow 类型输出引脚只允许一对一连接
-                                if (startPin->Type == PinType::Flow)
-                                {
-                                    auto sid = startPinId;
-                                    for (auto it = m_Links.begin(); it != m_Links.end();)
-                                    {
-                                        if (it->StartPinID == sid)
-                                            it = m_Links.erase(it);
-                                        else
-                                            ++it;
-                                    }
-                                }
-
-                                m_Links.emplace_back(Link(GetNextId(), startPinId, endPinId));
-                                m_Links.back().Color = GetIconColor(startPin->Type);
-                                m_IsDirty = true;
+                                CreateLinkWithFlowReconnect(startPin, startPinId, endPin, endPinId);
                             }
                         }
                     }
@@ -1784,7 +1903,38 @@ void BlueprintEditor::OnFrame(float deltaTime)
         }
         ImGui::Separator();
         if (ImGui::MenuItem("Delete"))
-            ed::DeleteNode(contextNodeId);
+        {
+            // 删除所有选中的节点（而不是仅删除右键点击的节点）
+            int selCount = ed::GetSelectedObjectCount();
+            if (selCount > 0)
+            {
+                std::vector<ed::NodeId> selectedNodeIds(selCount);
+                int nodeCount = ed::GetSelectedNodes(selectedNodeIds.data(), selCount);
+                selectedNodeIds.resize(nodeCount);
+
+                // 如果右键的节点不在选中列表中，只删除右键的节点
+                bool contextInSelection = false;
+                for (const auto& id : selectedNodeIds)
+                {
+                    if (id == contextNodeId) { contextInSelection = true; break; }
+                }
+
+                if (contextInSelection && nodeCount > 1)
+                {
+                    // 删除所有选中的节点
+                    for (const auto& nodeId : selectedNodeIds)
+                        ed::DeleteNode(nodeId);
+                }
+                else
+                {
+                    ed::DeleteNode(contextNodeId);
+                }
+            }
+            else
+            {
+                ed::DeleteNode(contextNodeId);
+            }
+        }
         ImGui::EndPopup();
     }
 
@@ -1897,8 +2047,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                         if (startPin->Kind == PinKind::Input)
                             std::swap(startPin, endPin);
 
-                        m_Links.emplace_back(Link(GetNextId(), startPin->ID, endPin->ID));
-                        m_Links.back().Color = GetIconColor(startPin->Type);
+                        CreateLinkWithFlowReconnect(startPin, startPin->ID, endPin, endPin->ID);
 
                         break;
                     }

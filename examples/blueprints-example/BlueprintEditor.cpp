@@ -308,6 +308,8 @@ Node* BlueprintEditor::SpawnNodeByDef(const std::string& defId)
         else if (dynType == "Int")     node.DynamicInputPinType = PinType::Int;
         else if (dynType == "Bool")    node.DynamicInputPinType = PinType::Bool;
         else if (dynType == "Object")  node.DynamicInputPinType = PinType::Object;
+        else if (dynType == "Any")     node.DynamicInputPinType = PinType::Any;
+        else if (dynType == "Array")   node.DynamicInputPinType = PinType::Array;
         else                           node.DynamicInputPinType = PinType::String;
     }
 

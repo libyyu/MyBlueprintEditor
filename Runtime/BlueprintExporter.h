@@ -10,6 +10,7 @@
 #pragma once
 
 #include "BlueprintData.h"
+#include "FileSystem.h"
 #include <string>
 #include <functional>
 #include <memory>
@@ -155,6 +156,17 @@ public:
 class JsonBlueprintExporter : public IBlueprintExporter
 {
 public:
+    // 默认构造：使用全局默认文件系统
+    JsonBlueprintExporter() : m_fileSystem(GetDefaultFileSystem()) {}
+
+    // 自定义文件系统构造
+    explicit JsonBlueprintExporter(std::shared_ptr<IFileSystem> fs)
+        : m_fileSystem(fs ? std::move(fs) : GetDefaultFileSystem()) {}
+
+    // 获取/设置文件系统
+    std::shared_ptr<IFileSystem> GetFileSystem() const { return m_fileSystem; }
+    void SetFileSystem(std::shared_ptr<IFileSystem> fs) { m_fileSystem = fs ? std::move(fs) : GetDefaultFileSystem(); }
+
     // Runtime 文件
     std::string exportRuntimeToString(const BlueprintData& data, const ExportOptions& options = ExportOptions()) const override;
     ExportResult exportRuntimeToFile(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const override;
@@ -180,6 +192,9 @@ public:
     std::vector<ExportFormat> getSupportedFormats() const override;
     
 private:
+    // 文件系统抽象（用于文件读写）
+    std::shared_ptr<IFileSystem> m_fileSystem;
+
     // JSON 序列化辅助方法
     std::string variantToJson(const Variant& value) const;
     Variant jsonToVariant(const std::string& json, PinDataType type) const;

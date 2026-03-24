@@ -335,7 +335,11 @@ struct BlueprintEditor : public Application
     // UI 绘制
     // ------------------------------------------------------------------
     ImColor GetIconColor(PinType type);
+    PinType GetLinkColor(const Pin* startPin, const Pin* endPin);  // 链接颜色：Any 引脚使用对端类型
+    PinType GetResolvedPinType(const Pin& pin);  // Any 引脚连线后解析为对端实际类型
     void    DrawPinIcon(const Pin& pin, bool connected, int alpha);
+    void    CreateLinkWithFlowReconnect(Pin* startPin, ed::PinId startPinId,
+                                        Pin* endPin, ed::PinId endPinId);  // 创建链接 + UE4 Flow 自动重连
     void    ShowStyleEditor(bool* show = nullptr);
     void    ShowLeftPane(float paneWidth);             // 旧版左侧面板（已不使用）
     void    DrawNodeListPanel();                       // 左侧节点列表面板（嵌入式）

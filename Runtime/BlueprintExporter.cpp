@@ -6,7 +6,6 @@
 
 #include "BlueprintExporter.h"
 #include "../Utils/Json/crude_json.h"
-#include <fstream>
 #include <sstream>
 #include <iomanip>
 #include <ctime>
@@ -54,35 +53,6 @@ std::string escapeJson(const std::string& str)
 std::string indentJson(int level, int spaces = 4)
 {
     return std::string(level * spaces, ' ');
-}
-
-// 读取文件内容
-std::string readFileContent(const std::string& filePath, std::string& errorMsg)
-{
-    std::ifstream file(filePath, std::ios::binary);
-    if (!file.is_open())
-    {
-        errorMsg = "Failed to open file: " + filePath;
-        return "";
-    }
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    file.close();
-    return buffer.str();
-}
-
-// 写入文件
-bool writeFileContent(const std::string& filePath, const std::string& content, std::string& errorMsg)
-{
-    std::ofstream file(filePath, std::ios::binary);
-    if (!file.is_open())
-    {
-        errorMsg = "Failed to open file for writing: " + filePath;
-        return false;
-    }
-    file << content;
-    file.close();
-    return true;
 }
 
 } // anonymous namespace
@@ -386,7 +356,7 @@ ExportResult JsonBlueprintExporter::exportRuntimeToFile(const BlueprintData& dat
         std::string jsonContent = exportRuntimeToString(data, options);
         
         std::string errorMsg;
-        if (!writeFileContent(filePath, jsonContent, errorMsg))
+        if (!m_fileSystem->WriteFile(filePath, jsonContent, errorMsg))
         {
             result.errorMessage = errorMsg;
             return result;
@@ -671,7 +641,7 @@ ExportResult JsonBlueprintExporter::exportEditorToFile(const BlueprintData& data
         std::string jsonContent = exportEditorToString(data, options);
         
         std::string errorMsg;
-        if (!writeFileContent(filePath, jsonContent, errorMsg))
+        if (!m_fileSystem->WriteFile(filePath, jsonContent, errorMsg))
         {
             result.errorMessage = errorMsg;
             return result;
@@ -1024,8 +994,8 @@ ImportResult JsonBlueprintExporter::importRuntimeFromFile(const std::string& fil
     try
     {
         std::string errorMsg;
-        std::string content = readFileContent(filePath, errorMsg);
-        if (!errorMsg.empty())
+        std::string content;
+        if (!m_fileSystem->ReadFile(filePath, content, errorMsg))
         {
             result.errorMessage = errorMsg;
             return result;
@@ -1224,15 +1194,15 @@ ImportResult JsonBlueprintExporter::importEditorFromFiles(const std::string& run
     {
         std::string errorMsg;
         
-        std::string runtimeContent = readFileContent(runtimeFilePath, errorMsg);
-        if (!errorMsg.empty())
+        std::string runtimeContent;
+        if (!m_fileSystem->ReadFile(runtimeFilePath, runtimeContent, errorMsg))
         {
             result.errorMessage = errorMsg;
             return result;
         }
         
-        std::string editorContent = readFileContent(editorFilePath, errorMsg);
-        if (!errorMsg.empty())
+        std::string editorContent;
+        if (!m_fileSystem->ReadFile(editorFilePath, editorContent, errorMsg))
         {
             result.errorMessage = errorMsg;
             return result;
@@ -1259,8 +1229,8 @@ ImportResult JsonBlueprintExporter::importFromEditorFile(const std::string& edit
     try
     {
         std::string errorMsg;
-        std::string editorContent = readFileContent(editorFilePath, errorMsg);
-        if (!errorMsg.empty())
+        std::string editorContent;
+        if (!m_fileSystem->ReadFile(editorFilePath, editorContent, errorMsg))
         {
             result.errorMessage = errorMsg;
             return result;

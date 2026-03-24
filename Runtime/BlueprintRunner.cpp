@@ -2,7 +2,6 @@
 
 #include "BlueprintRunner.h"
 #include "BlueprintExporter.h"
-#include <fstream>
 #include <sstream>
 #include <chrono>
 #include <algorithm>
@@ -54,7 +53,7 @@ bool BlueprintRunner::Load(const BlueprintData& data)
 
 bool BlueprintRunner::LoadFromJson(const std::string& jsonContent)
 {
-    JsonBlueprintExporter exporter;
+    JsonBlueprintExporter exporter(m_fileSystem);
     auto result = exporter.importRuntimeFromString(jsonContent);
     if (!result.success)
     {
@@ -66,7 +65,7 @@ bool BlueprintRunner::LoadFromJson(const std::string& jsonContent)
 
 bool BlueprintRunner::LoadFromFile(const std::string& filePath)
 {
-    JsonBlueprintExporter exporter;
+    JsonBlueprintExporter exporter(m_fileSystem);
     auto result = exporter.importRuntimeFromFile(filePath);
     if (!result.success)
     {

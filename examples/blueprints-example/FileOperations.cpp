@@ -9,7 +9,6 @@
 #pragma comment(lib, "shell32.lib")
 #endif
 
-#include <fstream>
 #include <sstream>
 
 // ============================================================================
@@ -173,9 +172,8 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
         std::string editorPath = GetEditorFilePath(path);
         
         // 检查 editor 文件是否存在
-        std::ifstream editorCheck(editorPath);
-        bool hasEditorFile = editorCheck.good();
-        editorCheck.close();
+        auto fs = ::NodeEditor::Runtime::GetDefaultFileSystem();
+        bool hasEditorFile = fs->FileExists(editorPath);
         
         if (hasEditorFile)
         {
@@ -212,7 +210,7 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
     std::string title = "Blueprint Editor - " + GetFileBaseName(m_CurrentFilePath);
     SetTitle(title.c_str());
 
-    // 添加到最近文件列表
+    // 添加到最近文件列表（记录用户实际打开的文件路径）
     AddRecentFile(path);
     
     m_ExecutionLog.push_back("[INFO] Opened: " + path);
@@ -706,10 +704,11 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
             
             m_Links.emplace_back(Link(GetNextId(), startPinId, endPinId));
             
-            // 设置链接颜色
+            // 设置链接颜色（Any 引脚使用对端类型颜色）
             auto* startPin = FindPin(startPinId);
+            auto* endPin   = FindPin(endPinId);
             if (startPin)
-                m_Links.back().Color = GetIconColor(startPin->Type);
+                m_Links.back().Color = GetIconColor(GetLinkColor(startPin, endPin));
         }
     }
     
@@ -744,14 +743,46 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
 // 最近文件列表
 // ============================================================================
 
+// 辅助函数：规范化路径（统一使用 / 分隔符）
+static std::string NormalizePath(const std::string& path)
+{
+    std::string result = path;
+    for (auto& c : result)
+    {
+        if (c == '\\') c = '/';
+    }
+    return result;
+}
+
+// 辅助函数：获取路径的"基础路径"用于去重比较
+// .editor.json 和 .json 视为同一文件
+static std::string GetCanonicalPath(const std::string& normalizedPath)
+{
+    const std::string editorSuffix = ".editor.json";
+    if (normalizedPath.size() > editorSuffix.size() &&
+        normalizedPath.substr(normalizedPath.size() - editorSuffix.size()) == editorSuffix)
+    {
+        return normalizedPath.substr(0, normalizedPath.size() - editorSuffix.size()) + ".json";
+    }
+    return normalizedPath;
+}
+
 void BlueprintEditor::AddRecentFile(const std::string& path)
 {
-    // 如果已存在，移到最前面
-    auto it = std::find(m_RecentFiles.begin(), m_RecentFiles.end(), path);
-    if (it != m_RecentFiles.end())
-        m_RecentFiles.erase(it);
+    // 规范化路径
+    std::string normalized = NormalizePath(path);
+    std::string canonical = GetCanonicalPath(normalized);
 
-    m_RecentFiles.insert(m_RecentFiles.begin(), path);
+    // 移除同一文件的旧记录（.editor.json 和 .json 视为同一文件）
+    m_RecentFiles.erase(
+        std::remove_if(m_RecentFiles.begin(), m_RecentFiles.end(),
+            [&canonical](const std::string& existing) {
+                return GetCanonicalPath(NormalizePath(existing)) == canonical;
+            }),
+        m_RecentFiles.end());
+
+    // 插入到最前面（使用规范化后的路径）
+    m_RecentFiles.insert(m_RecentFiles.begin(), normalized);
 
     // 保持最大数量
     while (static_cast<int>(m_RecentFiles.size()) > MaxRecentFiles)
@@ -769,28 +800,46 @@ static const char* kRecentFilesName = "Blueprint Editor.recent.txt";
 
 void BlueprintEditor::SaveRecentFiles()
 {
-    std::ofstream ofs(kRecentFilesName);
-    if (!ofs.is_open())
-        return;
+    std::string content;
     for (const auto& path : m_RecentFiles)
-        ofs << path << "\n";
+        content += path + "\n";
+    
+    auto fs = ::NodeEditor::Runtime::GetDefaultFileSystem();
+    std::string errorMsg;
+    fs->WriteFile(kRecentFilesName, content, errorMsg);
 }
 
 void BlueprintEditor::LoadRecentFiles()
 {
-    std::ifstream ifs(kRecentFilesName);
-    if (!ifs.is_open())
+    auto fs = ::NodeEditor::Runtime::GetDefaultFileSystem();
+    std::string fileContent;
+    std::string errorMsg;
+    if (!fs->ReadFile(kRecentFilesName, fileContent, errorMsg))
         return;
 
     m_RecentFiles.clear();
+    std::istringstream iss(fileContent);
     std::string line;
-    while (std::getline(ifs, line))
+    while (std::getline(iss, line))
     {
         // 去除尾部的 \r（跨平台兼容）
         if (!line.empty() && line.back() == '\r')
             line.pop_back();
-        if (!line.empty())
-            m_RecentFiles.push_back(line);
+        if (line.empty())
+            continue;
+
+        // 规范化路径
+        std::string normalized = NormalizePath(line);
+        std::string canonical = GetCanonicalPath(normalized);
+
+        // 去重检查（.editor.json 和 .json 视为同一文件）
+        bool duplicate = false;
+        for (const auto& existing : m_RecentFiles)
+        {
+            if (GetCanonicalPath(NormalizePath(existing)) == canonical) { duplicate = true; break; }
+        }
+        if (!duplicate)
+            m_RecentFiles.push_back(normalized);
     }
 
     // 确保不超过最大数量
@@ -838,5 +887,8 @@ void BlueprintEditor::DrawRecentFilesMenu()
 
     ImGui::Separator();
     if (ImGui::MenuItem("Clear Recent Files"))
+    {
         m_RecentFiles.clear();
+        SaveRecentFiles();  // 同步清空磁盘文件
+    }
 }
