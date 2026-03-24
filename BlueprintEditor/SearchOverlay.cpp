@@ -152,7 +152,7 @@ void BlueprintEditor::DrawSearchOverlay()
     {
         // 标题行：搜索图标 + 标题 + 关闭按钮
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.70f, 0.95f, 1.00f));
-        ImGui::TextUnformatted("\xef\x80\x82");  // 搜索图标占位
+        ImGui::TextUnformatted(ICON_FA_MAGNIFYING_GLASS);
         ImGui::PopStyleColor();
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(0.80f, 0.85f, 0.95f, 1.00f), "Search Nodes");
@@ -162,7 +162,7 @@ void BlueprintEditor::DrawSearchOverlay()
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.2f, 0.2f, 0.5f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.7f, 0.2f, 0.2f, 0.7f));
-        if (ImGui::SmallButton("X"))
+        if (ImGui::SmallButton(ICON_FA_XMARK))
             m_ShowSearchOverlay = false;
         ImGui::PopStyleColor(3);
 

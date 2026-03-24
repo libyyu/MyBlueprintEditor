@@ -421,7 +421,7 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
     // ---- 搜索过滤框（置顶） ----
     static char searchBuf[128] = "";
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-    ImGui::InputTextWithHint("##search", "Search nodes...", searchBuf, sizeof(searchBuf));
+    ImGui::InputTextWithHint("##search", ICON_FA_MAGNIFYING_GLASS " Search nodes...", searchBuf, sizeof(searchBuf));
     std::string filter(searchBuf);
 
     if (!filter.empty())

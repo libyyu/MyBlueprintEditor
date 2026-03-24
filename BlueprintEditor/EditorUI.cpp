@@ -271,19 +271,19 @@ void BlueprintEditor::ShowLeftPane(float paneWidth)
     static bool showStyleEditor = false;
     ImGui::BeginHorizontal("Style Editor", ImVec2(paneWidth, 0));
     ImGui::Spring(0.0f, 0.0f);
-    if (ImGui::Button("Zoom to Content"))
+    if (ImGui::Button(ICON_FA_EXPAND " Zoom"))
         ed::NavigateToContent();
     ImGui::Spring(0.0f);
-    if (ImGui::Button("Show Flow"))
+    if (ImGui::Button(ICON_FA_BOLT " Flow"))
     {
         for (auto& link : m_Links)
             ed::Flow(link.ID);
     }
     ImGui::Spring();
-    if (ImGui::Button("Edit Style"))
+    if (ImGui::Button(ICON_FA_PALETTE " Style"))
         showStyleEditor = true;
     ImGui::EndHorizontal();
-    ImGui::Checkbox("Show Ordinals", &m_ShowOrdinals);
+    ImGui::Checkbox(ICON_FA_TABLE_CELLS " Ordinals", &m_ShowOrdinals);
 
     if (showStyleEditor)
         ShowStyleEditor(&showStyleEditor);
@@ -435,7 +435,7 @@ void BlueprintEditor::ShowLeftPane(float paneWidth)
     ImGui::BeginHorizontal("Selection Stats", ImVec2(paneWidth, 0));
     ImGui::Text("Changed %d time%s", changeCount, changeCount > 1 ? "s" : "");
     ImGui::Spring();
-    if (ImGui::Button("Deselect All"))
+    if (ImGui::Button(ICON_FA_XMARK " Deselect"))
         ed::ClearSelection();
     ImGui::EndHorizontal();
     ImGui::Indent();
@@ -515,24 +515,24 @@ void BlueprintEditor::OnFrame(float deltaTime)
     // ================================================================
     if (ImGui::BeginMenuBar())
     {
-        if (ImGui::BeginMenu("File"))
+        if (ImGui::BeginMenu(ICON_FA_FILE " File"))
         {
-            if (ImGui::MenuItem("New", "Ctrl+N"))
+            if (ImGui::MenuItem(ICON_FA_FILE " New", "Ctrl+N"))
                 NewFile();
-            if (ImGui::MenuItem("Open...", "Ctrl+O"))
+            if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Open...", "Ctrl+O"))
                 OpenFile();
-            if (ImGui::BeginMenu("Recent Files"))
+            if (ImGui::BeginMenu(ICON_FA_CLOCK_ROTATE_LEFT " Recent Files"))
             {
                 DrawRecentFilesMenu();
                 ImGui::EndMenu();
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Save", "Ctrl+S"))
+            if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK " Save", "Ctrl+S"))
                 SaveFile();
-            if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S"))
+            if (ImGui::MenuItem(ICON_FA_FILE_EXPORT " Save As...", "Ctrl+Shift+S"))
                 SaveFileAs();
             ImGui::Separator();
-            if (ImGui::MenuItem("Close Tab", "Ctrl+W"))
+            if (ImGui::MenuItem(ICON_FA_XMARK " Close Tab", "Ctrl+W"))
             {
                 if (!m_Documents.empty())
                 {
@@ -547,72 +547,72 @@ void BlueprintEditor::OnFrame(float deltaTime)
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("Edit"))
+        if (ImGui::BeginMenu(ICON_FA_PEN " Edit"))
         {
-            if (ImGui::MenuItem("Copy", "Ctrl+C"))
+            if (ImGui::MenuItem(ICON_FA_COPY " Copy", "Ctrl+C"))
                 CopySelectedNodes();
-            if (ImGui::MenuItem("Paste", "Ctrl+V"))
+            if (ImGui::MenuItem(ICON_FA_PASTE " Paste", "Ctrl+V"))
             {
                 ImVec2 canvasPos = ed::ScreenToCanvas(ImGui::GetMousePos());
                 PasteNodes(canvasPos);
             }
-            if (ImGui::MenuItem("Cut", "Ctrl+X"))
+            if (ImGui::MenuItem(ICON_FA_SCISSORS " Cut", "Ctrl+X"))
                 CutSelectedNodes();
-            if (ImGui::MenuItem("Duplicate", "Ctrl+D"))
+            if (ImGui::MenuItem(ICON_FA_CLONE " Duplicate", "Ctrl+D"))
                 DuplicateSelectedNodes();
             ImGui::Separator();
-            if (ImGui::MenuItem("Select All", "Ctrl+A"))
+            if (ImGui::MenuItem(ICON_FA_OBJECT_GROUP " Select All", "Ctrl+A"))
             {
                 for (auto& node : m_Nodes)
                     ed::SelectNode(node.ID, true);
             }
             ImGui::Separator();
-            if (ImGui::BeginMenu("Align Selected"))
+            if (ImGui::BeginMenu(ICON_FA_ALIGN_LEFT " Align Selected"))
             {
-                if (ImGui::MenuItem("Align Left"))    AlignSelectedNodes(AlignMode::Left);
-                if (ImGui::MenuItem("Align Right"))   AlignSelectedNodes(AlignMode::Right);
-                if (ImGui::MenuItem("Align Top"))     AlignSelectedNodes(AlignMode::Top);
-                if (ImGui::MenuItem("Align Bottom"))  AlignSelectedNodes(AlignMode::Bottom);
+                if (ImGui::MenuItem(ICON_FA_ALIGN_LEFT " Align Left"))    AlignSelectedNodes(AlignMode::Left);
+                if (ImGui::MenuItem(ICON_FA_ALIGN_RIGHT " Align Right"))   AlignSelectedNodes(AlignMode::Right);
+                if (ImGui::MenuItem(ICON_FA_ARROW_UP " Align Top"))     AlignSelectedNodes(AlignMode::Top);
+                if (ImGui::MenuItem(ICON_FA_ARROW_DOWN " Align Bottom"))  AlignSelectedNodes(AlignMode::Bottom);
                 ImGui::Separator();
-                if (ImGui::MenuItem("Center Horizontally"))  AlignSelectedNodes(AlignMode::CenterH);
-                if (ImGui::MenuItem("Center Vertically"))    AlignSelectedNodes(AlignMode::CenterV);
+                if (ImGui::MenuItem(ICON_FA_ALIGN_CENTER " Center Horizontally"))  AlignSelectedNodes(AlignMode::CenterH);
+                if (ImGui::MenuItem(ICON_FA_ALIGN_CENTER " Center Vertically"))    AlignSelectedNodes(AlignMode::CenterV);
                 ImGui::EndMenu();
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Find...", "Ctrl+F"))
+            if (ImGui::MenuItem(ICON_FA_MAGNIFYING_GLASS " Find...", "Ctrl+F"))
                 OpenSearchOverlay();
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("View"))
+        if (ImGui::BeginMenu(ICON_FA_EYE " View"))
         {
-            ImGui::MenuItem("Node List", nullptr, &m_ShowNodeListWindow);
-            ImGui::MenuItem("Execution Output", nullptr, &m_ShowExecutionWindow);
-            ImGui::MenuItem("Timer Monitor", nullptr, &m_ShowTimerWindow);
-            ImGui::MenuItem("Minimap", nullptr, &m_ShowMinimap);
-            ImGui::MenuItem("Show Ordinals", nullptr, &m_ShowOrdinals);
+            ImGui::MenuItem(ICON_FA_LIST " Node List", nullptr, &m_ShowNodeListWindow);
+            ImGui::MenuItem(ICON_FA_TERMINAL " Execution Output", nullptr, &m_ShowExecutionWindow);
+            ImGui::MenuItem(ICON_FA_STOPWATCH " Timer Monitor", nullptr, &m_ShowTimerWindow);
+            ImGui::MenuItem(ICON_FA_MAP " Minimap", nullptr, &m_ShowMinimap);
+            ImGui::MenuItem(ICON_FA_TABLE_CELLS " Show Ordinals", nullptr, &m_ShowOrdinals);
             ImGui::Separator();
-            if (ImGui::MenuItem("Zoom to Content"))
+            if (ImGui::MenuItem(ICON_FA_EXPAND " Zoom to Content"))
                 ed::NavigateToContent();
-            if (ImGui::MenuItem("Style Editor"))
+            if (ImGui::MenuItem(ICON_FA_PALETTE " Style Editor"))
                 m_ShowStyleEditorWindow = true;
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("Run"))
+        if (ImGui::BeginMenu(ICON_FA_BOLT " Run"))
         {
-            if (ImGui::MenuItem("Execute Blueprint", "F5"))
+            if (ImGui::MenuItem(ICON_FA_PLAY " Execute Blueprint", "F5"))
                 ExecuteBlueprint();
             ImGui::Separator();
-            ImGui::MenuItem("Timer Monitor", nullptr, &m_ShowTimerWindow);
-            if (ImGui::MenuItem("Clear Execution Highlight"))
+            ImGui::MenuItem(ICON_FA_STOPWATCH " Timer Monitor", nullptr, &m_ShowTimerWindow);
+            if (ImGui::MenuItem(ICON_FA_ERASER " Clear Execution Highlight"))
             {
                 if (ActiveDoc())
                     ActiveDoc()->executedNodeHighlight.clear();
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("Help"))
+        if (ImGui::BeginMenu(ICON_FA_CIRCLE_QUESTION " Help"))
         {
-            ImGui::TextColored(ImVec4(0.45f, 0.70f, 0.95f, 1.00f), "Keyboard Shortcuts");
+            ImGui::TextColored(ImVec4(0.45f, 0.70f, 0.95f, 1.00f), ICON_FA_KEYBOARD " Keyboard Shortcuts");
             ImGui::Separator();
             ImGui::TextDisabled("File");
             ImGui::BulletText("Ctrl+N         New File");
@@ -1940,23 +1940,23 @@ void BlueprintEditor::OnFrame(float deltaTime)
         else
             ImGui::Text("Unknown node: %p", contextNodeId.AsPointer());
         ImGui::Separator();
-        if (ImGui::MenuItem("Copy", "Ctrl+C"))
+        if (ImGui::MenuItem(ICON_FA_COPY " Copy", "Ctrl+C"))
         {
             ed::SelectNode(contextNodeId, false);
             CopySelectedNodes();
         }
-        if (ImGui::MenuItem("Duplicate", "Ctrl+D"))
+        if (ImGui::MenuItem(ICON_FA_CLONE " Duplicate", "Ctrl+D"))
         {
             ed::SelectNode(contextNodeId, false);
             DuplicateSelectedNodes();
         }
-        if (ImGui::MenuItem("Cut", "Ctrl+X"))
+        if (ImGui::MenuItem(ICON_FA_SCISSORS " Cut", "Ctrl+X"))
         {
             ed::SelectNode(contextNodeId, false);
             CutSelectedNodes();
         }
         ImGui::Separator();
-        if (ImGui::MenuItem("Select Connected"))
+        if (ImGui::MenuItem(ICON_FA_LINK " Select Connected"))
         {
             // 选中与此节点直接连接的所有节点
             if (node)
@@ -1986,7 +1986,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
             }
         }
         ImGui::Separator();
-        if (ImGui::MenuItem("Delete"))
+        if (ImGui::MenuItem(ICON_FA_TRASH_CAN " Delete"))
         {
             // 删除所有选中的节点（而不是仅删除右键点击的节点）
             int selCount = ed::GetSelectedObjectCount();
@@ -2041,12 +2041,12 @@ void BlueprintEditor::OnFrame(float deltaTime)
         ImGui::Separator();
         if (pin && IsPinLinked(contextPinId))
         {
-            if (ImGui::MenuItem("Break Link(s)"))
+            if (ImGui::MenuItem(ICON_FA_UNLINK " Break Link(s)"))
                 ed::BreakLinks(contextPinId);
         }
         if (pin && pin->Node)
         {
-            if (ImGui::MenuItem("Break All Links on Node"))
+            if (ImGui::MenuItem(ICON_FA_UNLINK " Break All Links on Node"))
             {
                 // 断开该节点上所有引脚的所有链接
                 auto* node = pin->Node;
@@ -2059,7 +2059,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         // 重置引脚值
         if (pin && pin->Kind == PinKind::Input && pin->Type != PinType::Flow)
         {
-            if (ImGui::MenuItem("Reset Value"))
+            if (ImGui::MenuItem(ICON_FA_ARROWS_ROTATE " Reset Value"))
             {
                 pin->BoolValue = false;
                 pin->IntValue = 0;
@@ -2088,7 +2088,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         else
             ImGui::Text("Unknown link: %p", contextLinkId.AsPointer());
         ImGui::Separator();
-        if (ImGui::MenuItem("Delete"))
+        if (ImGui::MenuItem(ICON_FA_TRASH_CAN " Delete"))
             ed::DeleteLink(contextLinkId);
         ImGui::EndPopup();
     }
@@ -2100,7 +2100,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         // 如果剪贴板中有节点，提供 Paste Here 选项
         if (!m_ClipboardNodes.empty())
         {
-            if (ImGui::MenuItem("Paste Here", "Ctrl+V"))
+            if (ImGui::MenuItem(ICON_FA_PASTE " Paste Here", "Ctrl+V"))
             {
                 ImVec2 canvasPos = ed::ScreenToCanvas(newNodePostion);
                 PasteNodes(canvasPos);
@@ -2449,7 +2449,7 @@ void BlueprintEditor::ShowUnsavedChangesDialog()
         float startX = (ImGui::GetContentRegionAvail().x - totalWidth) * 0.5f;
         if (startX > 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + startX);
 
-        if (ImGui::Button("Save", ImVec2(buttonWidth, 0)))
+        if (ImGui::Button(ICON_FA_FLOPPY_DISK " Save", ImVec2(buttonWidth, 0)))
         {
             // 切换到待关闭的文档并保存
             if (m_PendingCloseTabIndex >= 0)
@@ -2469,7 +2469,7 @@ void BlueprintEditor::ShowUnsavedChangesDialog()
         }
 
         ImGui::SameLine();
-        if (ImGui::Button("Don't Save", ImVec2(buttonWidth, 0)))
+        if (ImGui::Button(ICON_FA_TRASH_CAN " Don't Save", ImVec2(buttonWidth, 0)))
         {
             // 不保存直接关闭
             if (m_PendingCloseTabIndex >= 0)
@@ -2481,7 +2481,7 @@ void BlueprintEditor::ShowUnsavedChangesDialog()
         }
 
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(buttonWidth, 0)))
+        if (ImGui::Button(ICON_FA_XMARK " Cancel", ImVec2(buttonWidth, 0)))
         {
             m_PendingCloseTabIndex = -1;
             m_PendingQuitApp = false;
@@ -2521,9 +2521,9 @@ void BlueprintEditor::DrawNodeListPanel()
             IM_COL32(75, 140, 190, 80));
         drawList->AddText(
             ImVec2(cursorPos.x + 10.0f, cursorPos.y + 4.0f),
-            IM_COL32(160, 195, 240, 240), "\xef\x80\x8d");  // icon placeholder
+            IM_COL32(160, 195, 240, 240), ICON_FA_SITEMAP);
         drawList->AddText(
-            ImVec2(cursorPos.x + 26.0f, cursorPos.y + 4.0f),
+            ImVec2(cursorPos.x + 28.0f, cursorPos.y + 4.0f),
             IM_COL32(175, 200, 235, 240), "Inspector");
         ImGui::Dummy(ImVec2(paneWidth, headerH));
     }
@@ -2534,19 +2534,19 @@ void BlueprintEditor::DrawNodeListPanel()
     static bool showStyleEditor = false;
     ImGui::BeginHorizontal("Style Editor", ImVec2(paneWidth, 0));
     ImGui::Spring(0.0f, 0.0f);
-    if (ImGui::Button("Zoom to Content"))
+    if (ImGui::Button(ICON_FA_EXPAND " Zoom"))
         ed::NavigateToContent();
     ImGui::Spring(0.0f);
-    if (ImGui::Button("Show Flow"))
+    if (ImGui::Button(ICON_FA_BOLT " Flow"))
     {
         for (auto& link : m_Links)
             ed::Flow(link.ID);
     }
     ImGui::Spring();
-    if (ImGui::Button("Edit Style"))
+    if (ImGui::Button(ICON_FA_PALETTE " Style"))
         showStyleEditor = true;
     ImGui::EndHorizontal();
-    ImGui::Checkbox("Show Ordinals", &m_ShowOrdinals);
+    ImGui::Checkbox(ICON_FA_TABLE_CELLS " Ordinals", &m_ShowOrdinals);
 
     if (showStyleEditor)
         ShowStyleEditor(&showStyleEditor);
@@ -2554,7 +2554,7 @@ void BlueprintEditor::DrawNodeListPanel()
     // 节点过滤器
     static char nodeFilterBuf[128] = {};
     ImGui::SetNextItemWidth(paneWidth);
-    ImGui::InputTextWithHint("##NodeFilter", "Filter nodes...", nodeFilterBuf, sizeof(nodeFilterBuf));
+    ImGui::InputTextWithHint("##NodeFilter", ICON_FA_MAGNIFYING_GLASS " Filter nodes...", nodeFilterBuf, sizeof(nodeFilterBuf));
 
     std::string nodeFilter(nodeFilterBuf);
     // 转小写
@@ -2598,7 +2598,7 @@ void BlueprintEditor::DrawNodeListPanel()
         drawList->AddText(
             ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
             IM_COL32(160, 195, 240, 230),
-            nodeFilter.empty() ? "Nodes" : "Nodes (filtered)");
+            nodeFilter.empty() ? ICON_FA_CUBES " Nodes" : ICON_FA_CUBES " Nodes (filtered)");
         ImGui::Dummy(ImVec2(paneWidth, sectionH));
     }
     ImGui::Indent();
@@ -2732,14 +2732,14 @@ void BlueprintEditor::DrawNodeListPanel()
             colL, colR, colR, colL);
         drawList->AddText(
             ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-            IM_COL32(160, 195, 240, 230), "Selection");
+            IM_COL32(160, 195, 240, 230), ICON_FA_HAND_POINTER " Selection");
         ImGui::Dummy(ImVec2(paneWidth, sectionH));
     }
 
     ImGui::BeginHorizontal("Selection Stats", ImVec2(paneWidth, 0));
     ImGui::Text("Changed %d time%s", changeCount, changeCount > 1 ? "s" : "");
     ImGui::Spring();
-    if (ImGui::Button("Deselect All"))
+    if (ImGui::Button(ICON_FA_XMARK " Deselect"))
         ed::ClearSelection();
     ImGui::EndHorizontal();
     ImGui::Indent();
@@ -2783,9 +2783,9 @@ void BlueprintEditor::DrawExecutionPanel()
             IM_COL32(75, 140, 190, 80));
         drawList->AddText(
             ImVec2(cursorPos.x + 10.0f, cursorPos.y + 4.0f),
-            IM_COL32(160, 195, 240, 240), "\xef\x84\xa0");  // icon placeholder
+            IM_COL32(160, 195, 240, 240), ICON_FA_TERMINAL);
         drawList->AddText(
-            ImVec2(cursorPos.x + 26.0f, cursorPos.y + 4.0f),
+            ImVec2(cursorPos.x + 28.0f, cursorPos.y + 4.0f),
             IM_COL32(175, 210, 250, 245), "Output");
         ImGui::Dummy(ImVec2(paneWidth, headerH));
     }
@@ -2800,14 +2800,14 @@ void BlueprintEditor::DrawExecutionPanel()
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.60f, 0.35f, 1.00f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.28f, 0.70f, 0.40f, 1.00f));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
-    if (ImGui::Button("\xe2\x96\xb6 Execute", ImVec2(90, 0)))
+    if (ImGui::Button(ICON_FA_PLAY " Execute", ImVec2(90, 0)))
     {
         ExecuteBlueprint();
     }
     ImGui::PopStyleVar();
     ImGui::PopStyleColor(3);
     ImGui::Spring(0.0f);
-    if (ImGui::Button("Copy Log", ImVec2(80, 0)))
+    if (ImGui::Button(ICON_FA_COPY " Copy Log", ImVec2(90, 0)))
     {
         if (!m_ExecutionLog.empty())
         {
@@ -2821,7 +2821,7 @@ void BlueprintEditor::DrawExecutionPanel()
         }
     }
     ImGui::Spring(0.0f);
-    if (ImGui::Button("Clear Log", ImVec2(80, 0)))
+    if (ImGui::Button(ICON_FA_ERASER " Clear", ImVec2(80, 0)))
     {
         m_ExecutionLog.clear();
         m_ExecutionLogText.clear();
@@ -2868,7 +2868,7 @@ void BlueprintEditor::DrawExecutionPanel()
 void BlueprintEditor::DrawTimerPanel()
 {
     ImGui::SetNextWindowSize(ImVec2(520, 340), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Timer Monitor", &m_ShowTimerWindow))
+    if (!ImGui::Begin(ICON_FA_STOPWATCH " Timer Monitor", &m_ShowTimerWindow))
     {
         ImGui::End();
         return;
@@ -2886,13 +2886,13 @@ void BlueprintEditor::DrawTimerPanel()
         timerMgr.SetTimeScale(ts);
 
     ImGui::SameLine(0, 20);
-    if (ImGui::Button("Clear All"))
+    if (ImGui::Button(ICON_FA_ERASER " Clear All"))
         timerMgr.ClearAllTimers();
     ImGui::SameLine();
-    if (ImGui::Button("Pause All"))
+    if (ImGui::Button(ICON_FA_PAUSE " Pause All"))
         timerMgr.PauseAll();
     ImGui::SameLine();
-    if (ImGui::Button("Resume All"))
+    if (ImGui::Button(ICON_FA_PLAY " Resume All"))
         timerMgr.ResumeAll();
 
     ImGui::Separator();
@@ -2988,16 +2988,16 @@ void BlueprintEditor::DrawTimerPanel()
                 ImGui::PushID(t.handle);
                 if (t.paused)
                 {
-                    if (ImGui::SmallButton("Resume"))
+                    if (ImGui::SmallButton(ICON_FA_PLAY " Resume"))
                         timerMgr.ResumeTimer(t.handle);
                 }
                 else
                 {
-                    if (ImGui::SmallButton("Pause"))
+                    if (ImGui::SmallButton(ICON_FA_PAUSE " Pause"))
                         timerMgr.PauseTimer(t.handle);
                 }
                 ImGui::SameLine();
-                if (ImGui::SmallButton("X"))
+                if (ImGui::SmallButton(ICON_FA_XMARK))
                     timerMgr.ClearTimer(t.handle);
                 ImGui::PopID();
             }

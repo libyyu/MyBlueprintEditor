@@ -169,12 +169,12 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
     ImGui::TextUnformatted("Execution");
 
     ImGui::BeginHorizontal("ExecButtons", ImVec2(paneWidth, 0));
-    if (ImGui::Button("Execute", ImVec2(80, 0)))
+    if (ImGui::Button(ICON_FA_PLAY " Execute", ImVec2(90, 0)))
     {
         ExecuteBlueprint();
     }
     ImGui::Spring(0.0f);
-    if (ImGui::Button("Copy Log", ImVec2(80, 0)))
+    if (ImGui::Button(ICON_FA_COPY " Copy Log", ImVec2(90, 0)))
     {
         if (!m_ExecutionLog.empty())
         {
@@ -188,7 +188,7 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
         }
     }
     ImGui::Spring(0.0f);
-    if (ImGui::Button("Clear Log", ImVec2(80, 0)))
+    if (ImGui::Button(ICON_FA_ERASER " Clear", ImVec2(80, 0)))
     {
         m_ExecutionLog.clear();
         m_ExecutionLogText.clear();

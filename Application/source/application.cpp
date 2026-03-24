@@ -3,12 +3,30 @@
 # include "platform.h"
 # include "renderer.h"
 
+#ifdef _WIN32
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shlwapi.h>
+#pragma comment(lib, "shlwapi.lib")
+#endif
+
 extern "C" {
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
 #include "stb_image.h"
 }
 
+// 确保工作目录为 exe 所在目录，这样 "data/xxx" 等相对路径能正确找到资源文件
+static void EnsureWorkingDirectoryIsExeDir()
+{
+#ifdef _WIN32
+    wchar_t exePath[MAX_PATH] = {};
+    GetModuleFileNameW(NULL, exePath, MAX_PATH);
+    PathRemoveFileSpecW(exePath);
+    SetCurrentDirectoryW(exePath);
+#endif
+}
 
 Application::Application(const char* name)
     : Application(name, 0, nullptr)
@@ -20,6 +38,7 @@ Application::Application(const char* name, int argc, char** argv)
     , m_Platform(CreatePlatform(*this))
     , m_Renderer(CreateRenderer())
 {
+    EnsureWorkingDirectoryIsExeDir();
     m_Platform->ApplicationStart(argc, argv);
 }
 
@@ -230,8 +249,43 @@ void Application::RecreateFontAtlas()
     config.OversampleV = 4;
     config.PixelSnapH = false;
 
+    // 1. 加载默认字体（Play-Regular）
     m_DefaultFont = io.Fonts->AddFontFromFileTTF("data/Play-Regular.ttf", 18.0f, &config);
-    m_HeaderFont  = io.Fonts->AddFontFromFileTTF("data/Cuprum-Bold.ttf",  20.0f, &config);
+
+    // 2. 合并 FontAwesome 6 图标字体到默认字体
+    {
+        static const ImWchar icon_ranges[] = { 0xe005, 0xf8ff, 0 };
+        ImFontConfig iconConfig;
+        iconConfig.MergeMode = true;          // 合并到上一个字体（m_DefaultFont）
+        iconConfig.PixelSnapH = true;
+        iconConfig.GlyphMinAdvanceX = 18.0f;  // 对齐：图标最小宽度 = 字体大小
+        iconConfig.GlyphOffset.y = 2.0f;      // 微调垂直偏移让图标与文字对齐
+        io.Fonts->AddFontFromFileTTF("data/fa-solid-900.ttf", 16.0f, &iconConfig, icon_ranges);
+    }
+
+    // 3. 加载标题字体（Cuprum-Bold）
+    m_HeaderFont = io.Fonts->AddFontFromFileTTF("data/Cuprum-Bold.ttf", 20.0f, &config);
+
+    // 4. 合并 FontAwesome 到标题字体
+    {
+        static const ImWchar icon_ranges[] = { 0xe005, 0xf8ff, 0 };
+        ImFontConfig iconConfig;
+        iconConfig.MergeMode = true;
+        iconConfig.PixelSnapH = true;
+        iconConfig.GlyphMinAdvanceX = 20.0f;
+        iconConfig.GlyphOffset.y = 2.0f;
+        io.Fonts->AddFontFromFileTTF("data/fa-solid-900.ttf", 18.0f, &iconConfig, icon_ranges);
+    }
+
+    // 5. 独立图标字体（大号，用于面板标题图标等）
+    {
+        static const ImWchar icon_ranges[] = { 0xe005, 0xf8ff, 0 };
+        ImFontConfig iconOnlyConfig;
+        iconOnlyConfig.OversampleH = 2;
+        iconOnlyConfig.OversampleV = 2;
+        iconOnlyConfig.GlyphMinAdvanceX = 24.0f;
+        m_IconFont = io.Fonts->AddFontFromFileTTF("data/fa-solid-900.ttf", 22.0f, &iconOnlyConfig, icon_ranges);
+    }
 
     io.Fonts->Build();
 }
@@ -313,6 +367,11 @@ ImFont* Application::DefaultFont() const
 ImFont* Application::HeaderFont() const
 {
     return m_HeaderFont;
+}
+
+ImFont* Application::IconFont() const
+{
+    return m_IconFont;
 }
 
 ImTextureID Application::LoadTexture(const char* path)
