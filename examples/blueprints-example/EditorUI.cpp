@@ -10,16 +10,16 @@ ImColor BlueprintEditor::GetIconColor(PinType type)
     switch (type)
     {
         default:
-        case PinType::Flow:     return ImColor(255, 255, 255);
-        case PinType::Bool:     return ImColor(220,  48,  48);
-        case PinType::Int:      return ImColor( 68, 201, 156);
-        case PinType::Float:    return ImColor(147, 226,  74);
-        case PinType::String:   return ImColor(124,  21, 153);
-        case PinType::Object:   return ImColor( 51, 150, 215);
-        case PinType::Function: return ImColor(218,   0, 183);
-        case PinType::Delegate: return ImColor(255,  48,  48);
-        case PinType::Array:    return ImColor(255, 165,   0);
-        case PinType::Any:      return ImColor(180, 180, 180);
+        case PinType::Flow:     return ImColor(240, 240, 240);
+        case PinType::Bool:     return ImColor(200,  50,  50);
+        case PinType::Int:      return ImColor( 55, 195, 150);
+        case PinType::Float:    return ImColor(130, 210,  80);
+        case PinType::String:   return ImColor(160,  60, 200);
+        case PinType::Object:   return ImColor( 60, 150, 220);
+        case PinType::Function: return ImColor(220,  30, 190);
+        case PinType::Delegate: return ImColor(235,  55,  55);
+        case PinType::Array:    return ImColor(245, 170,  30);
+        case PinType::Any:      return ImColor(170, 170, 180);
     }
 };
 
@@ -462,6 +462,11 @@ void BlueprintEditor::ShowLeftPane(float paneWidth)
 
 void BlueprintEditor::OnFrame(float deltaTime)
 {
+    // 每帧使编辑器侧索引失效（懒重建：首次查找时自动重建）
+    // 这样无需在每个节点/链接增删处手动 invalidate
+    for (auto& doc : m_Documents)
+        doc->invalidateEditorIndices();
+
     // 驱动所有文档的计时器
     for (auto& doc : m_Documents)
         doc->persistentRunner.Tick(deltaTime);
@@ -605,6 +610,33 @@ void BlueprintEditor::OnFrame(float deltaTime)
             }
             ImGui::EndMenu();
         }
+        if (ImGui::BeginMenu("Help"))
+        {
+            ImGui::TextColored(ImVec4(0.45f, 0.70f, 0.95f, 1.00f), "Keyboard Shortcuts");
+            ImGui::Separator();
+            ImGui::TextDisabled("File");
+            ImGui::BulletText("Ctrl+N         New File");
+            ImGui::BulletText("Ctrl+O         Open File");
+            ImGui::BulletText("Ctrl+S         Save");
+            ImGui::BulletText("Ctrl+Shift+S   Save As");
+            ImGui::BulletText("Ctrl+W         Close Tab");
+            ImGui::Spacing();
+            ImGui::TextDisabled("Edit");
+            ImGui::BulletText("Ctrl+C         Copy");
+            ImGui::BulletText("Ctrl+V         Paste");
+            ImGui::BulletText("Ctrl+X         Cut");
+            ImGui::BulletText("Ctrl+D         Duplicate");
+            ImGui::BulletText("Ctrl+A         Select All");
+            ImGui::BulletText("Ctrl+F         Find Nodes");
+            ImGui::BulletText("Delete         Delete Selected");
+            ImGui::Spacing();
+            ImGui::TextDisabled("View");
+            ImGui::BulletText("F              Zoom to Content");
+            ImGui::BulletText("F5             Execute Blueprint");
+            ImGui::BulletText("Right Click    Context Menu");
+            ImGui::BulletText("Double Click   Open Sub-Blueprint");
+            ImGui::EndMenu();
+        }
         ImGui::Separator();
 
         // 显示当前文件名
@@ -617,24 +649,26 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 if (lastSlash != std::string::npos)
                     displayName = displayName.substr(lastSlash + 1);
                 if (m_IsDirty)
-                    displayName += " *";
-                ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "%s", displayName.c_str());
+                    displayName += " \xe2\x80\xa2";  // bullet
+                ImGui::TextColored(ImVec4(0.55f, 0.75f, 1.0f, 0.90f), "%s", displayName.c_str());
                 ImGui::Separator();
             }
             else
             {
-                ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "[New]");
+                ImGui::TextColored(ImVec4(0.55f, 0.55f, 0.60f, 0.90f), "[New]");
                 ImGui::Separator();
             }
         }
 
-        ImGui::Text("FPS: %.2f (%.2gms)", io.Framerate, io.Framerate ? 1000.0f / io.Framerate : 0.0f);
+        // FPS（低调灰色）
+        ImGui::TextColored(ImVec4(0.50f, 0.52f, 0.58f, 0.90f),
+            "%.0f fps", io.Framerate);
 
         // 节点/链接统计
         if (ActiveDoc())
         {
             ImGui::Separator();
-            ImGui::TextColored(ImVec4(0.5f, 0.7f, 0.5f, 1.0f), "Nodes:%d  Links:%d",
+            ImGui::TextColored(ImVec4(0.42f, 0.60f, 0.42f, 0.85f), "N:%d  L:%d",
                                static_cast<int>(m_Nodes.size()), static_cast<int>(m_Links.size()));
         }
 
@@ -691,67 +725,22 @@ void BlueprintEditor::OnFrame(float deltaTime)
     if (ImGui::IsKeyPressed(ImGuiKey_F5))
         ExecuteBlueprint();
 
-    // ================================================================
-    // 标签栏（Tab Bar）
-    // ================================================================
-    int tabToClose = -1;
-    if (ImGui::BeginTabBar("##BlueprintTabs", ImGuiTabBarFlags_Reorderable | ImGuiTabBarFlags_AutoSelectNewTabs | ImGuiTabBarFlags_FittingPolicyScroll))
-    {
-        for (int i = 0; i < (int)m_Documents.size(); ++i)
-        {
-            auto& doc = m_Documents[i];
-            std::string tabTitle = doc->GetTabTitle();
-
-            bool isOpen = true;
-            ImGuiTabItemFlags flags = 0;
-
-            if (ImGui::BeginTabItem((tabTitle + "###tab" + std::to_string(i)).c_str(), &isOpen, flags))
-            {
-                m_ActiveDocIndex = i;
-                ImGui::EndTabItem();
-            }
-
-            if (!isOpen)
-            {
-                // 检查是否有未保存的修改
-                if (doc->isDirty)
-                {
-                    m_PendingCloseTabIndex = i;
-                    m_ShowUnsavedDialog = true;
-                }
-                else
-                    tabToClose = i;
-            }
-        }
-
-        // "+" 按钮：新建标签页
-        if (ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing | ImGuiTabItemFlags_NoTooltip))
-        {
-            CreateNewDocument();
-        }
-
-        ImGui::EndTabBar();
-    }
-
-    // 延迟关闭标签
-    if (tabToClose >= 0)
-        CloseDocument(tabToClose);
-
     // 确保有活跃文档
-    if (!ActiveDoc())
+    if (!m_Documents.empty() && !ActiveDoc())
         return;
 
-    // 切换到当前活跃文档的编辑器上下文
-    ed::SetCurrentEditor(ActiveDoc()->editorContext);
+    // 提前设置编辑器上下文（左侧面板 DrawNodeListPanel 需要 ed:: 函数）
+    if (ActiveDoc())
+        ed::SetCurrentEditor(ActiveDoc()->editorContext);
 
     // ================================================================
     // VSCode 风格固定面板布局
     // ================================================================
     //
     //  ┌──────────┬──────────────────────────┐
-    //  │          │                           │
-    //  │ 左侧面板  │    中间 Node Editor       │
-    //  │(NodeList)│                           │
+    //  │          │  [Tab1] [Tab2] [+]        │
+    //  │ 左侧面板  ├──────────────────────────┤
+    //  │(NodeList)│    中间 Node Editor       │
     //  │          ├──────────────────────────┤
     //  │          │    底部面板                │
     //  │          │  (Execution Output)       │
@@ -784,22 +773,115 @@ void BlueprintEditor::OnFrame(float deltaTime)
         ImGui::SameLine();
     }
 
-    // --- 右侧区域：上部编辑器 + 下部执行输出 垂直分割 ---
+    // --- 右侧区域：标签栏 + 编辑器 + 执行输出 垂直布局 ---
     ImVec2 editorMin(0, 0), editorMax(0, 0);  // 编辑器区域的屏幕坐标（供小地图等使用）
     ImGui::BeginGroup();
     {
-        float editorHeight = totalHeight;
+        // ================================================================
+        // 标签栏（Tab Bar）—— 与中间编辑器视图对齐
+        // ================================================================
+        int tabToClose = -1;
+        float tabBarHeight = 0.0f;
+        {
+            ImVec2 cursorBefore = ImGui::GetCursorPos();
+            ImGui::PushItemWidth(rightWidth);
+
+            // 标签栏背景微调（比窗口背景略深，形成分层感）
+            ImGui::PushStyleColor(ImGuiCol_Tab,        ImVec4(0.130f, 0.136f, 0.168f, 1.00f));
+            ImGui::PushStyleColor(ImGuiCol_TabSelected, ImVec4(0.165f, 0.175f, 0.220f, 1.00f));
+            ImGui::PushStyleColor(ImGuiCol_TabHovered,  ImVec4(0.200f, 0.340f, 0.520f, 0.70f));
+
+            if (ImGui::BeginTabBar("##BlueprintTabs", ImGuiTabBarFlags_Reorderable | ImGuiTabBarFlags_AutoSelectNewTabs | ImGuiTabBarFlags_FittingPolicyScroll))
+            {
+                for (int i = 0; i < (int)m_Documents.size(); ++i)
+                {
+                    auto& doc = m_Documents[i];
+                    std::string tabTitle = doc->GetTabTitle();
+
+                    bool isOpen = true;
+                    ImGuiTabItemFlags flags = 0;
+
+                    if (ImGui::BeginTabItem((tabTitle + "###tab" + std::to_string(i)).c_str(), &isOpen, flags))
+                    {
+                        m_ActiveDocIndex = i;
+
+                        // 绘制活跃标签的底部强调色指示线
+                        {
+                            ImVec2 tabMin = ImGui::GetItemRectMin();
+                            ImVec2 tabMax = ImGui::GetItemRectMax();
+                            auto* dl = ImGui::GetWindowDrawList();
+                            dl->AddRectFilled(
+                                ImVec2(tabMin.x + 2.0f, tabMax.y - 2.5f),
+                                ImVec2(tabMax.x - 2.0f, tabMax.y),
+                                IM_COL32(75, 140, 190, 240), 1.0f);
+                        }
+
+                        ImGui::EndTabItem();
+                    }
+
+                    if (!isOpen)
+                    {
+                        // 检查是否有未保存的修改
+                        if (doc->isDirty)
+                        {
+                            m_PendingCloseTabIndex = i;
+                            m_ShowUnsavedDialog = true;
+                        }
+                        else
+                            tabToClose = i;
+                    }
+                }
+
+                // "+" 按钮：新建标签页
+                if (ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing | ImGuiTabItemFlags_NoTooltip))
+                {
+                    CreateNewDocument();
+                }
+
+                ImGui::EndTabBar();
+            }
+            ImGui::PopStyleColor(3);
+            ImGui::PopItemWidth();
+            tabBarHeight = ImGui::GetCursorPos().y - cursorBefore.y;
+
+            // Tab Bar 底部分隔线
+            {
+                ImVec2 lineStart = ImGui::GetCursorScreenPos();
+                lineStart.y -= 1.0f;
+                auto* dl = ImGui::GetWindowDrawList();
+                dl->AddLine(lineStart, ImVec2(lineStart.x + rightWidth, lineStart.y),
+                            IM_COL32(50, 55, 70, 160), 1.0f);
+            }
+        }
+
+        // 延迟关闭标签
+        if (tabToClose >= 0)
+            CloseDocument(tabToClose);
+
+        // 确保有活跃文档
+        if (!ActiveDoc())
+        {
+            ImGui::EndGroup();
+            return;
+        }
+
+        // 切换到当前活跃文档的编辑器上下文（标签切换后需要更新）
+        ed::SetCurrentEditor(ActiveDoc()->editorContext);
+
+        // 剩余高度（减去 Tab Bar 占用）
+        float remainingHeight = totalHeight - tabBarHeight;
+        float editorHeight = remainingHeight;
         float bottomHeight = 0.0f;
 
         if (m_ShowExecutionWindow)
         {
             // 约束底部面板高度
             if (m_BottomPanelHeight < 100.0f) m_BottomPanelHeight = 100.0f;
-            if (m_BottomPanelHeight > totalHeight * 0.6f) m_BottomPanelHeight = totalHeight * 0.6f;
+            if (m_BottomPanelHeight > remainingHeight * 0.6f) m_BottomPanelHeight = remainingHeight * 0.6f;
 
-            editorHeight = totalHeight - m_BottomPanelHeight - splitterThickness;
+            editorHeight = remainingHeight - m_BottomPanelHeight - splitterThickness;
             if (editorHeight < 200.0f) editorHeight = 200.0f;
-            bottomHeight = totalHeight - editorHeight - splitterThickness;
+            bottomHeight = remainingHeight - editorHeight - splitterThickness;
 
             Splitter("##VerticalSplitter", false, splitterThickness, &editorHeight, &bottomHeight, 200.0f, 100.0f, rightWidth);
 
@@ -1827,12 +1909,14 @@ void BlueprintEditor::OnFrame(float deltaTime)
     ed::Resume();
 
     ed::Suspend();
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
+    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 6.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 6));
     if (ImGui::BeginPopup("Node Context Menu"))
     {
         auto node = FindNode(contextNodeId);
 
-        ImGui::TextUnformatted("Node Context Menu");
+        ImGui::TextColored(ImVec4(0.55f, 0.75f, 1.00f, 1.00f), "Node Context Menu");
         ImGui::Separator();
         if (node)
         {
@@ -1942,7 +2026,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
     {
         auto pin = FindPin(contextPinId);
 
-        ImGui::TextUnformatted("Pin Context Menu");
+        ImGui::TextColored(ImVec4(0.55f, 0.75f, 1.00f, 1.00f), "Pin Context Menu");
         ImGui::Separator();
         if (pin)
         {
@@ -1993,7 +2077,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
     {
         auto link = FindLink(contextLinkId);
 
-        ImGui::TextUnformatted("Link Context Menu");
+        ImGui::TextColored(ImVec4(0.55f, 0.75f, 1.00f, 1.00f), "Link Context Menu");
         ImGui::Separator();
         if (link)
         {
@@ -2059,7 +2143,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
     }
     else
         createNewNode = false;
-    ImGui::PopStyleVar();
+    ImGui::PopStyleVar(3);
     ed::Resume();
 # endif
 
@@ -2264,6 +2348,63 @@ void BlueprintEditor::OnFrame(float deltaTime)
     DrawSearchOverlay();
 
     // ================================================================
+    // 编辑器区域底部状态栏（覆盖在编辑器之上）
+    // ================================================================
+    if (ActiveDoc() && editorMax.x > editorMin.x)
+    {
+        auto* dl = ImGui::GetWindowDrawList();
+        float barH = 22.0f;
+        ImVec2 barMin(editorMin.x, editorMax.y - barH);
+        ImVec2 barMax(editorMax.x, editorMax.y);
+
+        // 渐变半透明背景
+        ImU32 barColTop    = IM_COL32(22, 24, 32, 210);
+        ImU32 barColBottom = IM_COL32(18, 20, 26, 230);
+        dl->AddRectFilledMultiColor(barMin, barMax, barColTop, barColTop, barColBottom, barColBottom);
+        // 顶部高光分割线
+        dl->AddLine(barMin, ImVec2(barMax.x, barMin.y), IM_COL32(60, 75, 100, 140));
+
+        float textY = barMin.y + 4.0f;
+        float x = barMin.x + 12.0f;
+
+        // 节点数
+        char buf[256];
+        snprintf(buf, sizeof(buf), "Nodes: %d", static_cast<int>(m_Nodes.size()));
+        dl->AddText(ImVec2(x, textY), IM_COL32(135, 160, 200, 210), buf);
+        x += ImGui::CalcTextSize(buf).x + 8.0f;
+
+        // 竖线分隔符
+        dl->AddLine(ImVec2(x, barMin.y + 4.0f), ImVec2(x, barMax.y - 4.0f), IM_COL32(60, 70, 90, 120));
+        x += 8.0f;
+
+        // 链接数
+        snprintf(buf, sizeof(buf), "Links: %d", static_cast<int>(m_Links.size()));
+        dl->AddText(ImVec2(x, textY), IM_COL32(135, 160, 200, 210), buf);
+        x += ImGui::CalcTextSize(buf).x + 8.0f;
+
+        // 选中数
+        int selCount = ed::GetSelectedObjectCount();
+        if (selCount > 0)
+        {
+            dl->AddLine(ImVec2(x, barMin.y + 4.0f), ImVec2(x, barMax.y - 4.0f), IM_COL32(60, 70, 90, 120));
+            x += 8.0f;
+            snprintf(buf, sizeof(buf), "Selected: %d", selCount);
+            dl->AddText(ImVec2(x, textY), IM_COL32(200, 210, 130, 230), buf);
+            x += ImGui::CalcTextSize(buf).x + 8.0f;
+        }
+
+        // 右侧：文件名
+        if (!m_CurrentFilePath.empty())
+        {
+            size_t lastSlash = m_CurrentFilePath.find_last_of("/\\");
+            std::string fileName = (lastSlash != std::string::npos) ? m_CurrentFilePath.substr(lastSlash + 1) : m_CurrentFilePath;
+            if (m_IsDirty) fileName += " \xe2\x80\xa2";  // bullet instead of *
+            float textW = ImGui::CalcTextSize(fileName.c_str()).x;
+            dl->AddText(ImVec2(barMax.x - textW - 12.0f, textY), IM_COL32(120, 145, 180, 190), fileName.c_str());
+        }
+    }
+
+    // ================================================================
     // 未保存修改确认对话框
     // ================================================================
     ShowUnsavedChangesDialog();
@@ -2360,7 +2501,36 @@ void BlueprintEditor::DrawNodeListPanel()
     auto& io = ImGui::GetIO();
     float paneWidth = ImGui::GetContentRegionAvail().x;
 
-    // 工具栏按钮
+    // 面板标题
+    {
+        auto* drawList = ImGui::GetWindowDrawList();
+        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+        float headerH = ImGui::GetTextLineHeight() + 8.0f;
+
+        // 渐变标题栏
+        ImU32 colTop    = IM_COL32(38, 52, 75, 230);
+        ImU32 colBottom = IM_COL32(28, 38, 55, 200);
+        drawList->AddRectFilledMultiColor(
+            cursorPos,
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + headerH),
+            colTop, colTop, colBottom, colBottom);
+        // 底部高光线
+        drawList->AddLine(
+            ImVec2(cursorPos.x, cursorPos.y + headerH - 1.0f),
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + headerH - 1.0f),
+            IM_COL32(75, 140, 190, 80));
+        drawList->AddText(
+            ImVec2(cursorPos.x + 10.0f, cursorPos.y + 4.0f),
+            IM_COL32(160, 195, 240, 240), "\xef\x80\x8d");  // icon placeholder
+        drawList->AddText(
+            ImVec2(cursorPos.x + 26.0f, cursorPos.y + 4.0f),
+            IM_COL32(175, 200, 235, 240), "Inspector");
+        ImGui::Dummy(ImVec2(paneWidth, headerH));
+    }
+
+    ImGui::Spacing();
+
+    // 工具栏按钮（紧凑行）
     static bool showStyleEditor = false;
     ImGui::BeginHorizontal("Style Editor", ImVec2(paneWidth, 0));
     ImGui::Spring(0.0f, 0.0f);
@@ -2380,6 +2550,17 @@ void BlueprintEditor::DrawNodeListPanel()
 
     if (showStyleEditor)
         ShowStyleEditor(&showStyleEditor);
+
+    // 节点过滤器
+    static char nodeFilterBuf[128] = {};
+    ImGui::SetNextItemWidth(paneWidth);
+    ImGui::InputTextWithHint("##NodeFilter", "Filter nodes...", nodeFilterBuf, sizeof(nodeFilterBuf));
+
+    std::string nodeFilter(nodeFilterBuf);
+    // 转小写
+    std::string lowerFilter = nodeFilter;
+    for (auto& c : lowerFilter)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
     // 选中节点信息
     std::vector<ed::NodeId> selectedNodes;
@@ -2403,16 +2584,35 @@ void BlueprintEditor::DrawNodeListPanel()
     if (restoreIconWidth <= 0) restoreIconWidth = 24;
     if (restoreIconHeight <= 0) restoreIconHeight = 24;
 
-    // 节点列表
-    ImGui::GetWindowDrawList()->AddRectFilled(
-        ImGui::GetCursorScreenPos(),
-        ImGui::GetCursorScreenPos() + ImVec2(paneWidth, ImGui::GetTextLineHeight()),
-        ImColor(ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]), ImGui::GetTextLineHeight() * 0.25f);
-    ImGui::Spacing(); ImGui::SameLine();
-    ImGui::TextUnformatted("Nodes");
+    // 节点列表（带美化标题）
+    {
+        auto* drawList = ImGui::GetWindowDrawList();
+        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+        float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+        ImU32 colL = IM_COL32(35, 48, 68, 210);
+        ImU32 colR = IM_COL32(28, 36, 52, 180);
+        drawList->AddRectFilledMultiColor(
+            cursorPos,
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+            colL, colR, colR, colL);
+        drawList->AddText(
+            ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
+            IM_COL32(160, 195, 240, 230),
+            nodeFilter.empty() ? "Nodes" : "Nodes (filtered)");
+        ImGui::Dummy(ImVec2(paneWidth, sectionH));
+    }
     ImGui::Indent();
     for (auto& node : m_Nodes)
     {
+        // 过滤：如果有过滤文字，跳过不匹配的节点
+        if (!lowerFilter.empty())
+        {
+            std::string lowerName = node.Name;
+            for (auto& c : lowerName)
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            if (lowerName.find(lowerFilter) == std::string::npos)
+                continue;
+        }
         ImGui::PushID(node.ID.AsPointer());
         auto start = ImGui::GetCursorScreenPos();
 
@@ -2520,12 +2720,21 @@ void BlueprintEditor::DrawNodeListPanel()
     // 选择信息
     static int changeCount = 0;
 
-    ImGui::GetWindowDrawList()->AddRectFilled(
-        ImGui::GetCursorScreenPos(),
-        ImGui::GetCursorScreenPos() + ImVec2(paneWidth, ImGui::GetTextLineHeight()),
-        ImColor(ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]), ImGui::GetTextLineHeight() * 0.25f);
-    ImGui::Spacing(); ImGui::SameLine();
-    ImGui::TextUnformatted("Selection");
+    {
+        auto* drawList = ImGui::GetWindowDrawList();
+        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+        float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+        ImU32 colL = IM_COL32(35, 48, 68, 210);
+        ImU32 colR = IM_COL32(28, 36, 52, 180);
+        drawList->AddRectFilledMultiColor(
+            cursorPos,
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+            colL, colR, colR, colL);
+        drawList->AddText(
+            ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
+            IM_COL32(160, 195, 240, 230), "Selection");
+        ImGui::Dummy(ImVec2(paneWidth, sectionH));
+    }
 
     ImGui::BeginHorizontal("Selection Stats", ImVec2(paneWidth, 0));
     ImGui::Text("Changed %d time%s", changeCount, changeCount > 1 ? "s" : "");
@@ -2554,12 +2763,49 @@ void BlueprintEditor::DrawExecutionPanel()
 {
     float paneWidth = ImGui::GetContentRegionAvail().x;
 
-    // 执行按钮栏
+    // 面板标题
+    {
+        auto* drawList = ImGui::GetWindowDrawList();
+        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+        float headerH = ImGui::GetTextLineHeight() + 8.0f;
+
+        // 渐变标题栏
+        ImU32 colTop    = IM_COL32(32, 50, 78, 230);
+        ImU32 colBottom = IM_COL32(24, 36, 56, 200);
+        drawList->AddRectFilledMultiColor(
+            cursorPos,
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + headerH),
+            colTop, colTop, colBottom, colBottom);
+        // 底部 accent 高光线
+        drawList->AddLine(
+            ImVec2(cursorPos.x, cursorPos.y + headerH - 1.0f),
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + headerH - 1.0f),
+            IM_COL32(75, 140, 190, 80));
+        drawList->AddText(
+            ImVec2(cursorPos.x + 10.0f, cursorPos.y + 4.0f),
+            IM_COL32(160, 195, 240, 240), "\xef\x84\xa0");  // icon placeholder
+        drawList->AddText(
+            ImVec2(cursorPos.x + 26.0f, cursorPos.y + 4.0f),
+            IM_COL32(175, 210, 250, 245), "Output");
+        ImGui::Dummy(ImVec2(paneWidth, headerH));
+    }
+
+    ImGui::Spacing();
+
+    // 执行按钮栏（带样式增强）
     ImGui::BeginHorizontal("ExecButtons", ImVec2(paneWidth, 0));
-    if (ImGui::Button("Execute", ImVec2(80, 0)))
+
+    // Execute 按钮（绿色强调 + 更圆润）
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.48f, 0.28f, 1.00f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.60f, 0.35f, 1.00f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.28f, 0.70f, 0.40f, 1.00f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+    if (ImGui::Button("\xe2\x96\xb6 Execute", ImVec2(90, 0)))
     {
         ExecuteBlueprint();
     }
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor(3);
     ImGui::Spring(0.0f);
     if (ImGui::Button("Copy Log", ImVec2(80, 0)))
     {
@@ -2593,26 +2839,26 @@ void BlueprintEditor::DrawExecutionPanel()
             "Status: %s", m_LastExecutionStatus.c_str());
     }
 
-    // 日志输出区域
+    // 彩色日志输出区域
     float logHeight = ImGui::GetContentRegionAvail().y;
     if (logHeight < 60.0f) logHeight = 60.0f;
 
+    ImGui::BeginChild("##ExecutionLog", ImVec2(paneWidth, logHeight), true,
+        ImGuiWindowFlags_HorizontalScrollbar);
+
+    for (const auto& line : m_ExecutionLog)
+    {
+        DrawColoredLogLine(line);
+    }
+
+    // 自动滚动到底部（新日志时）
     if (m_ExecutionLogDirty)
     {
-        m_ExecutionLogText.clear();
-        for (const auto& line : m_ExecutionLog)
-        {
-            m_ExecutionLogText += line;
-            m_ExecutionLogText += '\n';
-        }
+        ImGui::SetScrollHereY(1.0f);
         m_ExecutionLogDirty = false;
     }
 
-    ImGui::InputTextMultiline("##ExecutionLog",
-        const_cast<char*>(m_ExecutionLogText.c_str()),
-        m_ExecutionLogText.size() + 1,
-        ImVec2(paneWidth, logHeight),
-        ImGuiInputTextFlags_ReadOnly);
+    ImGui::EndChild();
 }
 
 // ============================================================================

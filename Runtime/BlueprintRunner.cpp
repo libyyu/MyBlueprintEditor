@@ -26,6 +26,9 @@ bool BlueprintRunner::Load(const BlueprintData& data)
     m_loaded = true;
     m_topoCacheDirty = true;
 
+    // 预建哈希索引，加速后续查找
+    m_blueprint.rebuildIndices();
+
     // 关联 context 和 runner
     m_context.m_runner = this;
 
@@ -118,21 +121,14 @@ bool BlueprintRunner::buildTopologicalOrder(std::vector<NodeId>& order) const
     if (m_blueprint.nodes.empty())
         return true;
 
-    // 建立 nodeId -> index 映射
+    // 确保 BlueprintData 索引已建好
+    m_blueprint.ensureIndices();
+
+    // 建立 nodeId -> index 映射（使用已有索引）
     std::unordered_map<NodeId, size_t> idToIndex;
     for (size_t i = 0; i < m_blueprint.nodes.size(); ++i)
     {
         idToIndex[m_blueprint.nodes[i].id] = i;
-    }
-
-    // 建立 pinId -> 所属节点 index 映射
-    std::unordered_map<PinId, size_t> pinToNodeIndex;
-    for (size_t i = 0; i < m_blueprint.nodes.size(); ++i)
-    {
-        for (const auto& pin : m_blueprint.nodes[i].pins)
-        {
-            pinToNodeIndex[pin.id] = i;
-        }
     }
 
     size_t n = m_blueprint.nodes.size();
@@ -145,9 +141,10 @@ bool BlueprintRunner::buildTopologicalOrder(std::vector<NodeId>& order) const
     {
         if (!link.isEnabled) continue;
 
-        auto itStart = pinToNodeIndex.find(link.startPinId);
-        auto itEnd = pinToNodeIndex.find(link.endPinId);
-        if (itStart == pinToNodeIndex.end() || itEnd == pinToNodeIndex.end())
+        const auto& pinNodeIndex = m_blueprint.getPinToNodeIndex();
+        auto itStart = pinNodeIndex.find(link.startPinId);
+        auto itEnd = pinNodeIndex.find(link.endPinId);
+        if (itStart == pinNodeIndex.end() || itEnd == pinNodeIndex.end())
             continue;
 
         size_t from = itStart->second;
@@ -228,6 +225,8 @@ void BlueprintRunner::prepareNodeContext(const NodeInstance& node)
 void BlueprintRunner::propagatePinValues(const NodeInstance& node)
 {
     // 将该节点的输出引脚值通过链接传播到下游节点的输入引脚
+    m_blueprint.ensureIndices();
+
     for (const auto& pin : node.pins)
     {
         if (pin.kind != PinKind::Output) continue;
@@ -239,15 +238,11 @@ void BlueprintRunner::propagatePinValues(const NodeInstance& node)
         // 导致 valueIt 迭代器失效。
         Variant value = valueIt->second;
 
-        // 查找从此输出引脚出发的所有链接
-        for (const auto& link : m_blueprint.links)
+        // 使用索引快速查找从此输出引脚出发的所有链接
+        auto downstreamPins = m_blueprint.getDownstreamPinIds(pin.id);
+        for (PinId endPinId : downstreamPins)
         {
-            if (!link.isEnabled) continue;
-            if (link.startPinId == pin.id)
-            {
-                // 将值传播到目标输入引脚
-                m_context.m_pinValues[link.endPinId] = value;
-            }
+            m_context.m_pinValues[endPinId] = value;
         }
     }
 }
@@ -590,150 +585,75 @@ bool ExecutionContext::FireConnectedNode(PinId inputPinId)
     return false;
 }
 
+// ============================================================================
+// Timer context 辅助：保存/恢复 context 状态的 RAII guard + 统一包装
+// ============================================================================
+
+// 内部辅助：将用户回调包装为带 context save/restore 的 TimerCallback
+// timer 回调在未来帧触发时 m_currentNode / m_pinNameToId / m_currentNodeData
+// 已被其他节点覆盖，需要先恢复再调用用户回调
+TimerCallback ExecutionContext::wrapCallbackWithContextRestore(TimerCallback callback)
+{
+    auto savedNode        = m_currentNode;
+    auto savedPinNameToId = m_pinNameToId;
+    auto savedNodeData    = m_currentNodeData;
+
+    return [this, callback = std::move(callback), savedNode, savedPinNameToId, savedNodeData]() -> bool
+    {
+        // 保存当前状态
+        auto prevNode        = m_currentNode;
+        auto prevPinNameToId = m_pinNameToId;
+        auto prevNodeData    = m_currentNodeData;
+
+        // 恢复注册时的状态
+        m_currentNode     = savedNode;
+        m_pinNameToId     = savedPinNameToId;
+        m_currentNodeData = savedNodeData;
+
+        const bool ret = callback();
+
+        // 恢复调用前的状态
+        m_currentNode     = prevNode;
+        m_pinNameToId     = prevPinNameToId;
+        m_currentNodeData = prevNodeData;
+
+        return ret;
+    };
+}
+
 TimerHandle ExecutionContext::Delay(float seconds, const std::function<void()>& callback)
 {
-    if (m_runner)
-    {
-        // 保存当前节点的 context 状态，因为 timer 回调在未来帧触发时
-        // m_currentNode / m_pinNameToId / m_currentNodeData 已被其他节点覆盖
-        auto savedNode = m_currentNode;
-        auto savedPinNameToId = m_pinNameToId;
-        auto savedNodeData = m_currentNodeData;
+    if (!m_runner) return InvalidTimerHandle;
 
-        return m_runner->GetTimerManager().SetTimer(seconds, [this, callback, savedNode, savedPinNameToId, savedNodeData]()->bool 
-        {
-            // 恢复 Delay 节点的 context 状态
-            auto* mutableThis = this;
-            auto prevNode = mutableThis->m_currentNode;
-            auto prevPinNameToId = mutableThis->m_pinNameToId;
-            auto prevNodeData = mutableThis->m_currentNodeData;
-
-            mutableThis->m_currentNode = savedNode;
-            mutableThis->m_pinNameToId = savedPinNameToId;
-            mutableThis->m_currentNodeData = savedNodeData;
-
-            callback();
-
-            // 恢复之前的状态
-            mutableThis->m_currentNode = prevNode;
-            mutableThis->m_pinNameToId = prevPinNameToId;
-            mutableThis->m_currentNodeData = prevNodeData;
-
-            return false;
-        });
-    }
-
-    return  InvalidTimerHandle;
+    // 将 void callback 包装为 TimerCallback（返回 false 表示不重复）
+    return m_runner->GetTimerManager().SetTimer(seconds,
+        wrapCallbackWithContextRestore([callback]() -> bool { callback(); return false; }));
 }
 
 TimerHandle ExecutionContext::SetTimer(float seconds, TimerCallback callback)
 {
-    if (m_runner)
-    {
-        // 保存当前节点的 context 状态，因为 timer 回调在未来帧触发时
-        // m_currentNode / m_pinNameToId / m_currentNodeData 已被其他节点覆盖
-        auto savedNode = m_currentNode;
-        auto savedPinNameToId = m_pinNameToId;
-        auto savedNodeData = m_currentNodeData;
+    if (!m_runner) return InvalidTimerHandle;
 
-        return m_runner->GetTimerManager().SetTimer(seconds, [this, callback, savedNode, savedPinNameToId, savedNodeData]()->bool 
-        {
-            // 恢复 Delay 节点的 context 状态
-            auto* mutableThis = this;
-            auto prevNode = mutableThis->m_currentNode;
-            auto prevPinNameToId = mutableThis->m_pinNameToId;
-            auto prevNodeData = mutableThis->m_currentNodeData;
-
-            mutableThis->m_currentNode = savedNode;
-            mutableThis->m_pinNameToId = savedPinNameToId;
-            mutableThis->m_currentNodeData = savedNodeData;
-
-            const bool ret = callback();
-
-            // 恢复之前的状态
-            mutableThis->m_currentNode = prevNode;
-            mutableThis->m_pinNameToId = prevPinNameToId;
-            mutableThis->m_currentNodeData = prevNodeData;
-
-            return ret;
-        });
-    }
-
-    return  InvalidTimerHandle;
+    return m_runner->GetTimerManager().SetTimer(seconds,
+        wrapCallbackWithContextRestore(std::move(callback)));
 }
 
 // 完整版：指定间隔、重复次数（-1=无限循环）
 TimerHandle ExecutionContext::SetTimer(float seconds, int repeatCount, TimerCallback callback)
 {
-    if (m_runner)
-    {
-        // 保存当前节点的 context 状态，因为 timer 回调在未来帧触发时
-        // m_currentNode / m_pinNameToId / m_currentNodeData 已被其他节点覆盖
-        auto savedNode = m_currentNode;
-        auto savedPinNameToId = m_pinNameToId;
-        auto savedNodeData = m_currentNodeData;
+    if (!m_runner) return InvalidTimerHandle;
 
-        return m_runner->GetTimerManager().SetTimer(seconds, repeatCount, [this, callback, savedNode, savedPinNameToId, savedNodeData]()->bool 
-        {
-            // 恢复 Delay 节点的 context 状态
-            auto* mutableThis = this;
-            auto prevNode = mutableThis->m_currentNode;
-            auto prevPinNameToId = mutableThis->m_pinNameToId;
-            auto prevNodeData = mutableThis->m_currentNodeData;
-
-            mutableThis->m_currentNode = savedNode;
-            mutableThis->m_pinNameToId = savedPinNameToId;
-            mutableThis->m_currentNodeData = savedNodeData;
-
-            const bool ret = callback();
-
-            // 恢复之前的状态
-            mutableThis->m_currentNode = prevNode;
-            mutableThis->m_pinNameToId = prevPinNameToId;
-            mutableThis->m_currentNodeData = prevNodeData;
-
-            return ret;
-        });
-    }
-
-    return  InvalidTimerHandle;
+    return m_runner->GetTimerManager().SetTimer(seconds, repeatCount,
+        wrapCallbackWithContextRestore(std::move(callback)));
 }
 
 // 带名称版：可通过名称查找/取消
 TimerHandle ExecutionContext::SetTimerByName(const std::string& name, float seconds, int repeatCount, TimerCallback callback)
 {
-    if (m_runner)
-    {
-        // 保存当前节点的 context 状态，因为 timer 回调在未来帧触发时
-        // m_currentNode / m_pinNameToId / m_currentNodeData 已被其他节点覆盖
-        auto savedNode = m_currentNode;
-        auto savedPinNameToId = m_pinNameToId;
-        auto savedNodeData = m_currentNodeData;
+    if (!m_runner) return InvalidTimerHandle;
 
-        return m_runner->GetTimerManager().SetTimerByName(name, seconds, repeatCount, [this, callback, savedNode, savedPinNameToId, savedNodeData]()->bool 
-        {
-            // 恢复 Delay 节点的 context 状态
-            auto* mutableThis = this;
-            auto prevNode = mutableThis->m_currentNode;
-            auto prevPinNameToId = mutableThis->m_pinNameToId;
-            auto prevNodeData = mutableThis->m_currentNodeData;
-
-            mutableThis->m_currentNode = savedNode;
-            mutableThis->m_pinNameToId = savedPinNameToId;
-            mutableThis->m_currentNodeData = savedNodeData;
-
-            const bool ret = callback();
-
-            // 恢复之前的状态
-            mutableThis->m_currentNode = prevNode;
-            mutableThis->m_pinNameToId = prevPinNameToId;
-            mutableThis->m_currentNodeData = prevNodeData;
-
-            return ret;
-        });
-    }
-
-    return  InvalidTimerHandle;
+    return m_runner->GetTimerManager().SetTimerByName(name, seconds, repeatCount,
+        wrapCallbackWithContextRestore(std::move(callback)));
 }
 
 
@@ -769,17 +689,14 @@ void ExecutionContext::MarkDownstreamAsHandled(PinId pinId)
 {
     if (!m_runner) return;
 
-    // 找到通过该输出引脚连接的所有直接下游节点
+    // 找到通过该输出引脚连接的所有直接下游节点（使用索引加速）
     std::vector<NodeId> directTargets;
-    for (const auto& link : m_runner->m_blueprint.links)
+    auto downstreamPins = m_runner->m_blueprint.getDownstreamPinIds(pinId);
+    for (PinId endPinId : downstreamPins)
     {
-        if (!link.isEnabled) continue;
-        if (link.startPinId == pinId)
-        {
-            const NodeInstance* targetNode = m_runner->m_blueprint.findNodeByPin(link.endPinId);
-            if (targetNode)
-                directTargets.push_back(targetNode->id);
-        }
+        const NodeInstance* targetNode = m_runner->m_blueprint.findNodeByPin(endPinId);
+        if (targetNode)
+            directTargets.push_back(targetNode->id);
     }
 
     // 标记直接目标及其所有下游为已执行
@@ -828,22 +745,20 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
             hasOutputPinValue = true;
         }
     }
-    for (const auto& link : m_blueprint.links)
+    m_blueprint.ensureIndices();
+    auto downstreamEndPins = m_blueprint.getDownstreamPinIds(outputPinId);
+    for (PinId endPinId : downstreamEndPins)
     {
-        if (!link.isEnabled) continue;
-        if (link.startPinId == outputPinId)
-        {
-            // 传播当前引脚值到目标输入引脚
-            if (hasOutputPinValue)
-                m_context.m_pinValues[link.endPinId] = outputPinValue;
+        // 传播当前引脚值到目标输入引脚
+        if (hasOutputPinValue)
+            m_context.m_pinValues[endPinId] = outputPinValue;
 
-            const NodeInstance* targetNode = m_blueprint.findNodeByPin(link.endPinId);
-            if (targetNode)
-            {
-                directTargets.push_back(targetNode->id);
-                // 记录该目标节点是通过哪个输入引脚被激活的
-                nodeToActivatedInputPin[targetNode->id] = link.endPinId;
-            }
+        const NodeInstance* targetNode = m_blueprint.findNodeByPin(endPinId);
+        if (targetNode)
+        {
+            directTargets.push_back(targetNode->id);
+            // 记录该目标节点是通过哪个输入引脚被激活的
+            nodeToActivatedInputPin[targetNode->id] = endPinId;
         }
     }
 
@@ -1003,14 +918,15 @@ bool BlueprintRunner::FireConnectedNode(PinId inputPinId)
 {
     if (!m_loaded || inputPinId == InvalidPinId) return false;
 
-    // 找到连接到该输入引脚的链接（startPin -> inputPinId）
-    for (const auto& link : m_blueprint.links)
+    // 使用索引查找连接到该输入引脚的链接（O(k) 而非 O(L)）
+    auto connectedLinks = m_blueprint.findLinksByPin(inputPinId);
+    for (const auto* link : connectedLinks)
     {
-        if (!link.isEnabled) continue;
-        if (link.endPinId != inputPinId) continue;
+        if (!link->isEnabled) continue;
+        if (link->endPinId != inputPinId) continue;
 
         // 找到源节点（连接到该输入引脚的输出端节点）
-        const NodeInstance* sourceNode = m_blueprint.findNodeByPin(link.startPinId);
+        const NodeInstance* sourceNode = m_blueprint.findNodeByPin(link->startPinId);
         if (!sourceNode) continue;
 
         if (m_logCallback)

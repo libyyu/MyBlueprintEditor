@@ -205,25 +205,24 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
             "Status: %s", m_LastExecutionStatus.c_str());
     }
 
-    // 日志输出区域（只读，可选词拷贝）
+    // 彩色日志输出区域
     float logHeight = ImGui::GetContentRegionAvail().y;
     if (logHeight < 60.0f) logHeight = 60.0f;
 
-    // 日志变化时重建合并文本
+    ImGui::BeginChild("##ExecutionLog", ImVec2(paneWidth, logHeight), true,
+        ImGuiWindowFlags_HorizontalScrollbar);
+
+    for (const auto& line : m_ExecutionLog)
+    {
+        DrawColoredLogLine(line);
+    }
+
+    // 自动滚动到底部
     if (m_ExecutionLogDirty)
     {
-        m_ExecutionLogText.clear();
-        for (const auto& line : m_ExecutionLog)
-        {
-            m_ExecutionLogText += line;
-            m_ExecutionLogText += '\n';
-        }
+        ImGui::SetScrollHereY(1.0f);
         m_ExecutionLogDirty = false;
     }
 
-    ImGui::InputTextMultiline("##ExecutionLog",
-        const_cast<char*>(m_ExecutionLogText.c_str()),
-        m_ExecutionLogText.size() + 1,
-        ImVec2(paneWidth, logHeight),
-        ImGuiInputTextFlags_ReadOnly);
+    ImGui::EndChild();
 }

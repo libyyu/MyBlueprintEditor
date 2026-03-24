@@ -70,9 +70,16 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
         );
     };
 
-    // 绘制背景
-    drawList->AddRectFilled(mapMin, mapMax, IM_COL32(20, 20, 25, 200), 4.0f);
-    drawList->AddRect(mapMin, mapMax, IM_COL32(80, 80, 90, 200), 4.0f);
+    // 绘制背景（柔和的暗色渐变 + 精致边框）
+    ImU32 bgTop    = IM_COL32(16, 18, 26, 215);
+    ImU32 bgBottom = IM_COL32(12, 14, 20, 230);
+    drawList->AddRectFilledMultiColor(mapMin, mapMax, bgTop, bgTop, bgBottom, bgBottom);
+    drawList->AddRect(mapMin, mapMax, IM_COL32(55, 70, 100, 140), 6.0f);
+    // 内侧微光
+    drawList->AddRect(
+        ImVec2(mapMin.x + 1, mapMin.y + 1),
+        ImVec2(mapMax.x - 1, mapMax.y - 1),
+        IM_COL32(80, 100, 140, 30), 5.0f);
 
     // 收集选中节点
     int selCount = ed::GetSelectedObjectCount();
@@ -100,7 +107,7 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
         ImVec2 p1 = canvasToMap(startPos.x + startSize.x * 0.5f, startPos.y + startSize.y * 0.5f);
         ImVec2 p2 = canvasToMap(endPos.x + endSize.x * 0.5f, endPos.y + endSize.y * 0.5f);
 
-        drawList->AddLine(p1, p2, IM_COL32(100, 100, 120, 80), 1.0f);
+        drawList->AddLine(p1, p2, IM_COL32(80, 100, 140, 60), 1.0f);
     }
 
     // 绘制节点矩形
@@ -142,7 +149,7 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
             if (selId == node.ID) { isSelected = true; break; }
         }
         if (isSelected)
-            drawList->AddRect(rectMin, rectMax, IM_COL32(255, 200, 50, 220), 1.0f, 0, 1.5f);
+            drawList->AddRect(rectMin, rectMax, IM_COL32(100, 170, 255, 220), 1.0f, 0, 1.5f);
     }
 
     // 绘制当前视口矩形（表示屏幕上可见的画布区域）
@@ -159,24 +166,43 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
     if (viewBR_map.x > mapMax.x) viewBR_map.x = mapMax.x;
     if (viewBR_map.y > mapMax.y) viewBR_map.y = mapMax.y;
 
-    drawList->AddRectFilled(viewTL_map, viewBR_map, IM_COL32(255, 255, 255, 20));
-    drawList->AddRect(viewTL_map, viewBR_map, IM_COL32(255, 255, 255, 120), 0.0f, 0, 1.5f);
+    drawList->AddRectFilled(viewTL_map, viewBR_map, IM_COL32(75, 140, 190, 22));
+    drawList->AddRect(viewTL_map, viewBR_map, IM_COL32(90, 155, 220, 150), 0.0f, 0, 1.5f);
 
-    // 小地图标题
-    drawList->AddText(ImVec2(mapMin.x + 4, mapMin.y + 2),
-                      IM_COL32(160, 160, 180, 180), "Minimap");
+    // 小地图标题（渐变底色条）
+    float titleH = 16.0f;
+    ImU32 titleColL = IM_COL32(32, 48, 72, 200);
+    ImU32 titleColR = IM_COL32(24, 34, 52, 180);
+    drawList->AddRectFilledMultiColor(
+        mapMin, ImVec2(mapMax.x, mapMin.y + titleH),
+        titleColL, titleColR, titleColR, titleColL);
+    drawList->AddText(ImVec2(mapMin.x + 6, mapMin.y + 1),
+                      IM_COL32(155, 190, 230, 220), "Minimap");
 
-    // 点击小地图导航到对应画布位置
+    // 点击/拖拽小地图导航到对应画布位置
     ImVec2 mousePos = ImGui::GetMousePos();
-    if (mousePos.x >= mapMin.x && mousePos.x <= mapMax.x &&
-        mousePos.y >= mapMin.y && mousePos.y <= mapMax.y)
+    bool mouseInMinimap = (mousePos.x >= mapMin.x && mousePos.x <= mapMax.x &&
+                           mousePos.y >= mapMin.y && mousePos.y <= mapMax.y);
+    if (mouseInMinimap)
     {
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        // 点击或拖拽时：将画布视口中心移动到鼠标对应的画布位置
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) ||
+            (ImGui::IsMouseDown(ImGuiMouseButton_Left) && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 1.0f)))
         {
-            // 屏幕坐标 -> 画布坐标
+            // 小地图屏幕坐标 -> 画布坐标
             float cx = canvasMinX + (mousePos.x - offsetX) / scale;
             float cy = canvasMinY + (mousePos.y - offsetY) / scale;
-            ed::NavigateToContent();  // 简单实现：点击时居中到所有内容
+
+            // 计算当前视口在画布中的半尺寸，用于构建以点击位置为中心的视口矩形
+            float viewHalfW = (viewBR_canvas.x - viewTL_canvas.x) * 0.5f;
+            float viewHalfH = (viewBR_canvas.y - viewTL_canvas.y) * 0.5f;
+
+            ImVec2 navMin(cx - viewHalfW, cy - viewHalfH);
+            ImVec2 navMax(cx + viewHalfW, cy + viewHalfH);
+            ed::NavigateToRect(navMin, navMax, false, 0.15f);
         }
+
+        // 鼠标悬停时改变光标样式提示可交互
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
     }
 }

@@ -47,24 +47,30 @@ void BlueprintEditor::UpdateTouch()
 }
 
 // ============================================================================
-// 查找
+// 查找（O(1) 哈希索引加速）
 // ============================================================================
 
 Node* BlueprintEditor::FindNode(ed::NodeId id)
 {
-    for (auto& node : m_Nodes)
-        if (node.ID == id)
-            return &node;
-
+    auto* doc = ActiveDoc();
+    if (!doc) return nullptr;
+    doc->ensureEditorIndices();
+    uint64_t nid = reinterpret_cast<uintptr_t>(id.AsPointer());
+    auto it = doc->nodeIdIndex.find(nid);
+    if (it != doc->nodeIdIndex.end() && it->second < doc->nodes.size())
+        return &doc->nodes[it->second];
     return nullptr;
 }
 
 Link* BlueprintEditor::FindLink(ed::LinkId id)
 {
-    for (auto& link : m_Links)
-        if (link.ID == id)
-            return &link;
-
+    auto* doc = ActiveDoc();
+    if (!doc) return nullptr;
+    doc->ensureEditorIndices();
+    uint64_t lid = reinterpret_cast<uintptr_t>(id.AsPointer());
+    auto it = doc->linkIdIndex.find(lid);
+    if (it != doc->linkIdIndex.end() && it->second < doc->links.size())
+        return &doc->links[it->second];
     return nullptr;
 }
 
@@ -72,31 +78,23 @@ Pin* BlueprintEditor::FindPin(ed::PinId id)
 {
     if (!id)
         return nullptr;
-
-    for (auto& node : m_Nodes)
-    {
-        for (auto& pin : node.Inputs)
-            if (pin.ID == id)
-                return &pin;
-
-        for (auto& pin : node.Outputs)
-            if (pin.ID == id)
-                return &pin;
-    }
-
-    return nullptr;
+    auto* doc = ActiveDoc();
+    if (!doc) return nullptr;
+    doc->ensureEditorIndices();
+    uint64_t pid = reinterpret_cast<uintptr_t>(id.AsPointer());
+    auto it = doc->pinIdIndex.find(pid);
+    return (it != doc->pinIdIndex.end()) ? it->second : nullptr;
 }
 
 bool BlueprintEditor::IsPinLinked(ed::PinId id)
 {
     if (!id)
         return false;
-
-    for (auto& link : m_Links)
-        if (link.StartPinID == id || link.EndPinID == id)
-            return true;
-
-    return false;
+    auto* doc = ActiveDoc();
+    if (!doc) return false;
+    doc->ensureEditorIndices();
+    uint64_t pid = reinterpret_cast<uintptr_t>(id.AsPointer());
+    return doc->pinLinkedCache.count(pid) > 0;
 }
 
 bool BlueprintEditor::CanCreateLink(Pin* a, Pin* b)
@@ -420,6 +418,54 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
     for (const auto& cat : categories)
         catIdToName[cat.id] = cat.name;
 
+    // ---- 搜索过滤框（置顶） ----
+    static char searchBuf[128] = "";
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    ImGui::InputTextWithHint("##search", "Search nodes...", searchBuf, sizeof(searchBuf));
+    std::string filter(searchBuf);
+
+    if (!filter.empty())
+    {
+        // 有搜索关键词时：只显示过滤后的平铺节点列表
+        ImGui::Separator();
+
+        std::string lower_filter = filter;
+        for (auto& c : lower_filter) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+        // 排序节点
+        std::sort(allDefs.begin(), allDefs.end(),
+            [](const RTNodeDef& a, const RTNodeDef& b) { return a.name < b.name; });
+
+        int shown = 0;
+        for (const auto& d : allDefs)
+        {
+            std::string lower_name = d.name;
+            for (auto& c : lower_name) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            if (lower_name.find(lower_filter) == std::string::npos)
+                continue;
+
+            // 显示节点名和分类标签
+            if (ImGui::MenuItem(d.name.c_str()))
+            {
+                result = SpawnNodeByDef(d.id);
+                if (result)
+                    FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d.id));
+                searchBuf[0] = '\0';  // 创建后清空搜索
+            }
+            if (!d.category.empty() && ImGui::IsItemHovered())
+                ImGui::SetTooltip("Category: %s", d.category.c_str());
+
+            ++shown;
+        }
+
+        if (shown == 0)
+            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "No matching nodes");
+
+        return result;
+    }
+
+    ImGui::Separator();
+
     // 递归渲染菜单的 lambda
     std::function<void(const CategoryMenuNode&)> renderMenu;
     renderMenu = [&](const CategoryMenuNode& menuNode)
@@ -457,7 +503,6 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
         auto it = rootChildren.find(rootId);
         if (it == rootChildren.end()) continue;
 
-        // 用显示名（如果已注册分类），否则用 id 本身
         auto nameIt = catIdToName.find(rootId);
         const char* displayName = (nameIt != catIdToName.end()) ? nameIt->second.c_str() : rootId.c_str();
 
@@ -465,36 +510,6 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
         {
             renderMenu(it->second);
             ImGui::EndMenu();
-        }
-    }
-
-    // Search filter — only show flat list when user has typed something
-    ImGui::Separator();
-    static char searchBuf[128] = "";
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-    ImGui::InputText("##search", searchBuf, sizeof(searchBuf));
-    std::string filter(searchBuf);
-
-    if (!filter.empty())
-    {
-        std::sort(allDefs.begin(), allDefs.end(),
-            [](const RTNodeDef& a, const RTNodeDef& b) { return a.name < b.name; });
-
-        for (const auto& d : allDefs)
-        {
-            // Simple case-insensitive substring match
-            std::string lower_name = d.name;
-            std::string lower_filter = filter;
-            for (auto& c : lower_name) c = (char)tolower(c);
-            for (auto& c : lower_filter) c = (char)tolower(c);
-            if (lower_name.find(lower_filter) == std::string::npos)
-                continue;
-            if (ImGui::MenuItem(d.name.c_str()))
-            {
-                result = SpawnNodeByDef(d.id);
-                if (result)
-                    FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d.id));
-            }
         }
     }
 

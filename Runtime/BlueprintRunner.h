@@ -166,6 +166,9 @@ public:
 private:
     friend class BlueprintRunner;
 
+    // 内部辅助：将用户回调包装为带 context save/restore 的 TimerCallback
+    TimerCallback wrapCallbackWithContextRestore(TimerCallback callback);
+
     // 所有引脚的当前值（输入和输出共用，通过链接传播）
     std::unordered_map<PinId, Variant>              m_pinValues;
 

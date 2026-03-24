@@ -82,7 +82,62 @@ static bool Splitter(const char* str_id, bool split_vertically, float thickness,
     ImRect bb;
     bb.Min = window->DC.CursorPos + (split_vertically ? ImVec2(*size1, 0.0f) : ImVec2(0.0f, *size1));
     bb.Max = bb.Min + CalcItemSize(split_vertically ? ImVec2(thickness, splitter_long_axis_size) : ImVec2(splitter_long_axis_size, thickness), 0.0f, 0.0f);
-    return SplitterBehavior(bb, id, split_vertically ? ImGuiAxis_X : ImGuiAxis_Y, size1, size2, min_size1, min_size2, 4.0f);
+    bool result = SplitterBehavior(bb, id, split_vertically ? ImGuiAxis_X : ImGuiAxis_Y, size1, size2, min_size1, min_size2, 4.0f);
+
+    // 视觉反馈：悬停/拖动时绘制强调色线条
+    bool hovered = g.HoveredId == id;
+    bool active  = g.ActiveId  == id;
+    if (hovered || active)
+    {
+        ImU32 lineCol = active  ? IM_COL32(75, 140, 190, 220)
+                                : IM_COL32(60, 110, 160, 140);
+        auto* dl = GetWindowDrawList();
+        if (split_vertically)
+        {
+            float cx = (bb.Min.x + bb.Max.x) * 0.5f;
+            dl->AddLine(ImVec2(cx, bb.Min.y), ImVec2(cx, bb.Max.y), lineCol, 2.0f);
+        }
+        else
+        {
+            float cy = (bb.Min.y + bb.Max.y) * 0.5f;
+            dl->AddLine(ImVec2(bb.Min.x, cy), ImVec2(bb.Max.x, cy), lineCol, 2.0f);
+        }
+    }
+    return result;
+}
+
+// 彩色日志行渲染辅助（共享于 DrawExecutionPanel 和 ShowExecutionPanel）
+static inline void DrawColoredLogLine(const std::string& line)
+{
+    static const ImVec4 colError   (0.95f, 0.32f, 0.32f, 1.00f);
+    static const ImVec4 colWarn    (0.95f, 0.72f, 0.28f, 1.00f);
+    static const ImVec4 colInfo    (0.38f, 0.68f, 0.95f, 1.00f);
+    static const ImVec4 colSuccess (0.35f, 0.88f, 0.42f, 1.00f);
+    static const ImVec4 colSeparator(0.45f, 0.48f, 0.56f, 0.70f);
+    static const ImVec4 colDim     (0.50f, 0.52f, 0.58f, 0.90f);
+    static const ImVec4 colDefault (0.82f, 0.84f, 0.90f, 1.00f);
+
+    const ImVec4* color = &colDefault;
+
+    if (line.find("[ERROR]") != std::string::npos)
+        color = &colError;
+    else if (line.find("[WARN]") != std::string::npos)
+        color = &colWarn;
+    else if (line.find("[INFO]") != std::string::npos || line.find("[Timer:") != std::string::npos)
+        color = &colInfo;
+    else if (line.find("Completed Successfully") != std::string::npos)
+        color = &colSuccess;
+    else if (line.find("FAILED") != std::string::npos || line.find("ABORTED") != std::string::npos)
+        color = &colError;
+    else if (line.find("========") != std::string::npos)
+        color = &colSeparator;
+    else if (line.find("Nodes:") == 0 || line.find("Links:") == 0 ||
+             line.find("Validation:") == 0 || line.find("Elapsed:") != std::string::npos)
+        color = &colDim;
+
+    ImGui::PushStyleColor(ImGuiCol_Text, *color);
+    ImGui::TextUnformatted(line.c_str());
+    ImGui::PopStyleColor();
 }
 
 // ============================================================================
@@ -134,6 +189,58 @@ struct BlueprintDocument
     bool       createNewNode      = false;
     Pin*       newNodeLinkPin     = nullptr;
     Pin*       newLinkPin         = nullptr;
+
+    // ---- 编辑器侧哈希索引（O(1) 查找加速） ----
+    // 调用 rebuildEditorIndices() 重建；数据变更后调用 invalidateEditorIndices()
+    mutable std::unordered_map<uint64_t, size_t> nodeIdIndex;    // NodeId → nodes[] 下标
+    mutable std::unordered_map<uint64_t, size_t> linkIdIndex;    // LinkId → links[] 下标
+    mutable std::unordered_map<uint64_t, Pin*>   pinIdIndex;     // PinId → Pin*
+    mutable std::unordered_map<uint64_t, bool>    pinLinkedCache; // PinId → 是否有链接
+    mutable bool editorIndexDirty = true;
+
+    void invalidateEditorIndices() const { editorIndexDirty = true; }
+
+    void rebuildEditorIndices() const
+    {
+        nodeIdIndex.clear();
+        linkIdIndex.clear();
+        pinIdIndex.clear();
+        pinLinkedCache.clear();
+
+        for (size_t i = 0; i < nodes.size(); ++i)
+        {
+            uint64_t nid = reinterpret_cast<uintptr_t>(nodes[i].ID.AsPointer());
+            nodeIdIndex[nid] = i;
+            for (auto& pin : const_cast<std::deque<Node>&>(nodes)[i].Inputs)
+            {
+                uint64_t pid = reinterpret_cast<uintptr_t>(pin.ID.AsPointer());
+                pinIdIndex[pid] = &pin;
+            }
+            for (auto& pin : const_cast<std::deque<Node>&>(nodes)[i].Outputs)
+            {
+                uint64_t pid = reinterpret_cast<uintptr_t>(pin.ID.AsPointer());
+                pinIdIndex[pid] = &pin;
+            }
+        }
+
+        for (size_t i = 0; i < links.size(); ++i)
+        {
+            uint64_t lid = reinterpret_cast<uintptr_t>(links[i].ID.AsPointer());
+            linkIdIndex[lid] = i;
+
+            uint64_t sid = reinterpret_cast<uintptr_t>(links[i].StartPinID.AsPointer());
+            uint64_t eid = reinterpret_cast<uintptr_t>(links[i].EndPinID.AsPointer());
+            pinLinkedCache[sid] = true;
+            pinLinkedCache[eid] = true;
+        }
+
+        editorIndexDirty = false;
+    }
+
+    void ensureEditorIndices() const
+    {
+        if (editorIndexDirty) rebuildEditorIndices();
+    }
 
     // 标签页显示名
     std::string GetTabName() const

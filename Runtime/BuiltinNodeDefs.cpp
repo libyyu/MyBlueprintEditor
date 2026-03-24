@@ -28,8 +28,25 @@ static PinDefinition MakeFlowPin(const char* name = "")
     return MakePin(name, PinDataType::Unknown, true);
 }
 
+// 统一的节点定义注册辅助函数（原先在 9 个 RegisterNodeDefs_* 函数中各自以 lambda 形式重复定义）
+static void RegisterNodeDef(INodeRegistry& registry,
+    const char* id, const char* name, const char* category,
+    std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
+    const char* color = "", const char* edType = "")
+{
+    NodeDefinition d;
+    d.id = id;
+    d.name = name;
+    d.category = category;
+    d.inputPins = std::move(inputs);
+    d.outputPins = std::move(outputs);
+    if (color[0]) d.color = color;
+    if (edType[0]) d.customProperties["editorType"] = edType;
+    registry.registerNode(d);
+}
+
 // ============================================================================
-// 注册辅助 lambda 类型
+// 各分类节点定义注册
 // ============================================================================
 
 static void RegisterNodeDefs_Flow(INodeRegistry& registry)
@@ -37,17 +54,7 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
     auto reg = [&registry](const char* id, const char* name, const char* category,
                   std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
                   const char* color = "", const char* edType = "")
-    {
-        NodeDefinition d;
-        d.id = id;
-        d.name = name;
-        d.category = category;
-        d.inputPins = std::move(inputs);
-        d.outputPins = std::move(outputs);
-        if (color[0]) d.color = color;
-        if (edType[0]) d.customProperties["editorType"] = edType;
-        registry.registerNode(d);
-    };
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
 
     reg("Branch", "Branch", "Flow",
         { MakeFlowPin(""), MakePin("Condition", PinDataType::Boolean) },
@@ -134,17 +141,7 @@ static void RegisterNodeDefs_Action(INodeRegistry& registry)
     auto reg = [&registry](const char* id, const char* name, const char* category,
                   std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
                   const char* color = "", const char* edType = "")
-    {
-        NodeDefinition d;
-        d.id = id;
-        d.name = name;
-        d.category = category;
-        d.inputPins = std::move(inputs);
-        d.outputPins = std::move(outputs);
-        if (color[0]) d.color = color;
-        if (edType[0]) d.customProperties["editorType"] = edType;
-        registry.registerNode(d);
-    };
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
 
     reg("InputActionFire", "InputAction Fire", "Action",
         {},
@@ -216,17 +213,7 @@ static void RegisterNodeDefs_Math(INodeRegistry& registry)
     auto reg = [&registry](const char* id, const char* name, const char* category,
                   std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
                   const char* color = "", const char* edType = "")
-    {
-        NodeDefinition d;
-        d.id = id;
-        d.name = name;
-        d.category = category;
-        d.inputPins = std::move(inputs);
-        d.outputPins = std::move(outputs);
-        if (color[0]) d.color = color;
-        if (edType[0]) d.customProperties["editorType"] = edType;
-        registry.registerNode(d);
-    };
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
 
     // --- Arithmetic (Math/Arithmetic) ---
     reg("Add", "+", "Math/Arithmetic",
@@ -484,17 +471,7 @@ static void RegisterNodeDefs_Debug(INodeRegistry& registry)
     auto reg = [&registry](const char* id, const char* name, const char* category,
                   std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
                   const char* color = "", const char* edType = "")
-    {
-        NodeDefinition d;
-        d.id = id;
-        d.name = name;
-        d.category = category;
-        d.inputPins = std::move(inputs);
-        d.outputPins = std::move(outputs);
-        if (color[0]) d.color = color;
-        if (edType[0]) d.customProperties["editorType"] = edType;
-        registry.registerNode(d);
-    };
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
 
     reg("PrintString", "Print String", "Debug",
         { MakeFlowPin(""), MakePin("In String", PinDataType::String) },
@@ -510,17 +487,7 @@ static void RegisterNodeDefs_String(INodeRegistry& registry)
     auto reg = [&registry](const char* id, const char* name, const char* category,
                   std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
                   const char* color = "", const char* edType = "")
-    {
-        NodeDefinition d;
-        d.id = id;
-        d.name = name;
-        d.category = category;
-        d.inputPins = std::move(inputs);
-        d.outputPins = std::move(outputs);
-        if (color[0]) d.color = color;
-        if (edType[0]) d.customProperties["editorType"] = edType;
-        registry.registerNode(d);
-    };
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
 
     reg("MakeString", "Make String", "Misc/String",
         { MakePin("Value", PinDataType::String) },
@@ -619,17 +586,7 @@ static void RegisterNodeDefs_Array(INodeRegistry& registry)
     auto reg = [&registry](const char* id, const char* name, const char* category,
                   std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
                   const char* color = "", const char* edType = "")
-    {
-        NodeDefinition d;
-        d.id = id;
-        d.name = name;
-        d.category = category;
-        d.inputPins = std::move(inputs);
-        d.outputPins = std::move(outputs);
-        if (color[0]) d.color = color;
-        if (edType[0]) d.customProperties["editorType"] = edType;
-        registry.registerNode(d);
-    };
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
 
     reg("ArrayLength", "Array Length", "Misc/Array",
         { MakePin("Array", PinDataType::Array) },
@@ -690,17 +647,7 @@ static void RegisterNodeDefs_Tree(INodeRegistry& registry)
     auto reg = [&registry](const char* id, const char* name, const char* category,
                   std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
                   const char* color = "", const char* edType = "")
-    {
-        NodeDefinition d;
-        d.id = id;
-        d.name = name;
-        d.category = category;
-        d.inputPins = std::move(inputs);
-        d.outputPins = std::move(outputs);
-        if (color[0]) d.color = color;
-        if (edType[0]) d.customProperties["editorType"] = edType;
-        registry.registerNode(d);
-    };
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
 
     reg("Sequence", "Sequence", "Tree",
         { MakeFlowPin("") },
@@ -721,17 +668,7 @@ static void RegisterNodeDefs_Houdini(INodeRegistry& registry)
     auto reg = [&registry](const char* id, const char* name, const char* category,
                   std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
                   const char* color = "", const char* edType = "")
-    {
-        NodeDefinition d;
-        d.id = id;
-        d.name = name;
-        d.category = category;
-        d.inputPins = std::move(inputs);
-        d.outputPins = std::move(outputs);
-        if (color[0]) d.color = color;
-        if (edType[0]) d.customProperties["editorType"] = edType;
-        registry.registerNode(d);
-    };
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
 
     reg("HoudiniTransform", "Transform", "Houdini",
         { MakeFlowPin("") },
@@ -749,17 +686,7 @@ static void RegisterNodeDefs_Misc(INodeRegistry& registry)
     auto reg = [&registry](const char* id, const char* name, const char* category,
                   std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
                   const char* color = "", const char* edType = "")
-    {
-        NodeDefinition d;
-        d.id = id;
-        d.name = name;
-        d.category = category;
-        d.inputPins = std::move(inputs);
-        d.outputPins = std::move(outputs);
-        if (color[0]) d.color = color;
-        if (edType[0]) d.customProperties["editorType"] = edType;
-        registry.registerNode(d);
-    };
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
 
     reg("Message", "Message", "Misc",
         {},

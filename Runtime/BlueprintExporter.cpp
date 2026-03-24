@@ -55,6 +55,28 @@ std::string indentJson(int level, int spaces = 4)
     return std::string(level * spaces, ' ');
 }
 
+// JSON 字段安全读取辅助函数（消除 importRuntimeFromString / importEditorFromStrings 中的重复 lambda）
+double getJsonNumber(const crude_json::value& obj, const char* key, double defaultVal = 0.0)
+{
+    if (obj.contains(key) && obj[key].type() == crude_json::type_t::number)
+        return obj[key].get<double>();
+    return defaultVal;
+}
+
+std::string getJsonString(const crude_json::value& obj, const char* key)
+{
+    if (obj.contains(key) && obj[key].type() == crude_json::type_t::string)
+        return obj[key].get<std::string>();
+    return "";
+}
+
+bool getJsonBool(const crude_json::value& obj, const char* key, bool defaultVal = false)
+{
+    if (obj.contains(key) && obj[key].type() == crude_json::type_t::boolean)
+        return obj[key].get<bool>();
+    return defaultVal;
+}
+
 } // anonymous namespace
 
 // ============================================================================
@@ -735,24 +757,10 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
         return result;
     }
 
-    // ---- 辅助 lambda ----
-    auto getNumber = [](const crude_json::value& obj, const char* key, double defaultVal = 0.0) -> double {
-        if (obj.contains(key) && obj[key].type() == crude_json::type_t::number)
-            return obj[key].get<double>();
-        return defaultVal;
-    };
-
-    auto getString = [](const crude_json::value& obj, const char* key) -> std::string {
-        if (obj.contains(key) && obj[key].type() == crude_json::type_t::string)
-            return obj[key].get<std::string>();
-        return "";
-    };
-
-    auto getBool = [](const crude_json::value& obj, const char* key, bool defaultVal = false) -> bool {
-        if (obj.contains(key) && obj[key].type() == crude_json::type_t::boolean)
-            return obj[key].get<bool>();
-        return defaultVal;
-    };
+    // ---- 辅助别名（使用文件级辅助函数，通过 lambda 保留默认参数）----
+    auto getNumber = [](const crude_json::value& obj, const char* key, double defaultVal = 0.0) { return getJsonNumber(obj, key, defaultVal); };
+    auto getString = [](const crude_json::value& obj, const char* key) { return getJsonString(obj, key); };
+    auto getBool   = [](const crude_json::value& obj, const char* key, bool defaultVal = false) { return getJsonBool(obj, key, defaultVal); };
 
     // ---- 解析元数据 ----
     if (rootObj.contains("metadata") && rootObj["metadata"].type() == crude_json::type_t::object)
@@ -1039,23 +1047,10 @@ ImportResult JsonBlueprintExporter::importEditorFromStrings(const std::string& r
         return result;
     }
     
-    auto getNumber = [](const crude_json::value& obj, const char* key, double defaultVal = 0.0) -> double {
-        if (obj.contains(key) && obj[key].type() == crude_json::type_t::number)
-            return obj[key].get<double>();
-        return defaultVal;
-    };
-
-    auto getString = [](const crude_json::value& obj, const char* key) -> std::string {
-        if (obj.contains(key) && obj[key].type() == crude_json::type_t::string)
-            return obj[key].get<std::string>();
-        return "";
-    };
-
-    auto getBool = [](const crude_json::value& obj, const char* key, bool defaultVal = false) -> bool {
-        if (obj.contains(key) && obj[key].type() == crude_json::type_t::boolean)
-            return obj[key].get<bool>();
-        return defaultVal;
-    };
+    // ---- 辅助别名（使用文件级辅助函数，通过 lambda 保留默认参数）----
+    auto getNumber = [](const crude_json::value& obj, const char* key, double defaultVal = 0.0) { return getJsonNumber(obj, key, defaultVal); };
+    auto getString = [](const crude_json::value& obj, const char* key) { return getJsonString(obj, key); };
+    auto getBool   = [](const crude_json::value& obj, const char* key, bool defaultVal = false) { return getJsonBool(obj, key, defaultVal); };
     
     // ---- 合并元数据（author、时间戳）----
     if (editorRoot.contains("metadata") && editorRoot["metadata"].type() == crude_json::type_t::object)
@@ -1291,8 +1286,9 @@ bool JsonBlueprintExporter::validate(const BlueprintData& data, std::vector<std:
 {
     errors.clear();
     
-    // 验证节点 ID 唯一性
+    // 验证节点 ID 唯一性 & 一次性收集所有 pinId（用于后续链接验证）
     std::unordered_map<NodeId, int> nodeIds;
+    std::unordered_set<PinId> allPinIds;
     for (const auto& node : data.nodes)
     {
         if (node.id == InvalidNodeId)
@@ -1305,9 +1301,12 @@ bool JsonBlueprintExporter::validate(const BlueprintData& data, std::vector<std:
             errors.push_back("Duplicate node ID: " + std::to_string(node.id));
         }
         nodeIds[node.id]++;
+        
+        for (const auto& pin : node.pins)
+            allPinIds.insert(pin.id);
     }
     
-    // 验证链接
+    // 验证链接 — O(L) 而非 O(L*N*P)
     for (const auto& link : data.links)
     {
         if (link.id == InvalidLinkId)
@@ -1320,24 +1319,12 @@ bool JsonBlueprintExporter::validate(const BlueprintData& data, std::vector<std:
             errors.push_back("Link has invalid pin IDs");
         }
         
-        bool startPinFound = false;
-        bool endPinFound = false;
-        
-        for (const auto& node : data.nodes)
-        {
-            for (const auto& pin : node.pins)
-            {
-                if (pin.id == link.startPinId) startPinFound = true;
-                if (pin.id == link.endPinId) endPinFound = true;
-            }
-        }
-        
-        if (!startPinFound)
+        if (allPinIds.find(link.startPinId) == allPinIds.end())
         {
             errors.push_back("Link references non-existent start pin: " + std::to_string(link.startPinId));
         }
         
-        if (!endPinFound)
+        if (allPinIds.find(link.endPinId) == allPinIds.end())
         {
             errors.push_back("Link references non-existent end pin: " + std::to_string(link.endPinId));
         }

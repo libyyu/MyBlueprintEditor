@@ -70,8 +70,6 @@ set(UI_SOURCES
 )
 
 set(UI_HEADERS
-    UI/Canvas/Canvas.h
-    UI/Drawing/DrawHelpers.h
     UI/Builders/NodeBuilder.h
 )
 

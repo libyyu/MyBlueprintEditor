@@ -127,7 +127,7 @@ void BlueprintEditor::DrawSearchOverlay()
 
     ImGui::SetNextWindowPos(ImVec2(overlayX, overlayY), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(overlayWidth, 0), ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.92f);
+    ImGui::SetNextWindowBgAlpha(0.94f);
 
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar |
                              ImGuiWindowFlags_NoResize |
@@ -144,13 +144,29 @@ void BlueprintEditor::DrawSearchOverlay()
         s_NeedFocus = true;
     s_WasShowing = m_ShowSearchOverlay;
 
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
+    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.22f, 0.32f, 0.48f, 0.50f));
+
     if (ImGui::Begin("##SearchOverlay", &m_ShowSearchOverlay, flags))
     {
-        // 搜索图标 + 输入框
-        ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Search Nodes");
+        // 标题行：搜索图标 + 标题 + 关闭按钮
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.70f, 0.95f, 1.00f));
+        ImGui::TextUnformatted("\xef\x80\x82");  // 搜索图标占位
+        ImGui::PopStyleColor();
         ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "(Ctrl+F)");
+        ImGui::TextColored(ImVec4(0.80f, 0.85f, 0.95f, 1.00f), "Search Nodes");
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(0.40f, 0.42f, 0.48f, 1.00f), "(Ctrl+F)");
+        ImGui::SameLine(overlayWidth - 30.0f);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.2f, 0.2f, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.7f, 0.2f, 0.2f, 0.7f));
+        if (ImGui::SmallButton("X"))
+            m_ShowSearchOverlay = false;
+        ImGui::PopStyleColor(3);
 
+        ImGui::Spacing();
         ImGui::SetNextItemWidth(overlayWidth - 16.0f);
 
         // 首次打开时聚焦输入框
@@ -213,11 +229,45 @@ void BlueprintEditor::DrawSearchOverlay()
                 if (!node) continue;
 
                 bool isSelected = (i == m_SearchResultIndex);
-                std::string label = node->Name + "##sr" + std::to_string(i);
 
+                // 节点类型彩色小标签
+                ImVec4 typeColor;
+                const char* typeLabel;
+                switch (node->Type)
+                {
+                    case NodeType::Blueprint: typeColor = ImVec4(0.26f, 0.46f, 0.72f, 1.0f); typeLabel = "BP";   break;
+                    case NodeType::Simple:    typeColor = ImVec4(0.35f, 0.65f, 0.35f, 1.0f); typeLabel = "S";    break;
+                    case NodeType::Tree:      typeColor = ImVec4(0.65f, 0.50f, 0.25f, 1.0f); typeLabel = "T";    break;
+                    case NodeType::Houdini:   typeColor = ImVec4(0.75f, 0.30f, 0.30f, 1.0f); typeLabel = "H";    break;
+                    case NodeType::Comment:   typeColor = ImVec4(0.50f, 0.50f, 0.50f, 1.0f); typeLabel = "C";    break;
+                    default:                  typeColor = ImVec4(0.50f, 0.50f, 0.60f, 1.0f); typeLabel = "?";    break;
+                }
+
+                // 绘制类型标签背景
+                ImVec2 labelSize = ImGui::CalcTextSize(typeLabel);
+                ImVec2 curPos = ImGui::GetCursorScreenPos();
+                float badgePadX = 4.0f;
+                float badgePadY = 1.0f;
+                float badgeW = labelSize.x + badgePadX * 2;
+                float badgeH = labelSize.y + badgePadY * 2;
+
+                auto* dl = ImGui::GetWindowDrawList();
+                ImVec2 badgeMin = ImVec2(curPos.x, curPos.y + 1.0f);
+                ImVec2 badgeMax = ImVec2(curPos.x + badgeW, curPos.y + badgeH + 1.0f);
+                dl->AddRectFilled(badgeMin, badgeMax,
+                    ImGui::ColorConvertFloat4ToU32(ImVec4(typeColor.x, typeColor.y, typeColor.z, 0.75f)),
+                    3.0f);
+                dl->AddText(ImVec2(curPos.x + badgePadX, curPos.y + badgePadY + 1.0f),
+                    IM_COL32(255, 255, 255, 220), typeLabel);
+
+                ImGui::Dummy(ImVec2(badgeW + 4.0f, badgeH));
+                ImGui::SameLine();
+
+                // 节点名
                 if (isSelected)
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.3f, 1.0f));
 
+                std::string label = node->Name + "##sr" + std::to_string(i);
                 if (ImGui::Selectable(label.c_str(), isSelected))
                     NavigateToSearchResult(i);
 
@@ -233,4 +283,6 @@ void BlueprintEditor::DrawSearchOverlay()
         }
     }
     ImGui::End();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
 }

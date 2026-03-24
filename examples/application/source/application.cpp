@@ -55,7 +55,138 @@ bool Application::Create(int width /*= -1*/, int height /*= -1*/)
     io.IniFilename = m_IniFilename.c_str();
     io.LogFilename = nullptr;
 
-    ImGui::StyleColorsDark();
+    // ================================================================
+    // 自定义现代暗色主题（替代默认 StyleColorsDark）
+    // ================================================================
+    {
+        ImGui::StyleColorsDark();
+        auto& style = ImGui::GetStyle();
+        auto& colors = style.Colors;
+
+        // ---- 基底色板 ----
+        // bg0: 最深背景 (主窗口)    bg1: 次级背景 (面板)    bg2: 控件背景
+        // accent: 强调蓝 (#4B8BBE)   accentDim: 暗调蓝       surface: 悬浮层
+        const ImVec4 bg0       (0.098f, 0.098f, 0.118f, 1.00f);  // #191920
+        const ImVec4 bg1       (0.118f, 0.122f, 0.149f, 1.00f);  // #1E1F26
+        const ImVec4 bg2       (0.153f, 0.157f, 0.192f, 1.00f);  // #272831
+        const ImVec4 surface   (0.176f, 0.180f, 0.220f, 1.00f);  // #2D2E38
+        const ImVec4 border    (0.220f, 0.228f, 0.278f, 0.50f);  // subtle edge
+        const ImVec4 accent    (0.294f, 0.545f, 0.745f, 1.00f);  // #4B8BBE
+        const ImVec4 accentDim (0.220f, 0.400f, 0.600f, 1.00f);
+        const ImVec4 accentLit (0.380f, 0.640f, 0.900f, 1.00f);
+        const ImVec4 textPri   (0.906f, 0.914f, 0.945f, 1.00f);  // #E7E9F1
+        const ImVec4 textSec   (0.550f, 0.565f, 0.620f, 1.00f);  // #8C9090
+        const ImVec4 green     (0.310f, 0.720f, 0.440f, 1.00f);  // 成功/执行
+
+        // 窗口 & 背景
+        colors[ImGuiCol_WindowBg]               = bg0;
+        colors[ImGuiCol_ChildBg]                = ImVec4(0.106f, 0.110f, 0.133f, 1.00f);
+        colors[ImGuiCol_PopupBg]                = ImVec4(0.137f, 0.141f, 0.173f, 0.97f);
+
+        // 边框 — 极细微的分隔感
+        colors[ImGuiCol_Border]                 = border;
+        colors[ImGuiCol_BorderShadow]           = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+
+        // 帧（输入框、下拉框等背景）
+        colors[ImGuiCol_FrameBg]                = bg2;
+        colors[ImGuiCol_FrameBgHovered]         = surface;
+        colors[ImGuiCol_FrameBgActive]          = ImVec4(0.200f, 0.210f, 0.260f, 1.00f);
+
+        // 标题栏
+        colors[ImGuiCol_TitleBg]                = ImVec4(0.078f, 0.078f, 0.098f, 1.00f);
+        colors[ImGuiCol_TitleBgActive]          = ImVec4(0.110f, 0.114f, 0.145f, 1.00f);
+        colors[ImGuiCol_TitleBgCollapsed]       = ImVec4(0.078f, 0.078f, 0.098f, 0.75f);
+
+        // 菜单栏 — 略深于窗口背景，形成层次
+        colors[ImGuiCol_MenuBarBg]              = ImVec4(0.110f, 0.114f, 0.141f, 1.00f);
+
+        // 滚动条 — 纤细、低调
+        colors[ImGuiCol_ScrollbarBg]            = ImVec4(0.098f, 0.098f, 0.118f, 0.60f);
+        colors[ImGuiCol_ScrollbarGrab]          = ImVec4(0.280f, 0.290f, 0.340f, 0.80f);
+        colors[ImGuiCol_ScrollbarGrabHovered]   = ImVec4(0.380f, 0.400f, 0.460f, 0.90f);
+        colors[ImGuiCol_ScrollbarGrabActive]    = ImVec4(0.480f, 0.500f, 0.560f, 1.00f);
+
+        // 选中 & 交互（accent 蓝）
+        colors[ImGuiCol_CheckMark]              = accentLit;
+        colors[ImGuiCol_SliderGrab]             = accent;
+        colors[ImGuiCol_SliderGrabActive]       = accentLit;
+
+        // 按钮 — accent 蓝调，hover 时提亮
+        colors[ImGuiCol_Button]                 = ImVec4(0.200f, 0.340f, 0.520f, 0.80f);
+        colors[ImGuiCol_ButtonHovered]          = ImVec4(0.260f, 0.440f, 0.660f, 0.95f);
+        colors[ImGuiCol_ButtonActive]           = ImVec4(0.300f, 0.500f, 0.740f, 1.00f);
+
+        // 头部（TreeNode, Collapsing Header, Table Header）
+        colors[ImGuiCol_Header]                 = ImVec4(0.180f, 0.190f, 0.240f, 1.00f);
+        colors[ImGuiCol_HeaderHovered]          = ImVec4(0.240f, 0.260f, 0.340f, 1.00f);
+        colors[ImGuiCol_HeaderActive]           = ImVec4(0.220f, 0.360f, 0.540f, 1.00f);
+
+        // 分隔线 — 低调
+        colors[ImGuiCol_Separator]              = ImVec4(0.200f, 0.210f, 0.260f, 0.70f);
+        colors[ImGuiCol_SeparatorHovered]       = accent;
+        colors[ImGuiCol_SeparatorActive]        = accentLit;
+
+        // 调整大小手柄
+        colors[ImGuiCol_ResizeGrip]             = ImVec4(accent.x, accent.y, accent.z, 0.15f);
+        colors[ImGuiCol_ResizeGripHovered]      = ImVec4(accent.x, accent.y, accent.z, 0.55f);
+        colors[ImGuiCol_ResizeGripActive]       = ImVec4(accent.x, accent.y, accent.z, 0.90f);
+
+        // 标签栏 — 活跃标签用强调色底部指示条风格
+        colors[ImGuiCol_Tab]                    = ImVec4(0.130f, 0.136f, 0.168f, 1.00f);
+        colors[ImGuiCol_TabHovered]             = ImVec4(0.200f, 0.340f, 0.520f, 0.85f);
+        colors[ImGuiCol_TabSelected]            = ImVec4(0.180f, 0.300f, 0.480f, 1.00f);
+        colors[ImGuiCol_TabDimmed]              = ImVec4(0.100f, 0.104f, 0.130f, 0.97f);
+        colors[ImGuiCol_TabDimmedSelected]      = ImVec4(0.160f, 0.260f, 0.420f, 1.00f);
+
+        // 文本选中
+        colors[ImGuiCol_TextSelectedBg]         = ImVec4(accent.x, accent.y, accent.z, 0.30f);
+
+        // 拖拽指示
+        colors[ImGuiCol_DragDropTarget]         = ImVec4(accentLit.x, accentLit.y, accentLit.z, 0.90f);
+
+        // 导航高亮
+        colors[ImGuiCol_NavHighlight]           = accent;
+
+        // 表格
+        colors[ImGuiCol_TableHeaderBg]          = ImVec4(0.140f, 0.148f, 0.185f, 1.00f);
+        colors[ImGuiCol_TableBorderStrong]      = ImVec4(0.200f, 0.210f, 0.260f, 0.70f);
+        colors[ImGuiCol_TableBorderLight]       = ImVec4(0.170f, 0.175f, 0.215f, 0.50f);
+        colors[ImGuiCol_TableRowBg]             = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+        colors[ImGuiCol_TableRowBgAlt]          = ImVec4(0.15f, 0.155f, 0.190f, 0.30f);
+
+        // 文字颜色
+        colors[ImGuiCol_Text]                   = textPri;
+        colors[ImGuiCol_TextDisabled]           = textSec;
+
+        // 圆角 — 统一 5px 基准，更现代
+        style.WindowRounding    = 6.0f;
+        style.FrameRounding     = 4.0f;
+        style.PopupRounding     = 6.0f;
+        style.ScrollbarRounding = 8.0f;
+        style.GrabRounding      = 4.0f;
+        style.TabRounding       = 5.0f;
+        style.ChildRounding     = 4.0f;
+
+        // 间距 — 略微紧凑
+        style.WindowPadding     = ImVec2(10, 10);
+        style.FramePadding      = ImVec2(8, 4);
+        style.ItemSpacing       = ImVec2(8, 5);
+        style.ItemInnerSpacing  = ImVec2(6, 4);
+        style.IndentSpacing     = 20.0f;
+        style.ScrollbarSize     = 12.0f;
+        style.GrabMinSize       = 10.0f;
+
+        // 边框 — 仅在必要处使用
+        style.WindowBorderSize  = 1.0f;
+        style.ChildBorderSize   = 1.0f;
+        style.FrameBorderSize   = 0.0f;
+        style.PopupBorderSize   = 1.0f;
+        style.TabBorderSize     = 0.0f;
+
+        // 对齐
+        style.TabBarBorderSize  = 1.0f;
+        style.SeparatorTextBorderSize = 2.0f;
+    }
 
     RecreateFontAtlas();
 

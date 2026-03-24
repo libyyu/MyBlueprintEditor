@@ -125,80 +125,154 @@ struct BlueprintData
         NodePosition    viewPosition;       // 视图位置
         float           viewScale = 1.0f;   // 视图缩放
     } viewInfo;
+
+    // ============================================================================
+    // 索引管理 —— O(1) 查找加速
+    // ============================================================================
+
+    // 重建所有索引（在数据加载、节点/链接增删后调用）
+    void rebuildIndices() const
+    {
+        m_nodeIdIndex.clear();
+        m_pinToNodeIndex.clear();
+        m_linkIdIndex.clear();
+        m_startPinLinks.clear();
+        m_endPinLinks.clear();
+
+        for (size_t i = 0; i < nodes.size(); ++i)
+        {
+            m_nodeIdIndex[nodes[i].id] = i;
+            for (const auto& pin : nodes[i].pins)
+            {
+                m_pinToNodeIndex[pin.id] = i;
+            }
+        }
+
+        for (size_t i = 0; i < links.size(); ++i)
+        {
+            m_linkIdIndex[links[i].id] = i;
+            if (links[i].isEnabled)
+            {
+                m_startPinLinks[links[i].startPinId].push_back(i);
+                m_endPinLinks[links[i].endPinId].push_back(i);
+            }
+        }
+
+        m_indexDirty = false;
+    }
+
+    // 标记索引需要重建
+    void invalidateIndices() const { m_indexDirty = true; }
+
+    // 确保索引可用
+    void ensureIndices() const
+    {
+        if (m_indexDirty) rebuildIndices();
+    }
+
+    // 获取引脚→节点索引映射（用于拓扑排序等需要 pinId→nodeIndex 的场景）
+    const std::unordered_map<PinId, size_t>& getPinToNodeIndex() const
+    {
+        ensureIndices();
+        return m_pinToNodeIndex;
+    }
     
-    // 辅助方法：查找节点
+    // 辅助方法：查找节点 — O(1) 哈希查找
     const NodeInstance* findNode(NodeId nodeId) const
     {
-        for (const auto& node : nodes)
-        {
-            if (node.id == nodeId) return &node;
-        }
-        return nullptr;
+        ensureIndices();
+        auto it = m_nodeIdIndex.find(nodeId);
+        return (it != m_nodeIdIndex.end()) ? &nodes[it->second] : nullptr;
     }
     
     // 辅助方法：查找节点（可修改）
     NodeInstance* findNode(NodeId nodeId)
     {
-        for (auto& node : nodes)
-        {
-            if (node.id == nodeId) return &node;
-        }
-        return nullptr;
+        ensureIndices();
+        auto it = m_nodeIdIndex.find(nodeId);
+        return (it != m_nodeIdIndex.end()) ? &nodes[it->second] : nullptr;
     }
     
-    // 辅助方法：查找链接
+    // 辅助方法：查找链接 — O(1) 哈希查找
     const LinkInstance* findLink(LinkId linkId) const
     {
-        for (const auto& link : links)
-        {
-            if (link.id == linkId) return &link;
-        }
-        return nullptr;
+        ensureIndices();
+        auto it = m_linkIdIndex.find(linkId);
+        return (it != m_linkIdIndex.end()) ? &links[it->second] : nullptr;
     }
     
-    // 辅助方法：根据引脚ID查找链接
+    // 辅助方法：根据引脚ID查找链接 — 使用索引加速
     std::vector<const LinkInstance*> findLinksByPin(PinId pinId) const
     {
+        ensureIndices();
         std::vector<const LinkInstance*> result;
-        for (const auto& link : links)
+        
+        // 查找以 pinId 为起始引脚的链接
+        auto itStart = m_startPinLinks.find(pinId);
+        if (itStart != m_startPinLinks.end())
         {
-            if (link.startPinId == pinId || link.endPinId == pinId)
-            {
-                result.push_back(&link);
-            }
+            for (size_t idx : itStart->second)
+                result.push_back(&links[idx]);
+        }
+        
+        // 查找以 pinId 为终止引脚的链接
+        auto itEnd = m_endPinLinks.find(pinId);
+        if (itEnd != m_endPinLinks.end())
+        {
+            for (size_t idx : itEnd->second)
+                result.push_back(&links[idx]);
+        }
+        
+        return result;
+    }
+    
+    // 辅助方法：获取从指定引脚出发的所有下游引脚ID（仅通过 startPinId 查找）
+    std::vector<PinId> getDownstreamPinIds(PinId startPinId) const
+    {
+        ensureIndices();
+        std::vector<PinId> result;
+        auto it = m_startPinLinks.find(startPinId);
+        if (it != m_startPinLinks.end())
+        {
+            for (size_t idx : it->second)
+                result.push_back(links[idx].endPinId);
         }
         return result;
     }
     
-    // 辅助方法：查找连接到指定引脚的所有引脚
+    // 辅助方法：查找连接到指定引脚的所有引脚 — 使用索引加速
     std::vector<PinId> findConnectedPins(PinId pinId) const
     {
+        ensureIndices();
         std::vector<PinId> result;
-        for (const auto& link : links)
+        
+        // 以 pinId 为起始引脚的链接 → 取 endPinId
+        auto itStart = m_startPinLinks.find(pinId);
+        if (itStart != m_startPinLinks.end())
         {
-            if (link.startPinId == pinId && link.endPinId != InvalidPinId)
-            {
-                result.push_back(link.endPinId);
-            }
-            else if (link.endPinId == pinId && link.startPinId != InvalidPinId)
-            {
-                result.push_back(link.startPinId);
-            }
+            for (size_t idx : itStart->second)
+                if (links[idx].endPinId != InvalidPinId)
+                    result.push_back(links[idx].endPinId);
         }
+        
+        // 以 pinId 为终止引脚的链接 → 取 startPinId
+        auto itEnd = m_endPinLinks.find(pinId);
+        if (itEnd != m_endPinLinks.end())
+        {
+            for (size_t idx : itEnd->second)
+                if (links[idx].startPinId != InvalidPinId)
+                    result.push_back(links[idx].startPinId);
+        }
+        
         return result;
     }
     
-    // 辅助方法：查找引脚所属的节点
+    // 辅助方法：查找引脚所属的节点 — O(1) 哈希查找
     const NodeInstance* findNodeByPin(PinId pinId) const
     {
-        for (const auto& node : nodes)
-        {
-            for (const auto& pin : node.pins)
-            {
-                if (pin.id == pinId) return &node;
-            }
-        }
-        return nullptr;
+        ensureIndices();
+        auto it = m_pinToNodeIndex.find(pinId);
+        return (it != m_pinToNodeIndex.end()) ? &nodes[it->second] : nullptr;
     }
     
     // 辅助方法：获取输入节点列表
@@ -375,7 +449,17 @@ struct BlueprintData
         variables.clear();
         comments.clear();
         viewInfo = ViewInfo();
+        invalidateIndices();
     }
+
+private:
+    // 哈希索引（mutable 因为它们是缓存，不影响逻辑 const 性）
+    mutable std::unordered_map<NodeId, size_t>  m_nodeIdIndex;       // nodeId → nodes[] 下标
+    mutable std::unordered_map<PinId, size_t>   m_pinToNodeIndex;    // pinId → nodes[] 下标
+    mutable std::unordered_map<LinkId, size_t>  m_linkIdIndex;       // linkId → links[] 下标
+    mutable std::unordered_map<PinId, std::vector<size_t>> m_startPinLinks;  // startPinId → links[] 下标列表
+    mutable std::unordered_map<PinId, std::vector<size_t>> m_endPinLinks;    // endPinId → links[] 下标列表
+    mutable bool                                m_indexDirty = true;
 };
 
 } // namespace Runtime
