@@ -348,11 +348,11 @@ void BlueprintEditor::FixupSpecialPinTypes(Node* node, const RTNodeDef* def)
 struct CategoryMenuNode
 {
     std::map<std::string, CategoryMenuNode>  children;     // 子分类
-    std::vector<RTNodeDef>                   directNodes;  // 直属该层的节点
+    std::vector<const RTNodeDef*>            directNodes;  // 直属该层的节点（指针，避免拷贝）
 };
 
 // 将所有节点按 category 路径组织成树状结构
-static void BuildCategoryTree(const std::vector<RTNodeDef>& allDefs,
+static void BuildCategoryTree(const std::vector<const RTNodeDef*>& allDefs,
                               const std::vector<RTNodeCategory>& categories,
                               std::map<std::string, CategoryMenuNode>& rootChildren,
                               std::vector<std::string>& rootOrder)
@@ -365,14 +365,14 @@ static void BuildCategoryTree(const std::vector<RTNodeDef>& allDefs,
         rootOrder.push_back(cat.id);
     }
 
-    for (const auto& d : allDefs)
+    for (const auto* d : allDefs)
     {
-        if (d.category.empty()) continue;
+        if (d->category.empty()) continue;
 
         // 按 '/' 拆分 category 路径
         std::vector<std::string> parts;
         std::string seg;
-        for (char c : d.category)
+        for (char c : d->category)
         {
             if (c == '/')
             {
@@ -406,7 +406,9 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
     Node* result = nullptr;
 
     // 构建分类树
-    auto allDefs = m_NodeRegistry.getAllNodeDefinitions();
+    const auto& allDefsRef = m_NodeRegistry.getAllNodeDefinitions();
+    // 拷贝到局部 vector 以便排序（仅排序指针，开销极小）
+    std::vector<const RTNodeDef*> allDefs(allDefsRef.begin(), allDefsRef.end());
     auto categories = m_NodeRegistry.getAllCategories();
 
     std::map<std::string, CategoryMenuNode> rootChildren;
@@ -432,28 +434,28 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
         std::string lower_filter = filter;
         for (auto& c : lower_filter) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
-        // 排序节点
+        // 排序节点（按指针的 name 字段排序）
         std::sort(allDefs.begin(), allDefs.end(),
-            [](const RTNodeDef& a, const RTNodeDef& b) { return a.name < b.name; });
+            [](const RTNodeDef* a, const RTNodeDef* b) { return a->name < b->name; });
 
         int shown = 0;
-        for (const auto& d : allDefs)
+        for (const auto* d : allDefs)
         {
-            std::string lower_name = d.name;
+            std::string lower_name = d->name;
             for (auto& c : lower_name) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
             if (lower_name.find(lower_filter) == std::string::npos)
                 continue;
 
             // 显示节点名和分类标签
-            if (ImGui::MenuItem(d.name.c_str()))
+            if (ImGui::MenuItem(d->name.c_str()))
             {
-                result = SpawnNodeByDef(d.id);
+                result = SpawnNodeByDef(d->id);
                 if (result)
-                    FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d.id));
+                    FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d->id));
                 searchBuf[0] = '\0';  // 创建后清空搜索
             }
-            if (!d.category.empty() && ImGui::IsItemHovered())
-                ImGui::SetTooltip("Category: %s", d.category.c_str());
+            if (!d->category.empty() && ImGui::IsItemHovered())
+                ImGui::SetTooltip("Category: %s", d->category.c_str());
 
             ++shown;
         }
@@ -486,13 +488,13 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
             ImGui::Separator();
 
         // 渲染直属节点
-        for (const auto& d : menuNode.directNodes)
+        for (const auto* d : menuNode.directNodes)
         {
-            if (ImGui::MenuItem(d.name.c_str()))
+            if (ImGui::MenuItem(d->name.c_str()))
             {
-                result = SpawnNodeByDef(d.id);
+                result = SpawnNodeByDef(d->id);
                 if (result)
-                    FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d.id));
+                    FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d->id));
             }
         }
     };

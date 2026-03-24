@@ -460,6 +460,100 @@ static void RegisterHandlers_Flow(
             ctx.ActivateOutputFlow("Default");
         return true;
     };
+
+    // MultiGate — 依次激活多个输出（可选循环和随机）
+    handlers["MultiGate"] = [](ExecutionContext& ctx) {
+        auto* node = ctx.GetCurrentNode();
+        std::string nodeIdStr = node ? std::to_string(node->id) : "0";
+        std::string indexKey = "__multigate_index_" + nodeIdStr;
+
+        std::string activatedPin = ctx.GetActivatedInputPinName();
+        if (activatedPin == "Reset")
+        {
+            ctx.SetVariable(indexKey, Variant(static_cast<int64_t>(0)));
+            ctx.Log("  [MultiGate] Reset");
+            return true;
+        }
+
+        bool loop = ctx.GetInputValue("Loop").asBool();
+        bool random = ctx.GetInputValue("Random").asBool();
+
+        // 收集所有 exec 输出引脚
+        std::vector<PinId> execOuts;
+        if (node)
+        {
+            for (const auto& pin : node->pins)
+            {
+                if (pin.kind == PinKind::Output && pin.isExec)
+                    execOuts.push_back(pin.id);
+            }
+        }
+
+        if (execOuts.empty()) return true;
+
+        int64_t index = ctx.GetVariable(indexKey).asInt();
+
+        if (random)
+        {
+            int r = rand() % static_cast<int>(execOuts.size());
+            ctx.Log("  [MultiGate] Random -> Out " + std::to_string(r));
+            ctx.ActivateOutputFlow(execOuts[r]);
+        }
+        else
+        {
+            if (index >= static_cast<int64_t>(execOuts.size()))
+            {
+                if (loop)
+                    index = 0;
+                else
+                {
+                    ctx.Log("  [MultiGate] All outputs exhausted");
+                    return true;
+                }
+            }
+            ctx.Log("  [MultiGate] -> Out " + std::to_string(index));
+            ctx.ActivateOutputFlow(execOuts[static_cast<size_t>(index)]);
+            ctx.SetVariable(indexKey, Variant(index + 1));
+        }
+        return true;
+    };
+
+    // ForLoopWithBreak — 可中断的 For 循环
+    handlers["ForLoopWithBreak"] = [](ExecutionContext& ctx) {
+        auto* node = ctx.GetCurrentNode();
+        std::string nodeIdStr = node ? std::to_string(node->id) : "0";
+        std::string breakKey = "__forloopbreak_" + nodeIdStr;
+
+        std::string activatedPin = ctx.GetActivatedInputPinName();
+        if (activatedPin == "Break")
+        {
+            ctx.SetVariable(breakKey, Variant(true));
+            ctx.Log("  [ForLoopWithBreak] Break requested");
+            return true;
+        }
+
+        // 重置 break 标志
+        ctx.SetVariable(breakKey, Variant(false));
+
+        int64_t first = ctx.GetInputValue("First Index").asInt();
+        int64_t last = ctx.GetInputValue("Last Index").asInt();
+        ctx.Log("  [ForLoopWithBreak] " + std::to_string(first) + " to " + std::to_string(last));
+
+        for (int64_t i = first; i <= last; ++i)
+        {
+            // 检查 break 标志
+            if (ctx.GetVariable(breakKey).asBool())
+            {
+                ctx.Log("  [ForLoopWithBreak] Broken at index " + std::to_string(i));
+                break;
+            }
+            ctx.SetOutputValue("Index", Variant(i));
+            if (!ctx.ActivateOutputFlow("Loop Body"))
+                return false;
+        }
+        ctx.ActivateOutputFlow("Completed");
+        return true;
+    };
 }
 
 // ============================================================================
@@ -942,6 +1036,80 @@ static void RegisterHandlers_Math(std::unordered_map<std::string, NodeHandler>& 
         ctx.SetOutputValue("Value", Variant(2.71828182845904523536));
         return true;
     };
+
+    // --- Advanced Functions ---
+    handlers["InverseLerp"] = [](ExecutionContext& ctx) {
+        double a = ctx.GetInputValue("A").asFloat();
+        double b = ctx.GetInputValue("B").asFloat();
+        double v = ctx.GetInputValue("Value").asFloat();
+        double range = b - a;
+        if (range == 0.0) range = 1.0;
+        ctx.SetOutputValue("Result", Variant((v - a) / range));
+        return true;
+    };
+
+    handlers["Remap01"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value").asFloat();
+        double inMin = ctx.GetInputValue("InMin").asFloat();
+        double inMax = ctx.GetInputValue("InMax").asFloat();
+        double range = inMax - inMin;
+        if (range == 0.0) range = 1.0;
+        double result = (v - inMin) / range;
+        // Clamp to [0, 1]
+        if (result < 0.0) result = 0.0;
+        if (result > 1.0) result = 1.0;
+        ctx.SetOutputValue("Result", Variant(result));
+        return true;
+    };
+
+    handlers["DegreesToRadians"] = [](ExecutionContext& ctx) {
+        double deg = ctx.GetInputValue("Degrees").asFloat();
+        ctx.SetOutputValue("Radians", Variant(deg * 3.14159265358979323846 / 180.0));
+        return true;
+    };
+
+    handlers["RadiansToDegrees"] = [](ExecutionContext& ctx) {
+        double rad = ctx.GetInputValue("Radians").asFloat();
+        ctx.SetOutputValue("Degrees", Variant(rad * 180.0 / 3.14159265358979323846));
+        return true;
+    };
+
+    handlers["Wrap"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value").asFloat();
+        double lo = ctx.GetInputValue("Min").asFloat();
+        double hi = ctx.GetInputValue("Max").asFloat();
+        double range = hi - lo;
+        if (range <= 0.0) { ctx.SetOutputValue("Result", Variant(lo)); return true; }
+        double result = lo + std::fmod(std::fmod(v - lo, range) + range, range);
+        ctx.SetOutputValue("Result", Variant(result));
+        return true;
+    };
+
+    handlers["Snap"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value").asFloat();
+        double grid = ctx.GetInputValue("GridSize").asFloat();
+        if (grid <= 0.0) grid = 1.0;
+        ctx.SetOutputValue("Result", Variant(std::round(v / grid) * grid));
+        return true;
+    };
+
+    handlers["Log2"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value").asFloat();
+        ctx.SetOutputValue("Result", Variant(v > 0.0 ? std::log2(v) : 0.0));
+        return true;
+    };
+
+    handlers["Log10"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value").asFloat();
+        ctx.SetOutputValue("Result", Variant(v > 0.0 ? std::log10(v) : 0.0));
+        return true;
+    };
+
+    handlers["Exp"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value").asFloat();
+        ctx.SetOutputValue("Result", Variant(std::exp(v)));
+        return true;
+    };
 }
 
 // ============================================================================
@@ -959,6 +1127,48 @@ static void RegisterHandlers_Debug(std::unordered_map<std::string, NodeHandler>&
     handlers["Log"] = [](ExecutionContext& ctx) {
         auto msg = ctx.GetInputValue("Message").asString();
         ctx.Log("  [LOG] " + msg);
+        return true;
+    };
+
+    handlers["Assert"] = [](ExecutionContext& ctx) {
+        bool condition = ctx.GetInputValue("Condition").asBool();
+        auto message = ctx.GetInputValue("Message").asString();
+        if (!condition)
+        {
+            ctx.Log("  [ASSERT FAILED] " + (message.empty() ? "Assertion failed!" : message));
+            return false;  // 中断执行
+        }
+        ctx.Log("  [Assert] Passed");
+        return true;
+    };
+
+    handlers["FormatLog"] = [](ExecutionContext& ctx) {
+        std::string fmt = ctx.GetInputValue("Format").asString();
+        const auto* node = ctx.GetCurrentNode();
+        if (node)
+        {
+            std::vector<std::string> args;
+            bool skipFirst = true;
+            for (const auto& pin : node->pins)
+            {
+                if (pin.kind == PinKind::Input && !pin.isExec)
+                {
+                    if (skipFirst) { skipFirst = false; continue; }
+                    args.push_back(ctx.GetInputValue(pin.id).asString());
+                }
+            }
+            for (size_t i = 0; i < args.size(); ++i)
+            {
+                std::string placeholder = "{" + std::to_string(i) + "}";
+                size_t pos = 0;
+                while ((pos = fmt.find(placeholder, pos)) != std::string::npos)
+                {
+                    fmt.replace(pos, placeholder.size(), args[i]);
+                    pos += args[i].size();
+                }
+            }
+        }
+        ctx.Log("  [FORMAT] " + fmt);
         return true;
     };
 }
@@ -1177,6 +1387,79 @@ static void RegisterHandlers_String(std::unordered_map<std::string, NodeHandler>
         ctx.SetOutputValue("Result", Variant(fmt));
         return true;
     };
+
+    // StringJoin — 用分隔符连接数组
+    handlers["StringJoin"] = [](ExecutionContext& ctx) {
+        auto arr = ctx.GetInputValue("Array");
+        auto sep = ctx.GetInputValue("Separator").asString();
+        std::string result;
+        for (size_t i = 0; i < arr.arraySize(); ++i)
+        {
+            if (i > 0) result += sep;
+            result += arr.arrayGet(i).asString();
+        }
+        ctx.SetOutputValue("Result", Variant(result));
+        return true;
+    };
+
+    // StringRepeat — 重复字符串 N 次
+    handlers["StringRepeat"] = [](ExecutionContext& ctx) {
+        auto str = ctx.GetInputValue("String").asString();
+        int64_t count = ctx.GetInputValue("Count").asInt();
+        if (count < 0) count = 0;
+        if (count > 10000) count = 10000; // 安全限制
+        std::string result;
+        result.reserve(str.size() * static_cast<size_t>(count));
+        for (int64_t i = 0; i < count; ++i)
+            result += str;
+        ctx.SetOutputValue("Result", Variant(result));
+        return true;
+    };
+
+    // StringPadLeft — 左侧填充
+    handlers["StringPadLeft"] = [](ExecutionContext& ctx) {
+        auto str = ctx.GetInputValue("String").asString();
+        int64_t totalWidth = ctx.GetInputValue("TotalWidth").asInt();
+        auto padChar = ctx.GetInputValue("PadChar").asString();
+        char pad = padChar.empty() ? ' ' : padChar[0];
+        while (static_cast<int64_t>(str.size()) < totalWidth)
+            str.insert(str.begin(), pad);
+        ctx.SetOutputValue("Result", Variant(str));
+        return true;
+    };
+
+    // StringPadRight — 右侧填充
+    handlers["StringPadRight"] = [](ExecutionContext& ctx) {
+        auto str = ctx.GetInputValue("String").asString();
+        int64_t totalWidth = ctx.GetInputValue("TotalWidth").asInt();
+        auto padChar = ctx.GetInputValue("PadChar").asString();
+        char pad = padChar.empty() ? ' ' : padChar[0];
+        while (static_cast<int64_t>(str.size()) < totalWidth)
+            str.push_back(pad);
+        ctx.SetOutputValue("Result", Variant(str));
+        return true;
+    };
+
+    // CharAt — 获取指定位置字符
+    handlers["CharAt"] = [](ExecutionContext& ctx) {
+        auto str = ctx.GetInputValue("String").asString();
+        int64_t index = ctx.GetInputValue("Index").asInt();
+        bool valid = (index >= 0 && static_cast<size_t>(index) < str.size());
+        if (valid)
+            ctx.SetOutputValue("Char", Variant(std::string(1, str[static_cast<size_t>(index)])));
+        else
+            ctx.SetOutputValue("Char", Variant(std::string()));
+        ctx.SetOutputValue("Valid", Variant(valid));
+        return true;
+    };
+
+    // StringReverse — 反转字符串
+    handlers["StringReverse"] = [](ExecutionContext& ctx) {
+        auto str = ctx.GetInputValue("String").asString();
+        std::reverse(str.begin(), str.end());
+        ctx.SetOutputValue("Result", Variant(str));
+        return true;
+    };
 }
 
 // ============================================================================
@@ -1385,6 +1668,253 @@ static void RegisterHandlers_Houdini(std::unordered_map<std::string, NodeHandler
 }
 
 // ============================================================================
+// Time 处理器
+// ============================================================================
+
+static void RegisterHandlers_Time(
+    std::unordered_map<std::string, NodeHandler>& handlers,
+    BlueprintRunner& runner)
+{
+    handlers["GetTime"] = [](ExecutionContext& ctx) {
+        double seconds = static_cast<double>(FrameTimerManager::GetCurrentUnixTime());
+        ctx.SetOutputValue("Seconds", Variant(seconds));
+        return true;
+    };
+
+    handlers["DeltaTime"] = [](ExecutionContext& ctx) {
+        // 从 TimerManager 获取上一帧 deltaTime（近似值）
+        // 注意：实际精确值需要从外部传入，这里用 timer manager 的最后 tick 间隔
+        ctx.SetOutputValue("Seconds", Variant(0.016));  // 默认 ~60fps
+        return true;
+    };
+
+    handlers["TimeSince"] = [](ExecutionContext& ctx) {
+        double timestamp = ctx.GetInputValue("Timestamp").asFloat();
+        double now = static_cast<double>(FrameTimerManager::GetCurrentUnixTime());
+        ctx.SetOutputValue("Elapsed", Variant(now - timestamp));
+        return true;
+    };
+
+    handlers["FormatTime"] = [](ExecutionContext& ctx) {
+        double seconds = ctx.GetInputValue("Seconds").asFloat();
+        int totalSec = static_cast<int>(seconds);
+        int hours = totalSec / 3600;
+        int mins = (totalSec % 3600) / 60;
+        int secs = totalSec % 60;
+        int ms = static_cast<int>((seconds - totalSec) * 1000);
+
+        char buf[64];
+        if (hours > 0)
+            snprintf(buf, sizeof(buf), "%02d:%02d:%02d.%03d", hours, mins, secs, ms);
+        else
+            snprintf(buf, sizeof(buf), "%02d:%02d.%03d", mins, secs, ms);
+        ctx.SetOutputValue("Formatted", Variant(std::string(buf)));
+        return true;
+    };
+
+    handlers["TimerInfo"] = [&runner](ExecutionContext& ctx) {
+        int64_t handleVal = ctx.GetInputValue("TimerHandle").asInt();
+        auto handle = static_cast<TimerHandle>(handleVal);
+
+        bool isActive = false;
+        bool isPaused = false;
+        double elapsed = 0.0;
+        double remaining = 0.0;
+
+        if (handle != 0)
+        {
+            const auto& timers = runner.GetTimerManager().GetAllTimers();
+            for (const auto& t : timers)
+            {
+                if (t.handle == handle && !t.pendingKill)
+                {
+                    isActive = true;
+                    isPaused = t.paused;
+                    elapsed = static_cast<double>(t.totalElapsed);
+                    remaining = static_cast<double>(t.remaining);
+                    if (remaining < 0.0) remaining = 0.0;
+                    break;
+                }
+            }
+        }
+
+        ctx.SetOutputValue("IsActive", Variant(isActive));
+        ctx.SetOutputValue("IsPaused", Variant(isPaused));
+        ctx.SetOutputValue("Elapsed", Variant(elapsed));
+        ctx.SetOutputValue("Remaining", Variant(remaining));
+        return true;
+    };
+}
+
+// ============================================================================
+// Data 处理器
+// ============================================================================
+
+static void RegisterHandlers_Data(std::unordered_map<std::string, NodeHandler>& handlers)
+{
+    handlers["ToJSON"] = [](ExecutionContext& ctx) {
+        auto val = ctx.GetInputValue("Value");
+        std::string json;
+        switch (val.type)
+        {
+        case PinDataType::Boolean:
+            json = val.boolValue ? "true" : "false";
+            break;
+        case PinDataType::Integer:
+            json = std::to_string(val.intValue);
+            break;
+        case PinDataType::Float:
+            json = std::to_string(val.floatValue);
+            break;
+        case PinDataType::String:
+            json = "\"" + val.stringValue + "\"";
+            break;
+        case PinDataType::Array:
+        {
+            json = "[";
+            for (size_t i = 0; i < val.arraySize(); ++i)
+            {
+                if (i > 0) json += ", ";
+                auto elem = val.arrayGet(i);
+                if (elem.type == PinDataType::String)
+                    json += "\"" + elem.asString() + "\"";
+                else
+                    json += elem.asString();
+            }
+            json += "]";
+            break;
+        }
+        default:
+            json = "null";
+            break;
+        }
+        ctx.SetOutputValue("JSON", Variant(json));
+        return true;
+    };
+
+    handlers["FromJSON"] = [](ExecutionContext& ctx) {
+        auto json = ctx.GetInputValue("JSON").asString();
+        bool valid = false;
+
+        // 简单 JSON 值解析
+        // 去除首尾空白
+        size_t start = json.find_first_not_of(" \t\n\r");
+        size_t end = json.find_last_not_of(" \t\n\r");
+        if (start != std::string::npos && end != std::string::npos)
+        {
+            std::string trimmed = json.substr(start, end - start + 1);
+            if (trimmed == "true")
+            {
+                ctx.SetOutputValue("Value", Variant(true));
+                valid = true;
+            }
+            else if (trimmed == "false")
+            {
+                ctx.SetOutputValue("Value", Variant(false));
+                valid = true;
+            }
+            else if (trimmed == "null")
+            {
+                ctx.SetOutputValue("Value", Variant());
+                valid = true;
+            }
+            else if (trimmed.size() >= 2 && trimmed.front() == '"' && trimmed.back() == '"')
+            {
+                ctx.SetOutputValue("Value", Variant(trimmed.substr(1, trimmed.size() - 2)));
+                valid = true;
+            }
+            else
+            {
+                // 尝试解析数字
+                try
+                {
+                    if (trimmed.find('.') != std::string::npos)
+                    {
+                        double v = std::stod(trimmed);
+                        ctx.SetOutputValue("Value", Variant(v));
+                        valid = true;
+                    }
+                    else
+                    {
+                        int64_t v = std::stoll(trimmed);
+                        ctx.SetOutputValue("Value", Variant(v));
+                        valid = true;
+                    }
+                }
+                catch (...) {}
+            }
+        }
+        if (!valid)
+            ctx.SetOutputValue("Value", Variant());
+        ctx.SetOutputValue("Valid", Variant(valid));
+        return true;
+    };
+
+    handlers["HasKey"] = [](ExecutionContext& ctx) {
+        auto json = ctx.GetInputValue("JSON").asString();
+        auto key = ctx.GetInputValue("Key").asString();
+        // 简单的字符串搜索（查找 "key": 模式）
+        std::string pattern = "\"" + key + "\"";
+        bool found = json.find(pattern) != std::string::npos;
+        ctx.SetOutputValue("Result", Variant(found));
+        return true;
+    };
+
+    handlers["GetField"] = [](ExecutionContext& ctx) {
+        auto json = ctx.GetInputValue("JSON").asString();
+        auto key = ctx.GetInputValue("Key").asString();
+        std::string pattern = "\"" + key + "\"";
+        auto pos = json.find(pattern);
+        bool found = false;
+        std::string value;
+        if (pos != std::string::npos)
+        {
+            pos += pattern.size();
+            // 跳过 : 和空白
+            while (pos < json.size() && (json[pos] == ':' || json[pos] == ' ' || json[pos] == '\t'))
+                ++pos;
+            if (pos < json.size())
+            {
+                if (json[pos] == '"')
+                {
+                    ++pos;
+                    size_t end = json.find('"', pos);
+                    if (end != std::string::npos)
+                    {
+                        value = json.substr(pos, end - pos);
+                        found = true;
+                    }
+                }
+                else
+                {
+                    // 数字或布尔值
+                    size_t end = json.find_first_of(",]} \t\n\r", pos);
+                    if (end == std::string::npos) end = json.size();
+                    value = json.substr(pos, end - pos);
+                    found = true;
+                }
+            }
+        }
+        ctx.SetOutputValue("Value", Variant(value));
+        ctx.SetOutputValue("Found", Variant(found));
+        return true;
+    };
+
+    handlers["ArrayToString"] = [](ExecutionContext& ctx) {
+        auto arr = ctx.GetInputValue("Array");
+        std::string result = "[";
+        for (size_t i = 0; i < arr.arraySize(); ++i)
+        {
+            if (i > 0) result += ", ";
+            result += arr.arrayGet(i).asString();
+        }
+        result += "]";
+        ctx.SetOutputValue("String", Variant(result));
+        return true;
+    };
+}
+
+// ============================================================================
 // Misc 处理器
 // ============================================================================
 
@@ -1460,6 +1990,8 @@ void RegisterBuiltinHandlers(
     RegisterHandlers_Debug(allHandlers);
     RegisterHandlers_String(allHandlers);
     RegisterHandlers_Array(allHandlers);
+    RegisterHandlers_Time(allHandlers, runner);
+    RegisterHandlers_Data(allHandlers);
     RegisterHandlers_Tree(allHandlers);
     RegisterHandlers_Houdini(allHandlers);
     RegisterHandlers_Misc(allHandlers);

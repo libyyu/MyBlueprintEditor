@@ -134,17 +134,29 @@ PinType BlueprintEditor::GetResolvedPinType(const Pin& pin)
     if (pin.Type != PinType::Any)
         return pin.Type;
 
-    // 查找与此 Any 引脚相连的对端引脚
-    for (const auto& link : m_Links)
-    {
-        Pin* otherPin = nullptr;
-        if (link.StartPinID == pin.ID)
-            otherPin = FindPin(link.EndPinID);
-        else if (link.EndPinID == pin.ID)
-            otherPin = FindPin(link.StartPinID);
+    // 使用哈希索引加速查找（避免线性扫描全部链接）
+    auto* doc = ActiveDoc();
+    if (!doc) return PinType::Any;
+    doc->ensureEditorIndices();
 
-        if (otherPin && otherPin->Type != PinType::Any)
-            return otherPin->Type;
+    uint64_t pinId = reinterpret_cast<uintptr_t>(pin.ID.AsPointer());
+    for (const auto& link : doc->links)
+    {
+        uint64_t startId = reinterpret_cast<uintptr_t>(link.StartPinID.AsPointer());
+        uint64_t endId   = reinterpret_cast<uintptr_t>(link.EndPinID.AsPointer());
+
+        if (startId == pinId)
+        {
+            auto it = doc->pinIdIndex.find(endId);
+            if (it != doc->pinIdIndex.end() && it->second->Type != PinType::Any)
+                return it->second->Type;
+        }
+        else if (endId == pinId)
+        {
+            auto it = doc->pinIdIndex.find(startId);
+            if (it != doc->pinIdIndex.end() && it->second->Type != PinType::Any)
+                return it->second->Type;
+        }
     }
 
     return PinType::Any;  // 未连线或对端也是 Any

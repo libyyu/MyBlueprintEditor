@@ -134,6 +134,24 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
         d.outputPins = { MakeFlowPin("Default"), MakeFlowPin("0"), MakeFlowPin("1"), MakeFlowPin("2"), MakeFlowPin("3") };
         registry.registerNode(d);
     }
+
+    // MultiGate — 依次激活多个输出（或随机）
+    {
+        NodeDefinition d;
+        d.id = "MultiGate";
+        d.name = "Multi Gate";
+        d.category = "Flow";
+        d.inputPins = { MakeFlowPin(""), MakeFlowPin("Reset"), MakePin("Loop", PinDataType::Boolean), MakePin("Random", PinDataType::Boolean) };
+        d.outputPins = { MakeFlowPin("Out 0"), MakeFlowPin("Out 1"), MakeFlowPin("Out 2"), MakeFlowPin("Out 3") };
+        registry.registerNode(d);
+    }
+
+    // ForLoopWithBreak — 可中断的 For Loop
+    reg("ForLoopWithBreak", "For Loop with Break", "Flow",
+        { MakeFlowPin(""), MakePin("First Index", PinDataType::Integer),
+          MakePin("Last Index", PinDataType::Integer), MakeFlowPin("Break") },
+        { MakeFlowPin("Loop Body"), MakePin("Index", PinDataType::Integer),
+          MakeFlowPin("Completed") });
 }
 
 static void RegisterNodeDefs_Action(INodeRegistry& registry)
@@ -459,6 +477,52 @@ static void RegisterNodeDefs_Math(INodeRegistry& registry)
         { MakePin("Value", PinDataType::Float) },
         "80C3F8", "Simple");
 
+    // --- Advanced Functions (Math/Functions) ---
+    reg("InverseLerp", "Inverse Lerp", "Math/Functions",
+        { MakePin("A", PinDataType::Float), MakePin("B", PinDataType::Float), MakePin("Value", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Remap01", "Remap 0-1", "Math/Functions",
+        { MakePin("Value", PinDataType::Float), MakePin("InMin", PinDataType::Float), MakePin("InMax", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("DegreesToRadians", "Degrees to Radians", "Math/Conversion",
+        { MakePin("Degrees", PinDataType::Float) },
+        { MakePin("Radians", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("RadiansToDegrees", "Radians to Degrees", "Math/Conversion",
+        { MakePin("Radians", PinDataType::Float) },
+        { MakePin("Degrees", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Wrap", "Wrap", "Math/Functions",
+        { MakePin("Value", PinDataType::Float), MakePin("Min", PinDataType::Float), MakePin("Max", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Snap", "Snap to Grid", "Math/Functions",
+        { MakePin("Value", PinDataType::Float), MakePin("GridSize", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Log2", "Log2", "Math/Functions",
+        { MakePin("Value", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Log10", "Log10", "Math/Functions",
+        { MakePin("Value", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Exp", "Exp", "Math/Functions",
+        { MakePin("Value", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
     // --- Misc (直接在 Math 顶级) ---
     reg("Weird", "o.O", "Math",
         { MakePin("", PinDataType::Float) },
@@ -480,6 +544,22 @@ static void RegisterNodeDefs_Debug(INodeRegistry& registry)
     reg("Log", "Log", "Debug",
         { MakeFlowPin(""), MakePin("Message", PinDataType::String) },
         { MakeFlowPin("") });
+
+    // Assert — 断言条件为真，否则输出错误
+    reg("Assert", "Assert", "Debug",
+        { MakeFlowPin(""), MakePin("Condition", PinDataType::Boolean), MakePin("Message", PinDataType::String) },
+        { MakeFlowPin("") },
+        "FF4040");
+
+    // FormatLog — 带格式化的日志输出
+    reg("FormatLog", "Format Log", "Debug",
+        { MakeFlowPin(""), MakePin("Format", PinDataType::String),
+          MakePin("Arg 0", PinDataType::Any), MakePin("Arg 1", PinDataType::Any) },
+        { MakeFlowPin("") });
+    {
+        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("FormatLog"));
+        if (d) d->customProperties["dynamicInputs"] = "Any";
+    }
 }
 
 static void RegisterNodeDefs_String(INodeRegistry& registry)
@@ -579,6 +659,42 @@ static void RegisterNodeDefs_String(INodeRegistry& registry)
         auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("FormatString"));
         if (d) d->customProperties["dynamicInputs"] = "Any";
     }
+
+    // StringJoin — 用分隔符连接数组中的字符串
+    reg("StringJoin", "String Join", "Misc/String",
+        { MakePin("Array", PinDataType::Array), MakePin("Separator", PinDataType::String) },
+        { MakePin("Result", PinDataType::String) },
+        "", "Simple");
+
+    // StringRepeat — 重复字符串 N 次
+    reg("StringRepeat", "String Repeat", "Misc/String",
+        { MakePin("String", PinDataType::String), MakePin("Count", PinDataType::Integer) },
+        { MakePin("Result", PinDataType::String) },
+        "", "Simple");
+
+    // StringPadLeft — 左侧填充
+    reg("StringPadLeft", "String Pad Left", "Misc/String",
+        { MakePin("String", PinDataType::String), MakePin("TotalWidth", PinDataType::Integer), MakePin("PadChar", PinDataType::String) },
+        { MakePin("Result", PinDataType::String) },
+        "", "Simple");
+
+    // StringPadRight — 右侧填充
+    reg("StringPadRight", "String Pad Right", "Misc/String",
+        { MakePin("String", PinDataType::String), MakePin("TotalWidth", PinDataType::Integer), MakePin("PadChar", PinDataType::String) },
+        { MakePin("Result", PinDataType::String) },
+        "", "Simple");
+
+    // CharAt — 获取指定位置字符
+    reg("CharAt", "Char At", "Misc/String",
+        { MakePin("String", PinDataType::String), MakePin("Index", PinDataType::Integer) },
+        { MakePin("Char", PinDataType::String), MakePin("Valid", PinDataType::Boolean) },
+        "", "Simple");
+
+    // StringReverse — 反转字符串
+    reg("StringReverse", "String Reverse", "Misc/String",
+        { MakePin("String", PinDataType::String) },
+        { MakePin("Result", PinDataType::String) },
+        "", "Simple");
 }
 
 static void RegisterNodeDefs_Array(INodeRegistry& registry)
@@ -681,6 +797,83 @@ static void RegisterNodeDefs_Houdini(INodeRegistry& registry)
         "", "Houdini");
 }
 
+static void RegisterNodeDefs_Time(INodeRegistry& registry)
+{
+    auto reg = [&registry](const char* id, const char* name, const char* category,
+                  std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
+                  const char* color = "", const char* edType = "")
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
+
+    // GetTime — 获取当前时间（秒，自 epoch）
+    reg("GetTime", "Get Time", "Time",
+        {},
+        { MakePin("Seconds", PinDataType::Float) },
+        "40C0C0", "Simple");
+
+    // DeltaTime — 获取帧间隔时间
+    reg("DeltaTime", "Delta Time", "Time",
+        {},
+        { MakePin("Seconds", PinDataType::Float) },
+        "40C0C0", "Simple");
+
+    // TimeSince — 计算距某时间戳过去了多少秒
+    reg("TimeSince", "Time Since", "Time",
+        { MakePin("Timestamp", PinDataType::Float) },
+        { MakePin("Elapsed", PinDataType::Float) },
+        "40C0C0", "Simple");
+
+    // FormatTime — 格式化时间为可读字符串
+    reg("FormatTime", "Format Time", "Time",
+        { MakePin("Seconds", PinDataType::Float) },
+        { MakePin("Formatted", PinDataType::String) },
+        "40C0C0", "Simple");
+
+    // TimerInfo — 查询计时器状态
+    reg("TimerInfo", "Timer Info", "Time",
+        { MakePin("TimerHandle", PinDataType::Integer) },
+        { MakePin("IsActive", PinDataType::Boolean), MakePin("IsPaused", PinDataType::Boolean),
+          MakePin("Elapsed", PinDataType::Float), MakePin("Remaining", PinDataType::Float) },
+        "40C0C0", "Simple");
+}
+
+static void RegisterNodeDefs_Data(INodeRegistry& registry)
+{
+    auto reg = [&registry](const char* id, const char* name, const char* category,
+                  std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
+                  const char* color = "", const char* edType = "")
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
+
+    // ToJSON — 将值序列化为 JSON 字符串
+    reg("ToJSON", "To JSON", "Data",
+        { MakePin("Value", PinDataType::Any) },
+        { MakePin("JSON", PinDataType::String) },
+        "C080F8", "Simple");
+
+    // FromJSON — 从 JSON 字符串解析值
+    reg("FromJSON", "From JSON", "Data",
+        { MakePin("JSON", PinDataType::String) },
+        { MakePin("Value", PinDataType::Any), MakePin("Valid", PinDataType::Boolean) },
+        "C080F8", "Simple");
+
+    // HasKey — 检查 JSON 对象中是否含有指定键
+    reg("HasKey", "Has Key", "Data",
+        { MakePin("JSON", PinDataType::String), MakePin("Key", PinDataType::String) },
+        { MakePin("Result", PinDataType::Boolean) },
+        "C080F8", "Simple");
+
+    // GetField — 从 JSON 字符串中获取指定字段
+    reg("GetField", "Get Field", "Data",
+        { MakePin("JSON", PinDataType::String), MakePin("Key", PinDataType::String) },
+        { MakePin("Value", PinDataType::String), MakePin("Found", PinDataType::Boolean) },
+        "C080F8", "Simple");
+
+    // ArrayToString — 将数组转为字符串表示
+    reg("ArrayToString", "Array to String", "Data",
+        { MakePin("Array", PinDataType::Array) },
+        { MakePin("String", PinDataType::String) },
+        "C080F8", "Simple");
+}
+
 static void RegisterNodeDefs_Misc(INodeRegistry& registry)
 {
     auto reg = [&registry](const char* id, const char* name, const char* category,
@@ -757,6 +950,8 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     addCat("Action",   "Actions");
     addCat("Math",     "Math");
     addCat("Debug",    "Debug");
+    addCat("Time",     "Time");
+    addCat("Data",     "Data");
     addCat("Tree",     "Behavior Tree");
     addCat("Houdini",  "Houdini");
     addCat("Misc",     "Misc");
@@ -768,6 +963,8 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     RegisterNodeDefs_Debug(registry);
     RegisterNodeDefs_String(registry);
     RegisterNodeDefs_Array(registry);
+    RegisterNodeDefs_Time(registry);
+    RegisterNodeDefs_Data(registry);
     RegisterNodeDefs_Tree(registry);
     RegisterNodeDefs_Houdini(registry);
     RegisterNodeDefs_Misc(registry);

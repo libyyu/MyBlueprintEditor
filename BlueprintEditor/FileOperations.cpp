@@ -336,13 +336,13 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
         std::string resolvedDefId = rtNode.definitionId;
         if (!def)
         {
-            auto allDefs = m_NodeRegistry.getAllNodeDefinitions();
-            for (const auto& d : allDefs)
+            auto& allDefs = m_NodeRegistry.getAllNodeDefinitions();
+            for (const auto* d : allDefs)
             {
-                if (d.name == rtNode.definitionId || d.name == rtNode.name)
+                if (d->name == rtNode.definitionId || d->name == rtNode.name)
                 {
-                    def = m_NodeRegistry.getNodeDefinition(d.id);
-                    resolvedDefId = d.id;
+                    def = m_NodeRegistry.getNodeDefinition(d->id);
+                    resolvedDefId = d->id;
                     break;
                 }
             }

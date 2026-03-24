@@ -93,8 +93,8 @@ public:
     // 获取节点定义
     virtual const NodeDefinition* getNodeDefinition(const std::string& nodeId) const = 0;
     
-    // 获取所有节点定义
-    virtual std::vector<NodeDefinition> getAllNodeDefinitions() const = 0;
+    // 获取所有节点定义（返回 const 引用，避免拷贝）
+    virtual const std::vector<const NodeDefinition*>& getAllNodeDefinitions() const = 0;
     
     // 获取类别下的所有节点（精确匹配 category 字段）
     virtual std::vector<NodeDefinition> getNodesByCategory(const std::string& categoryId) const = 0;
@@ -125,7 +125,15 @@ public:
     {
         if (definition.id.empty()) return false;
         
+        bool isNew = (m_nodeDefinitions.find(definition.id) == m_nodeDefinitions.end());
         m_nodeDefinitions[definition.id] = definition;
+        
+        // 同步维护 allDefs 缓存
+        if (isNew)
+            m_allDefsCache.push_back(&m_nodeDefinitions[definition.id]);
+        else
+            rebuildAllDefsCache();
+        
         return true;
     }
     
@@ -135,6 +143,7 @@ public:
         if (it == m_nodeDefinitions.end()) return false;
         
         m_nodeDefinitions.erase(it);
+        rebuildAllDefsCache();
         return true;
     }
     
@@ -144,14 +153,9 @@ public:
         return (it != m_nodeDefinitions.end()) ? &it->second : nullptr;
     }
     
-    std::vector<NodeDefinition> getAllNodeDefinitions() const override
+    const std::vector<const NodeDefinition*>& getAllNodeDefinitions() const override
     {
-        std::vector<NodeDefinition> result;
-        for (const auto& pair : m_nodeDefinitions)
-        {
-            result.push_back(pair.second);
-        }
-        return result;
+        return m_allDefsCache;
     }
     
     std::vector<NodeDefinition> getNodesByCategory(const std::string& categoryId) const override
@@ -220,8 +224,17 @@ public:
     }
     
 private:
+    void rebuildAllDefsCache() const
+    {
+        m_allDefsCache.clear();
+        m_allDefsCache.reserve(m_nodeDefinitions.size());
+        for (const auto& pair : m_nodeDefinitions)
+            m_allDefsCache.push_back(&pair.second);
+    }
+
     std::unordered_map<std::string, NodeDefinition>   m_nodeDefinitions;
     std::unordered_map<std::string, NodeCategory>     m_categories;
+    mutable std::vector<const NodeDefinition*>        m_allDefsCache;  // 缓存，避免每次调用时拷贝
 };
 
 } // namespace Runtime
