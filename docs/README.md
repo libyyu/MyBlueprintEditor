@@ -1,5 +1,31 @@
 # Node Editor in ImGui
 
+imgui-node-editor/
+├── Application/        ← 应用框架库（原 examples/application/）
+├── BlueprintEditor/    ← 🎯 正式蓝图编辑器（原 examples/blueprints-example/）
+│   ├── main.cpp
+│   ├── BlueprintEditor.h / .cpp
+│   ├── EditorTypes.h
+│   ├── EditorUI.cpp
+│   ├── ExecutionPanel.cpp
+│   ├── FileOperations.cpp
+│   ├── ClipboardOps.cpp
+│   ├── Minimap.cpp
+│   ├── SearchOverlay.cpp
+│   ├── BuiltinNodeDefs.cpp
+│   ├── BuiltinHandlers.cpp
+│   └── utilities/          (builders, drawing, widgets)
+├── Editor/             — 节点编辑器核心库
+├── Runtime/            — 蓝图运行时库
+├── UI/                 — UI 组件
+├── Utils/              — 工具库
+├── data/               — 资源文件（字体、图片、配置）
+├── examples/           — 保留的小示例（simple, canvas, widgets, basic-interaction, runtime）
+├── external/           — 第三方依赖
+├── CMakeLists.txt      — 统一构建入口
+└── build.bat           — 一键构建脚本
+
+
 [![build](https://github.com/thedmd/imgui-node-editor/actions/workflows/build.yml/badge.svg)](https://github.com/thedmd/imgui-node-editor/actions/workflows/build.yml)
 
 ## About

@@ -29,7 +29,7 @@ exit /b 1
 
 :start_build
 echo ============================================
-echo  ImGui Node Editor - Build Script
+echo  Blueprint Editor - Build Script
 echo  Configuration: %BUILD_TYPE%
 echo  Examples: %BUILD_EXAMPLES%
 echo ============================================
@@ -72,7 +72,7 @@ if %ERRORLEVEL% neq 0 (
 echo.
 echo ============================================
 echo  Build succeeded! (%BUILD_TYPE%)
-echo  Output: %BUILD_DIR%
+echo  Output: %BUILD_DIR%\bin
 echo ============================================
 
 endlocal
