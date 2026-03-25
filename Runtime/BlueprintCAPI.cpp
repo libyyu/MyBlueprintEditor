@@ -201,7 +201,9 @@ BLUEPRINT_CAPI void BP_SetLogCallback(BP_Runner runner, BP_LogCallback callback)
     if (!runner) return;
     auto* w = asWrapper(runner);
     if (callback)
-        w->runner.SetLogCallback([callback](const std::string& msg) { callback(msg.c_str()); });
+        w->runner.SetLogCallback([callback](LogLevel lv, const std::string& msg) {
+            callback(static_cast<BP_LogLevel>(lv), msg.c_str());
+        });
     else
         w->runner.SetLogCallback(nullptr);
 }
@@ -227,7 +229,9 @@ BLUEPRINT_CAPI void BP_SetPrintCallback(BP_Runner runner, BP_LogCallback callbac
     if (!runner) return;
     auto* w = asWrapper(runner);
     if (callback)
-        w->runner.SetPrintCallback([callback](const std::string& msg) { callback(msg.c_str()); });
+        w->runner.SetPrintCallback([callback](LogLevel lv, const std::string& msg) {
+            callback(static_cast<BP_LogLevel>(lv), msg.c_str());
+        });
     else
         w->runner.SetPrintCallback(nullptr);
 }

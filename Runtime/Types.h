@@ -348,5 +348,32 @@ struct NodeSize
     NodeSize(float w, float h) : width(w), height(h) {}
 };
 
+// ---------------------------------------------------------------------------
+// Log / Print level
+// ---------------------------------------------------------------------------
+
+/// Severity level for both debug log messages (OnLog) and
+/// application-level print messages (OnPrint / PrintString node).
+enum class LogLevel : int
+{
+    Verbose = 0,   ///< Detailed trace information (e.g. per-node execution steps)
+    Info    = 1,   ///< Normal informational output (PrintString default)
+    Warning = 2,   ///< Non-fatal issues (e.g. missing optional pin, type coercion)
+    Error   = 3,   ///< Fatal errors that stop or skip execution
+};
+
+/// Returns a short prefix string for a given level, e.g. "[W] ".
+inline const char* LogLevelPrefix(LogLevel level)
+{
+    switch (level)
+    {
+        case LogLevel::Verbose: return "[V] ";
+        case LogLevel::Info:    return "[I] ";
+        case LogLevel::Warning: return "[W] ";
+        case LogLevel::Error:   return "[E] ";
+        default:                return "    ";
+    }
+}
+
 } // namespace Runtime
 } // namespace NodeEditor

@@ -26,6 +26,18 @@ using UnityEngine;
 namespace BlueprintRuntime
 {
     // =========================================================================
+    // Log level (mirrors Runtime::LogLevel in C++)
+    // =========================================================================
+
+    public enum BPLogLevel : int
+    {
+        Verbose = 0,   // Detailed trace (internal debug)
+        Info    = 1,   // Normal output (PrintString default)
+        Warning = 2,   // Non-fatal issues
+        Error   = 3,   // Fatal / assertion failures
+    }
+
+    // =========================================================================
     // Platform-specific DLL name selection
     // =========================================================================
 
@@ -54,7 +66,8 @@ namespace BlueprintRuntime
     {
         // Log callback delegate – must be cdecl to match C side
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public delegate void LogCallbackDelegate([MarshalAs(UnmanagedType.LPStr)] string message);
+        public delegate void LogCallbackDelegate(BPLogLevel level,
+            [MarshalAs(UnmanagedType.LPStr)] string message);
 
         // --- Lifecycle ---
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
@@ -163,17 +176,17 @@ namespace BlueprintRuntime
         private Native.LogCallbackDelegate _printDelegate;
 
         /// <summary>
-        /// Fired for internal debug/diagnostic messages.
-        /// Only active when logging is enabled (see EnableLogging).
+        /// Fired for internal debug/diagnostic messages (only when logging enabled).
+        /// Parameters: (level, message)
         /// </summary>
-        public event Action<string> OnLog;
+        public event Action<BPLogLevel, string> OnLog;
 
         /// <summary>
         /// Fired by PrintString / Log / FormatLog nodes.
-        /// This is the application-level print channel – wire it to your
-        /// game console, UI log, or Debug.Log.  Independent of EnableLogging.
+        /// Wire to your game console / UI. Independent of EnableLogging.
+        /// Parameters: (level, message)
         /// </summary>
-        public event Action<string> OnPrint;
+        public event Action<BPLogLevel, string> OnPrint;
 
         // ---------------------------------------------------------------------
         // Construction / disposal
@@ -186,8 +199,8 @@ namespace BlueprintRuntime
                 throw new InvalidOperationException("BP_CreateRunner returned null");
 
             // Wire up callbacks – keep delegate refs alive to prevent GC
-            _logDelegate   = msg => OnLog?.Invoke(msg);
-            _printDelegate = msg => OnPrint?.Invoke(msg);
+            _logDelegate   = (lv, msg) => OnLog?.Invoke(lv, msg);
+            _printDelegate = (lv, msg) => OnPrint?.Invoke(lv, msg);
             Native.BP_SetLogCallback(_handle, _logDelegate);
             Native.BP_SetPrintCallback(_handle, _printDelegate);
         }
@@ -436,11 +449,27 @@ namespace BlueprintRuntime
         {
             Runner = new BPRunner();
             // PrintString / Log / FormatLog → Unity console
-            Runner.OnPrint += msg => Debug.Log($"[Blueprint] {msg}");
+            Runner.OnPrint += (lv, msg) =>
+            {
+                switch (lv)
+                {
+                    case BPLogLevel.Warning: Debug.LogWarning($"[Blueprint] {msg}"); break;
+                    case BPLogLevel.Error:   Debug.LogError  ($"[Blueprint] {msg}"); break;
+                    default:                 Debug.Log       ($"[Blueprint] {msg}"); break;
+                }
+            };
             // Internal debug log only in Editor / development builds
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Runner.EnableLogging(true);
-            Runner.OnLog += msg => Debug.Log($"[Blueprint:dbg] {msg}");
+            Runner.OnLog += (lv, msg) =>
+            {
+                switch (lv)
+                {
+                    case BPLogLevel.Warning: Debug.LogWarning($"[BP:dbg] {msg}"); break;
+                    case BPLogLevel.Error:   Debug.LogError  ($"[BP:dbg] {msg}"); break;
+                    default:                 Debug.Log       ($"[BP:dbg] {msg}"); break;
+                }
+            };
 #endif
 
             try

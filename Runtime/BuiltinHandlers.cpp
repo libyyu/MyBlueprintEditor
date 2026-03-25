@@ -93,7 +93,7 @@ static void RegisterHandlers_Flow(
 
         if (filePath.empty())
         {
-            ctx.Log("  [ExecuteBlueprint] ERROR: File path is empty");
+            ctx.LogError("[ExecuteBlueprint] File path is empty");
             ctx.SetOutputValue("Success", Variant(false));
             ctx.SetOutputValue("Output", Variant(std::string("Error: empty file path")));
             ctx.ActivateOutputFlow("Done");
@@ -119,7 +119,7 @@ static void RegisterHandlers_Flow(
 
         if (!importResult.success)
         {
-            ctx.Log("  [ExecuteBlueprint] ERROR: " + importResult.errorMessage);
+            ctx.LogError("[ExecuteBlueprint] " + importResult.errorMessage);
             ctx.SetOutputValue("Success", Variant(false));
             ctx.SetOutputValue("Output", Variant(std::string("Load error: ") + importResult.errorMessage));
             ctx.ActivateOutputFlow("Done");
@@ -141,14 +141,14 @@ static void RegisterHandlers_Flow(
             subRunner.SetParentTimerManager(runner.GetTimerManagerPtr());
 
             std::vector<std::string> subLog;
-            subRunner.SetLogCallback([&subLog, &ctx](const std::string& msg) {
+            subRunner.SetLogCallback([&subLog, &ctx](LogLevel lv, const std::string& msg) {
                 subLog.push_back(msg);
-                ctx.Log("    | " + msg);
+                ctx.Log("    | " + msg, lv);
             });
 
             if (!subRunner.Load(importResult.data))
             {
-                ctx.Log("  [ExecuteBlueprint] ERROR: Failed to load sub-blueprint");
+                ctx.LogError("[ExecuteBlueprint] Failed to load sub-blueprint");
                 ctx.SetOutputValue("Success", Variant(false));
                 ctx.SetOutputValue("Output", Variant(std::string("Load failed")));
                 ctx.ActivateOutputFlow("Done");
@@ -217,14 +217,14 @@ static void RegisterHandlers_Flow(
 
             // 使用 shared_ptr 管理 subLog，保证异步 timer 回调时仍可访问
             auto subLog = std::make_shared<std::vector<std::string>>();
-            subRunner->SetLogCallback([subLog, &ctx](const std::string& msg) {
+            subRunner->SetLogCallback([subLog, &ctx](LogLevel lv, const std::string& msg) {
                 subLog->push_back(msg);
-                ctx.Log("    | " + msg);
+                ctx.Log("    | " + msg, lv);
             });
 
             if (!subRunner->Load(*sharedData))
             {
-                ctx.Log("  [ExecuteBlueprint] Async ERROR: Failed to load sub-blueprint");
+                ctx.LogError("[ExecuteBlueprint:Async] Failed to load sub-blueprint");
                 ctx.SetOutputValue("Success", Variant(false));
                 ctx.SetOutputValue("Output", Variant(std::string("Async load failed")));
                 if (completedPinId != 0)
@@ -288,7 +288,7 @@ static void RegisterHandlers_Flow(
         {
             if (++iterations > maxIterations)
             {
-                ctx.Log("  [WhileLoop] Max iterations reached (" + std::to_string(maxIterations) + "), breaking");
+                ctx.LogWarning("[WhileLoop] Max iterations reached (" + std::to_string(maxIterations) + "), breaking");
                 break;
             }
             if (!ctx.ActivateOutputFlow("Loop Body"))
@@ -1166,7 +1166,7 @@ static void RegisterHandlers_Debug(std::unordered_map<std::string, NodeHandler>&
         auto message = ctx.GetInputValue("Message").asString();
         if (!condition)
         {
-            ctx.Print("[ASSERT FAILED] " + (message.empty() ? "Assertion failed!" : message));
+            ctx.PrintError(message.empty() ? "Assertion failed!" : message);
             return false;  // 中断执行
         }
         ctx.Log("  [Assert] Passed");

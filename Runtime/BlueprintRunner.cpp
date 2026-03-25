@@ -272,7 +272,7 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
         // 没有处理器，跳过但记录警告
         if (m_logCallback)
         {
-            m_logCallback("[WARN] No handler for node '" + node.name +
+            m_logCallback(LogLevel::Warning, "No handler for node '" + node.name +
                 "' (def: " + node.definitionId + "), skipping");
         }
         return true;
@@ -336,7 +336,7 @@ ExecutionResult BlueprintRunner::Execute()
 
         if (m_logCallback)
         {
-            m_logCallback("[EXEC] Node '" + node->name +
+            m_logCallback(LogLevel::Verbose, "Node '" + node->name +
                 "' (id=" + std::to_string(node->id) +
                 ", def=" + node->definitionId + ")");
         }
@@ -546,13 +546,13 @@ std::vector<NodeId> BlueprintRunner::GetDownstreamNodes(NodeId nodeId) const
 // 其他
 // ============================================================================
 
-void BlueprintRunner::SetLogCallback(std::function<void(const std::string&)> callback)
+void BlueprintRunner::SetLogCallback(std::function<void(LogLevel, const std::string&)> callback)
 {
     m_logCallback = std::move(callback);
     m_context.OnLog = m_logCallback;
 }
 
-void BlueprintRunner::SetPrintCallback(std::function<void(const std::string&)> callback)
+void BlueprintRunner::SetPrintCallback(std::function<void(LogLevel, const std::string&)> callback)
 {
     m_printCallback = std::move(callback);
     m_context.OnPrint = m_printCallback;
@@ -689,7 +689,7 @@ bool ExecutionContext::ActivateOutputFlow(const std::string& pinName)
     auto it = m_state->pinNameToId.find(pinName);
     if (it == m_state->pinNameToId.end())
     {
-        Log("[WARN] ActivateOutputFlow: pin '" + pinName + "' not found");
+        LogWarning("ActivateOutputFlow: pin '" + pinName + "' not found");
         return true; // 引脚不存在不视为致命错误
     }
     return ActivateOutputFlow(it->second);
@@ -737,7 +737,7 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     if (++m_flowDepth > kMaxFlowDepth)
     {
         if (m_logCallback)
-            m_logCallback("[ERROR] Flow depth exceeded limit (" + std::to_string(kMaxFlowDepth) + "), possible infinite loop");
+            m_logCallback(LogLevel::Error, "Flow depth exceeded limit (" + std::to_string(kMaxFlowDepth) + "), possible infinite loop");
         --m_flowDepth;
         return false;
     }
@@ -885,7 +885,7 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
 
         if (m_logCallback)
         {
-            m_logCallback("[EXEC] Node '" + node->name +
+            m_logCallback(LogLevel::Verbose, "Node '" + node->name +
                 "' (id=" + std::to_string(node->id) +
                 ", def=" + node->definitionId + ")");
         }
@@ -954,7 +954,7 @@ bool BlueprintRunner::FireConnectedNode(PinId inputPinId)
 
         if (m_logCallback)
         {
-            m_logCallback("[FIRE] Node '" + sourceNode->name +
+            m_logCallback(LogLevel::Verbose, "Node '" + sourceNode->name +
                 "' (id=" + std::to_string(sourceNode->id) +
                 ", def=" + sourceNode->definitionId + ")");
         }

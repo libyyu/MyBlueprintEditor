@@ -150,7 +150,7 @@ static void test_flow_blueprint(const std::string& flowTestPath)
     RegisterBuiltinHandlers(runner, ".");
 
     std::vector<std::string> logs;
-    runner.SetLogCallback([&](const std::string& msg) {
+    runner.SetLogCallback([&](NodeEditor::Runtime::LogLevel lv, const std::string& msg) {
         logs.push_back(msg);
         std::cout << "    LOG: " << msg << "\n";
     });
@@ -192,7 +192,7 @@ static void test_map_nodes()
     RegisterBuiltinHandlers(runner, ".");
 
     std::vector<std::string> logs;
-    runner.SetLogCallback([&](const std::string& msg) { logs.push_back(msg); });
+    runner.SetLogCallback([&](NodeEditor::Runtime::LogLevel lv, const std::string& msg) { logs.push_back(msg); });
 
     BlueprintData bp;
     bp.metadata.name = "MapTest";
@@ -456,7 +456,7 @@ static int runBlueprintFromFile(const std::string& filePath, float maxTimeSec, i
     std::cout << std::endl;
 
     BlueprintRunner runner;
-    runner.SetLogCallback([](const std::string& msg) { std::cout << msg << std::endl; });
+    runner.SetLogCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
 
     bool isEditorFile = (fileName.size() > 12 && fileName.substr(fileName.size()-12) == ".editor.json");
 
@@ -643,7 +643,7 @@ int main(int argc, char* argv[])
     // Step 2: 运行时 — 只加载 Runtime 文件
     std::cout << "--- Step 2: Runtime — load only Runtime file and execute ---" << std::endl;
     BlueprintRunner runner;
-    runner.SetLogCallback([](const std::string& msg) { std::cout << msg << std::endl; });
+    runner.SetLogCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
 
     if (!runner.LoadFromFile("blueprint.json"))
     {

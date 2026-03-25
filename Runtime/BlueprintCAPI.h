@@ -69,8 +69,16 @@ extern "C" {
 
 typedef void* BP_Runner;
 
-// Log callback type: called on the same thread as BP_Execute / BP_Tick
-typedef void (*BP_LogCallback)(const char* message);
+// Log level – matches NodeEditor::Runtime::LogLevel
+typedef enum BP_LogLevel {
+    BP_LOG_VERBOSE = 0,
+    BP_LOG_INFO    = 1,
+    BP_LOG_WARNING = 2,
+    BP_LOG_ERROR   = 3
+} BP_LogLevel;
+
+// Log/print callback type: (level, message)
+typedef void (*BP_LogCallback)(BP_LogLevel level, const char* message);
 
 // ---------------------------------------------------------------------------
 // Lifecycle

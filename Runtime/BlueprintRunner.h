@@ -183,7 +183,8 @@ public:
 
     /// Called for internal debug/diagnostic messages.
     /// Gated by loggingEnabled – silent when false (default in Release builds).
-    std::function<void(const std::string& message)> OnLog;
+    /// Signature: (level, message)
+    std::function<void(LogLevel, const std::string&)> OnLog;
 
     /// Master switch for internal debug logging.
     /// Default: OFF in release (NDEBUG defined), ON otherwise.
@@ -193,37 +194,41 @@ public:
     bool loggingEnabled = true;
 #endif
 
-    void Log(const std::string& message) const
+    void Log(const std::string& message, LogLevel level = LogLevel::Verbose) const
     {
-        if (loggingEnabled && OnLog) OnLog(message);
+        if (loggingEnabled && OnLog) OnLog(level, message);
     }
+    void LogWarning(const std::string& message) const { Log(message, LogLevel::Warning); }
+    void LogError  (const std::string& message) const { Log(message, LogLevel::Error);   }
 
     // ------------------------------------------------------------------
     // 行为层：Print（逻辑输出，第三方引擎可接管）
     // ------------------------------------------------------------------
 
-    /// Called by PrintString / Log nodes.
+    /// Called by PrintString / Log / FormatLog / Assert nodes.
     /// Independent of loggingEnabled – always fires when set.
+    /// Signature: (level, message)
     /// If not set, falls back to OnLog (if loggingEnabled), then stderr.
-    std::function<void(const std::string& message)> OnPrint;
+    std::function<void(LogLevel, const std::string&)> OnPrint;
 
-    void Print(const std::string& message) const
+    void Print(const std::string& message, LogLevel level = LogLevel::Info) const
     {
         if (OnPrint)
         {
-            OnPrint(message);
+            OnPrint(level, message);
         }
         else if (loggingEnabled && OnLog)
         {
-            OnLog(message);
+            OnLog(level, message);
         }
         else
         {
-            // Last-resort fallback so output is never silently discarded
-            // when no callback is wired up at all.
-            fprintf(stderr, "[Blueprint] %s\n", message.c_str());
+            // Last-resort fallback so output is never silently discarded.
+            fprintf(stderr, "%s%s\n", LogLevelPrefix(level), message.c_str());
         }
     }
+    void PrintWarning(const std::string& message) const { Print(message, LogLevel::Warning); }
+    void PrintError  (const std::string& message) const { Print(message, LogLevel::Error);   }
 
     // ------------------------------------------------------------------
     // 行为层：Timer
@@ -414,19 +419,19 @@ public:
     // 日志 / 输出配置
     // ------------------------------------------------------------------
 
-    /// Set callback for internal debug/diagnostic messages.
+    /// Set callback for internal debug/diagnostic messages (LogLevel, message).
     /// Has no effect when logging is disabled (see EnableLogging).
-    void SetLogCallback(std::function<void(const std::string&)> callback);
+    void SetLogCallback(std::function<void(LogLevel, const std::string&)> callback);
 
     /// Enable or disable internal debug logging (OnLog).
     /// Default: OFF when NDEBUG is defined (Release), ON otherwise.
     void EnableLogging(bool enable) { m_context.loggingEnabled = enable; }
     bool IsLoggingEnabled() const   { return m_context.loggingEnabled; }
 
-    /// Set callback for PrintString / Log node output.
+    /// Set callback for PrintString / Log / FormatLog node output (LogLevel, message).
     /// This is the "application-level" print channel that engines like Unity
     /// should override.  Independent of EnableLogging.
-    void SetPrintCallback(std::function<void(const std::string&)> callback);
+    void SetPrintCallback(std::function<void(LogLevel, const std::string&)> callback);
 
     // 重置执行状态（保留蓝图数据和处理器注册）
     void ResetState();
@@ -552,8 +557,8 @@ private:
     std::string                                         m_lastError;
 
     // 调试日志回调 / 逻辑输出回调
-    std::function<void(const std::string&)>             m_logCallback;
-    std::function<void(const std::string&)>             m_printCallback;
+    std::function<void(LogLevel, const std::string&)>   m_logCallback;
+    std::function<void(LogLevel, const std::string&)>   m_printCallback;
 
     // 主线程计时器管理器（shared_ptr，可共享给子 runner）
     std::shared_ptr<FrameTimerManager>                  m_timerManager;
