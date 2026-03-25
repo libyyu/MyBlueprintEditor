@@ -106,7 +106,11 @@ public:
         ImU32       pinHoverColor = IM_COL32(200, 200, 200, 255);
     };
     
-    explicit SimpleNodeBuilder(const Config& config = Config());
+    // Two constructors: GCC rejects a defaulted argument of type Config{} inside
+    // the enclosing class body when Config has NSDMI members (CWG 1264 / GCC bug).
+    // The no-arg overload delegates to the explicit one with a default-constructed Config.
+    SimpleNodeBuilder();
+    explicit SimpleNodeBuilder(const Config& config);
     
     // 开始构建节点
     void Begin(uint64_t nodeId, const std::string& title, const ImVec2& position);

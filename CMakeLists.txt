@@ -208,6 +208,35 @@ if(NOT BUILD_RUNTIME_ONLY)
     # ------------------------------------------------------------------
     # Application framework  (platform abstraction + rendering backend)
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Detect platform backends (GLFW + OpenGL for non-Windows)
+    # ------------------------------------------------------------------
+    set(HAVE_GLFW3  0)
+    set(HAVE_OPENGL 0)
+
+    if(WIN32)
+        # Windows always uses Win32 + DX11; no GLFW/OpenGL needed
+    else()
+        find_package(glfw3 QUIET)
+        find_package(OpenGL QUIET)
+        if(glfw3_FOUND AND OpenGL_FOUND)
+            set(HAVE_GLFW3  1)
+            set(HAVE_OPENGL 1)
+            message(STATUS "[Application] GLFW3 + OpenGL found → GLFW/OGL3 backend")
+        else()
+            if(NOT glfw3_FOUND)
+                message(WARNING "[Application] glfw3 not found. Install: apt install libglfw3-dev / brew install glfw")
+            endif()
+            if(NOT OpenGL_FOUND)
+                message(WARNING "[Application] OpenGL not found.")
+            endif()
+            message(FATAL_ERROR "[Application] GLFW3 and OpenGL are required on non-Windows platforms. "
+                "Install them or pass -DBUILD_RUNTIME_ONLY=ON to skip the editor.")
+        endif()
+    endif()
+
+    # Regenerate config.h with HAVE_GLFW3 / HAVE_OPENGL
     configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/Application/source/config.h.in
         ${CMAKE_BINARY_DIR}/Application/config.h
@@ -221,13 +250,13 @@ if(NOT BUILD_RUNTIME_ONLY)
         Application/source/imgui_extra_keys.h
         Application/source/setup.h
         Application/source/platform.h
-        Application/source/platform_win32.cpp
         Application/source/renderer.h
-        Application/source/renderer_dx11.cpp
     )
 
     if(WIN32)
         list(APPEND APPLICATION_SOURCES
+            Application/source/platform_win32.cpp
+            Application/source/renderer_dx11.cpp
             Application/source/imgui_impl_dx11.cpp
             Application/source/imgui_impl_dx11.h
             Application/source/imgui_impl_win32.cpp
@@ -251,6 +280,17 @@ if(NOT BUILD_RUNTIME_ONLY)
             IMPORTED_LOCATION_DEBUG "${DXSDK_DIR}/lib/${DXSDK_ARCH}/d3dx11d.lib"
             INTERFACE_INCLUDE_DIRECTORIES "${DXSDK_DIR}/include"
         )
+    else()
+        # Linux / macOS: GLFW + OpenGL 3
+        list(APPEND APPLICATION_SOURCES
+            Application/source/platform_glfw.cpp
+            Application/source/renderer_ogl3.cpp
+            Application/source/imgui_impl_glfw.cpp
+            Application/source/imgui_impl_glfw.h
+            Application/source/imgui_impl_opengl3.cpp
+            Application/source/imgui_impl_opengl3.h
+            Application/source/imgui_impl_opengl3_loader.h
+        )
     endif()
 
     add_library(Application STATIC ${APPLICATION_SOURCES})
@@ -266,6 +306,8 @@ if(NOT BUILD_RUNTIME_ONLY)
     target_link_libraries(Application PUBLIC ImGuiNodeEditor)
     if(WIN32)
         target_link_libraries(Application PRIVATE d3d11.lib d3dcompiler.lib d3dx11 dxerr)
+    else()
+        target_link_libraries(Application PRIVATE glfw OpenGL::GL ${CMAKE_DL_LIBS})
     endif()
 
     set_target_properties(Application PROPERTIES

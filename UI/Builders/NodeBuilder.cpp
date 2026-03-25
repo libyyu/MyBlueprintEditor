@@ -162,6 +162,11 @@ void NodeBuilder::SetSize(const ImVec2& size)
 // SimpleNodeBuilder 实现
 // ============================================================================
 
+SimpleNodeBuilder::SimpleNodeBuilder()
+    : SimpleNodeBuilder(Config{})
+{
+}
+
 SimpleNodeBuilder::SimpleNodeBuilder(const Config& config)
     : m_Config(config)
     , m_CurrentNodeId(0)
