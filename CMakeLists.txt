@@ -51,7 +51,6 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # ---------------------------------------------------------------------------
 option(BUILD_RUNTIME_ONLY      "Build only BlueprintRuntime (no Editor / Application)" OFF)
 option(BUILD_EXAMPLES          "Build example applications" ON)
-option(BUILD_TESTS             "Build runtime unit tests" OFF)
 option(BLUEPRINT_NO_FILESYSTEM "Exclude DefaultFileSystem from BlueprintRuntime" OFF)
 
 # Emscripten: force runtime-only + static
@@ -345,9 +344,3 @@ if(NOT BUILD_RUNTIME_ONLY)
     endif()
 
 endif() # NOT BUILD_RUNTIME_ONLY
-
-# Tests（不依赖 Editor，仅需 Runtime）
-if(BUILD_TESTS)
-    message(STATUS "Building runtime tests...")
-    add_subdirectory(tests)
-endif()
