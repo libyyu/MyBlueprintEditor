@@ -83,7 +83,9 @@ Pin* BlueprintEditor::FindPin(ed::PinId id)
     doc->ensureEditorIndices();
     uint64_t pid = reinterpret_cast<uintptr_t>(id.AsPointer());
     auto it = doc->pinIdIndex.find(pid);
-    return (it != doc->pinIdIndex.end()) ? it->second : nullptr;
+    // pinIdIndex stores const Pin* to avoid const_cast in the (const) rebuild method.
+    // FindPin is called from non-const contexts only, so casting back is safe.
+    return (it != doc->pinIdIndex.end()) ? const_cast<Pin*>(it->second) : nullptr;
 }
 
 bool BlueprintEditor::IsPinLinked(ed::PinId id)

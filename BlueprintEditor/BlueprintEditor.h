@@ -193,10 +193,10 @@ struct BlueprintDocument
 
     // ---- 编辑器侧哈希索引（O(1) 查找加速） ----
     // 调用 rebuildEditorIndices() 重建；数据变更后调用 invalidateEditorIndices()
-    mutable std::unordered_map<uint64_t, size_t> nodeIdIndex;    // NodeId → nodes[] 下标
-    mutable std::unordered_map<uint64_t, size_t> linkIdIndex;    // LinkId → links[] 下标
-    mutable std::unordered_map<uint64_t, Pin*>   pinIdIndex;     // PinId → Pin*
-    mutable std::unordered_map<uint64_t, bool>    pinLinkedCache; // PinId → 是否有链接
+    mutable std::unordered_map<uint64_t, size_t>      nodeIdIndex;    // NodeId → nodes[] 下标
+    mutable std::unordered_map<uint64_t, size_t>      linkIdIndex;    // LinkId → links[] 下标
+    mutable std::unordered_map<uint64_t, const Pin*>  pinIdIndex;     // PinId → Pin* (const, no cast needed)
+    mutable std::unordered_map<uint64_t, bool>         pinLinkedCache; // PinId → 是否有链接
     mutable bool editorIndexDirty = true;
 
     void invalidateEditorIndices() const { editorIndexDirty = true; }
@@ -212,12 +212,12 @@ struct BlueprintDocument
         {
             uint64_t nid = reinterpret_cast<uintptr_t>(nodes[i].ID.AsPointer());
             nodeIdIndex[nid] = i;
-            for (auto& pin : const_cast<std::deque<Node>&>(nodes)[i].Inputs)
+            for (const auto& pin : nodes[i].Inputs)
             {
                 uint64_t pid = reinterpret_cast<uintptr_t>(pin.ID.AsPointer());
                 pinIdIndex[pid] = &pin;
             }
-            for (auto& pin : const_cast<std::deque<Node>&>(nodes)[i].Outputs)
+            for (const auto& pin : nodes[i].Outputs)
             {
                 uint64_t pid = reinterpret_cast<uintptr_t>(pin.ID.AsPointer());
                 pinIdIndex[pid] = &pin;
