@@ -62,10 +62,12 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinNodeDefs.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FileSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintCAPI.cpp
 )
 
 set(RUNTIME_PUBLIC_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintExport.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintCAPI.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Types.h
     ${CMAKE_CURRENT_SOURCE_DIR}/NodeDefinition.h
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintData.h

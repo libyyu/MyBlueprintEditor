@@ -25,7 +25,7 @@ namespace Runtime {
 //   runner    - 蓝图运行器（处理器将注册到其中）
 //   basePath  - 基准路径（用于解析 ExecuteBlueprint 等节点的相对路径）
 //   handlers  - 可选输出，返回已注册的处理器映射表（供子蓝图继承）
-void RegisterBuiltinHandlers(
+void BLUEPRINT_API RegisterBuiltinHandlers(
     BlueprintRunner& runner,
     const std::string& basePath = "",
     std::unordered_map<std::string, NodeHandler>* handlers = nullptr);

@@ -18,7 +18,7 @@ namespace NodeEditor {
 namespace Runtime {
 
 // 向注册表注册所有内置节点定义（分类 + 节点模板）
-void RegisterBuiltinNodeDefinitions(INodeRegistry& registry);
+void BLUEPRINT_API RegisterBuiltinNodeDefinitions(INodeRegistry& registry);
 
 } // namespace Runtime
 } // namespace NodeEditor
