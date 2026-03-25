@@ -194,10 +194,7 @@ public:
     bool loggingEnabled = true;
 #endif
 
-    void Log(const std::string& message, LogLevel level = LogLevel::Verbose) const
-    {
-        if (loggingEnabled && OnLog) OnLog(level, message);
-    }
+    void Log(const std::string& message, LogLevel level = LogLevel::Verbose) const;
     void LogWarning(const std::string& message) const { Log(message, LogLevel::Warning); }
     void LogError  (const std::string& message) const { Log(message, LogLevel::Error);   }
 
@@ -211,22 +208,7 @@ public:
     /// If not set, falls back to OnLog (if loggingEnabled), then stderr.
     std::function<void(LogLevel, const std::string&)> OnPrint;
 
-    void Print(const std::string& message, LogLevel level = LogLevel::Info) const
-    {
-        if (OnPrint)
-        {
-            OnPrint(level, message);
-        }
-        else if (loggingEnabled && OnLog)
-        {
-            OnLog(level, message);
-        }
-        else
-        {
-            // Last-resort fallback so output is never silently discarded.
-            fprintf(stderr, "%s%s\n", LogLevelPrefix(level), message.c_str());
-        }
-    }
+    void Print(const std::string& message, LogLevel level = LogLevel::Info) const;
     void PrintWarning(const std::string& message) const { Print(message, LogLevel::Warning); }
     void PrintError  (const std::string& message) const { Print(message, LogLevel::Error);   }
 

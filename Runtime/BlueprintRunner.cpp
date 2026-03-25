@@ -644,6 +644,42 @@ TimerCallback ExecutionContext::wrapCallbackWithContextRestore(TimerCallback cal
     };
 }
 
+void ExecutionContext::Log(const std::string& message, LogLevel level/* = LogLevel::Verbose*/) const
+{
+    if (loggingEnabled)
+    {
+        if (OnLog)
+        {
+            OnLog(level, message);
+        }
+        else
+        {
+            // Last-resort fallback so output is never silently discarded.
+            fprintf(stderr, "[Editor]%s%s\n", LogLevelPrefix(level), message.c_str());
+        }
+    }
+}
+
+void ExecutionContext::Print(const std::string& message, LogLevel level/* = LogLevel::Info*/) const
+{
+    if (m_runner && m_runner->IsWithEditor())
+    {
+        // 编辑器环境下 Print 直接走 Log 回调，确保输出可见且带颜色
+        Log(message, level);
+        return;
+    }
+
+    if (OnPrint)
+    {
+        OnPrint(level, message);
+    }
+    else
+    {
+        // Last-resort fallback so output is never silently discarded.
+        fprintf(stderr, "%s%s\n", LogLevelPrefix(level), message.c_str());
+    }
+}
+
 TimerHandle ExecutionContext::Delay(float seconds, const std::function<void()>& callback)
 {
     if (!m_runner) return InvalidTimerHandle;
