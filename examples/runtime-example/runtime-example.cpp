@@ -150,9 +150,15 @@ static void test_flow_blueprint(const std::string& flowTestPath)
     RegisterBuiltinHandlers(runner, ".");
 
     std::vector<std::string> logs;
+    // Debug diagnostics → logs[]
     runner.SetLogCallback([&](NodeEditor::Runtime::LogLevel lv, const std::string& msg) {
         logs.push_back(msg);
         std::cout << "    LOG: " << msg << "\n";
+    });
+    // PrintString / Log node output → also captured in logs[]
+    runner.SetPrintCallback([&](NodeEditor::Runtime::LogLevel lv, const std::string& msg) {
+        logs.push_back(msg);
+        std::cout << "    PRINT: " << msg << "\n";
     });
 
     bool loaded = runner.LoadFromFile(flowTestPath);
