@@ -1,9 +1,11 @@
 // Runtime/BlueprintCAPI.h - Plain C interface for Unity DllImport
 //
-// All functions use the BLUEPRINT_CAPI macro which resolves to:
-//   Windows  → __declspec(dllexport) with cdecl calling convention
-//   Linux    → visibility("default")
-//   Emscripten → EMSCRIPTEN_KEEPALIVE
+// All functions are declared as:
+//   BLUEPRINT_CAPI_EXPORT return_type BLUEPRINT_CAPI_CALL funcname(args);
+//
+// This correctly places __declspec(dllexport) before the return type and
+// __cdecl (calling convention) between the return type and function name,
+// as required by MSVC on Windows.
 //
 // Typical Unity usage (C#):
 //
@@ -63,9 +65,12 @@
 #   define BLUEPRINT_CAPI_CALL
 #endif
 
-// Use: BLUEPRINT_CAPI_EXPORT return_type BLUEPRINT_CAPI_CALL funcname(args);
-// For brevity, we provide a combined macro that works for most cases:
-#define BLUEPRINT_CAPI BLUEPRINT_CAPI_EXPORT
+// Full declaration syntax (correct on all platforms):
+//   BLUEPRINT_CAPI_EXPORT return_type BLUEPRINT_CAPI_CALL funcname(args);
+//
+// On Windows:    __declspec(dllexport) ret __cdecl funcname(args)
+// On Linux/macOS: __attribute__((visibility("default"))) ret funcname(args)
+// On Emscripten: EMSCRIPTEN_KEEPALIVE ret funcname(args)
 
 // ---------------------------------------------------------------------------
 // Opaque handle
@@ -93,10 +98,10 @@ typedef void (*BP_LogCallback)(BP_LogLevel level, const char* message);
 // ---------------------------------------------------------------------------
 
 /// Create a new BlueprintRunner instance. Returns NULL on OOM.
-BLUEPRINT_CAPI BP_Runner BP_CreateRunner(void);
+BLUEPRINT_CAPI_EXPORT BP_Runner BLUEPRINT_CAPI_CALL BP_CreateRunner(void);
 
 /// Destroy a runner created with BP_CreateRunner. Safe to call with NULL.
-BLUEPRINT_CAPI void BP_DestroyRunner(BP_Runner runner);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_DestroyRunner(BP_Runner runner);
 
 // ---------------------------------------------------------------------------
 // Loading
@@ -104,14 +109,14 @@ BLUEPRINT_CAPI void BP_DestroyRunner(BP_Runner runner);
 
 /// Load blueprint from a JSON string.
 /// Returns 0 on success, non-zero on failure (call BP_GetLastError for details).
-BLUEPRINT_CAPI int BP_LoadFromJson(BP_Runner runner, const char* json);
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromJson(BP_Runner runner, const char* json);
 
 /// Load blueprint from a file path (uses the runner's IFileSystem).
 /// Returns 0 on success, non-zero on failure.
-BLUEPRINT_CAPI int BP_LoadFromFile(BP_Runner runner, const char* filePath);
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromFile(BP_Runner runner, const char* filePath);
 
 /// Returns 1 if a blueprint has been loaded successfully, 0 otherwise.
-BLUEPRINT_CAPI int BP_IsLoaded(BP_Runner runner);
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_IsLoaded(BP_Runner runner);
 
 // ---------------------------------------------------------------------------
 // Execution
@@ -119,31 +124,31 @@ BLUEPRINT_CAPI int BP_IsLoaded(BP_Runner runner);
 
 /// Execute the blueprint from its entry point(s).
 /// Returns 0 on success, non-zero on failure.
-BLUEPRINT_CAPI int BP_Execute(BP_Runner runner);
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_Execute(BP_Runner runner);
 
 /// Execute a single node by ID.
 /// Returns 0 on success, non-zero on failure.
-BLUEPRINT_CAPI int BP_ExecuteNode(BP_Runner runner, uint64_t nodeId);
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_ExecuteNode(BP_Runner runner, uint64_t nodeId);
 
 /// Advance async timers (call once per frame with your deltaTime in seconds).
-BLUEPRINT_CAPI void BP_Tick(BP_Runner runner, float deltaTime);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_Tick(BP_Runner runner, float deltaTime);
 
 // ---------------------------------------------------------------------------
 // Variables
 // ---------------------------------------------------------------------------
 
-BLUEPRINT_CAPI void   BP_SetVariableInt   (BP_Runner runner, const char* name, int64_t value);
-BLUEPRINT_CAPI void   BP_SetVariableFloat (BP_Runner runner, const char* name, double value);
-BLUEPRINT_CAPI void   BP_SetVariableString(BP_Runner runner, const char* name, const char* value);
-BLUEPRINT_CAPI void   BP_SetVariableBool  (BP_Runner runner, const char* name, int value); // 0=false 1=true
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetVariableInt(BP_Runner runner, const char* name, int64_t value);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetVariableFloat(BP_Runner runner, const char* name, double value);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetVariableString(BP_Runner runner, const char* name, const char* value);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetVariableBool(BP_Runner runner, const char* name, int value); // 0=false 1=true
 
-BLUEPRINT_CAPI int64_t BP_GetVariableInt   (BP_Runner runner, const char* name);
-BLUEPRINT_CAPI double  BP_GetVariableFloat (BP_Runner runner, const char* name);
-BLUEPRINT_CAPI int     BP_GetVariableBool  (BP_Runner runner, const char* name); // returns 0 or 1
+BLUEPRINT_CAPI_EXPORT int64_t BLUEPRINT_CAPI_CALL BP_GetVariableInt(BP_Runner runner, const char* name);
+BLUEPRINT_CAPI_EXPORT double BLUEPRINT_CAPI_CALL BP_GetVariableFloat(BP_Runner runner, const char* name);
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetVariableBool(BP_Runner runner, const char* name); // returns 0 or 1
 
 /// Copy the string variable into buf (at most bufLen-1 bytes + NUL).
 /// Returns the number of bytes written (excluding NUL), or -1 if not found.
-BLUEPRINT_CAPI int BP_GetVariableString(BP_Runner runner, const char* name, char* buf, int bufLen);
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetVariableString(BP_Runner runner, const char* name, char* buf, int bufLen);
 
 // ---------------------------------------------------------------------------
 // Logging  (internal debug diagnostics – gated by BP_EnableLogging)
@@ -152,14 +157,14 @@ BLUEPRINT_CAPI int BP_GetVariableString(BP_Runner runner, const char* name, char
 /// Register a callback that receives internal debug/diagnostic messages.
 /// Only fires when logging is enabled (see BP_EnableLogging).
 /// Pass NULL to clear.
-BLUEPRINT_CAPI void BP_SetLogCallback(BP_Runner runner, BP_LogCallback callback);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetLogCallback(BP_Runner runner, BP_LogCallback callback);
 
 /// Enable or disable internal debug logging.
 /// Default: 0 (disabled) when built with NDEBUG (Release), 1 otherwise.
-BLUEPRINT_CAPI void BP_EnableLogging(BP_Runner runner, int enable);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_EnableLogging(BP_Runner runner, int enable);
 
 /// Returns 1 if internal logging is currently enabled, 0 otherwise.
-BLUEPRINT_CAPI int BP_IsLoggingEnabled(BP_Runner runner);
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_IsLoggingEnabled(BP_Runner runner);
 
 // ---------------------------------------------------------------------------
 // Print  (application-level output – PrintString / Log / FormatLog nodes)
@@ -171,7 +176,7 @@ BLUEPRINT_CAPI int BP_IsLoggingEnabled(BP_Runner runner);
 /// If not set, output falls back to the log callback (if logging enabled)
 /// and then to stderr.
 /// Pass NULL to clear.
-BLUEPRINT_CAPI void BP_SetPrintCallback(BP_Runner runner, BP_LogCallback callback);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetPrintCallback(BP_Runner runner, BP_LogCallback callback);
 
 // ---------------------------------------------------------------------------
 // Error handling
@@ -179,7 +184,7 @@ BLUEPRINT_CAPI void BP_SetPrintCallback(BP_Runner runner, BP_LogCallback callbac
 
 /// Copy the last error message into buf (at most bufLen-1 bytes + NUL).
 /// Returns the number of bytes written (excluding NUL).
-BLUEPRINT_CAPI int BP_GetLastError(BP_Runner runner, char* buf, int bufLen);
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetLastError(BP_Runner runner, char* buf, int bufLen);
 
 #ifdef __cplusplus
 } // extern "C"
