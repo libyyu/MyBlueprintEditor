@@ -19,6 +19,7 @@ ImColor BlueprintEditor::GetIconColor(PinType type)
         case PinType::Function: return ImColor(220,  30, 190);
         case PinType::Delegate: return ImColor(235,  55,  55);
         case PinType::Array:    return ImColor(245, 170,  30);
+        case PinType::Map:      return ImColor( 80, 190, 220);
         case PinType::Any:      return ImColor(170, 170, 180);
     }
 };
@@ -181,6 +182,7 @@ void BlueprintEditor::DrawPinIcon(const Pin& pin, bool connected, int alpha)
         case PinType::Function: iconType = IconType::Circle; break;
         case PinType::Delegate: iconType = IconType::Square; break;
         case PinType::Array:    iconType = IconType::Grid;   break;
+        case PinType::Map:      iconType = IconType::Grid;   break;
         case PinType::Any:      iconType = IconType::Diamond; break;
         default:
             return;
@@ -1220,25 +1222,48 @@ void BlueprintEditor::OnFrame(float deltaTime)
                         int pinIdx = static_cast<int>(&input - node.Inputs.data());
                         if (pinIdx >= node.DynamicInputFixedCount)
                         {
-                            ImGui::Spring(0);
-                            ImGui::PushID(input.ID.AsPointer());
-                            ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.6f, 0.1f, 0.1f, 0.6f));
-                            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.2f, 0.2f, 0.8f));
-                            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
-                            if (ImGui::SmallButton("-"))
+                            // MakeMap: 成对删除，只在 Key 引脚上显示 [-] 按钮
+                            bool isMakeMap = (node.DefinitionId == "MakeMap");
+                            bool showRemoveBtn = true;
+                            if (isMakeMap)
                             {
-                                // Remove all links connected to this pin
-                                ed::PinId pinId = input.ID;
-                                m_Links.erase(std::remove_if(m_Links.begin(), m_Links.end(),
-                                    [pinId](const Link& l) { return l.StartPinID == pinId || l.EndPinID == pinId; }),
-                                    m_Links.end());
-                                // Mark for removal (can't erase during iteration)
-                                // We'll handle it after builder.EndInput()
-                                node.Inputs[pinIdx].StringValue = "\x01REMOVE";
-                                m_IsDirty = true;
+                                int dynIdx = pinIdx - node.DynamicInputFixedCount;
+                                // 动态引脚中偶数索引是 Key，奇数是 Value
+                                if (dynIdx % 2 != 0)
+                                    showRemoveBtn = false;
                             }
-                            ImGui::PopStyleColor(3);
-                            ImGui::PopID();
+
+                            if (showRemoveBtn)
+                            {
+                                ImGui::Spring(0);
+                                ImGui::PushID(input.ID.AsPointer());
+                                ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.6f, 0.1f, 0.1f, 0.6f));
+                                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.2f, 0.2f, 0.8f));
+                                ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+                                if (ImGui::SmallButton("-"))
+                                {
+                                    // Remove all links connected to this pin
+                                    ed::PinId pinId = input.ID;
+                                    m_Links.erase(std::remove_if(m_Links.begin(), m_Links.end(),
+                                        [pinId](const Link& l) { return l.StartPinID == pinId || l.EndPinID == pinId; }),
+                                        m_Links.end());
+                                    node.Inputs[pinIdx].StringValue = "\x01REMOVE";
+
+                                    // MakeMap: 同时标记删除配对的 Value 引脚
+                                    if (isMakeMap && pinIdx + 1 < static_cast<int>(node.Inputs.size()))
+                                    {
+                                        ed::PinId valuePinId = node.Inputs[pinIdx + 1].ID;
+                                        m_Links.erase(std::remove_if(m_Links.begin(), m_Links.end(),
+                                            [valuePinId](const Link& l) { return l.StartPinID == valuePinId || l.EndPinID == valuePinId; }),
+                                            m_Links.end());
+                                        node.Inputs[pinIdx + 1].StringValue = "\x01REMOVE";
+                                    }
+
+                                    m_IsDirty = true;
+                                }
+                                ImGui::PopStyleColor(3);
+                                ImGui::PopID();
+                            }
                         }
                     }
 
@@ -1261,6 +1286,54 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
                     ImGui::Spring(1, 0);
                     ImGui::TextUnformatted(node.Name.c_str());
+                    // Simple + Dynamic: 在节点名称右侧显示 [+] 按钮
+                    if (node.HasDynamicInputs)
+                    {
+                        ImGui::Spring(0);
+                        ImGui::PushID(node.ID.AsPointer());
+                        ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.1f, 0.4f, 0.1f, 0.6f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.6f, 0.2f, 0.8f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.3f, 0.8f, 0.3f, 1.0f));
+                        if (ImGui::SmallButton("+"))
+                        {
+                            int dynCount = static_cast<int>(node.Inputs.size()) - node.DynamicInputFixedCount;
+
+                            if (node.DefinitionId == "MakeMap")
+                            {
+                                // MakeMap: 成对添加 Key + Value
+                                int pairIdx = dynCount / 2;
+                                int totalPairs = static_cast<int>(node.Inputs.size()) / 2;
+                                std::string keyName = "Key " + std::to_string(totalPairs);
+                                std::string valName = "Value " + std::to_string(totalPairs);
+                                node.Inputs.emplace_back(GetNextId(), keyName.c_str(), node.DynamicInputPinType);
+                                node.Inputs.emplace_back(GetNextId(), valName.c_str(), node.DynamicInputPinType);
+                            }
+                            else if (node.DefinitionId == "FormatString")
+                            {
+                                std::string pinName = "Arg " + std::to_string(dynCount);
+                                node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
+                            }
+                            else if (node.DefinitionId == "MakeArray")
+                            {
+                                std::string pinName = "Element " + std::to_string(dynCount);
+                                node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
+                            }
+                            else
+                            {
+                                int idx = static_cast<int>(node.Inputs.size());
+                                std::string pinName;
+                                do {
+                                    pinName = std::string(1, 'A' + (idx % 26)) + pinName;
+                                    idx = idx / 26 - 1;
+                                } while (idx >= 0);
+                                node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
+                            }
+                            BuildNode(&node);
+                            m_IsDirty = true;
+                        }
+                        ImGui::PopStyleColor(3);
+                        ImGui::PopID();
+                    }
                     ImGui::Spring(1, 0);
                 }
                 else if (node.HasDynamicInputs)
@@ -1278,15 +1351,24 @@ void BlueprintEditor::OnFrame(float deltaTime)
                         int dynCount = static_cast<int>(node.Inputs.size()) - node.DynamicInputFixedCount;
                         std::string pinName;
 
-                        if (node.DefinitionId == "FormatString")
+                        if (node.DefinitionId == "MakeMap")
                         {
-                            // FormatString: "Arg 0", "Arg 1", "Arg 2", ...
+                            // MakeMap: 成对添加 Key + Value
+                            int totalPairs = static_cast<int>(node.Inputs.size()) / 2;
+                            std::string keyName = "Key " + std::to_string(totalPairs);
+                            std::string valName = "Value " + std::to_string(totalPairs);
+                            node.Inputs.emplace_back(GetNextId(), keyName.c_str(), node.DynamicInputPinType);
+                            node.Inputs.emplace_back(GetNextId(), valName.c_str(), node.DynamicInputPinType);
+                        }
+                        else if (node.DefinitionId == "FormatString")
+                        {
                             pinName = "Arg " + std::to_string(dynCount);
+                            node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
                         }
                         else if (node.DefinitionId == "MakeArray")
                         {
-                            // MakeArray: "Element 0", "Element 1", ...
                             pinName = "Element " + std::to_string(dynCount);
+                            node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
                         }
                         else
                         {
@@ -1296,8 +1378,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
                                 pinName = std::string(1, 'A' + (idx % 26)) + pinName;
                                 idx = idx / 26 - 1;
                             } while (idx >= 0);
+                            node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
                         }
-                        node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
                         BuildNode(&node);
                         m_IsDirty = true;
                     }
@@ -2819,7 +2901,7 @@ void BlueprintEditor::DrawExecutionPanel()
     ImGui::PopStyleVar();
     ImGui::PopStyleColor(3);
     ImGui::Spring(0.0f);
-    if (ImGui::Button(ICON_FA_COPY " Copy Log", ImVec2(90, 0)))
+    if (ImGui::Button(ICON_FA_COPY " Copy Log", ImVec2(100, 0)))
     {
         if (!m_ExecutionLog.empty())
         {

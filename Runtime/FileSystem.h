@@ -171,6 +171,7 @@ public:
         }
         std::stringstream buffer;
         buffer << file.rdbuf();
+        file.close();
         outContent = buffer.str();
         return true;
     }
@@ -186,6 +187,7 @@ public:
             return false;
         }
         file << content;
+        file.close();
         return true;
     }
 
@@ -205,40 +207,13 @@ public:
 // ============================================================================
 
 /// 获取全局 IFileSystem 引用（内部使用）
-inline std::shared_ptr<IFileSystem>& GetDefaultFileSystemRef()
-{
-#if defined(BLUEPRINT_NO_FILESYSTEM)
-    // 裁剪模式：初始 nullptr，调用方必须先 SetDefaultFileSystem()
-    static std::shared_ptr<IFileSystem> s_fs;
-#else
-    static std::shared_ptr<IFileSystem> s_fs =
-        std::make_shared<DefaultFileSystem>();
-#endif
-    return s_fs;
-}
+BLUEPRINT_API std::shared_ptr<IFileSystem>& GetDefaultFileSystemRef();
 
 /// 获取当前全局文件系统
-inline std::shared_ptr<IFileSystem> GetDefaultFileSystem()
-{
-    return GetDefaultFileSystemRef();
-}
+BLUEPRINT_API std::shared_ptr<IFileSystem> GetDefaultFileSystem();
 
 /// 替换全局文件系统。传入 nullptr 则恢复为内置 DefaultFileSystem（若可用）。
-inline void SetDefaultFileSystem(std::shared_ptr<IFileSystem> fs)
-{
-    if (fs)
-    {
-        GetDefaultFileSystemRef() = std::move(fs);
-    }
-    else
-    {
-#if !defined(BLUEPRINT_NO_FILESYSTEM)
-        GetDefaultFileSystemRef() = std::make_shared<DefaultFileSystem>();
-#else
-        GetDefaultFileSystemRef() = nullptr;
-#endif
-    }
-}
+BLUEPRINT_API void SetDefaultFileSystem(std::shared_ptr<IFileSystem> fs);
 
 } // namespace Runtime
 } // namespace NodeEditor

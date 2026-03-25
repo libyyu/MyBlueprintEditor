@@ -44,6 +44,7 @@ enum class PinDataType
     String,
     Object,
     Array,
+    Map,    // 键值对映射（字符串键 → Variant 值）
     Any,
     Custom  // 用户自定义类型
 };
@@ -80,6 +81,8 @@ struct Variant
     std::string stringValue;
     // Array 值 —— 用于 PinDataType::Array
     std::vector<Variant> arrayValue;
+    // Map 值 —— 用于 PinDataType::Map（存储键为 string，运行时任意类型通过 asString() 转换）
+    std::unordered_map<std::string, Variant> mapValue;
 
     // 默认构造
     Variant() : intValue(0) {}
@@ -99,6 +102,7 @@ struct Variant
         case PinDataType::String:  stringValue = other.stringValue; break;
         case PinDataType::Object:  stringValue = other.stringValue; break;
         case PinDataType::Array:   arrayValue = other.arrayValue; break;
+        case PinDataType::Map:     mapValue = other.mapValue; break;
         default: break;
         }
     }
@@ -115,6 +119,7 @@ struct Variant
         case PinDataType::String:  stringValue = std::move(other.stringValue); break;
         case PinDataType::Object:  stringValue = std::move(other.stringValue); break;
         case PinDataType::Array:   arrayValue = std::move(other.arrayValue); break;
+        case PinDataType::Map:     mapValue = std::move(other.mapValue); break;
         default: break;
         }
     }
@@ -130,6 +135,8 @@ struct Variant
                 stringValue.clear();
             if (type == PinDataType::Array && other.type != PinDataType::Array)
                 arrayValue.clear();
+            if (type == PinDataType::Map && other.type != PinDataType::Map)
+                mapValue.clear();
             type = other.type;
             switch (type)
             {
@@ -139,6 +146,7 @@ struct Variant
             case PinDataType::String:  stringValue = other.stringValue; break;
             case PinDataType::Object:  stringValue = other.stringValue; break;
             case PinDataType::Array:   arrayValue = other.arrayValue; break;
+            case PinDataType::Map:     mapValue = other.mapValue; break;
             default: intValue = 0; break;
             }
         }
@@ -155,6 +163,8 @@ struct Variant
                 stringValue.clear();
             if (type == PinDataType::Array && other.type != PinDataType::Array)
                 arrayValue.clear();
+            if (type == PinDataType::Map && other.type != PinDataType::Map)
+                mapValue.clear();
             type = other.type;
             switch (type)
             {
@@ -164,6 +174,7 @@ struct Variant
             case PinDataType::String:  stringValue = std::move(other.stringValue); break;
             case PinDataType::Object:  stringValue = std::move(other.stringValue); break;
             case PinDataType::Array:   arrayValue = std::move(other.arrayValue); break;
+            case PinDataType::Map:     mapValue = std::move(other.mapValue); break;
             default: intValue = 0; break;
             }
         }
@@ -179,6 +190,7 @@ struct Variant
     explicit Variant(const char* v)        : type(PinDataType::String),  intValue(0), stringValue(v) {}
     explicit Variant(const std::string& v) : type(PinDataType::String),  intValue(0), stringValue(v) {}
     explicit Variant(std::vector<Variant> v) : type(PinDataType::Array), intValue(0), arrayValue(std::move(v)) {}
+    explicit Variant(std::unordered_map<std::string, Variant> m) : type(PinDataType::Map), intValue(0), mapValue(std::move(m)) {}
 
     // Object 工厂方法（用字符串 ID 表示对象引用）
     static Variant MakeObject(const std::string& objectId)
@@ -208,6 +220,7 @@ struct Variant
         case PinDataType::String:  return !stringValue.empty();
         case PinDataType::Object:  return !stringValue.empty();
         case PinDataType::Array:   return !arrayValue.empty();
+        case PinDataType::Map:     return !mapValue.empty();
         default:                   return false;
         }
     }
@@ -223,6 +236,7 @@ struct Variant
             try { return std::stoll(stringValue); }
             catch (...) { return 0; }
         case PinDataType::Array:   return static_cast<int64_t>(arrayValue.size());
+        case PinDataType::Map:     return static_cast<int64_t>(mapValue.size());
         default: return 0;
         }
     }
@@ -259,6 +273,19 @@ struct Variant
                 result += arrayValue[i].asString();
             }
             result += "]";
+            return result;
+        }
+        case PinDataType::Map:
+        {
+            std::string result = "{";
+            bool first = true;
+            for (const auto& kv : mapValue)
+            {
+                if (!first) result += ", ";
+                first = false;
+                result += "\"" + kv.first + "\": " + kv.second.asString();
+            }
+            result += "}";
             return result;
         }
         default:                   return std::string();
@@ -300,6 +327,60 @@ struct Variant
     void arrayClear()
     {
         arrayValue.clear();
+    }
+
+    // Map 访问方法
+    const std::unordered_map<std::string, Variant>& asMap() const { return mapValue; }
+    size_t mapSize() const { return mapValue.size(); }
+
+    bool mapHasKey(const std::string& key) const
+    {
+        return mapValue.find(key) != mapValue.end();
+    }
+
+    const Variant& mapGet(const std::string& key) const
+    {
+        static Variant empty;
+        auto it = mapValue.find(key);
+        return (it != mapValue.end()) ? it->second : empty;
+    }
+
+    void mapSet(const std::string& key, const Variant& value)
+    {
+        if (type != PinDataType::Map)
+        {
+            type = PinDataType::Map;
+            mapValue.clear();
+        }
+        mapValue[key] = value;
+    }
+
+    bool mapRemove(const std::string& key)
+    {
+        return mapValue.erase(key) > 0;
+    }
+
+    void mapClear()
+    {
+        mapValue.clear();
+    }
+
+    std::vector<std::string> mapKeys() const
+    {
+        std::vector<std::string> keys;
+        keys.reserve(mapValue.size());
+        for (const auto& kv : mapValue)
+            keys.push_back(kv.first);
+        return keys;
+    }
+
+    std::vector<Variant> mapValues() const
+    {
+        std::vector<Variant> values;
+        values.reserve(mapValue.size());
+        for (const auto& kv : mapValue)
+            values.push_back(kv.second);
+        return values;
     }
 };
 

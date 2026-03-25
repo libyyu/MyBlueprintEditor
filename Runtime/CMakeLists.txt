@@ -26,6 +26,10 @@ cmake_minimum_required(VERSION 3.12)
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     project(BlueprintRuntime VERSION 1.0.0 LANGUAGES CXX)
     set(BLUEPRINT_STANDALONE TRUE)
+    # 独立构建时，根目录默认为上一级
+    if(NOT DEFINED BLUEPRINT_ROOT_DIR)
+        set(BLUEPRINT_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
+    endif()
 else()
     set(BLUEPRINT_STANDALONE FALSE)
 endif()
@@ -55,6 +59,7 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/FrameTimerManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinNodeDefs.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/FileSystem.cpp
     ${BLUEPRINT_ROOT_DIR}/Utils/Json/crude_json.cpp
 )
 

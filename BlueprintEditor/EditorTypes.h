@@ -30,6 +30,7 @@ enum class PinType
     Function,
     Delegate,
     Array,
+    Map,        // 键值对映射类型
     Any,        // 通配类型：可与任何数据类型连接（用于 ArrayGet 等泛型节点）
 };
 

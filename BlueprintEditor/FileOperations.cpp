@@ -687,6 +687,27 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
         // 应用特殊引脚类型
         if (def)
             FixupSpecialPinTypes(&node, def);
+
+        // 恢复动态输入引脚属性（加载时 SpawnNodeByDef 不被调用，需手动恢复）
+        if (def)
+        {
+            auto dynIt = def->customProperties.find("dynamicInputs");
+            if (dynIt != def->customProperties.end() && !dynIt->second.empty())
+            {
+                node.HasDynamicInputs = true;
+                node.DynamicInputFixedCount = static_cast<int>(def->inputPins.size());
+                const std::string& dynType = dynIt->second;
+                if (dynType == "String")       node.DynamicInputPinType = PinType::String;
+                else if (dynType == "Float")   node.DynamicInputPinType = PinType::Float;
+                else if (dynType == "Int")     node.DynamicInputPinType = PinType::Int;
+                else if (dynType == "Bool")    node.DynamicInputPinType = PinType::Bool;
+                else if (dynType == "Object")  node.DynamicInputPinType = PinType::Object;
+                else if (dynType == "Any")     node.DynamicInputPinType = PinType::Any;
+                else if (dynType == "Array")   node.DynamicInputPinType = PinType::Array;
+                else if (dynType == "Map")     node.DynamicInputPinType = PinType::Map;
+                else                           node.DynamicInputPinType = PinType::String;
+            }
+        }
     }
     
     BuildNodes();

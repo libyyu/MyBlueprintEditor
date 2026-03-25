@@ -174,7 +174,7 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
         ExecuteBlueprint();
     }
     ImGui::Spring(0.0f);
-    if (ImGui::Button(ICON_FA_COPY " Copy Log", ImVec2(90, 0)))
+    if (ImGui::Button(ICON_FA_COPY " Copy Log", ImVec2(100, 0)))
     {
         if (!m_ExecutionLog.empty())
         {

@@ -758,6 +758,69 @@ static void RegisterNodeDefs_Array(INodeRegistry& registry)
     }
 }
 
+static void RegisterNodeDefs_Map(INodeRegistry& registry)
+{
+    auto reg = [&registry](const char* id, const char* name, const char* category,
+                  std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
+                  const char* color = "", const char* edType = "")
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
+
+    reg("MakeMap", "Make Map", "Misc/Map",
+        { MakePin("Key 0", PinDataType::Any), MakePin("Value 0", PinDataType::Any) },
+        { MakePin("Map", PinDataType::Map) },
+        "", "Simple");
+    {
+        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("MakeMap"));
+        if (d) d->customProperties["dynamicInputs"] = "Any";
+    }
+
+    reg("MapGet", "Map Get", "Misc/Map",
+        { MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::Any) },
+        { MakePin("Value", PinDataType::Any), MakePin("Found", PinDataType::Boolean) },
+        "", "Simple");
+
+    reg("MapSet", "Map Set", "Misc/Map",
+        { MakeFlowPin(""), MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::Any), MakePin("Value", PinDataType::Any) },
+        { MakeFlowPin(""), MakePin("Map", PinDataType::Map) });
+
+    reg("MapRemove", "Map Remove", "Misc/Map",
+        { MakeFlowPin(""), MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::Any) },
+        { MakeFlowPin(""), MakePin("Map", PinDataType::Map), MakePin("Removed", PinDataType::Boolean) });
+
+    reg("MapHasKey", "Map Has Key", "Misc/Map",
+        { MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::Any) },
+        { MakePin("Result", PinDataType::Boolean) },
+        "", "Simple");
+
+    reg("MapSize", "Map Size", "Misc/Map",
+        { MakePin("Map", PinDataType::Map) },
+        { MakePin("Size", PinDataType::Integer) },
+        "", "Simple");
+
+    reg("MapKeys", "Map Keys", "Misc/Map",
+        { MakePin("Map", PinDataType::Map) },
+        { MakePin("Keys", PinDataType::Array) },
+        "", "Simple");
+
+    reg("MapMerge", "Map Merge", "Misc/Map",
+        { MakeFlowPin(""), MakePin("Map A", PinDataType::Map), MakePin("Map B", PinDataType::Map) },
+        { MakeFlowPin(""), MakePin("Map", PinDataType::Map) });
+
+    reg("MapValues", "Map Values", "Misc/Map",
+        { MakePin("Map", PinDataType::Map) },
+        { MakePin("Values", PinDataType::Array) },
+        "", "Simple");
+
+    reg("MapClear", "Map Clear", "Misc/Map",
+        { MakeFlowPin(""), MakePin("Map", PinDataType::Map) },
+        { MakeFlowPin(""), MakePin("Map", PinDataType::Map) });
+
+    reg("ForEachMapLoop", "For Each Map", "Misc/Map",
+        { MakeFlowPin(""), MakePin("Map", PinDataType::Map) },
+        { MakeFlowPin("Loop Body"), MakePin("Key", PinDataType::Any),
+          MakePin("Value", PinDataType::Any), MakeFlowPin("Completed") });
+}
+
 static void RegisterNodeDefs_Tree(INodeRegistry& registry)
 {
     auto reg = [&registry](const char* id, const char* name, const char* category,
@@ -963,6 +1026,7 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     RegisterNodeDefs_Debug(registry);
     RegisterNodeDefs_String(registry);
     RegisterNodeDefs_Array(registry);
+    RegisterNodeDefs_Map(registry);
     RegisterNodeDefs_Time(registry);
     RegisterNodeDefs_Data(registry);
     RegisterNodeDefs_Tree(registry);

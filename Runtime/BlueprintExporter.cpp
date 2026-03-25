@@ -188,19 +188,31 @@ std::string JsonBlueprintExporter::exportRuntimeToString(const BlueprintData& da
             writeNewline();
             indentLevel++;
             
+            // 必选字段：id, kind(int), dataType(int)
             writeIndent(); oss << "\"id\": " << pin.id << ","; writeNewline();
-            writeIndent(); oss << "\"name\": \"" << escapeJson(pin.name) << "\","; writeNewline();
-            writeIndent(); oss << "\"kind\": \"" << (pin.kind == PinKind::Input ? "input" : "output") << "\","; writeNewline();
-            writeIndent(); oss << "\"dataType\": " << static_cast<int>(pin.dataType) << ","; writeNewline();
-            writeIndent(); oss << "\"allowMultiple\": " << (pin.allowMultiple ? "true" : "false") << ","; writeNewline();
-            writeIndent(); oss << "\"isExec\": " << (pin.isExec ? "true" : "false");
-            
+            writeIndent(); oss << "\"kind\": " << static_cast<int>(pin.kind) << ","; writeNewline();
+            writeIndent(); oss << "\"dataType\": " << static_cast<int>(pin.dataType);
+            // 可选字段：仅在非默认值时写入（减少 JSON 体积）
+            if (!pin.name.empty())
+            {
+                oss << ","; writeNewline();
+                writeIndent(); oss << "\"name\": \"" << escapeJson(pin.name) << "\"";
+            }
+            if (pin.isExec)
+            {
+                oss << ","; writeNewline();
+                writeIndent(); oss << "\"isExec\": true";
+            }
+            if (pin.allowMultiple)
+            {
+                oss << ","; writeNewline();
+                writeIndent(); oss << "\"allowMultiple\": true";
+            }
             if (pin.defaultValue.type != PinDataType::Unknown)
             {
                 oss << ","; writeNewline();
                 writeIndent(); oss << "\"defaultValue\": " << variantToJson(pin.defaultValue);
             }
-            
             writeNewline();
             indentLevel--;
             writeIndent();
@@ -211,12 +223,15 @@ std::string JsonBlueprintExporter::exportRuntimeToString(const BlueprintData& da
         
         indentLevel--;
         writeIndent();
-        oss << "],";
-        writeNewline();
+        oss << "]";
         
-        // 节点启用状态
-        writeIndent();
-        oss << "\"isEnabled\": " << (node.isEnabled ? "true" : "false");
+        // 节点启用状态（仅在 false 时写入，默认 true）
+        if (!node.isEnabled)
+        {
+            oss << ","; writeNewline();
+            writeIndent();
+            oss << "\"isEnabled\": false";
+        }
         
         // 节点数据（配置参数，如常量值）
         if (!node.nodeData.empty())
@@ -823,11 +838,20 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
 
                     PinInfo pin;
                     pin.id       = static_cast<PinId>(getNumber(pinJson, "id"));
-                    pin.name     = getString(pinJson, "name");
+                    pin.name     = getString(pinJson, "name");  // 缺失时返回空字符串（默认值）
                     pin.dataType = static_cast<PinDataType>(static_cast<int>(getNumber(pinJson, "dataType")));
 
-                    std::string kindStr = getString(pinJson, "kind");
-                    pin.kind = (kindStr == "output") ? PinKind::Output : PinKind::Input;
+                    // kind: 兼容新格式(int: 0=Input, 1=Output) 和旧格式(string: "input"/"output")
+                    if (pinJson.contains("kind"))
+                    {
+                        if (pinJson["kind"].type() == crude_json::type_t::number)
+                            pin.kind = (static_cast<int>(pinJson["kind"].get<double>()) == 1) ? PinKind::Output : PinKind::Input;
+                        else
+                        {
+                            std::string kindStr = getString(pinJson, "kind");
+                            pin.kind = (kindStr == "output") ? PinKind::Output : PinKind::Input;
+                        }
+                    }
 
                     pin.allowMultiple = getBool(pinJson, "allowMultiple", false);
                     pin.isExec        = getBool(pinJson, "isExec", false);
@@ -1352,6 +1376,30 @@ std::string JsonBlueprintExporter::variantToJson(const Variant& value) const
         return "\"" + escapeJson(value.stringValue) + "\"";
     case PinDataType::Object:
         return "\"" + escapeJson(value.stringValue) + "\"";
+    case PinDataType::Array:
+    {
+        std::string s = "[";
+        for (size_t i = 0; i < value.arrayValue.size(); ++i)
+        {
+            if (i > 0) s += ",";
+            s += variantToJson(value.arrayValue[i]);
+        }
+        s += "]";
+        return s;
+    }
+    case PinDataType::Map:
+    {
+        std::string s = "{";
+        bool first = true;
+        for (const auto& kv : value.mapValue)
+        {
+            if (!first) s += ",";
+            first = false;
+            s += "\"" + escapeJson(kv.first) + "\":" + variantToJson(kv.second);
+        }
+        s += "}";
+        return s;
+    }
     default:
         return "null";
     }
@@ -1387,6 +1435,39 @@ Variant JsonBlueprintExporter::jsonToVariant(const std::string& json, PinDataTyp
     case PinDataType::Object:
         if (val.type() == crude_json::type_t::string)
             result.stringValue = val.get<std::string>();
+        break;
+    case PinDataType::Array:
+        if (val.type() == crude_json::type_t::array)
+        {
+            for (auto& elem : val.get<crude_json::array>())
+            {
+                // 数组元素反序列化为 Any（通过 JSON 类型推断）
+                Variant elemVar;
+                if (elem.type() == crude_json::type_t::boolean)
+                    elemVar = Variant(elem.get<bool>());
+                else if (elem.type() == crude_json::type_t::number)
+                    elemVar = Variant(elem.get<double>());
+                else if (elem.type() == crude_json::type_t::string)
+                    elemVar = Variant(elem.get<std::string>());
+                result.arrayValue.push_back(std::move(elemVar));
+            }
+        }
+        break;
+    case PinDataType::Map:
+        if (val.type() == crude_json::type_t::object)
+        {
+            for (auto& kv : val.get<crude_json::object>())
+            {
+                Variant elemVar;
+                if (kv.second.type() == crude_json::type_t::boolean)
+                    elemVar = Variant(kv.second.get<bool>());
+                else if (kv.second.type() == crude_json::type_t::number)
+                    elemVar = Variant(kv.second.get<double>());
+                else if (kv.second.type() == crude_json::type_t::string)
+                    elemVar = Variant(kv.second.get<std::string>());
+                result.mapValue[kv.first] = std::move(elemVar);
+            }
+        }
         break;
     default:
         break;

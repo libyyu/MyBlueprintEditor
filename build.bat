@@ -50,7 +50,7 @@ if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 :: CMake 配置
 echo.
 echo [2/3] Running CMake configure...
-cmake -S "%PROJECT_DIR%" -B "%BUILD_DIR%" -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DBUILD_EXAMPLES=%BUILD_EXAMPLES%
+cmake -S "%PROJECT_DIR%" -B "%BUILD_DIR%" -A x64 -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DBUILD_EXAMPLES=%BUILD_EXAMPLES%
 
 if %ERRORLEVEL% neq 0 (
     echo.

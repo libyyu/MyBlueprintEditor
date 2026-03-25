@@ -108,6 +108,7 @@ if(NOT BUILD_RUNTIME_ONLY)
 
     add_library(imgui STATIC ${IMGUI_SOURCES})
     target_include_directories(imgui PUBLIC ${IMGUI_INCLUDE_DIR})
+    target_compile_definitions(imgui PUBLIC IMGUI_DEFINE_MATH_OPERATORS)
     set_property(TARGET imgui PROPERTY FOLDER "Libraries")
 
     # ------------------------------------------------------------------
@@ -143,6 +144,14 @@ if(NOT BUILD_RUNTIME_ONLY)
         ${CORE_SOURCES} ${CORE_HEADERS}
         ${UI_SOURCES} ${UI_HEADERS}
     )
+
+    # MSVC: attach .natvis files so Visual Studio debugger displays types nicely
+    if(MSVC)
+        target_sources(ImGuiNodeEditor PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/natvis/imgui_node_editor.natvis
+            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/natvis/crude_json.natvis
+        )
+    endif()
 
     target_include_directories(ImGuiNodeEditor
         PUBLIC

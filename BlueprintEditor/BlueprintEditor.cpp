@@ -171,6 +171,7 @@ PinType BlueprintEditor::MapRTPinDataType(RTPinDataType dt, bool isExec)
     case RTPinDataType::String:  return PinType::String;
     case RTPinDataType::Object:  return PinType::Object;
     case RTPinDataType::Array:   return PinType::Array;
+    case RTPinDataType::Map:     return PinType::Map;
     case RTPinDataType::Any:     return PinType::Any;
     default:                     return PinType::Flow;
     }
@@ -187,6 +188,7 @@ RTPinDataType BlueprintEditor::MapPinType(PinType type)
     case PinType::String:   return RTPinDataType::String;
     case PinType::Object:   return RTPinDataType::Object;
     case PinType::Array:    return RTPinDataType::Array;
+    case PinType::Map:      return RTPinDataType::Map;
     case PinType::Any:      return RTPinDataType::Any;
     case PinType::Function: return RTPinDataType::Custom;
     case PinType::Delegate: return RTPinDataType::Custom;
@@ -308,6 +310,7 @@ Node* BlueprintEditor::SpawnNodeByDef(const std::string& defId)
         else if (dynType == "Object")  node.DynamicInputPinType = PinType::Object;
         else if (dynType == "Any")     node.DynamicInputPinType = PinType::Any;
         else if (dynType == "Array")   node.DynamicInputPinType = PinType::Array;
+        else if (dynType == "Map")     node.DynamicInputPinType = PinType::Map;
         else                           node.DynamicInputPinType = PinType::String;
     }
 

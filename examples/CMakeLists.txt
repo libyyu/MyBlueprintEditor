@@ -10,18 +10,8 @@ cmake_minimum_required(VERSION 3.12)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 
-# 包含目录（复用根项目已定义的路径）
-include_directories(
-    ${IMGUI_NODE_EDITOR_ROOT_DIR}
-    ${IMGUI_NODE_EDITOR_ROOT_DIR}/Editor/Core
-    ${IMGUI_NODE_EDITOR_ROOT_DIR}/Utils/Json
-    ${IMGUI_NODE_EDITOR_ROOT_DIR}/external/imgui
-    ${IMGUI_NODE_EDITOR_ROOT_DIR}/external/stb_image
-    ${IMGUI_NODE_EDITOR_ROOT_DIR}/Runtime
-    ${IMGUI_NODE_EDITOR_ROOT_DIR}/Editor
-    ${IMGUI_NODE_EDITOR_ROOT_DIR}/UI
-    ${IMGUI_NODE_EDITOR_ROOT_DIR}/Utils
-)
+# 包含目录已通过 target_link_libraries → Application → ImGuiNodeEditor 传播，
+# 无需额外 include_directories()。
 
 # 输出目录（与 BlueprintEditor 共用）
 set(EXAMPLE_OUTPUT_DIR ${CMAKE_BINARY_DIR}/bin)
