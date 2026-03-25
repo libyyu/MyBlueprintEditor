@@ -1,57 +1,183 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
+
+:: ==============================================================================
+:: build.bat – MyBlueprintEditor cross-platform build script (Windows)
+::
+:: Usage:
+::   build.bat [platform] [options...]
+::
+:: Platforms:
+::   windows       Windows x64, Win32+DX11, full editor (default)
+::   wasm          WebAssembly via Emscripten (Runtime only, static)
+::   android       Android ARM64-v8a (Runtime only)
+::   runtime       Windows host, Runtime-only build (no Editor)
+::
+:: Options:
+::   debug         Build Debug configuration (default: Release)
+::   release       Build Release configuration
+::   clean         Wipe build directory before building
+::   noexamples    Skip building examples
+::   shared        Build BlueprintRuntime as a shared library
+::   --ndk <path>  Android NDK root (required for android platform)
+::   --api <N>     Android min API level (default: 21)
+::   --emsdk <path> Emscripten SDK root (default: %EMSDK% env var)
+::
+:: Examples:
+::   build.bat                          Windows Release (full editor)
+::   build.bat debug                    Windows Debug
+::   build.bat wasm                     WASM Release (needs Emscripten)
+::   build.bat android --ndk C:\ndk     Android Release
+::   build.bat runtime shared           Runtime-only, shared DLL
+:: ==============================================================================
 
 set PROJECT_DIR=%~dp0
-:: 去掉末尾的反斜杠
 if "%PROJECT_DIR:~-1%"=="\" set PROJECT_DIR=%PROJECT_DIR:~0,-1%
-set BUILD_DIR=%PROJECT_DIR%\build
 
-:: 默认参数
+:: ── Defaults ─────────────────────────────────────────────────────────────────
+set PLATFORM=windows
 set BUILD_TYPE=Release
-set BUILD_EXAMPLES=ON
 set CLEAN_BUILD=0
+set BUILD_EXAMPLES=ON
+set BUILD_SHARED=OFF
+set RUNTIME_ONLY=0
+set NDK_PATH=
+set ANDROID_API=21
+set EMSDK_PATH=%EMSDK%
 
-:: 解析命令行参数
+:: ── Parse arguments ───────────────────────────────────────────────────────────
 :parse_args
-if "%~1"=="" goto :start_build
-if /i "%~1"=="debug"   (set BUILD_TYPE=Debug& shift & goto :parse_args)
-if /i "%~1"=="release" (set BUILD_TYPE=Release& shift & goto :parse_args)
-if /i "%~1"=="clean"   (set CLEAN_BUILD=1& shift & goto :parse_args)
-if /i "%~1"=="noexamples" (set BUILD_EXAMPLES=OFF& shift & goto :parse_args)
-echo Unknown option: %~1
+if "%~1"=="" goto :validate
+
+if /i "%~1"=="windows"    (set PLATFORM=windows&    shift & goto :parse_args)
+if /i "%~1"=="wasm"       (set PLATFORM=wasm&        shift & goto :parse_args)
+if /i "%~1"=="android"    (set PLATFORM=android&     shift & goto :parse_args)
+if /i "%~1"=="runtime"    (set PLATFORM=runtime&     shift & goto :parse_args)
+
+if /i "%~1"=="debug"      (set BUILD_TYPE=Debug&     shift & goto :parse_args)
+if /i "%~1"=="release"    (set BUILD_TYPE=Release&   shift & goto :parse_args)
+if /i "%~1"=="clean"      (set CLEAN_BUILD=1&        shift & goto :parse_args)
+if /i "%~1"=="noexamples" (set BUILD_EXAMPLES=OFF&   shift & goto :parse_args)
+if /i "%~1"=="shared"     (set BUILD_SHARED=ON&      shift & goto :parse_args)
+
+if /i "%~1"=="--ndk"      (set NDK_PATH=%~2&         shift & shift & goto :parse_args)
+if /i "%~1"=="--api"      (set ANDROID_API=%~2&      shift & shift & goto :parse_args)
+if /i "%~1"=="--emsdk"    (set EMSDK_PATH=%~2&       shift & shift & goto :parse_args)
+
+if /i "%~1"=="/?" goto :show_help
+if /i "%~1"=="--help" goto :show_help
+
+echo [ERROR] Unknown option: %~1
 echo.
-echo Usage: build.bat [debug^|release] [clean] [noexamples]
-echo   debug       - Build Debug configuration (default: Release)
-echo   release     - Build Release configuration
-echo   clean       - Clean build directory before building
-echo   noexamples  - Skip building examples
+goto :show_help
+
+:show_help
+echo Usage: build.bat [platform] [options...]
+echo.
+echo Platforms:
+echo   windows      Windows x64, Win32+DX11, full editor (default)
+echo   wasm         WebAssembly via Emscripten (Runtime only)
+echo   android      Android ARM64-v8a (Runtime only)
+echo   runtime      Windows host, Runtime-only (no Editor)
+echo.
+echo Options:
+echo   debug / release     Build configuration (default: Release)
+echo   clean               Wipe build directory before building
+echo   noexamples          Skip building examples
+echo   shared              Build BlueprintRuntime as shared DLL
+echo   --ndk ^<path^>        Android NDK root
+echo   --api ^<N^>           Android min API level (default: 21)
+echo   --emsdk ^<path^>      Emscripten SDK root
 exit /b 1
 
-:start_build
+:: ── Validate & resolve platform-specific settings ────────────────────────────
+:validate
+set BUILD_DIR=%PROJECT_DIR%\build-%PLATFORM%
+
+if /i "%PLATFORM%"=="windows" (
+    set RUNTIME_ONLY=0
+    set CMAKE_EXTRA=-A x64 -DBUILD_EXAMPLES=%BUILD_EXAMPLES% -DBUILD_SHARED_LIBS=%BUILD_SHARED%
+    goto :banner
+)
+
+if /i "%PLATFORM%"=="runtime" (
+    set RUNTIME_ONLY=1
+    set CMAKE_EXTRA=-A x64 -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=%BUILD_SHARED% -DBUILD_EXAMPLES=%BUILD_EXAMPLES%
+    goto :banner
+)
+
+if /i "%PLATFORM%"=="wasm" (
+    set RUNTIME_ONLY=1
+    :: Locate emcmake
+    if "%EMSDK_PATH%"=="" (
+        where emcmake >nul 2>&1
+        if errorlevel 1 (
+            echo [ERROR] Emscripten not found. Install the Emscripten SDK or pass --emsdk ^<path^>.
+            echo         See: https://emscripten.org/docs/getting_started/downloads.html
+            exit /b 1
+        )
+        set EMCMAKE=emcmake
+    ) else (
+        :: Try activating emsdk
+        if exist "%EMSDK_PATH%\emsdk_env.bat" call "%EMSDK_PATH%\emsdk_env.bat" >nul 2>&1
+        set EMCMAKE=emcmake
+    )
+    set CMAKE_EXTRA=-DBUILD_RUNTIME_ONLY=ON -DCMAKE_BUILD_TYPE=%BUILD_TYPE%
+    goto :banner
+)
+
+if /i "%PLATFORM%"=="android" (
+    set RUNTIME_ONLY=1
+    :: Resolve NDK path
+    if "%NDK_PATH%"=="" (
+        if not "%ANDROID_NDK%"==""      set NDK_PATH=%ANDROID_NDK%
+        if not "%ANDROID_NDK_HOME%"=="" set NDK_PATH=%ANDROID_NDK_HOME%
+    )
+    if "%NDK_PATH%"=="" (
+        echo [ERROR] Android NDK not found. Pass --ndk ^<path^> or set %%ANDROID_NDK%%.
+        exit /b 1
+    )
+    set CMAKE_EXTRA=-DCMAKE_TOOLCHAIN_FILE="%NDK_PATH%\build\cmake\android.toolchain.cmake" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-%ANDROID_API% -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=%BUILD_SHARED% -DBUILD_EXAMPLES=OFF -DCMAKE_BUILD_TYPE=%BUILD_TYPE%
+    goto :banner
+)
+
+echo [ERROR] Unknown platform: %PLATFORM%
+exit /b 1
+
+:: ── Banner ────────────────────────────────────────────────────────────────────
+:banner
+echo.
 echo ============================================
 echo  Blueprint Editor - Build Script
-echo  Configuration: %BUILD_TYPE%
-echo  Examples: %BUILD_EXAMPLES%
+echo  Platform      : %PLATFORM%
+echo  Configuration : %BUILD_TYPE%
+echo  Runtime only  : %RUNTIME_ONLY%
+echo  Shared libs   : %BUILD_SHARED%
+echo  Examples      : %BUILD_EXAMPLES%
+echo  Build dir     : %BUILD_DIR%
 echo ============================================
 echo.
 
-:: 清理构建目录（如果指定了 clean）
+:: ── Step 1 – Clean ────────────────────────────────────────────────────────────
 if %CLEAN_BUILD%==1 (
     echo [1/3] Cleaning build directory...
     if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
     echo       Done.
 ) else (
-    echo [1/3] Skipping clean (use 'clean' option to force)
+    echo [1/3] Skipping clean (pass 'clean' to force^)
 )
 
-:: 创建构建目录
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 
-:: CMake 配置
-:: 注意: MSVC 是多配置生成器，不需要 CMAKE_BUILD_TYPE（由 --config 指定）
+:: ── Step 2 – CMake configure ─────────────────────────────────────────────────
 echo.
 echo [2/3] Running CMake configure...
-cmake -S "%PROJECT_DIR%" -B "%BUILD_DIR%" -A x64 -DBUILD_EXAMPLES=%BUILD_EXAMPLES%
+
+if /i "%PLATFORM%"=="wasm" (
+    %EMCMAKE% cmake -S "%PROJECT_DIR%" -B "%BUILD_DIR%" %CMAKE_EXTRA%
+) else (
+    cmake -S "%PROJECT_DIR%" -B "%BUILD_DIR%" %CMAKE_EXTRA%
+)
 
 if %ERRORLEVEL% neq 0 (
     echo.
@@ -59,7 +185,7 @@ if %ERRORLEVEL% neq 0 (
     exit /b %ERRORLEVEL%
 )
 
-:: 编译
+:: ── Step 3 – Build ───────────────────────────────────────────────────────────
 echo.
 echo [3/3] Building...
 cmake --build "%BUILD_DIR%" --config %BUILD_TYPE% --parallel
@@ -70,10 +196,18 @@ if %ERRORLEVEL% neq 0 (
     exit /b %ERRORLEVEL%
 )
 
+:: ── Done ──────────────────────────────────────────────────────────────────────
 echo.
 echo ============================================
-echo  Build succeeded! (%BUILD_TYPE%)
+echo  Build succeeded! (%PLATFORM% / %BUILD_TYPE%)
 echo  Output: %BUILD_DIR%\bin
+if /i "%PLATFORM%"=="wasm" (
+    echo  WASM lib: %BUILD_DIR%\Runtime\libBlueprintRuntime.a
+    echo  ^> Drop into Assets/Plugins/WebGL/ for Unity
+)
+if /i "%PLATFORM%"=="android" (
+    echo  Android lib: %BUILD_DIR%\Runtime\
+)
 echo ============================================
 
 endlocal
