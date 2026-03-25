@@ -26,10 +26,14 @@
 
 #pragma once
 
+#include "BlueprintExport.h"  // BLUEPRINT_API, BLUEPRINT_PLATFORM_EMSCRIPTEN
+
 #include <string>
 #include <memory>
-#include <fstream>
-#include <sstream>
+#ifndef BLUEPRINT_NO_FILESYSTEM
+#   include <fstream>
+#   include <sstream>
+#endif
 
 namespace NodeEditor {
 namespace Runtime {
@@ -38,7 +42,7 @@ namespace Runtime {
 // 文件系统抽象接口
 // ============================================================================
 
-class IFileSystem
+class BLUEPRINT_API IFileSystem
 {
 public:
     virtual ~IFileSystem() = default;
@@ -57,9 +61,20 @@ public:
 
 // ============================================================================
 // 默认文件系统实现（使用标准 C++ 文件流，直接磁盘读写）
+// 在 Emscripten/WebGL 下需要注意：std::fstream 映射到 Emscripten 的虚拟文件系统，
+// 需要通过 FS.mount(MEMFS/IDBFS, ...) 挂载才能正常工作。
+// 若定义了 BLUEPRINT_NO_FILESYSTEM，则不编译此实现，
+// 调用者须通过 SetDefaultFileSystem() 注入自定义 IFileSystem。
 // ============================================================================
 
-class DefaultFileSystem : public IFileSystem
+#if defined(BLUEPRINT_NO_FILESYSTEM)
+
+// 占位：不提供默认实现，运行时必须注入 IFileSystem
+// class DefaultFileSystem intentionally omitted.
+
+#else
+
+class BLUEPRINT_API DefaultFileSystem : public IFileSystem
 {
 public:
     bool ReadFile(const std::string& path, std::string& outContent, std::string& outError) override
@@ -97,15 +112,23 @@ public:
     }
 };
 
+#endif // !BLUEPRINT_NO_FILESYSTEM
+
 // ============================================================================
 // 全局默认文件系统（单例模式）
 // ============================================================================
 
 // 获取当前全局默认文件系统
 // 如果未设置自定义实现，返回内置的 DefaultFileSystem
+// 注意：当 BLUEPRINT_NO_FILESYSTEM 定义时，初始值为 nullptr，
+//       必须在使用前调用 SetDefaultFileSystem() 注入实现。
 inline std::shared_ptr<IFileSystem>& GetDefaultFileSystemRef()
 {
+#if defined(BLUEPRINT_NO_FILESYSTEM)
+    static std::shared_ptr<IFileSystem> s_defaultFS;  // nullptr – caller must inject
+#else
     static std::shared_ptr<IFileSystem> s_defaultFS = std::make_shared<DefaultFileSystem>();
+#endif
     return s_defaultFS;
 }
 
@@ -116,13 +139,21 @@ inline std::shared_ptr<IFileSystem> GetDefaultFileSystem()
 }
 
 // 设置全局默认文件系统
-// 传入 nullptr 将恢复为内置的 DefaultFileSystem
+// 传入 nullptr 将恢复为内置的 DefaultFileSystem（若可用）
 inline void SetDefaultFileSystem(std::shared_ptr<IFileSystem> fs)
 {
     if (fs)
+    {
         GetDefaultFileSystemRef() = std::move(fs);
+    }
     else
+    {
+#if !defined(BLUEPRINT_NO_FILESYSTEM)
         GetDefaultFileSystemRef() = std::make_shared<DefaultFileSystem>();
+#else
+        GetDefaultFileSystemRef() = nullptr;
+#endif
+    }
 }
 
 } // namespace Runtime

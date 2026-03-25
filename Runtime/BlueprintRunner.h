@@ -8,6 +8,7 @@
 //   4. 调用 Execute() 按拓扑顺序执行所有节点
 
 #pragma once
+#include "BlueprintExport.h"
 
 #include "BlueprintData.h"
 #include "NodeDefinition.h"
@@ -34,7 +35,7 @@ namespace Runtime {
 // 执行上下文 —— 节点处理函数可通过它读写引脚数据
 // ============================================================================
 
-class ExecutionContext
+class BLUEPRINT_API ExecutionContext
 {
 public:
     // 获取输入引脚的值
@@ -222,7 +223,7 @@ struct ExecutionResult
 // 蓝图运行时执行器
 // ============================================================================
 
-class BlueprintRunner
+class BLUEPRINT_API BlueprintRunner
 {
 public:
     BlueprintRunner() : m_fileSystem(GetDefaultFileSystem()) {}

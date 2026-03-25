@@ -9,6 +9,7 @@
 //   3. 通过 runner.GetTimerManager() 访问计时器 API
 //
 #pragma once
+#include "BlueprintExport.h"
 
 #include <string>
 #include <vector>
@@ -57,7 +58,7 @@ struct FrameTimerEntry
 // 主线程计时器管理器
 // ============================================================================
 
-class FrameTimerManager
+class BLUEPRINT_API FrameTimerManager
 {
 public:
     FrameTimerManager() = default;

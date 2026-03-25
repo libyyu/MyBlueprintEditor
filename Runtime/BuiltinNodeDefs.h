@@ -10,6 +10,7 @@
 //
 
 #pragma once
+#include "BlueprintExport.h"
 
 #include "NodeDefinition.h"
 

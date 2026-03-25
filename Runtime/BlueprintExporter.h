@@ -8,6 +8,7 @@
 //   - 运行时只需要加载 Runtime 文件即可执行
 
 #pragma once
+#include "BlueprintExport.h"
 
 #include "BlueprintData.h"
 #include "FileSystem.h"
@@ -98,7 +99,7 @@ struct ImportResult
 // 蓝图导入导出接口
 // ============================================================================
 
-class IBlueprintExporter
+class BLUEPRINT_API IBlueprintExporter
 {
 public:
     virtual ~IBlueprintExporter() = default;
@@ -153,7 +154,7 @@ public:
 // JSON 导出器实现
 // ============================================================================
 
-class JsonBlueprintExporter : public IBlueprintExporter
+class BLUEPRINT_API JsonBlueprintExporter : public IBlueprintExporter
 {
 public:
     // 默认构造：使用全局默认文件系统
@@ -204,7 +205,7 @@ private:
 // 二进制导出器实现（头文件声明，实现在 cpp 中）
 // ============================================================================
 
-class BinaryBlueprintExporter : public IBlueprintExporter
+class BLUEPRINT_API BinaryBlueprintExporter : public IBlueprintExporter
 {
 public:
     std::string exportRuntimeToString(const BlueprintData& data, const ExportOptions& options = ExportOptions()) const override;

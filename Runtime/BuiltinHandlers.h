@@ -12,6 +12,7 @@
 //
 
 #pragma once
+#include "BlueprintExport.h"
 
 #include "BlueprintRunner.h"
 #include <string>
