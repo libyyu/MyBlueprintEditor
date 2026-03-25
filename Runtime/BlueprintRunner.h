@@ -32,82 +32,165 @@ namespace NodeEditor {
 namespace Runtime {
 
 // ============================================================================
-// 前向声明（ExecutionContext 内部持有 BlueprintRunner 指针）
+// 前向声明
+// ============================================================================
 class BlueprintRunner;
 
-// 执行上下文 —— 节点处理函数可通过它读写引脚数据
+// ============================================================================
+// NodeExecutionState —— 单次节点执行的纯数据上下文
+//
+// 职责：存储一次节点执行所需的所有可变状态
+//   · 引脚值（输入/输出共享，通过链接传播）
+//   · 引脚名→ID 映射（每次执行节点前重建）
+//   · 当前节点指针及其自定义数据
+//   · 蓝图级别的变量
+//   · 触发当前节点的输入引脚 ID
+//   · 蓝图元数据
+//
+// 设计原则：
+//   · 无行为（无 Timer/ActivateOutputFlow 等）
+//   · 无对 BlueprintRunner 的反向引用
+//   · 可独立构造，便于单元测试
+// ============================================================================
+
+struct BLUEPRINT_API NodeExecutionState
+{
+    // 所有引脚的当前值（输入和输出共用，通过链接传播）
+    std::unordered_map<PinId, Variant>              pinValues;
+
+    // 当前节点的引脚名到ID的映射（每次执行节点前重建）
+    std::unordered_map<std::string, PinId>          pinNameToId;
+
+    // 当前节点的自定义数据
+    std::unordered_map<std::string, Variant>        nodeData;
+
+    // 蓝图级别的变量
+    std::unordered_map<std::string, Variant>        variables;
+
+    // 当前正在执行的节点指针（不拥有，生命周期由 BlueprintData 保证）
+    const NodeInstance*                             currentNode = nullptr;
+
+    // 触发当前节点执行的输入引脚 ID
+    // 用于区分 DoN 的 Enter/Reset、Gate 的 Enter/Open/Close/Toggle 等
+    PinId                                           activatedInputPinId = InvalidPinId;
+
+    // 蓝图元数据（名称、版本等）
+    BlueprintMetadata                               metadata;
+};
+
+// ============================================================================
+// ExecutionContext —— 节点处理函数的执行上下文（公开 API 层）
+//
+// 职责：
+//   · 数据访问：通过 NodeExecutionState 提供引脚读写、变量读写等
+//   · 行为触发：Timer、控制流激活（ActivateOutputFlow）、日志
+//   · 节点状态查询：当前节点、激活引脚、元数据等
+//
+// 与 NodeExecutionState 的关系：
+//   · ExecutionContext 持有 NodeExecutionState 的引用（由 BlueprintRunner 拥有）
+//   · handler 只通过 ExecutionContext 访问状态，不直接操作 NodeExecutionState
 // ============================================================================
 
 class BLUEPRINT_API ExecutionContext
 {
 public:
-    // 获取输入引脚的值
+    // ------------------------------------------------------------------
+    // 数据层：引脚 / 变量 / 节点状态
+    // ------------------------------------------------------------------
+
+    // 获取输入引脚的值（按 ID）
     Variant GetInputValue(PinId pinId) const
     {
-        auto it = m_pinValues.find(pinId);
-        return (it != m_pinValues.end()) ? it->second : Variant();
+        auto it = m_state->pinValues.find(pinId);
+        return (it != m_state->pinValues.end()) ? it->second : Variant();
     }
 
-    // 获取输入引脚的值（按名称查找，在当前节点的输入引脚中搜索）
+    // 获取输入引脚的值（按名称，在当前节点的输入引脚中搜索）
     Variant GetInputValue(const std::string& pinName) const
     {
-        auto it = m_pinNameToId.find(pinName);
-        if (it != m_pinNameToId.end())
-        {
+        auto it = m_state->pinNameToId.find(pinName);
+        if (it != m_state->pinNameToId.end())
             return GetInputValue(it->second);
-        }
         return Variant();
     }
 
-    // 设置输出引脚的值
+    // 设置输出引脚的值（按 ID）
     void SetOutputValue(PinId pinId, const Variant& value)
     {
-        m_pinValues[pinId] = value;
+        m_state->pinValues[pinId] = value;
     }
 
-    // 设置输出引脚的值（按名称查找）
+    // 设置输出引脚的值（按名称）
     void SetOutputValue(const std::string& pinName, const Variant& value)
     {
-        auto it = m_pinNameToId.find(pinName);
-        if (it != m_pinNameToId.end())
-        {
+        auto it = m_state->pinNameToId.find(pinName);
+        if (it != m_state->pinNameToId.end())
             SetOutputValue(it->second, value);
-        }
     }
 
     // 获取节点自定义数据
     Variant GetNodeData(const std::string& key) const
     {
-        auto it = m_currentNodeData.find(key);
-        return (it != m_currentNodeData.end()) ? it->second : Variant();
+        auto it = m_state->nodeData.find(key);
+        return (it != m_state->nodeData.end()) ? it->second : Variant();
     }
 
     // 获取蓝图变量
     Variant GetVariable(const std::string& name) const
     {
-        auto it = m_variables.find(name);
-        return (it != m_variables.end()) ? it->second : Variant();
+        auto it = m_state->variables.find(name);
+        return (it != m_state->variables.end()) ? it->second : Variant();
     }
 
     // 设置蓝图变量
     void SetVariable(const std::string& name, const Variant& value)
     {
-        m_variables[name] = value;
+        m_state->variables[name] = value;
     }
 
     // 获取当前正在执行的节点
-    const NodeInstance* GetCurrentNode() const { return m_currentNode; }
+    const NodeInstance* GetCurrentNode() const { return m_state->currentNode; }
 
     // 获取蓝图元数据
-    const BlueprintMetadata& GetMetadata() const { return m_metadata; }
+    const BlueprintMetadata& GetMetadata() const { return m_state->metadata; }
 
-    // 日志输出（可被外部替换）
+    // 获取当前节点指定引脚名对应的 PinId（用于在异步回调中捕获引脚ID）
+    PinId GetPinId(const std::string& pinName) const
+    {
+        auto it = m_state->pinNameToId.find(pinName);
+        return (it != m_state->pinNameToId.end()) ? it->second : InvalidPinId;
+    }
+
+    // 获取触发当前节点执行的输入引脚 ID
+    PinId GetActivatedInputPinId() const { return m_state->activatedInputPinId; }
+
+    // 获取触发当前节点的输入引脚名称
+    std::string GetActivatedInputPinName() const
+    {
+        if (m_state->activatedInputPinId == InvalidPinId) return "";
+        if (!m_state->currentNode) return "";
+        for (const auto& pin : m_state->currentNode->pins)
+        {
+            if (pin.id == m_state->activatedInputPinId)
+                return pin.name;
+        }
+        return "";
+    }
+
+    // ------------------------------------------------------------------
+    // 行为层：日志
+    // ------------------------------------------------------------------
+
     std::function<void(const std::string& message)> OnLog;
 
     void Log(const std::string& message) const
     {
         if (OnLog) OnLog(message);
     }
+
+    // ------------------------------------------------------------------
+    // 行为层：Timer
+    // ------------------------------------------------------------------
 
     TimerHandle Delay(float seconds, const std::function<void()>& callback);
 
@@ -119,52 +202,22 @@ public:
     // 带名称版：可通过名称查找/取消
     TimerHandle SetTimerByName(const std::string& name, float interval, int repeatCount, TimerCallback callback);
 
-    // ----------------------------------------------------------------
-    // 控制流 API —— 允许 handler 触发指定输出 exec 引脚连接的下游子图
-    // ----------------------------------------------------------------
+    // ------------------------------------------------------------------
+    // 行为层：控制流
+    // ------------------------------------------------------------------
 
     // 按引脚名称激活输出流（执行连接到该输出 exec 引脚的所有下游节点）
-    // 可多次调用以实现循环；返回 false 表示执行失败
     bool ActivateOutputFlow(const std::string& pinName);
 
     // 按引脚 ID 激活输出流
     bool ActivateOutputFlow(PinId pinId);
 
     // 标记指定输出引脚的所有下游节点为"已被控制流接管"，
-    // 主循环会跳过这些节点。用于异步节点（如 Delay）预先占位，
-    // 防止主循环在异步回调之前就执行了下游节点。
+    // 主循环会跳过这些节点。用于异步节点（如 Delay）预先占位。
     void MarkDownstreamAsHandled(const std::string& pinName);
     void MarkDownstreamAsHandled(PinId pinId);
 
-    // 获取当前节点指定引脚名对应的 PinId（用于在异步回调中捕获引脚ID）
-    PinId GetPinId(const std::string& pinName) const
-    {
-        auto it = m_pinNameToId.find(pinName);
-        return (it != m_pinNameToId.end()) ? it->second : InvalidPinId;
-    }
-
-    // 获取触发当前节点执行的输入引脚 ID
-    // 用于有多个 exec 输入引脚的节点（如 DoN 的 Enter/Reset, Gate 的 Enter/Open/Close/Toggle）
-    // 区分是从哪个输入引脚触发的
-    PinId GetActivatedInputPinId() const { return m_activatedInputPinId; }
-
-    // 获取触发当前节点的输入引脚名称
-    std::string GetActivatedInputPinName() const
-    {
-        if (m_activatedInputPinId == InvalidPinId) return "";
-        if (!m_currentNode) return "";
-        for (const auto& pin : m_currentNode->pins)
-        {
-            if (pin.id == m_activatedInputPinId)
-                return pin.name;
-        }
-        return "";
-    }
-
     // 通过输入引脚 ID 找到连接的源节点并执行
-    // 用于 SetTimer 等节点在 timer 回调中触发 Function Name 引脚连接的回调节点
-    // 内部转发到当前 runner（而非注册 handler 时捕获的 runner），
-    // 这样在子蓝图中使用时也能正确找到子蓝图的节点
     bool FireConnectedNode(PinId inputPinId);
 
 private:
@@ -173,30 +226,12 @@ private:
     // 内部辅助：将用户回调包装为带 context save/restore 的 TimerCallback
     TimerCallback wrapCallbackWithContextRestore(TimerCallback callback);
 
-    // 所有引脚的当前值（输入和输出共用，通过链接传播）
-    std::unordered_map<PinId, Variant>              m_pinValues;
+    // 数据层：由 BlueprintRunner 拥有，ExecutionContext 持有指针（不拥有）
+    // 使用指针而非引用，以便 BlueprintRunner 可以默认构造 ExecutionContext
+    NodeExecutionState*  m_state  = nullptr;
 
-    // 当前节点的引脚名到ID的映射（每次执行节点前重建）
-    std::unordered_map<std::string, PinId>          m_pinNameToId;
-
-    // 当前节点的自定义数据
-    std::unordered_map<std::string, Variant>         m_currentNodeData;
-
-    // 蓝图级别的变量
-    std::unordered_map<std::string, Variant>         m_variables;
-
-    // 当前正在执行的节点指针
-    const NodeInstance*                             m_currentNode = nullptr;
-
-    // 触发当前节点执行的输入引脚 ID（由 executeDownstreamFromPin 设置）
-    // 用于区分 DoN 的 Enter/Reset、Gate 的 Enter/Open/Close/Toggle 等
-    PinId                                           m_activatedInputPinId = InvalidPinId;
-
-    // 蓝图元数据
-    BlueprintMetadata                               m_metadata;
-
-    // 所属 runner（用于 ActivateOutputFlow 回调）
-    BlueprintRunner*                                m_runner = nullptr;
+    // 所属 runner（行为层回调用；生命周期由 BlueprintRunner 保证）
+    BlueprintRunner*     m_runner = nullptr;
 };
 
 // ============================================================================
@@ -455,7 +490,10 @@ private:
     std::unordered_map<std::string, NodeHandler>        m_handlers;
     NodeHandler                                         m_defaultHandler;
 
-    // 执行上下文
+    // 数据层：节点执行状态（引脚值、变量、当前节点等纯数据）
+    NodeExecutionState                                  m_state;
+
+    // 行为层：执行上下文（handler 的公开 API，持有 m_state 的指针）
     ExecutionContext                                    m_context;
 
     // 错误信息

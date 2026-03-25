@@ -31,12 +31,13 @@ bool BlueprintRunner::Load(const BlueprintData& data)
 
     // 关联 context 和 runner
     m_context.m_runner = this;
+    m_context.m_state  = &m_state;
 
     // 初始化蓝图变量到执行上下文
-    m_context.m_metadata = data.metadata;
+    m_state.metadata = data.metadata;
     for (const auto& var : data.variables)
     {
-        m_context.m_variables[var.name] = var.defaultValue;
+        m_state.variables[var.name] = var.defaultValue;
     }
 
     // 初始化所有引脚的默认值
@@ -46,7 +47,7 @@ bool BlueprintRunner::Load(const BlueprintData& data)
         {
             if (pin.kind == PinKind::Input && pin.defaultValue.type != PinDataType::Unknown)
             {
-                m_context.m_pinValues[pin.id] = pin.defaultValue;
+                m_state.pinValues[pin.id] = pin.defaultValue;
             }
         }
     }
@@ -212,13 +213,13 @@ bool BlueprintRunner::buildTopologicalOrder(std::vector<NodeId>& order) const
 
 void BlueprintRunner::prepareNodeContext(const NodeInstance& node)
 {
-    m_context.m_currentNode = &node;
-    m_context.m_currentNodeData = node.nodeData;
-    m_context.m_pinNameToId.clear();
+    m_state.currentNode = &node;
+    m_state.nodeData = node.nodeData;
+    m_state.pinNameToId.clear();
 
     for (const auto& pin : node.pins)
     {
-        m_context.m_pinNameToId[pin.name] = pin.id;
+        m_state.pinNameToId[pin.name] = pin.id;
     }
 }
 
@@ -231,8 +232,8 @@ void BlueprintRunner::propagatePinValues(const NodeInstance& node)
     {
         if (pin.kind != PinKind::Output) continue;
 
-        auto valueIt = m_context.m_pinValues.find(pin.id);
-        if (valueIt == m_context.m_pinValues.end()) continue;
+        auto valueIt = m_state.pinValues.find(pin.id);
+        if (valueIt == m_state.pinValues.end()) continue;
 
         // 必须先拷贝值！下方 operator[] 插入新 key 时可能触发 rehash，
         // 导致 valueIt 迭代器失效。
@@ -242,7 +243,7 @@ void BlueprintRunner::propagatePinValues(const NodeInstance& node)
         auto downstreamPins = m_blueprint.getDownstreamPinIds(pin.id);
         for (PinId endPinId : downstreamPins)
         {
-            m_context.m_pinValues[endPinId] = value;
+            m_state.pinValues[endPinId] = value;
         }
     }
 }
@@ -361,8 +362,8 @@ ExecutionResult BlueprintRunner::Execute()
         {
             if (pin.kind == PinKind::Output)
             {
-                auto it = m_context.m_pinValues.find(pin.id);
-                if (it != m_context.m_pinValues.end())
+                auto it = m_state.pinValues.find(pin.id);
+                if (it != m_state.pinValues.end())
                 {
                     result.outputValues[pin.id] = it->second;
                 }
@@ -445,29 +446,29 @@ ExecutionResult BlueprintRunner::ExecuteNodes(const std::vector<NodeId>& nodeIds
 
 void BlueprintRunner::SetVariable(const std::string& name, const Variant& value)
 {
-    m_context.m_variables[name] = value;
+    m_state.variables[name] = value;
 }
 
 Variant BlueprintRunner::GetVariable(const std::string& name) const
 {
-    auto it = m_context.m_variables.find(name);
-    return (it != m_context.m_variables.end()) ? it->second : Variant();
+    auto it = m_state.variables.find(name);
+    return (it != m_state.variables.end()) ? it->second : Variant();
 }
 
 const std::unordered_map<std::string, Variant>& BlueprintRunner::GetAllVariables() const
 {
-    return m_context.m_variables;
+    return m_state.variables;
 }
 
 Variant BlueprintRunner::GetPinValue(PinId pinId) const
 {
-    auto it = m_context.m_pinValues.find(pinId);
-    return (it != m_context.m_pinValues.end()) ? it->second : Variant();
+    auto it = m_state.pinValues.find(pinId);
+    return (it != m_state.pinValues.end()) ? it->second : Variant();
 }
 
 void BlueprintRunner::SetPinValue(PinId pinId, const Variant& value)
 {
-    m_context.m_pinValues[pinId] = value;
+    m_state.pinValues[pinId] = value;
 }
 
 // ============================================================================
@@ -553,12 +554,12 @@ void BlueprintRunner::SetLogCallback(std::function<void(const std::string&)> cal
 
 void BlueprintRunner::ResetState()
 {
-    m_context.m_pinValues.clear();
-    m_context.m_variables.clear();
-    m_context.m_currentNode = nullptr;
-    m_context.m_activatedInputPinId = InvalidPinId;
-    m_context.m_currentNodeData.clear();
-    m_context.m_pinNameToId.clear();
+    m_state.pinValues.clear();
+    m_state.variables.clear();
+    m_state.currentNode = nullptr;
+    m_state.activatedInputPinId = InvalidPinId;
+    m_state.nodeData.clear();
+    m_state.pinNameToId.clear();
     m_flowDepth = 0;
 
     // 清理保持存活的子蓝图 runner，重置异步计数
@@ -570,7 +571,7 @@ void BlueprintRunner::ResetState()
     {
         for (const auto& var : m_blueprint.variables)
         {
-            m_context.m_variables[var.name] = var.defaultValue;
+            m_state.variables[var.name] = var.defaultValue;
         }
         for (const auto& node : m_blueprint.nodes)
         {
@@ -578,7 +579,7 @@ void BlueprintRunner::ResetState()
             {
                 if (pin.kind == PinKind::Input && pin.defaultValue.type != PinDataType::Unknown)
                 {
-                    m_context.m_pinValues[pin.id] = pin.defaultValue;
+                    m_state.pinValues[pin.id] = pin.defaultValue;
                 }
             }
         }
@@ -597,49 +598,39 @@ bool ExecutionContext::FireConnectedNode(PinId inputPinId)
 // ============================================================================
 
 // 内部辅助：将用户回调包装为带 context save/restore 的 TimerCallback
-// timer 回调在未来帧触发时 m_currentNode / m_pinNameToId / m_currentNodeData
+// timer 回调在未来帧触发时 m_state->currentNode / pinNameToId / nodeData
 // 已被其他节点覆盖，需要先恢复再调用用户回调
 TimerCallback ExecutionContext::wrapCallbackWithContextRestore(TimerCallback callback)
 {
-    auto savedNode        = m_currentNode;
-    auto savedPinNameToId = m_pinNameToId;
-    auto savedNodeData    = m_currentNodeData;
+    auto savedNode        = m_state->currentNode;
+    auto savedPinNameToId = m_state->pinNameToId;
+    auto savedNodeData    = m_state->nodeData;
 
-    // 注册一个异步操作占位：当前 runner 有一个正在等待的 timer 回调。
-    // 用 shared_ptr<AsyncGuard> 管理生命周期：
-    //   - 非循环 timer (repeatCount=1)：回调触发一次后 lambda 析构 → guard 析构 → ReleaseAsync
-    //   - 循环 timer (repeatCount=-1)：每次触发回调后 guard 继续存活，
-    //     直到 callback() 返回 false（取消循环）时 lambda 被 FrameTimerManager
-    //     移除 → guard 析构 → ReleaseAsync
-    // 注意：guard 持有的是 m_runner 裸指针，所以只在 runner 存活期间有效。
-    // ExecutionContext 的生命周期与 BlueprintRunner 绑定，这里是安全的。
     if (m_runner)
         m_runner->AcquireAsync();
 
-    BlueprintRunner* runner = m_runner; // 捕获裸指针（与 m_runner 生命周期一致）
+    BlueprintRunner* runner = m_runner;
 
     return [this, runner, callback = std::move(callback),
             savedNode, savedPinNameToId, savedNodeData]() mutable -> bool
     {
         // 保存当前状态
-        auto prevNode        = m_currentNode;
-        auto prevPinNameToId = m_pinNameToId;
-        auto prevNodeData    = m_currentNodeData;
+        auto prevNode        = m_state->currentNode;
+        auto prevPinNameToId = m_state->pinNameToId;
+        auto prevNodeData    = m_state->nodeData;
 
         // 恢复注册时的状态
-        m_currentNode     = savedNode;
-        m_pinNameToId     = savedPinNameToId;
-        m_currentNodeData = savedNodeData;
+        m_state->currentNode  = savedNode;
+        m_state->pinNameToId  = savedPinNameToId;
+        m_state->nodeData     = savedNodeData;
 
         const bool ret = callback();
 
         // 恢复调用前的状态
-        m_currentNode     = prevNode;
-        m_pinNameToId     = prevPinNameToId;
-        m_currentNodeData = prevNodeData;
+        m_state->currentNode  = prevNode;
+        m_state->pinNameToId  = prevPinNameToId;
+        m_state->nodeData     = prevNodeData;
 
-        // 非循环 timer / 循环 timer 取消时（ret == false），回调不再触发
-        // → 释放异步计数。循环 timer（ret == true）保持计数，下次触发继续。
         if (!ret && runner)
             runner->ReleaseAsync();
 
@@ -689,8 +680,8 @@ TimerHandle ExecutionContext::SetTimerByName(const std::string& name, float seco
 
 bool ExecutionContext::ActivateOutputFlow(const std::string& pinName)
 {
-    auto it = m_pinNameToId.find(pinName);
-    if (it == m_pinNameToId.end())
+    auto it = m_state->pinNameToId.find(pinName);
+    if (it == m_state->pinNameToId.end())
     {
         Log("[WARN] ActivateOutputFlow: pin '" + pinName + "' not found");
         return true; // 引脚不存在不视为致命错误
@@ -706,8 +697,8 @@ bool ExecutionContext::ActivateOutputFlow(PinId pinId)
 
 void ExecutionContext::MarkDownstreamAsHandled(const std::string& pinName)
 {
-    auto it = m_pinNameToId.find(pinName);
-    if (it != m_pinNameToId.end())
+    auto it = m_state->pinNameToId.find(pinName);
+    if (it != m_state->pinNameToId.end())
         MarkDownstreamAsHandled(it->second);
 }
 
@@ -746,10 +737,10 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     }
 
     // 保存当前 context 状态（递归执行会修改它）
-    auto savedNode = m_context.m_currentNode;
-    auto savedPinNameToId = m_context.m_pinNameToId;
-    auto savedNodeData = m_context.m_currentNodeData;
-    auto savedActivatedInputPinId = m_context.m_activatedInputPinId;
+    auto savedNode = m_state.currentNode;
+    auto savedPinNameToId = m_state.pinNameToId;
+    auto savedNodeData = m_state.nodeData;
+    auto savedActivatedInputPinId = m_state.activatedInputPinId;
 
     // 传播当前节点的所有输出引脚值到下游（不仅是触发的 exec 引脚）
     if (savedNode)
@@ -764,8 +755,8 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     Variant outputPinValue;
     bool hasOutputPinValue = false;
     {
-        auto valIt = m_context.m_pinValues.find(outputPinId);
-        if (valIt != m_context.m_pinValues.end())
+        auto valIt = m_state.pinValues.find(outputPinId);
+        if (valIt != m_state.pinValues.end())
         {
             outputPinValue = valIt->second;
             hasOutputPinValue = true;
@@ -777,7 +768,7 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     {
         // 传播当前引脚值到目标输入引脚
         if (hasOutputPinValue)
-            m_context.m_pinValues[endPinId] = outputPinValue;
+            m_state.pinValues[endPinId] = outputPinValue;
 
         const NodeInstance* targetNode = m_blueprint.findNodeByPin(endPinId);
         if (targetNode)
@@ -856,10 +847,10 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     if (!ensureTopologicalOrder())
     {
         // 恢复 context
-        m_context.m_currentNode = savedNode;
-        m_context.m_pinNameToId = savedPinNameToId;
-        m_context.m_currentNodeData = savedNodeData;
-        m_context.m_activatedInputPinId = savedActivatedInputPinId;
+        m_state.currentNode = savedNode;
+        m_state.pinNameToId = savedPinNameToId;
+        m_state.nodeData = savedNodeData;
+        m_state.activatedInputPinId = savedActivatedInputPinId;
         --m_flowDepth;
         return false; // cycle
     }
@@ -898,7 +889,7 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
 
         // 设置触发该节点的输入引脚 ID（仅直接目标节点有此信息）
         auto activatedIt = nodeToActivatedInputPin.find(id);
-        m_context.m_activatedInputPinId = (activatedIt != nodeToActivatedInputPin.end())
+        m_state.activatedInputPinId = (activatedIt != nodeToActivatedInputPin.end())
             ? activatedIt->second : InvalidPinId;
 
         if (!executeNodeInternal(*node))
@@ -908,7 +899,7 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
         }
 
         // 清除已用完的激活引脚信息
-        m_context.m_activatedInputPinId = InvalidPinId;
+        m_state.activatedInputPinId = InvalidPinId;
 
         // 标记为全局已执行（供主循环 execute() 使用）
         m_flowExecutedNodes.insert(id);
@@ -926,10 +917,10 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     }
 
     // 恢复 context 状态
-    m_context.m_currentNode = savedNode;
-    m_context.m_pinNameToId = savedPinNameToId;
-    m_context.m_currentNodeData = savedNodeData;
-    m_context.m_activatedInputPinId = savedActivatedInputPinId;
+    m_state.currentNode = savedNode;
+    m_state.pinNameToId = savedPinNameToId;
+    m_state.nodeData = savedNodeData;
+    m_state.activatedInputPinId = savedActivatedInputPinId;
 
     --m_flowDepth;
     return ok;
