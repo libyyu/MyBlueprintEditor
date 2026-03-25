@@ -1,5 +1,6 @@
 // ExecutionPanel.cpp -- 蓝图执行 & 执行面板 UI
 #include "BlueprintEditor.h"
+#include "BuiltinHandlers.h"
 
 // ============================================================================
 // 执行蓝图
@@ -106,10 +107,14 @@ void BlueprintEditor::ExecuteBlueprint()
         return;
     }
 
-    // 3. Register all handlers from the handler registry
+    // 3. 用当前文件路径重新注册 handlers（确保 ExecuteBlueprint 节点能解析子蓝图的相对路径）
+    {
+        std::string currentPath = m_CurrentFilePath;  // 当前蓝图文件路径
+        ::NodeEditor::Runtime::RegisterBuiltinHandlers(
+            m_PersistentRunner, currentPath, &m_HandlerRegistry);
+    }
     if (m_DefaultHandler)
         m_PersistentRunner.SetDefaultHandler(m_DefaultHandler);
-    m_PersistentRunner.RegisterHandlers(m_HandlerRegistry);
 
     // 4. 执行
     auto startTime = std::chrono::high_resolution_clock::now();

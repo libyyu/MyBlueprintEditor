@@ -357,27 +357,34 @@
             ]
         },
         {
-            "id": 65,
+            "id": 52,
             "definitionId": "AppendString",
             "definitionVersion": 1,
             "name": "Append String",
             "pins": [
                 {
-                    "id": 66,
+                    "id": 53,
                     "kind": 0,
                     "dataType": 4,
                     "name": "A",
                     "defaultValue": "sub result:"
                 },
                 {
-                    "id": 67,
+                    "id": 54,
                     "kind": 0,
                     "dataType": 4,
                     "name": "B",
                     "defaultValue": ""
                 },
                 {
-                    "id": 68,
+                    "id": 74,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "C",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 55,
                     "kind": 1,
                     "dataType": 4,
                     "name": "Result"
@@ -385,20 +392,20 @@
             ]
         },
         {
-            "id": 69,
+            "id": 56,
             "definitionId": "BoolToString",
             "definitionVersion": 1,
             "name": "Bool to String",
             "pins": [
                 {
-                    "id": 70,
+                    "id": 57,
                     "kind": 0,
                     "dataType": 1,
                     "name": "Value",
                     "defaultValue": false
                 },
                 {
-                    "id": 71,
+                    "id": 58,
                     "kind": 1,
                     "dataType": 4,
                     "name": "Result"
@@ -408,79 +415,79 @@
     ],
     "links": [
         {
-            "id": 52,
+            "id": 59,
             "startPinId": 5,
             "endPinId": 9,
             "isEnabled": true
         },
         {
-            "id": 53,
+            "id": 60,
             "startPinId": 6,
             "endPinId": 17,
             "isEnabled": true
         },
         {
-            "id": 54,
+            "id": 61,
             "startPinId": 18,
             "endPinId": 14,
             "isEnabled": true
         },
         {
-            "id": 55,
+            "id": 62,
             "startPinId": 15,
             "endPinId": 10,
             "isEnabled": true
         },
         {
-            "id": 56,
+            "id": 63,
             "startPinId": 11,
             "endPinId": 20,
             "isEnabled": true
         },
         {
-            "id": 57,
+            "id": 64,
             "startPinId": 6,
             "endPinId": 25,
             "isEnabled": true
         },
         {
-            "id": 58,
+            "id": 65,
             "startPinId": 27,
             "endPinId": 21,
             "isEnabled": true
         },
         {
-            "id": 59,
+            "id": 66,
             "startPinId": 22,
             "endPinId": 29,
             "isEnabled": true
         },
         {
-            "id": 60,
+            "id": 67,
             "startPinId": 7,
             "endPinId": 33,
             "isEnabled": true
         },
         {
-            "id": 61,
+            "id": 68,
             "startPinId": 35,
             "endPinId": 37,
             "isEnabled": true
         },
         {
-            "id": 62,
+            "id": 69,
             "startPinId": 40,
             "endPinId": 45,
             "isEnabled": true
         },
         {
-            "id": 63,
+            "id": 70,
             "startPinId": 41,
             "endPinId": 49,
             "isEnabled": true
         },
         {
-            "id": 64,
+            "id": 71,
             "startPinId": 43,
             "endPinId": 50,
             "isEnabled": true
@@ -488,13 +495,19 @@
         {
             "id": 72,
             "startPinId": 42,
-            "endPinId": 70,
+            "endPinId": 57,
             "isEnabled": true
         },
         {
             "id": 73,
-            "startPinId": 71,
-            "endPinId": 67,
+            "startPinId": 58,
+            "endPinId": 54,
+            "isEnabled": true
+        },
+        {
+            "id": 75,
+            "startPinId": 43,
+            "endPinId": 74,
             "isEnabled": true
         }
     ]

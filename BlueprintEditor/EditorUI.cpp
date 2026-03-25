@@ -1274,9 +1274,12 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 // Process pending removals for dynamic pins
                 if (node.HasDynamicInputs)
                 {
+                    auto oldSize = node.Inputs.size();
                     node.Inputs.erase(std::remove_if(node.Inputs.begin(), node.Inputs.end(),
                         [](const Pin& p) { return p.StringValue == "\x01REMOVE"; }),
                         node.Inputs.end());
+                    if (node.Inputs.size() != oldSize)
+                        ActiveDoc()->invalidateEditorIndices();  // 引脚被删除，需要重建索引
                     BuildNode(&node);
                 }
 
@@ -1329,6 +1332,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                                 node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
                             }
                             BuildNode(&node);
+                            ActiveDoc()->invalidateEditorIndices();  // 引脚指针可能失效，需要重建索引
                             m_IsDirty = true;
                         }
                         ImGui::PopStyleColor(3);
@@ -1381,6 +1385,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                             node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
                         }
                         BuildNode(&node);
+                        ActiveDoc()->invalidateEditorIndices();  // 引脚指针可能失效，需要重建索引
                         m_IsDirty = true;
                     }
                     ImGui::PopStyleColor(3);
@@ -1434,18 +1439,17 @@ void BlueprintEditor::OnFrame(float deltaTime)
             // ---- 错误节点视觉反馈（UE4 风格）----
             if (node.HasError)
             {
+                // GetNodeBackgroundDrawList 使用画布坐标，不需要转换到屏幕坐标
                 auto drawList = ed::GetNodeBackgroundDrawList(node.ID);
-                auto nodeMin = ed::GetNodePosition(node.ID);
+                auto nodePos = ed::GetNodePosition(node.ID);
                 auto nodeSize = ed::GetNodeSize(node.ID);
-                auto nodeMax = ImVec2(nodeMin.x + nodeSize.x, nodeMin.y + nodeSize.y);
-                // 将画布坐标转换为屏幕坐标
-                auto screenMin = ed::CanvasToScreen(nodeMin);
-                auto screenMax = ed::CanvasToScreen(nodeMax);
+                ImVec2 rectMin = nodePos;
+                ImVec2 rectMax = ImVec2(nodePos.x + nodeSize.x, nodePos.y + nodeSize.y);
 
                 // 红色边框
                 drawList->AddRect(
-                    screenMin - ImVec2(2, 2),
-                    screenMax + ImVec2(2, 2),
+                    rectMin - ImVec2(2, 2),
+                    rectMax + ImVec2(2, 2),
                     IM_COL32(255, 40, 40, 200), 6.0f, 0, 2.5f);
 
                 // 错误信息：在节点底部渲染红色文字
@@ -1453,8 +1457,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 {
                     auto textSize = ImGui::CalcTextSize(node.ErrorMessage.c_str());
                     auto textPos = ImVec2(
-                        screenMin.x + (screenMax.x - screenMin.x - textSize.x) * 0.5f,
-                        screenMax.y + 2.0f);
+                        rectMin.x + (rectMax.x - rectMin.x - textSize.x) * 0.5f,
+                        rectMax.y + 2.0f);
                     drawList->AddRectFilled(
                         textPos - ImVec2(4, 1),
                         textPos + textSize + ImVec2(4, 1),
@@ -1473,22 +1477,22 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     if (alpha > 1.0f) alpha = 1.0f;
                     int a = static_cast<int>(alpha * 200);
 
+                    // GetNodeBackgroundDrawList 使用画布坐标，不需要转换到屏幕坐标
                     auto drawList = ed::GetNodeBackgroundDrawList(node.ID);
-                    auto nodeMin = ed::GetNodePosition(node.ID);
+                    auto nodePos = ed::GetNodePosition(node.ID);
                     auto nodeSize = ed::GetNodeSize(node.ID);
-                    auto nodeMax = ImVec2(nodeMin.x + nodeSize.x, nodeMin.y + nodeSize.y);
-                    auto screenMin = ed::CanvasToScreen(nodeMin);
-                    auto screenMax = ed::CanvasToScreen(nodeMax);
+                    ImVec2 rectMin = nodePos;
+                    ImVec2 rectMax = ImVec2(nodePos.x + nodeSize.x, nodePos.y + nodeSize.y);
 
                     // 绿色发光边框
                     drawList->AddRect(
-                        screenMin - ImVec2(3, 3),
-                        screenMax + ImVec2(3, 3),
+                        rectMin - ImVec2(3, 3),
+                        rectMax + ImVec2(3, 3),
                         IM_COL32(50, 255, 100, a), 8.0f, 0, 3.0f);
                     // 外层淡光晕
                     drawList->AddRect(
-                        screenMin - ImVec2(6, 6),
-                        screenMax + ImVec2(6, 6),
+                        rectMin - ImVec2(6, 6),
+                        rectMax + ImVec2(6, 6),
                         IM_COL32(50, 255, 100, a / 3), 10.0f, 0, 2.0f);
                 }
             }
