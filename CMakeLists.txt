@@ -76,6 +76,11 @@ add_definitions(-DIMGUI_DEFINE_MATH_OPERATORS)
 set(BLUEPRINT_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 # ---------------------------------------------------------------------------
+# crude_json  (lightweight JSON parser – used by Runtime and Editor)
+# ---------------------------------------------------------------------------
+add_subdirectory(Utils/Json)
+
+# ---------------------------------------------------------------------------
 # BlueprintRuntime  (always built)
 # ---------------------------------------------------------------------------
 add_subdirectory(Runtime)

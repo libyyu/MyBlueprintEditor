@@ -24,7 +24,7 @@ bool BlueprintRunner::Load(const BlueprintData& data)
 {
     m_blueprint = data;
     m_loaded = true;
-    m_topoCacheDirty = true;
+    invalidateTopoCache();
 
     // 预建哈希索引，加速后续查找
     m_blueprint.rebuildIndices();
@@ -305,13 +305,13 @@ ExecutionResult BlueprintRunner::Execute()
 
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    // 拓扑排序
-    std::vector<NodeId> order;
-    if (!buildTopologicalOrder(order))
+    // 拓扑排序（使用缓存）
+    if (!ensureTopologicalOrder())
     {
         result.errorMessage = "Blueprint contains a cycle, cannot execute";
         return result;
     }
+    const auto& order = m_topoCache;
 
     // 按拓扑顺序执行
     m_flowExecutedNodes.clear(); // 清空控制流已执行记录
@@ -397,13 +397,13 @@ ExecutionResult BlueprintRunner::ExecuteNodes(const std::vector<NodeId>& nodeIds
 
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    // 获取完整拓扑序
-    std::vector<NodeId> fullOrder;
-    if (!buildTopologicalOrder(fullOrder))
+    // 获取完整拓扑序（使用缓存）
+    if (!ensureTopologicalOrder())
     {
         result.errorMessage = "Blueprint contains a cycle, cannot execute";
         return result;
     }
+    const auto& fullOrder = m_topoCache;
 
     // 过滤：只保留指定的节点，但保持拓扑顺序
     std::unordered_set<NodeId> targetSet(nodeIds.begin(), nodeIds.end());
@@ -474,13 +474,19 @@ void BlueprintRunner::SetPinValue(PinId pinId, const Variant& value)
 // 图查询工具方法
 // ============================================================================
 
-std::vector<NodeId> BlueprintRunner::GetTopologicalOrder() const
+bool BlueprintRunner::ensureTopologicalOrder() const
 {
     if (m_topoCacheDirty)
     {
-        buildTopologicalOrder(m_topoCache);
+        m_topoCacheHasCycle = !buildTopologicalOrder(m_topoCache);
         m_topoCacheDirty = false;
     }
+    return !m_topoCacheHasCycle;
+}
+
+std::vector<NodeId> BlueprintRunner::GetTopologicalOrder() const
+{
+    ensureTopologicalOrder();
     return m_topoCache;
 }
 
@@ -826,9 +832,8 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
         }
     }
 
-    // 获取拓扑序并过滤
-    std::vector<NodeId> fullOrder;
-    if (!buildTopologicalOrder(fullOrder))
+    // 获取拓扑序并过滤（使用缓存）
+    if (!ensureTopologicalOrder())
     {
         // 恢复 context
         m_context.m_currentNode = savedNode;
@@ -838,6 +843,7 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
         --m_flowDepth;
         return false; // cycle
     }
+    const auto& fullOrder = m_topoCache;
 
     // executedHere: 追踪在本次执行循环中，被内层 ActivateOutputFlow 递归执行过的节点
     // 用于防止"单 exec 输出节点的 handler 调用 ActivateOutputFlow 后，

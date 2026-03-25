@@ -22,6 +22,7 @@ struct NodeInstance
 {
     NodeId              id = InvalidNodeId;
     std::string         definitionId;           // 节点类型ID（对应 NodeDefinition::id）
+    int                 definitionVersion = 1;  // 节点定义版本号（保存时记录 NodeDefinition::version）
     std::string         name;                   // 自定义名称（可选）
     NodePosition        position;               // 节点位置
     NodeSize            size;                   // 节点尺寸
@@ -83,15 +84,26 @@ struct CommentRegion
 };
 
 // ============================================================================
+// Schema 版本常量
+// ============================================================================
+
+// 当前蓝图文件格式版本号。
+// 修改规则：
+//   - 新增可选字段（向后兼容）→ 不递增
+//   - 修改已有字段语义 / 删除字段 / 改变引脚格式 → 递增
+constexpr int BLUEPRINT_CURRENT_SCHEMA_VERSION = 1;
+
+// ============================================================================
 // 蓝图元数据
 // ============================================================================
 
 struct BlueprintMetadata
 {
+    int                         schemaVersion = BLUEPRINT_CURRENT_SCHEMA_VERSION; // 文件格式版本
     std::string                 name;           // 蓝图名称
     std::string                 description;    // 蓝图描述
     std::string                 author;         // 作者
-    std::string                 version;        // 版本号
+    std::string                 version;        // 用户蓝图版本号
     std::string                 createdAt;      // 创建时间
     std::string                 updatedAt;      // 更新时间
     std::vector<std::string>    tags;           // 标签
@@ -275,13 +287,14 @@ struct BlueprintData
         return (it != m_pinToNodeIndex.end()) ? &nodes[it->second] : nullptr;
     }
     
-    // 辅助方法：获取输入节点列表
+    // 辅助方法：获取输入节点列表（已去重）
     std::vector<NodeId> getInputNodes(NodeId nodeId) const
     {
         std::vector<NodeId> result;
         const NodeInstance* node = findNode(nodeId);
         if (!node) return result;
         
+        std::unordered_set<NodeId> seen;
         // 遍历所有输入引脚
         for (const auto& pin : node->pins)
         {
@@ -292,7 +305,7 @@ struct BlueprintData
                 for (const auto* link : linkPins)
                 {
                     const NodeInstance* sourceNode = findNodeByPin(link->startPinId);
-                    if (sourceNode)
+                    if (sourceNode && seen.insert(sourceNode->id).second)
                     {
                         result.push_back(sourceNode->id);
                     }
@@ -302,13 +315,14 @@ struct BlueprintData
         return result;
     }
     
-    // 辅助方法：获取数据输入节点列表（仅通过非exec引脚连接的上游节点）
+    // 辅助方法：获取数据输入节点列表（仅通过非exec引脚连接的上游节点，已去重）
     std::vector<NodeId> getDataInputNodes(NodeId nodeId) const
     {
         std::vector<NodeId> result;
         const NodeInstance* node = findNode(nodeId);
         if (!node) return result;
         
+        std::unordered_set<NodeId> seen;
         for (const auto& pin : node->pins)
         {
             if (pin.kind == PinKind::Input && !pin.isExec)
@@ -317,7 +331,7 @@ struct BlueprintData
                 for (const auto* link : linkPins)
                 {
                     const NodeInstance* sourceNode = findNodeByPin(link->startPinId);
-                    if (sourceNode)
+                    if (sourceNode && seen.insert(sourceNode->id).second)
                     {
                         result.push_back(sourceNode->id);
                     }
@@ -327,13 +341,14 @@ struct BlueprintData
         return result;
     }
     
-    // 辅助方法：获取通过 exec 输出引脚连接的下游节点列表
+    // 辅助方法：获取通过 exec 输出引脚连接的下游节点列表（已去重）
     std::vector<NodeId> getExecOutputNodes(NodeId nodeId) const
     {
         std::vector<NodeId> result;
         const NodeInstance* node = findNode(nodeId);
         if (!node) return result;
         
+        std::unordered_set<NodeId> seen;
         for (const auto& pin : node->pins)
         {
             if (pin.kind == PinKind::Output && pin.isExec)
@@ -342,7 +357,7 @@ struct BlueprintData
                 for (const auto* link : findLinks)
                 {
                     const NodeInstance* targetNode = findNodeByPin(link->endPinId);
-                    if (targetNode)
+                    if (targetNode && seen.insert(targetNode->id).second)
                         result.push_back(targetNode->id);
                 }
             }
@@ -413,13 +428,14 @@ struct BlueprintData
         return result;
     }
     
-    // 辅助方法：获取输出节点列表
+    // 辅助方法：获取输出节点列表（已去重）
     std::vector<NodeId> getOutputNodes(NodeId nodeId) const
     {
         std::vector<NodeId> result;
         const NodeInstance* node = findNode(nodeId);
         if (!node) return result;
         
+        std::unordered_set<NodeId> seen;
         // 遍历所有输出引脚
         for (const auto& pin : node->pins)
         {
@@ -430,7 +446,7 @@ struct BlueprintData
                 for (const auto* link : findLinks)
                 {
                     const NodeInstance* targetNode = findNodeByPin(link->endPinId);
-                    if (targetNode)
+                    if (targetNode && seen.insert(targetNode->id).second)
                     {
                         result.push_back(targetNode->id);
                     }

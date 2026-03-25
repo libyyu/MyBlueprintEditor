@@ -30,6 +30,8 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     if(NOT DEFINED BLUEPRINT_ROOT_DIR)
         set(BLUEPRINT_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
     endif()
+    # crude_json 需要在当前项目中构建（非独立构建时由根 CMakeLists 负责）
+    add_subdirectory("${BLUEPRINT_ROOT_DIR}/Utils/Json" "${CMAKE_CURRENT_BINARY_DIR}/crude_json")
 else()
     set(BLUEPRINT_STANDALONE FALSE)
 endif()
@@ -60,7 +62,6 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinNodeDefs.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FileSystem.cpp
-    ${BLUEPRINT_ROOT_DIR}/Utils/Json/crude_json.cpp
 )
 
 set(RUNTIME_PUBLIC_HEADERS
@@ -88,13 +89,16 @@ add_library(BlueprintRuntime ${_RUNTIME_LIB_TYPE}
 add_library(BlueprintRuntime::BlueprintRuntime ALIAS BlueprintRuntime)
 
 # ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+target_link_libraries(BlueprintRuntime PUBLIC crude_json)
+
+# ---------------------------------------------------------------------------
 # Include directories
 # ---------------------------------------------------------------------------
 target_include_directories(BlueprintRuntime
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-        $<BUILD_INTERFACE:${BLUEPRINT_ROOT_DIR}/Utils>
-        $<BUILD_INTERFACE:${BLUEPRINT_ROOT_DIR}/Utils/Json>
         $<INSTALL_INTERFACE:include/BlueprintRuntime>
 )
 
@@ -136,14 +140,13 @@ if(EMSCRIPTEN)
         -fno-rtti                # Unity WebGL strips RTTI
         -O2
     )
-    # Emscripten link flags (only meaningful when building the final .js/.wasm,
-    # but harmless to set here for documentation purposes)
-    target_link_options(BlueprintRuntime INTERFACE
-        -sWASM=1
-        -sALLOW_MEMORY_GROWTH=1
-        -sUSE_WEBGL2=0           # Unity WebGL uses its own GL
-        -sERROR_ON_UNDEFINED_SYMBOLS=0
-    )
+    # NOTE: Emscripten link flags (-sWASM=1, -sALLOW_MEMORY_GROWTH=1, etc.)
+    # are NOT set here because BlueprintRuntime is always a STATIC library
+    # under Emscripten.  INTERFACE link options on a static library only
+    # propagate when the consumer links via target_link_libraries(); Unity
+    # performs its own linking step, so these flags would never take effect.
+    # If you build a standalone Emscripten app (non-Unity), add the flags
+    # in your final executable's CMakeLists.txt instead.
     message(STATUS "[BlueprintRuntime] Emscripten flags applied (-fno-exceptions, -fno-rtti, -O2)")
 
 elseif(MSVC)
@@ -192,7 +195,7 @@ set_property(TARGET BlueprintRuntime PROPERTY FOLDER "Libraries")
 # ---------------------------------------------------------------------------
 include(GNUInstallDirs)
 
-install(TARGETS BlueprintRuntime
+install(TARGETS BlueprintRuntime crude_json
     EXPORT BlueprintRuntimeTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -201,6 +204,12 @@ install(TARGETS BlueprintRuntime
 
 install(FILES ${RUNTIME_PUBLIC_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/BlueprintRuntime
+)
+
+# Install crude_json headers alongside
+install(FILES
+    ${BLUEPRINT_ROOT_DIR}/Utils/Json/crude_json.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/crude_json
 )
 
 # CMake package config (so find_package(BlueprintRuntime) works)

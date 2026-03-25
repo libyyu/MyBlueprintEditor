@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -233,8 +234,12 @@ struct Variant
         case PinDataType::Boolean: return boolValue ? 1 : 0;
         case PinDataType::Float:   return static_cast<int64_t>(floatValue);
         case PinDataType::String:
-            try { return std::stoll(stringValue); }
-            catch (...) { return 0; }
+        {
+            if (stringValue.empty()) return 0;
+            char* end = nullptr;
+            auto v = std::strtoll(stringValue.c_str(), &end, 10);
+            return (end != stringValue.c_str()) ? v : 0;
+        }
         case PinDataType::Array:   return static_cast<int64_t>(arrayValue.size());
         case PinDataType::Map:     return static_cast<int64_t>(mapValue.size());
         default: return 0;
@@ -249,8 +254,12 @@ struct Variant
         case PinDataType::Integer: return static_cast<double>(intValue);
         case PinDataType::Boolean: return boolValue ? 1.0 : 0.0;
         case PinDataType::String:
-            try { return std::stod(stringValue); }
-            catch (...) { return 0.0; }
+        {
+            if (stringValue.empty()) return 0.0;
+            char* end = nullptr;
+            auto v = std::strtod(stringValue.c_str(), &end);
+            return (end != stringValue.c_str()) ? v : 0.0;
+        }
         default: return 0.0;
         }
     }

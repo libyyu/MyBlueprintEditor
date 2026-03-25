@@ -405,6 +405,13 @@ private:
     // 缓存：拓扑排序结果
     mutable std::vector<NodeId>                         m_topoCache;
     mutable bool                                        m_topoCacheDirty = true;
+    mutable bool                                        m_topoCacheHasCycle = false;
+
+    // 标记拓扑缓存失效（图结构变更时调用）
+    void invalidateTopoCache() { m_topoCacheDirty = true; }
+
+    // 确保拓扑缓存有效，返回是否无环
+    bool ensureTopologicalOrder() const;
 
     // 内部方法
     bool buildTopologicalOrder(std::vector<NodeId>& order) const;

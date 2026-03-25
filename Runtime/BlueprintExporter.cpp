@@ -1,7 +1,7 @@
 // Runtime/BlueprintExporter.cpp - 蓝图数据导出器实现
 //
 // 导出策略:
-//   Runtime 文件:  节点(id/definitionId/name/pins/isEnabled/nodeData/customProperties)、链接、变量(核心)、元数据(name/desc/version)
+//   Runtime 文件:  元数据(schemaVersion/name/desc/version)、节点(id/definitionId/definitionVersion/name/pins/isEnabled/nodeData/customProperties)、链接、变量(核心)
 //   Editor 文件:   节点(position/size/isCollapsed) 通过 nodeId 关联、注释、视图信息、元数据(author/timestamps)、变量(category/tooltip)
 
 #include "BlueprintExporter.h"
@@ -108,7 +108,7 @@ std::string JsonBlueprintExporter::exportRuntimeToString(const BlueprintData& da
     writeNewline();
     
     // ================================================================
-    // 元数据（运行时只保留 name/description/version）
+    // 元数据（运行时只保留 name/description/version/schemaVersion）
     // ================================================================
     if (options.includeMetadata)
     {
@@ -116,6 +116,10 @@ std::string JsonBlueprintExporter::exportRuntimeToString(const BlueprintData& da
         oss << "\"metadata\": {";
         writeNewline();
         indentLevel++;
+        
+        writeIndent();
+        oss << "\"schemaVersion\": " << data.metadata.schemaVersion << ",";
+        writeNewline();
         
         writeIndent();
         oss << "\"name\": \"" << escapeJson(data.metadata.name) << "\",";
@@ -167,6 +171,10 @@ std::string JsonBlueprintExporter::exportRuntimeToString(const BlueprintData& da
         
         writeIndent();
         oss << "\"definitionId\": \"" << escapeJson(node.definitionId) << "\",";
+        writeNewline();
+        
+        writeIndent();
+        oss << "\"definitionVersion\": " << node.definitionVersion << ",";
         writeNewline();
         
         writeIndent();
@@ -781,6 +789,7 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
     if (rootObj.contains("metadata") && rootObj["metadata"].type() == crude_json::type_t::object)
     {
         auto& meta = rootObj["metadata"];
+        result.data.metadata.schemaVersion = static_cast<int>(getNumber(meta, "schemaVersion", 0));
         result.data.metadata.name        = getString(meta, "name");
         result.data.metadata.description  = getString(meta, "description");
         result.data.metadata.version      = getString(meta, "version");
@@ -799,6 +808,33 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
         }
     }
 
+    // ---- Schema 版本检查 ----
+    {
+        int fileSchema = result.data.metadata.schemaVersion;
+        if (fileSchema > BLUEPRINT_CURRENT_SCHEMA_VERSION)
+        {
+            result.errorMessage = "Blueprint file requires schema version "
+                + std::to_string(fileSchema)
+                + ", but this runtime only supports up to version "
+                + std::to_string(BLUEPRINT_CURRENT_SCHEMA_VERSION)
+                + ". Please update the application.";
+            return result;
+        }
+        if (fileSchema > 0 && fileSchema < BLUEPRINT_CURRENT_SCHEMA_VERSION)
+        {
+            result.warnings.push_back(
+                "Blueprint file uses older schema version "
+                + std::to_string(fileSchema)
+                + " (current: " + std::to_string(BLUEPRINT_CURRENT_SCHEMA_VERSION)
+                + "). Data will be migrated automatically.");
+        }
+        // fileSchema == 0 表示老文件没有 schemaVersion 字段，视为版本 1
+        if (fileSchema == 0)
+        {
+            result.data.metadata.schemaVersion = 1;
+        }
+    }
+
     // ---- 解析节点 ----
     if (rootObj.contains("nodes") && rootObj["nodes"].type() == crude_json::type_t::array)
     {
@@ -807,11 +843,12 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
             if (nodeJson.type() != crude_json::type_t::object) continue;
 
             NodeInstance node;
-            node.id           = static_cast<NodeId>(getNumber(nodeJson, "id"));
-            node.definitionId = getString(nodeJson, "definitionId");
-            node.name         = getString(nodeJson, "name");
-            node.isEnabled    = getBool(nodeJson, "isEnabled", true);
-            node.isCollapsed  = getBool(nodeJson, "isCollapsed", false);
+            node.id                = static_cast<NodeId>(getNumber(nodeJson, "id"));
+            node.definitionId      = getString(nodeJson, "definitionId");
+            node.definitionVersion = static_cast<int>(getNumber(nodeJson, "definitionVersion", 1));
+            node.name              = getString(nodeJson, "name");
+            node.isEnabled         = getBool(nodeJson, "isEnabled", true);
+            node.isCollapsed       = getBool(nodeJson, "isCollapsed", false);
 
             // 位置（Runtime 文件不含，但兼容老格式）
             if (nodeJson.contains("position") && nodeJson["position"].type() == crude_json::type_t::object)
@@ -1480,59 +1517,59 @@ Variant JsonBlueprintExporter::jsonToVariant(const std::string& json, PinDataTyp
 // BinaryBlueprintExporter 实现（占位）
 // ============================================================================
 
-std::string BinaryBlueprintExporter::exportRuntimeToString(const BlueprintData& data, const ExportOptions& options) const
+std::string BinaryBlueprintExporter::exportRuntimeToString(const BlueprintData& /*data*/, const ExportOptions& /*options*/) const
 {
     return "";
 }
 
-ExportResult BinaryBlueprintExporter::exportRuntimeToFile(const BlueprintData& data, const std::string& filePath, const ExportOptions& options) const
+ExportResult BinaryBlueprintExporter::exportRuntimeToFile(const BlueprintData& /*data*/, const std::string& /*filePath*/, const ExportOptions& /*options*/) const
 {
     ExportResult result;
     result.errorMessage = "Binary export not yet implemented";
     return result;
 }
 
-ImportResult BinaryBlueprintExporter::importRuntimeFromString(const std::string& content, const ImportOptions& options) const
+ImportResult BinaryBlueprintExporter::importRuntimeFromString(const std::string& /*content*/, const ImportOptions& /*options*/) const
 {
     ImportResult result;
     result.errorMessage = "Binary import not yet implemented";
     return result;
 }
 
-ImportResult BinaryBlueprintExporter::importRuntimeFromFile(const std::string& filePath, const ImportOptions& options) const
+ImportResult BinaryBlueprintExporter::importRuntimeFromFile(const std::string& /*filePath*/, const ImportOptions& /*options*/) const
 {
     ImportResult result;
     result.errorMessage = "Binary import not yet implemented";
     return result;
 }
 
-std::string BinaryBlueprintExporter::exportEditorToString(const BlueprintData& data, const ExportOptions& options) const
+std::string BinaryBlueprintExporter::exportEditorToString(const BlueprintData& /*data*/, const ExportOptions& /*options*/) const
 {
     return "";
 }
 
-ExportResult BinaryBlueprintExporter::exportEditorToFile(const BlueprintData& data, const std::string& filePath, const ExportOptions& options) const
+ExportResult BinaryBlueprintExporter::exportEditorToFile(const BlueprintData& /*data*/, const std::string& /*filePath*/, const ExportOptions& /*options*/) const
 {
     ExportResult result;
     result.errorMessage = "Binary editor export not yet implemented";
     return result;
 }
 
-EditorExportResult BinaryBlueprintExporter::exportEditorFiles(const BlueprintData& data, const std::string& runtimeFilePath, const std::string& editorFilePath, const ExportOptions& options) const
+EditorExportResult BinaryBlueprintExporter::exportEditorFiles(const BlueprintData& /*data*/, const std::string& /*runtimeFilePath*/, const std::string& /*editorFilePath*/, const ExportOptions& /*options*/) const
 {
     EditorExportResult result;
     result.errorMessage = "Binary editor export not yet implemented";
     return result;
 }
 
-ImportResult BinaryBlueprintExporter::importEditorFromStrings(const std::string& runtimeContent, const std::string& editorContent, const ImportOptions& options) const
+ImportResult BinaryBlueprintExporter::importEditorFromStrings(const std::string& /*runtimeContent*/, const std::string& /*editorContent*/, const ImportOptions& /*options*/) const
 {
     ImportResult result;
     result.errorMessage = "Binary editor import not yet implemented";
     return result;
 }
 
-ImportResult BinaryBlueprintExporter::importEditorFromFiles(const std::string& runtimeFilePath, const std::string& editorFilePath, const ImportOptions& options) const
+ImportResult BinaryBlueprintExporter::importEditorFromFiles(const std::string& /*runtimeFilePath*/, const std::string& /*editorFilePath*/, const ImportOptions& /*options*/) const
 {
     ImportResult result;
     result.errorMessage = "Binary editor import not yet implemented";

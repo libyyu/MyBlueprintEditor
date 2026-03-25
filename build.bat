@@ -48,9 +48,10 @@ if %CLEAN_BUILD%==1 (
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 
 :: CMake 配置
+:: 注意: MSVC 是多配置生成器，不需要 CMAKE_BUILD_TYPE（由 --config 指定）
 echo.
 echo [2/3] Running CMake configure...
-cmake -S "%PROJECT_DIR%" -B "%BUILD_DIR%" -A x64 -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DBUILD_EXAMPLES=%BUILD_EXAMPLES%
+cmake -S "%PROJECT_DIR%" -B "%BUILD_DIR%" -A x64 -DBUILD_EXAMPLES=%BUILD_EXAMPLES%
 
 if %ERRORLEVEL% neq 0 (
     echo.

@@ -166,6 +166,8 @@ void ed::Log(const char* fmt, ...)
     va_start(args, fmt);
     LogV(fmt, args);
     va_end(args);
+# else
+    IM_UNUSED(fmt);
 # endif
 }
 

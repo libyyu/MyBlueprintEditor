@@ -52,6 +52,7 @@ struct NodeDefinition
     std::string                     name;            // 显示名称
     std::string                     category;        // 所属类别
     NodeType                        type = NodeType::Blueprint;
+    int                             version = 1;     // 节点定义版本号（引脚变化时递增）
     
     // 引脚定义
     std::vector<PinDefinition>      inputPins;

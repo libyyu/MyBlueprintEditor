@@ -921,8 +921,12 @@ static void RegisterHandlers_Math(std::unordered_map<std::string, NodeHandler>& 
         auto str = ctx.GetInputValue("Value").asString();
         bool valid = false;
         int64_t result = 0;
-        try { result = std::stoll(str); valid = true; }
-        catch (...) {}
+        if (!str.empty())
+        {
+            char* end = nullptr;
+            result = std::strtoll(str.c_str(), &end, 10);
+            valid = (end != str.c_str() && *end == '\0');
+        }
         ctx.SetOutputValue("Result", Variant(result));
         ctx.SetOutputValue("Valid", Variant(valid));
         return true;
@@ -932,8 +936,12 @@ static void RegisterHandlers_Math(std::unordered_map<std::string, NodeHandler>& 
         auto str = ctx.GetInputValue("Value").asString();
         bool valid = false;
         double result = 0.0;
-        try { result = std::stod(str); valid = true; }
-        catch (...) {}
+        if (!str.empty())
+        {
+            char* end = nullptr;
+            result = std::strtod(str.c_str(), &end);
+            valid = (end != str.c_str() && *end == '\0');
+        }
         ctx.SetOutputValue("Result", Variant(result));
         ctx.SetOutputValue("Valid", Variant(valid));
         return true;

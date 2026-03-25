@@ -91,6 +91,7 @@ void NodeBuilder::End()
 void NodeBuilder::BeginPin(uint64_t pinId, bool isInput, int pinType)
 {
     IM_ASSERT(m_IsInNode && !m_IsInPin && "Not in node or already in pin");
+    (void)pinType; // Reserved for future use (e.g. pin shape/color by type)
     
     m_CurrentPinId = pinId;
     m_PinIsInput = isInput;
