@@ -68,9 +68,9 @@ void BlueprintEditor::CopySelectedNodes()
             cp.name = pin.Name;
             cp.type = pin.Type;
             cp.kind = PinKind::Input;
-            cp.boolValue = pin.BoolValue;
-            cp.intValue = pin.IntValue;
-            cp.floatValue = pin.FloatValue;
+            cp.numericValue = pin.BoolValue;
+            cp.numericValue = static_cast<int64_t>(pin.IntValue);
+            cp.numericValue = static_cast<double>(pin.FloatValue);
             cp.stringValue = pin.StringValue;
             cp.objectValue = pin.ObjectValue;
             cp.hiddenWhen = pin.HiddenWhen;
@@ -89,9 +89,9 @@ void BlueprintEditor::CopySelectedNodes()
             cp.name = pin.Name;
             cp.type = pin.Type;
             cp.kind = PinKind::Output;
-            cp.boolValue = pin.BoolValue;
-            cp.intValue = pin.IntValue;
-            cp.floatValue = pin.FloatValue;
+            cp.numericValue = pin.BoolValue;
+            cp.numericValue = static_cast<int64_t>(pin.IntValue);
+            cp.numericValue = static_cast<double>(pin.FloatValue);
             cp.stringValue = pin.StringValue;
             cp.objectValue = pin.ObjectValue;
             cp.hiddenWhen = pin.HiddenWhen;
@@ -198,9 +198,9 @@ void BlueprintEditor::PasteNodes(ImVec2 pastePosition)
             int newPinId = GetNextId();
             node.Inputs.emplace_back(newPinId, cp.name.c_str(), cp.type);
             auto& pin = node.Inputs.back();
-            pin.BoolValue = cp.boolValue;
-            pin.IntValue = cp.intValue;
-            pin.FloatValue = cp.floatValue;
+            pin.BoolValue  = cp.type == PinDataType::Boolean ? std::get<bool>(cp.numericValue) : false;
+            pin.IntValue   = cp.type == PinDataType::Integer ? static_cast<int>(std::get<int64_t>(cp.numericValue)) : 0;
+            pin.FloatValue = cp.type == PinDataType::Float   ? static_cast<float>(std::get<double>(cp.numericValue)) : 0.0f;
             pin.StringValue = cp.stringValue;
             pin.ObjectValue = cp.objectValue;
             pin.HiddenWhen = cp.hiddenWhen;

@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <variant>
 
 namespace NodeEditor {
 namespace Runtime {
@@ -71,127 +72,40 @@ struct Variant
 {
     PinDataType type = PinDataType::Unknown;
 
-    // 使用 union 节省内存，同一时刻只存储一种类型的值
-    union
-    {
-        bool        boolValue;
-        int64_t     intValue;
-        double      floatValue;
-    };
-    // std::string 含非平凡析构，不能放入 union，单独存储
+    // C++17 std::variant 替代 union，完全消除 type-punning UB
+    // monostate = Unknown/未初始化状态
+    std::variant<std::monostate, bool, int64_t, double> numericValue;
+
+    // std::string 含非平凡析构，不能放入 variant，单独存储
     std::string stringValue;
     // Array 值 —— 用于 PinDataType::Array
     std::vector<Variant> arrayValue;
-    // Map 值 —— 用于 PinDataType::Map（存储键为 string，运行时任意类型通过 asString() 转换）
+    // Map 值 —— 用于 PinDataType::Map
     std::unordered_map<std::string, Variant> mapValue;
 
     // 默认构造
-    Variant() : intValue(0) {}
+    Variant() : numericValue(std::monostate{}) {}
 
     // 析构
     ~Variant() = default;
 
-    // 拷贝构造
-    Variant(const Variant& other)
-        : type(other.type), intValue(0)
-    {
-        switch (type)
-        {
-        case PinDataType::Boolean: boolValue  = other.boolValue;  break;
-        case PinDataType::Integer: intValue   = other.intValue;   break;
-        case PinDataType::Float:   floatValue = other.floatValue; break;
-        case PinDataType::String:  stringValue = other.stringValue; break;
-        case PinDataType::Object:  stringValue = other.stringValue; break;
-        case PinDataType::Array:   arrayValue = other.arrayValue; break;
-        case PinDataType::Map:     mapValue = other.mapValue; break;
-        default: break;
-        }
-    }
-
-    // 移动构造
-    Variant(Variant&& other) noexcept
-        : type(other.type), intValue(0)
-    {
-        switch (type)
-        {
-        case PinDataType::Boolean: boolValue  = other.boolValue;  break;
-        case PinDataType::Integer: intValue   = other.intValue;   break;
-        case PinDataType::Float:   floatValue = other.floatValue; break;
-        case PinDataType::String:  stringValue = std::move(other.stringValue); break;
-        case PinDataType::Object:  stringValue = std::move(other.stringValue); break;
-        case PinDataType::Array:   arrayValue = std::move(other.arrayValue); break;
-        case PinDataType::Map:     mapValue = std::move(other.mapValue); break;
-        default: break;
-        }
-    }
-
-    // 拷贝赋值
-    Variant& operator=(const Variant& other)
-    {
-        if (this != &other)
-        {
-            // 如果旧类型使用 stringValue 但新类型不使用，清空 stringValue
-            if ((type == PinDataType::String || type == PinDataType::Object)
-                && other.type != PinDataType::String && other.type != PinDataType::Object)
-                stringValue.clear();
-            if (type == PinDataType::Array && other.type != PinDataType::Array)
-                arrayValue.clear();
-            if (type == PinDataType::Map && other.type != PinDataType::Map)
-                mapValue.clear();
-            type = other.type;
-            switch (type)
-            {
-            case PinDataType::Boolean: boolValue  = other.boolValue;  break;
-            case PinDataType::Integer: intValue   = other.intValue;   break;
-            case PinDataType::Float:   floatValue = other.floatValue; break;
-            case PinDataType::String:  stringValue = other.stringValue; break;
-            case PinDataType::Object:  stringValue = other.stringValue; break;
-            case PinDataType::Array:   arrayValue = other.arrayValue; break;
-            case PinDataType::Map:     mapValue = other.mapValue; break;
-            default: intValue = 0; break;
-            }
-        }
-        return *this;
-    }
-
-    // 移动赋值
-    Variant& operator=(Variant&& other) noexcept
-    {
-        if (this != &other)
-        {
-            if ((type == PinDataType::String || type == PinDataType::Object)
-                && other.type != PinDataType::String && other.type != PinDataType::Object)
-                stringValue.clear();
-            if (type == PinDataType::Array && other.type != PinDataType::Array)
-                arrayValue.clear();
-            if (type == PinDataType::Map && other.type != PinDataType::Map)
-                mapValue.clear();
-            type = other.type;
-            switch (type)
-            {
-            case PinDataType::Boolean: boolValue  = other.boolValue;  break;
-            case PinDataType::Integer: intValue   = other.intValue;   break;
-            case PinDataType::Float:   floatValue = other.floatValue; break;
-            case PinDataType::String:  stringValue = std::move(other.stringValue); break;
-            case PinDataType::Object:  stringValue = std::move(other.stringValue); break;
-            case PinDataType::Array:   arrayValue = std::move(other.arrayValue); break;
-            case PinDataType::Map:     mapValue = std::move(other.mapValue); break;
-            default: intValue = 0; break;
-            }
-        }
-        return *this;
-    }
+    // 拷贝构造 / 移动构造 / 拷贝赋值 / 移动赋值 —— 全部默认即可
+    // std::variant 已正确处理拷贝/移动语义，无需手写
+    Variant(const Variant&)            = default;
+    Variant(Variant&&) noexcept        = default;
+    Variant& operator=(const Variant&) = default;
+    Variant& operator=(Variant&&) noexcept = default;
 
     // 类型转换构造函数
-    explicit Variant(bool v)               : type(PinDataType::Boolean), boolValue(v) {}
-    explicit Variant(int v)                : type(PinDataType::Integer), intValue(v) {}
-    explicit Variant(int64_t v)            : type(PinDataType::Integer), intValue(v) {}
-    explicit Variant(float v)              : type(PinDataType::Float),   floatValue(static_cast<double>(v)) {}
-    explicit Variant(double v)             : type(PinDataType::Float),   floatValue(v) {}
-    explicit Variant(const char* v)        : type(PinDataType::String),  intValue(0), stringValue(v) {}
-    explicit Variant(const std::string& v) : type(PinDataType::String),  intValue(0), stringValue(v) {}
-    explicit Variant(std::vector<Variant> v) : type(PinDataType::Array), intValue(0), arrayValue(std::move(v)) {}
-    explicit Variant(std::unordered_map<std::string, Variant> m) : type(PinDataType::Map), intValue(0), mapValue(std::move(m)) {}
+    explicit Variant(bool v)               : type(PinDataType::Boolean), numericValue(v) {}
+    explicit Variant(int v)                : type(PinDataType::Integer), numericValue(static_cast<int64_t>(v)) {}
+    explicit Variant(int64_t v)            : type(PinDataType::Integer), numericValue(v) {}
+    explicit Variant(float v)              : type(PinDataType::Float),   numericValue(static_cast<double>(v)) {}
+    explicit Variant(double v)             : type(PinDataType::Float),   numericValue(v) {}
+    explicit Variant(const char* v)        : type(PinDataType::String),  stringValue(v) {}
+    explicit Variant(const std::string& v) : type(PinDataType::String),  stringValue(v) {}
+    explicit Variant(std::vector<Variant> v) : type(PinDataType::Array), arrayValue(std::move(v)) {}
+    explicit Variant(std::unordered_map<std::string, Variant> m) : type(PinDataType::Map), mapValue(std::move(m)) {}
 
     // Object 工厂方法（用字符串 ID 表示对象引用）
     static Variant MakeObject(const std::string& objectId)
@@ -215,9 +129,9 @@ struct Variant
     {
         switch (type)
         {
-        case PinDataType::Boolean: return boolValue;
-        case PinDataType::Integer: return intValue != 0;
-        case PinDataType::Float:   return floatValue != 0.0;
+        case PinDataType::Boolean: return std::get<bool>(numericValue);
+        case PinDataType::Integer: return std::get<int64_t>(numericValue) != 0;
+        case PinDataType::Float:   return std::get<double>(numericValue) != 0.0;
         case PinDataType::String:  return !stringValue.empty();
         case PinDataType::Object:  return !stringValue.empty();
         case PinDataType::Array:   return !arrayValue.empty();
@@ -230,9 +144,9 @@ struct Variant
     {
         switch (type)
         {
-        case PinDataType::Integer: return intValue;
-        case PinDataType::Boolean: return boolValue ? 1 : 0;
-        case PinDataType::Float:   return static_cast<int64_t>(floatValue);
+        case PinDataType::Integer: return std::get<int64_t>(numericValue);
+        case PinDataType::Boolean: return std::get<bool>(numericValue) ? 1 : 0;
+        case PinDataType::Float:   return static_cast<int64_t>(std::get<double>(numericValue));
         case PinDataType::String:
         {
             if (stringValue.empty()) return 0;
@@ -240,8 +154,8 @@ struct Variant
             auto v = std::strtoll(stringValue.c_str(), &end, 10);
             return (end != stringValue.c_str()) ? v : 0;
         }
-        case PinDataType::Array:   return static_cast<int64_t>(arrayValue.size());
-        case PinDataType::Map:     return static_cast<int64_t>(mapValue.size());
+        case PinDataType::Array: return static_cast<int64_t>(arrayValue.size());
+        case PinDataType::Map:   return static_cast<int64_t>(mapValue.size());
         default: return 0;
         }
     }
@@ -250,9 +164,9 @@ struct Variant
     {
         switch (type)
         {
-        case PinDataType::Float:   return floatValue;
-        case PinDataType::Integer: return static_cast<double>(intValue);
-        case PinDataType::Boolean: return boolValue ? 1.0 : 0.0;
+        case PinDataType::Float:   return std::get<double>(numericValue);
+        case PinDataType::Integer: return static_cast<double>(std::get<int64_t>(numericValue));
+        case PinDataType::Boolean: return std::get<bool>(numericValue) ? 1.0 : 0.0;
         case PinDataType::String:
         {
             if (stringValue.empty()) return 0.0;
@@ -269,9 +183,9 @@ struct Variant
         switch (type)
         {
         case PinDataType::String:  return stringValue;
-        case PinDataType::Boolean: return boolValue ? "True" : "False";
-        case PinDataType::Integer: return std::to_string(intValue);
-        case PinDataType::Float:   return std::to_string(floatValue);
+        case PinDataType::Boolean: return std::get<bool>(numericValue) ? "True" : "False";
+        case PinDataType::Integer: return std::to_string(std::get<int64_t>(numericValue));
+        case PinDataType::Float:   return std::to_string(std::get<double>(numericValue));
         case PinDataType::Object:  return stringValue.empty() ? "(none)" : stringValue;
         case PinDataType::Array:
         {

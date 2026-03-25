@@ -1404,11 +1404,11 @@ std::string JsonBlueprintExporter::variantToJson(const Variant& value) const
     switch (value.type)
     {
     case PinDataType::Boolean:
-        return value.boolValue ? "true" : "false";
+        return std::get<bool>(value.numericValue) ? "true" : "false";
     case PinDataType::Integer:
-        return std::to_string(value.intValue);
+        return std::to_string(std::get<int64_t>(value.numericValue));
     case PinDataType::Float:
-        return std::to_string(value.floatValue);
+        return std::to_string(std::get<double>(value.numericValue));
     case PinDataType::String:
         return "\"" + escapeJson(value.stringValue) + "\"";
     case PinDataType::Object:
@@ -1455,15 +1455,15 @@ Variant JsonBlueprintExporter::jsonToVariant(const std::string& json, PinDataTyp
     {
     case PinDataType::Boolean:
         if (val.type() == crude_json::type_t::boolean)
-            result.boolValue = val.get<bool>();
+            result.numericValue = val.get<bool>();
         break;
     case PinDataType::Integer:
         if (val.type() == crude_json::type_t::number)
-            result.intValue = static_cast<int64_t>(val.get<double>());
+            result.numericValue = static_cast<int64_t>(val.get<double>());
         break;
     case PinDataType::Float:
         if (val.type() == crude_json::type_t::number)
-            result.floatValue = val.get<double>();
+            result.numericValue = val.get<double>();
         break;
     case PinDataType::String:
         if (val.type() == crude_json::type_t::string)

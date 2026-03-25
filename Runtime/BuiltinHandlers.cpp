@@ -1899,13 +1899,13 @@ static void RegisterHandlers_Data(std::unordered_map<std::string, NodeHandler>& 
         switch (val.type)
         {
         case PinDataType::Boolean:
-            json = val.boolValue ? "true" : "false";
+            json = std::get<bool>(val.numericValue) ? "true" : "false";
             break;
         case PinDataType::Integer:
-            json = std::to_string(val.intValue);
+            json = std::to_string(std::get<int64_t>(val.numericValue));
             break;
         case PinDataType::Float:
-            json = std::to_string(val.floatValue);
+            json = std::to_string(std::get<double>(val.numericValue));
             break;
         case PinDataType::String:
             json = "\"" + val.stringValue + "\"";
@@ -2083,9 +2083,9 @@ static void RegisterHandlers_Misc(std::unordered_map<std::string, NodeHandler>& 
         case PinDataType::String:  isValid = !val.stringValue.empty(); break;
         case PinDataType::Object:  isValid = !val.stringValue.empty(); break;
         case PinDataType::Array:   isValid = !val.arrayValue.empty(); break;
-        case PinDataType::Integer: isValid = val.intValue != 0; break;
-        case PinDataType::Float:   isValid = val.floatValue != 0.0; break;
-        case PinDataType::Boolean: isValid = val.boolValue; break;
+        case PinDataType::Integer: isValid = std::get<int64_t>(val.numericValue) != 0; break;
+        case PinDataType::Float:   isValid = std::get<double>(val.numericValue) != 0.0; break;
+        case PinDataType::Boolean: isValid = std::get<bool>(val.numericValue); break;
         default: break;
         }
         ctx.SetOutputValue("Is Valid", Variant(isValid));
