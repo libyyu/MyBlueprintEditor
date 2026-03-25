@@ -561,8 +561,9 @@ void BlueprintRunner::ResetState()
     m_context.m_pinNameToId.clear();
     m_flowDepth = 0;
 
-    // 清理保持存活的子蓝图 runner
+    // 清理保持存活的子蓝图 runner，重置异步计数
     m_keepAliveRunners.clear();
+    m_pendingAsyncCount = 0;
 
     // 重新初始化默认值
     if (m_loaded)
@@ -604,7 +605,21 @@ TimerCallback ExecutionContext::wrapCallbackWithContextRestore(TimerCallback cal
     auto savedPinNameToId = m_pinNameToId;
     auto savedNodeData    = m_currentNodeData;
 
-    return [this, callback = std::move(callback), savedNode, savedPinNameToId, savedNodeData]() -> bool
+    // 注册一个异步操作占位：当前 runner 有一个正在等待的 timer 回调。
+    // 用 shared_ptr<AsyncGuard> 管理生命周期：
+    //   - 非循环 timer (repeatCount=1)：回调触发一次后 lambda 析构 → guard 析构 → ReleaseAsync
+    //   - 循环 timer (repeatCount=-1)：每次触发回调后 guard 继续存活，
+    //     直到 callback() 返回 false（取消循环）时 lambda 被 FrameTimerManager
+    //     移除 → guard 析构 → ReleaseAsync
+    // 注意：guard 持有的是 m_runner 裸指针，所以只在 runner 存活期间有效。
+    // ExecutionContext 的生命周期与 BlueprintRunner 绑定，这里是安全的。
+    if (m_runner)
+        m_runner->AcquireAsync();
+
+    BlueprintRunner* runner = m_runner; // 捕获裸指针（与 m_runner 生命周期一致）
+
+    return [this, runner, callback = std::move(callback),
+            savedNode, savedPinNameToId, savedNodeData]() mutable -> bool
     {
         // 保存当前状态
         auto prevNode        = m_currentNode;
@@ -622,6 +637,11 @@ TimerCallback ExecutionContext::wrapCallbackWithContextRestore(TimerCallback cal
         m_currentNode     = prevNode;
         m_pinNameToId     = prevPinNameToId;
         m_currentNodeData = prevNodeData;
+
+        // 非循环 timer / 循环 timer 取消时（ret == false），回调不再触发
+        // → 释放异步计数。循环 timer（ret == true）保持计数，下次触发继续。
+        if (!ret && runner)
+            runner->ReleaseAsync();
 
         return ret;
     };
@@ -987,9 +1007,9 @@ void BlueprintRunner::Tick(float deltaTime)
                 m_keepAliveRunners.begin(),
                 m_keepAliveRunners.end(),
                 [](const std::shared_ptr<BlueprintRunner>& sub) {
-                    // use_count == 1：只有 m_keepAliveRunners 自己持有，
-                    // timer 回调已全部完成（或从未注册过 timer），可以释放。
-                    return sub.use_count() == 1;
+                    // 没有正在进行的异步操作时可以释放。
+                    // 涵盖 timer、网络、IO 等所有通过 AcquireAsync/ReleaseAsync 登记的操作。
+                    return !sub->HasPendingAsync();
                 }),
             m_keepAliveRunners.end());
     }

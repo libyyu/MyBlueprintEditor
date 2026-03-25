@@ -358,13 +358,62 @@ public:
     // 例如 SetTimer 的 Function Name 引脚连接了一个回调节点，timer 触发时调用此方法
     bool FireConnectedNode(PinId inputPinId);
 
-    // 保持子蓝图 runner 存活（直到其所有异步 timer 完成）
-    // 子蓝图的 Delay/SetTimer 回调引用了 subRunner 的 context，
-    // 需要确保 subRunner 在回调期间不被销毁
+    // 保持子蓝图 runner 存活（直到其所有异步操作完成）
+    // 子蓝图的异步回调（timer、网络等）引用了 subRunner 的 context，
+    // 需要确保 subRunner 在所有回调期间不被销毁。
+    // Tick() 会在 subRunner->HasPendingAsync() == false 时自动释放。
     void KeepAlive(std::shared_ptr<BlueprintRunner> subRunner)
     {
         m_keepAliveRunners.push_back(std::move(subRunner));
     }
+
+    // ----------------------------------------------------------------
+    // 通用异步计数 API
+    // 任何异步操作（timer、网络、IO 等）开始时调用 AcquireAsync()，
+    // 完成或取消时调用 ReleaseAsync()。
+    // Tick() 依靠 HasPendingAsync() == false 来决定是否回收子 runner。
+    // ----------------------------------------------------------------
+    void AcquireAsync() { ++m_pendingAsyncCount; }
+    void ReleaseAsync()
+    {
+        if (m_pendingAsyncCount > 0)
+            --m_pendingAsyncCount;
+    }
+    bool HasPendingAsync() const { return m_pendingAsyncCount > 0; }
+    int  PendingAsyncCount() const { return m_pendingAsyncCount; }
+
+    // RAII 封装：构造时 Acquire，析构时 Release（支持移动，不可拷贝）
+    struct AsyncGuard
+    {
+        explicit AsyncGuard(BlueprintRunner* runner) : m_runner(runner)
+        {
+            if (m_runner) m_runner->AcquireAsync();
+        }
+        ~AsyncGuard() { release(); }
+
+        // 可移动（转让所有权）
+        AsyncGuard(AsyncGuard&& other) noexcept : m_runner(other.m_runner)
+        {
+            other.m_runner = nullptr;
+        }
+        AsyncGuard& operator=(AsyncGuard&& other) noexcept
+        {
+            if (this != &other) { release(); m_runner = other.m_runner; other.m_runner = nullptr; }
+            return *this;
+        }
+
+        // 不可拷贝
+        AsyncGuard(const AsyncGuard&)            = delete;
+        AsyncGuard& operator=(const AsyncGuard&) = delete;
+
+        void release()
+        {
+            if (m_runner) { m_runner->ReleaseAsync(); m_runner = nullptr; }
+        }
+
+    private:
+        BlueprintRunner* m_runner = nullptr;
+    };
 
 private:
     friend class ExecutionContext;
@@ -401,6 +450,10 @@ private:
 
     // 保持子蓝图 runner 存活的容器
     std::vector<std::shared_ptr<BlueprintRunner>>       m_keepAliveRunners;
+
+    // 正在进行的异步操作计数（timer、网络、IO 等）
+    // AcquireAsync/ReleaseAsync 维护；Tick() 用于判断是否可回收
+    int                                                 m_pendingAsyncCount = 0;
 
     // 缓存：拓扑排序结果
     mutable std::vector<NodeId>                         m_topoCache;
