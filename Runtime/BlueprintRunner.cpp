@@ -953,5 +953,47 @@ bool BlueprintRunner::FireConnectedNode(PinId inputPinId)
     return true;
 }
 
+// ============================================================================
+// Tick — 驱动计时器并回收已完成的子蓝图 runner
+// ============================================================================
+
+void BlueprintRunner::Tick(float deltaTime)
+{
+    m_timerManager.Tick(deltaTime);
+
+    // 清理 m_keepAliveRunners 中所有 timer 已全部触发完的子 runner。
+    //
+    // 判断条件：子 runner 自身的 m_timerManager 活跃 timer 数为 0。
+    // 注意：子 runner 使用 SetParentTimerManager 把 timer 注册到父 runner 的
+    //       m_timerManager 里，因此子 runner 自身的 m_timerManager 始终为空；
+    //       我们真正需要等待的是"父 timerManager 里由该子 runner 注册的 timer"。
+    //
+    // 当前实现的折中方案：
+    //   - Execute() 完成后立即 KeepAlive，此时子 runner 自身无 timer
+    //   - 如果子 runner 内部也会再派生 timer（例如子蓝图里有 Delay 节点），
+    //     则这些 timer 实际上注册在父 timerManager，子 runner 的 m_timerManager
+    //     依然是空的 —— 这意味着子 runner 在下一个 Tick 就会被清理，
+    //     而 timer 回调仍持有对它的 shared_ptr 引用，所以不会真正析构，
+    //     只是提前从 m_keepAliveRunners 里移除。
+    //
+    // 结论：用 use_count() == 1（只有 m_keepAliveRunners 持有引用）作为
+    //       "可以释放"的判断更准确：timer 回调持有 shared_ptr 时
+    //       use_count >= 2，回调全部触发完毕后 use_count 降回 1。
+    //
+    if (!m_keepAliveRunners.empty())
+    {
+        m_keepAliveRunners.erase(
+            std::remove_if(
+                m_keepAliveRunners.begin(),
+                m_keepAliveRunners.end(),
+                [](const std::shared_ptr<BlueprintRunner>& sub) {
+                    // use_count == 1：只有 m_keepAliveRunners 自己持有，
+                    // timer 回调已全部完成（或从未注册过 timer），可以释放。
+                    return sub.use_count() == 1;
+                }),
+            m_keepAliveRunners.end());
+    }
+}
+
 } // namespace Runtime
 } // namespace NodeEditor

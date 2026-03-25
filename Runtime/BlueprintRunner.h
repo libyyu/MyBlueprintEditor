@@ -344,7 +344,7 @@ public:
     // ------------------------------------------------------------------
 
     // 每帧调用，驱动计时器
-    void Tick(float deltaTime) { m_timerManager.Tick(deltaTime); }
+    void Tick(float deltaTime);
 
     // 获取计时器管理器（可读写）
     // 如果设置了父 timer manager，则使用父级的（子蓝图场景）
