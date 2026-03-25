@@ -42,7 +42,7 @@ project(MyBlueprintEditor VERSION 0.9.1 LANGUAGES CXX)
 # ---------------------------------------------------------------------------
 # Global C++ standard
 # ---------------------------------------------------------------------------
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -169,7 +169,7 @@ if(NOT BUILD_RUNTIME_ONLY)
     target_link_libraries(ImGuiNodeEditor PUBLIC imgui BlueprintRuntime)
 
     set_target_properties(ImGuiNodeEditor PROPERTIES
-        CXX_STANDARD 14
+        CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
         POSITION_INDEPENDENT_CODE ON
         FOLDER "Libraries"
@@ -245,7 +245,7 @@ if(NOT BUILD_RUNTIME_ONLY)
     endif()
 
     set_target_properties(Application PROPERTIES
-        CXX_STANDARD 14
+        CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
         FOLDER "Libraries"
     )
@@ -285,7 +285,7 @@ if(NOT BUILD_RUNTIME_ONLY)
     target_link_libraries(BlueprintEditor PRIVATE Application)
 
     set_target_properties(BlueprintEditor PROPERTIES
-        CXX_STANDARD 14
+        CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
         RUNTIME_OUTPUT_DIRECTORY           "${OUTPUT_DIR}"
         RUNTIME_OUTPUT_DIRECTORY_DEBUG     "${OUTPUT_DIR}"

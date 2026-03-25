@@ -10,6 +10,8 @@
 #include <unordered_set>
 #include <queue>
 #include <string>
+#include <mutex>
+#include <shared_mutex>
 
 namespace NodeEditor {
 namespace Runtime {
@@ -116,6 +118,72 @@ struct BlueprintMetadata
 
 struct BlueprintData
 {
+    BlueprintData() = default;
+
+    // shared_mutex 不可拷贝/移动，手动定义以保证每个实例拥有独立的锁
+    BlueprintData(const BlueprintData& other)
+        : metadata(other.metadata)
+        , nodes(other.nodes)
+        , links(other.links)
+        , variables(other.variables)
+        , comments(other.comments)
+        , viewInfo(other.viewInfo)
+        , m_indexDirty(true)   // 新对象重建索引，不拷贝缓存
+    {}
+
+    BlueprintData(BlueprintData&& other) noexcept
+        : metadata(std::move(other.metadata))
+        , nodes(std::move(other.nodes))
+        , links(std::move(other.links))
+        , variables(std::move(other.variables))
+        , comments(std::move(other.comments))
+        , viewInfo(std::move(other.viewInfo))
+        , m_indexDirty(true)   // 移动后重建索引
+    {}
+
+    BlueprintData& operator=(const BlueprintData& other)
+    {
+        if (this != &other)
+        {
+            metadata  = other.metadata;
+            nodes     = other.nodes;
+            links     = other.links;
+            variables = other.variables;
+            comments  = other.comments;
+            viewInfo  = other.viewInfo;
+            // 不拷贝 m_indexMutex；不拷贝索引缓存，标记为 dirty 重建
+            std::unique_lock<std::shared_mutex> wlock(m_indexMutex);
+            m_nodeIdIndex.clear();
+            m_pinToNodeIndex.clear();
+            m_linkIdIndex.clear();
+            m_startPinLinks.clear();
+            m_endPinLinks.clear();
+            m_indexDirty = true;
+        }
+        return *this;
+    }
+
+    BlueprintData& operator=(BlueprintData&& other) noexcept
+    {
+        if (this != &other)
+        {
+            metadata  = std::move(other.metadata);
+            nodes     = std::move(other.nodes);
+            links     = std::move(other.links);
+            variables = std::move(other.variables);
+            comments  = std::move(other.comments);
+            viewInfo  = std::move(other.viewInfo);
+            std::unique_lock<std::shared_mutex> wlock(m_indexMutex);
+            m_nodeIdIndex.clear();
+            m_pinToNodeIndex.clear();
+            m_linkIdIndex.clear();
+            m_startPinLinks.clear();
+            m_endPinLinks.clear();
+            m_indexDirty = true;
+        }
+        return *this;
+    }
+
     // 元数据
     BlueprintMetadata                   metadata;
     
@@ -140,149 +208,137 @@ struct BlueprintData
 
     // ============================================================================
     // 索引管理 —— O(1) 查找加速
+    //
+    // 线程安全语义：
+    //   · 并发读（findNode / findLink / findLinksByPin 等）：安全，使用共享锁
+    //   · 写（rebuildIndices / invalidateIndices）：需要独占锁，调用方须确保
+    //     此时没有并发读写 nodes/links（通常在加载阶段单线程调用）
+    //   · nodes / links 向量本身不加锁；如需并发修改数据，需外层同步
     // ============================================================================
 
     // 重建所有索引（在数据加载、节点/链接增删后调用）
+    // 调用方须持有外层独占锁，或确保此时无并发访问
     void rebuildIndices() const
     {
-        m_nodeIdIndex.clear();
-        m_pinToNodeIndex.clear();
-        m_linkIdIndex.clear();
-        m_startPinLinks.clear();
-        m_endPinLinks.clear();
-
-        for (size_t i = 0; i < nodes.size(); ++i)
-        {
-            m_nodeIdIndex[nodes[i].id] = i;
-            for (const auto& pin : nodes[i].pins)
-            {
-                m_pinToNodeIndex[pin.id] = i;
-            }
-        }
-
-        for (size_t i = 0; i < links.size(); ++i)
-        {
-            m_linkIdIndex[links[i].id] = i;
-            if (links[i].isEnabled)
-            {
-                m_startPinLinks[links[i].startPinId].push_back(i);
-                m_endPinLinks[links[i].endPinId].push_back(i);
-            }
-        }
-
-        m_indexDirty = false;
+        std::unique_lock<std::shared_mutex> lock(m_indexMutex);
+        rebuildIndicesLocked();
     }
 
-    // 标记索引需要重建
-    void invalidateIndices() const { m_indexDirty = true; }
+    // 标记索引需要重建（下次访问时懒重建）
+    void invalidateIndices() const
+    {
+        std::unique_lock<std::shared_mutex> lock(m_indexMutex);
+        m_indexDirty = true;
+    }
 
-    // 确保索引可用
+    // 确保索引可用（内部懒重建，线程安全）
     void ensureIndices() const
     {
-        if (m_indexDirty) rebuildIndices();
+        // 快速路径：共享锁下检查 dirty 标志
+        {
+            std::shared_lock<std::shared_mutex> rlock(m_indexMutex);
+            if (!m_indexDirty) return;
+        }
+        // 慢路径：升级为独占锁后重建（double-check）
+        std::unique_lock<std::shared_mutex> wlock(m_indexMutex);
+        if (m_indexDirty) rebuildIndicesLocked();
     }
 
     // 获取引脚→节点索引映射（用于拓扑排序等需要 pinId→nodeIndex 的场景）
+    // ⚠️ 返回内部引用，调用方须确保此期间无并发写操作（单线程调用安全）
     const std::unordered_map<PinId, size_t>& getPinToNodeIndex() const
     {
         ensureIndices();
         return m_pinToNodeIndex;
     }
-    
-    // 辅助方法：查找节点 — O(1) 哈希查找
+
+    // 辅助方法：查找节点 — O(1)，线程安全（共享锁）
     const NodeInstance* findNode(NodeId nodeId) const
     {
         ensureIndices();
+        std::shared_lock<std::shared_mutex> rlock(m_indexMutex);
         auto it = m_nodeIdIndex.find(nodeId);
         return (it != m_nodeIdIndex.end()) ? &nodes[it->second] : nullptr;
     }
-    
-    // 辅助方法：查找节点（可修改）
+
+    // 辅助方法：查找节点（可修改）— 单线程场景，不加共享锁
     NodeInstance* findNode(NodeId nodeId)
     {
         ensureIndices();
+        std::shared_lock<std::shared_mutex> rlock(m_indexMutex);
         auto it = m_nodeIdIndex.find(nodeId);
         return (it != m_nodeIdIndex.end()) ? &nodes[it->second] : nullptr;
     }
-    
-    // 辅助方法：查找链接 — O(1) 哈希查找
+
+    // 辅助方法：查找链接 — O(1)，线程安全（共享锁）
     const LinkInstance* findLink(LinkId linkId) const
     {
         ensureIndices();
+        std::shared_lock<std::shared_mutex> rlock(m_indexMutex);
         auto it = m_linkIdIndex.find(linkId);
         return (it != m_linkIdIndex.end()) ? &links[it->second] : nullptr;
     }
-    
-    // 辅助方法：根据引脚ID查找链接 — 使用索引加速
+
+    // 辅助方法：根据引脚ID查找链接 — 线程安全（共享锁保护索引读）
     std::vector<const LinkInstance*> findLinksByPin(PinId pinId) const
     {
         ensureIndices();
         std::vector<const LinkInstance*> result;
-        
-        // 查找以 pinId 为起始引脚的链接
+        std::shared_lock<std::shared_mutex> rlock(m_indexMutex);
+
         auto itStart = m_startPinLinks.find(pinId);
         if (itStart != m_startPinLinks.end())
-        {
             for (size_t idx : itStart->second)
                 result.push_back(&links[idx]);
-        }
-        
-        // 查找以 pinId 为终止引脚的链接
+
         auto itEnd = m_endPinLinks.find(pinId);
         if (itEnd != m_endPinLinks.end())
-        {
             for (size_t idx : itEnd->second)
                 result.push_back(&links[idx]);
-        }
-        
+
         return result;
     }
-    
-    // 辅助方法：获取从指定引脚出发的所有下游引脚ID（仅通过 startPinId 查找）
+
+    // 辅助方法：获取从指定引脚出发的所有下游引脚ID
     std::vector<PinId> getDownstreamPinIds(PinId startPinId) const
     {
         ensureIndices();
         std::vector<PinId> result;
+        std::shared_lock<std::shared_mutex> rlock(m_indexMutex);
         auto it = m_startPinLinks.find(startPinId);
         if (it != m_startPinLinks.end())
-        {
             for (size_t idx : it->second)
                 result.push_back(links[idx].endPinId);
-        }
         return result;
     }
-    
-    // 辅助方法：查找连接到指定引脚的所有引脚 — 使用索引加速
+
+    // 辅助方法：查找连接到指定引脚的所有引脚
     std::vector<PinId> findConnectedPins(PinId pinId) const
     {
         ensureIndices();
         std::vector<PinId> result;
-        
-        // 以 pinId 为起始引脚的链接 → 取 endPinId
+        std::shared_lock<std::shared_mutex> rlock(m_indexMutex);
+
         auto itStart = m_startPinLinks.find(pinId);
         if (itStart != m_startPinLinks.end())
-        {
             for (size_t idx : itStart->second)
                 if (links[idx].endPinId != InvalidPinId)
                     result.push_back(links[idx].endPinId);
-        }
-        
-        // 以 pinId 为终止引脚的链接 → 取 startPinId
+
         auto itEnd = m_endPinLinks.find(pinId);
         if (itEnd != m_endPinLinks.end())
-        {
             for (size_t idx : itEnd->second)
                 if (links[idx].startPinId != InvalidPinId)
                     result.push_back(links[idx].startPinId);
-        }
-        
+
         return result;
     }
-    
-    // 辅助方法：查找引脚所属的节点 — O(1) 哈希查找
+
+    // 辅助方法：查找引脚所属的节点 — O(1)，线程安全（共享锁）
     const NodeInstance* findNodeByPin(PinId pinId) const
     {
         ensureIndices();
+        std::shared_lock<std::shared_mutex> rlock(m_indexMutex);
         auto it = m_pinToNodeIndex.find(pinId);
         return (it != m_pinToNodeIndex.end()) ? &nodes[it->second] : nullptr;
     }
@@ -469,13 +525,43 @@ struct BlueprintData
     }
 
 private:
-    // 哈希索引（mutable 因为它们是缓存，不影响逻辑 const 性）
-    mutable std::unordered_map<NodeId, size_t>  m_nodeIdIndex;       // nodeId → nodes[] 下标
-    mutable std::unordered_map<PinId, size_t>   m_pinToNodeIndex;    // pinId → nodes[] 下标
-    mutable std::unordered_map<LinkId, size_t>  m_linkIdIndex;       // linkId → links[] 下标
+    // 哈希索引（mutable：缓存，不影响逻辑 const 性；由 m_indexMutex 保护）
+    mutable std::shared_mutex                           m_indexMutex;        // 读写锁：多读单写
+    mutable std::unordered_map<NodeId, size_t>          m_nodeIdIndex;       // nodeId → nodes[] 下标
+    mutable std::unordered_map<PinId, size_t>           m_pinToNodeIndex;    // pinId → nodes[] 下标
+    mutable std::unordered_map<LinkId, size_t>          m_linkIdIndex;       // linkId → links[] 下标
     mutable std::unordered_map<PinId, std::vector<size_t>> m_startPinLinks;  // startPinId → links[] 下标列表
     mutable std::unordered_map<PinId, std::vector<size_t>> m_endPinLinks;    // endPinId → links[] 下标列表
-    mutable bool                                m_indexDirty = true;
+    mutable bool                                        m_indexDirty = true;
+
+    // 内部：在已持有独占锁的情况下重建索引（供 rebuildIndices/ensureIndices 调用）
+    void rebuildIndicesLocked() const
+    {
+        m_nodeIdIndex.clear();
+        m_pinToNodeIndex.clear();
+        m_linkIdIndex.clear();
+        m_startPinLinks.clear();
+        m_endPinLinks.clear();
+
+        for (size_t i = 0; i < nodes.size(); ++i)
+        {
+            m_nodeIdIndex[nodes[i].id] = i;
+            for (const auto& pin : nodes[i].pins)
+                m_pinToNodeIndex[pin.id] = i;
+        }
+
+        for (size_t i = 0; i < links.size(); ++i)
+        {
+            m_linkIdIndex[links[i].id] = i;
+            if (links[i].isEnabled)
+            {
+                m_startPinLinks[links[i].startPinId].push_back(i);
+                m_endPinLinks[links[i].endPinId].push_back(i);
+            }
+        }
+
+        m_indexDirty = false;
+    }
 };
 
 } // namespace Runtime

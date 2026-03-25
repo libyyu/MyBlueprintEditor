@@ -128,7 +128,7 @@ endif()
 # Compiler flags – platform-specific
 # ---------------------------------------------------------------------------
 set_target_properties(BlueprintRuntime PROPERTIES
-    CXX_STANDARD 14
+    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
     POSITION_INDEPENDENT_CODE ON  # required for shared libs on Linux/macOS
 )
