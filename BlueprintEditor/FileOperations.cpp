@@ -88,16 +88,16 @@ std::string GetEditorFilePath(const std::string& runtimePath)
 void BlueprintEditor::ClearEditor()
 {
     if (!ActiveDoc()) return;
-    m_Nodes.clear();
-    m_Links.clear();
-    m_NodeTouchTime.clear();
-    m_ExecutionLog.clear();
-    m_ExecutionLogText.clear();
-    m_ExecutionLogDirty = false;
-    m_LastExecutionStatus.clear();
-    m_FlowLinks.clear();
-    m_NextId = 1;
-    m_IsExecuting = false;
+    ActiveDoc()->nodes.clear();
+    ActiveDoc()->links.clear();
+    ActiveDoc()->nodeTouchTime.clear();
+    ActiveDoc()->executionLog.clear();
+    ActiveDoc()->executionLogText.clear();
+    ActiveDoc()->executionLogDirty = false;
+    ActiveDoc()->lastExecutionStatus.clear();
+    ActiveDoc()->flowLinks.clear();
+    ActiveDoc()->nextId = 1;
+    ActiveDoc()->isExecuting = false;
 }
 
 // ============================================================================
@@ -149,8 +149,8 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
         {
             if (ActiveDoc())
             {
-                m_ExecutionLog.push_back("[ERROR] Failed to open editor file: " + result.errorMessage);
-                m_ExecutionLogDirty = true;
+                ActiveDoc()->executionLog.push_back("[ERROR] Failed to open editor file: " + result.errorMessage);
+                ActiveDoc()->executionLogDirty = true;
             }
             return;
         }
@@ -164,7 +164,7 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
         
         // 保存对应的 runtime 文件路径（去掉 .editor 部分）
         std::string runtimePath = path.substr(0, path.size() - 12) + ".json";
-        m_CurrentFilePath = runtimePath;
+        ActiveDoc()->filePath = runtimePath;
     }
     else
     {
@@ -189,8 +189,8 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
         {
             if (ActiveDoc())
             {
-                m_ExecutionLog.push_back("[ERROR] Failed to open: " + result.errorMessage);
-                m_ExecutionLogDirty = true;
+                ActiveDoc()->executionLog.push_back("[ERROR] Failed to open: " + result.errorMessage);
+                ActiveDoc()->executionLogDirty = true;
             }
             return;
         }
@@ -202,24 +202,24 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
         // 加载数据到编辑器
         LoadEditorData(result.data);
         
-        m_CurrentFilePath = path;
+        ActiveDoc()->filePath = path;
     }
     
-    m_IsDirty = false;
+    ActiveDoc()->isDirty = false;
     
-    std::string title = "Blueprint Editor - " + GetFileBaseName(m_CurrentFilePath);
+    std::string title = "Blueprint Editor - " + GetFileBaseName(ActiveDoc()->filePath);
     SetTitle(title.c_str());
 
     // 添加到最近文件列表（记录用户实际打开的文件路径）
     AddRecentFile(path);
     
-    m_ExecutionLog.push_back("[INFO] Opened: " + path);
+    ActiveDoc()->executionLog.push_back("[INFO] Opened: " + path);
     if (!result.warnings.empty())
     {
         for (const auto& w : result.warnings)
-            m_ExecutionLog.push_back("[WARN] " + w);
+            ActiveDoc()->executionLog.push_back("[WARN] " + w);
     }
-    m_ExecutionLogDirty = true;
+    ActiveDoc()->executionLogDirty = true;
 }
 
 // ============================================================================
@@ -228,13 +228,13 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
 
 void BlueprintEditor::SaveFile()
 {
-    if (m_CurrentFilePath.empty())
+    if (ActiveDoc()->filePath.empty())
     {
         SaveFileAs();
         return;
     }
     
-    DoSaveFile(m_CurrentFilePath);
+    DoSaveFile(ActiveDoc()->filePath);
 }
 
 void BlueprintEditor::SaveFileAs()
@@ -247,7 +247,7 @@ void BlueprintEditor::SaveFileAs()
     
     if (!path.empty())
     {
-        m_CurrentFilePath = path;
+        ActiveDoc()->filePath = path;
         DoSaveFile(path);
     }
 }
@@ -264,22 +264,22 @@ void BlueprintEditor::DoSaveFile(const std::string& path)
     
     if (result.success)
     {
-        m_IsDirty = false;
+        ActiveDoc()->isDirty = false;
         std::string title = "Blueprint Editor - " + GetFileBaseName(path);
         SetTitle(title.c_str());
 
         // 添加到最近文件列表
         AddRecentFile(path);
         
-        m_ExecutionLog.push_back("[INFO] Saved: " + path + " (" + 
+        ActiveDoc()->executionLog.push_back("[INFO] Saved: " + path + " (" + 
             std::to_string(result.runtimeBytes) + " + " + 
             std::to_string(result.editorBytes) + " bytes)");
     }
     else
     {
-        m_ExecutionLog.push_back("[ERROR] Save failed: " + result.errorMessage);
+        ActiveDoc()->executionLog.push_back("[ERROR] Save failed: " + result.errorMessage);
     }
-    m_ExecutionLogDirty = true;
+    ActiveDoc()->executionLogDirty = true;
 }
 
 // ============================================================================
@@ -291,10 +291,10 @@ RTBlueprintData BlueprintEditor::BuildFullEditorData()
     RTBlueprintData bp = BuildRuntimeData();
     
     // 补充编辑器专属数据：节点位置和尺寸
-    for (size_t i = 0; i < m_Nodes.size() && i < bp.nodes.size(); ++i)
+    for (size_t i = 0; i < ActiveDoc()->nodes.size() && i < bp.nodes.size(); ++i)
     {
         auto& rtNode = bp.nodes[i];
-        auto& edNode = m_Nodes[i];
+        auto& edNode = ActiveDoc()->nodes[i];
         
         auto pos = ed::GetNodePosition(edNode.ID);
         auto size = ed::GetNodeSize(edNode.ID);
@@ -306,8 +306,8 @@ RTBlueprintData BlueprintEditor::BuildFullEditorData()
     }
     
     // 元数据
-    if (!m_CurrentFilePath.empty())
-        bp.metadata.name = GetFileBaseName(m_CurrentFilePath);
+    if (!ActiveDoc()->filePath.empty())
+        bp.metadata.name = GetFileBaseName(ActiveDoc()->filePath);
     else
         bp.metadata.name = "Untitled";
     bp.metadata.description = "Blueprint Editor file";
@@ -388,8 +388,8 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
                 else if (it->second == "Houdini") ntype = NodeType::Houdini;
             }
             
-            m_Nodes.emplace_back(newNodeId, rtNode.name.c_str(), color);
-            auto& node = m_Nodes.back();
+            ActiveDoc()->nodes.emplace_back(newNodeId, rtNode.name.c_str(), color);
+            auto& node = ActiveDoc()->nodes.back();
             node.Type = ntype;
             node.DefinitionId = resolvedDefId;
             
@@ -399,15 +399,15 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
         else
         {
             // 定义未找到 → 标记为错误节点（UE4 风格）
-            m_Nodes.emplace_back(newNodeId, rtNode.name.c_str());
-            auto& node = m_Nodes.back();
+            ActiveDoc()->nodes.emplace_back(newNodeId, rtNode.name.c_str());
+            auto& node = ActiveDoc()->nodes.back();
             node.DefinitionId = rtNode.definitionId;
             node.HasError = true;
             node.ErrorMessage = "Node definition '" + rtNode.definitionId + "' not found";
             node.Color = ImColor(180, 0, 0); // 深红色表示错误
         }
         
-        auto& node = m_Nodes.back();
+        auto& node = ActiveDoc()->nodes.back();
         
         // 创建引脚
         for (const auto& rtPin : rtNode.pins)
@@ -472,7 +472,7 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
         // 1) 标记孤立引脚（JSON 有但 NodeDef 没有）→ 不删除，保留但标记
         // 2) 补全新增引脚（NodeDef 有但 JSON 没有）→ 追加
         // 3) 标记必须连接的引脚（Delegate 类型等）
-        // 4) 如果发生任何变化 → m_IsDirty = true
+        // 4) 如果发生任何变化 → ActiveDoc()->isDirty = true
         // ============================================================
         bool reconcileChanged = false;
         
@@ -705,7 +705,7 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
         
         // 如果引脚调和发生了变化，标记文件为"未保存"
         if (reconcileChanged)
-            m_IsDirty = true;
+            ActiveDoc()->isDirty = true;
         
         // 应用特殊引脚类型
         if (def)
@@ -725,19 +725,19 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
             ed::PinId startPinId(startIt->second);
             ed::PinId endPinId(endIt->second);
             
-            m_Links.emplace_back(Link(GetNextId(), startPinId, endPinId));
+            ActiveDoc()->links.emplace_back(Link(GetNextId(), startPinId, endPinId));
             
             // 设置链接颜色（Any 引脚使用对端类型颜色）
             auto* startPin = FindPin(startPinId);
             auto* endPin   = FindPin(endPinId);
             if (startPin)
-                m_Links.back().Color = GetIconColor(GetLinkColor(startPin, endPin));
+                ActiveDoc()->links.back().Color = GetIconColor(GetLinkColor(startPin, endPin));
         }
     }
     
     // 保存加载数据和 ID 映射，用于延迟设置节点位置
-    m_PendingLoadData = data;
-    m_NeedSetNodePositions = true;
+    ActiveDoc()->pendingLoadData = data;
+    ActiveDoc()->needSetNodePositions = true;
     
     // 保存 nodeIdMap 到成员中以便 OnFrame 使用
     // 直接在这里使用：在编辑器初始化后设置位置
@@ -750,7 +750,7 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
         if (it != nodeIdMap.end())
         {
             // 在 PendingLoadData 中记录新 ID
-            for (auto& pendNode : m_PendingLoadData.nodes)
+            for (auto& pendNode : ActiveDoc()->pendingLoadData.nodes)
             {
                 if (pendNode.id == rtNode.id)
                 {
@@ -896,7 +896,7 @@ void BlueprintEditor::DrawRecentFilesMenu()
                 {
                     m_ActiveDocIndex = j;
                     ed::SetCurrentEditor(ActiveDoc()->editorContext);
-                    m_NeedNavigateToContent = 1;
+                    ActiveDoc()->needNavigateToContent = 1;
                     alreadyOpen = true;
                     break;
                 }

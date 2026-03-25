@@ -54,18 +54,18 @@ void BlueprintEditor::CreateLinkWithFlowReconnect(
     // Flow 输出引脚只允许一对一连接：删除旧链接，记录被断开的对端
     if (startPin->Type == PinType::Flow)
     {
-        for (auto it = m_Links.begin(); it != m_Links.end();)
+        for (auto it = ActiveDoc()->links.begin(); it != ActiveDoc()->links.end();)
         {
             // 检查此链接是否涉及当前 Flow 输出引脚（可能在 Start 或 End 端）
             if (it->StartPinID == startPinId)
             {
                 disconnectedPinId = it->EndPinID;
-                it = m_Links.erase(it);
+                it = ActiveDoc()->links.erase(it);
             }
             else if (it->EndPinID == startPinId)
             {
                 disconnectedPinId = it->StartPinID;
-                it = m_Links.erase(it);
+                it = ActiveDoc()->links.erase(it);
             }
             else
                 ++it;
@@ -75,19 +75,19 @@ void BlueprintEditor::CreateLinkWithFlowReconnect(
     // Flow 输入引脚也只允许一对一连接
     if (endPin->Type == PinType::Flow)
     {
-        for (auto it = m_Links.begin(); it != m_Links.end();)
+        for (auto it = ActiveDoc()->links.begin(); it != ActiveDoc()->links.end();)
         {
             if (it->StartPinID == endPinId || it->EndPinID == endPinId)
-                it = m_Links.erase(it);
+                it = ActiveDoc()->links.erase(it);
             else
                 ++it;
         }
     }
 
     // 创建新链接
-    m_Links.emplace_back(Link(GetNextId(), startPinId, endPinId));
-    m_Links.back().Color = GetIconColor(GetLinkColor(startPin, endPin));
-    m_IsDirty = true;
+    ActiveDoc()->links.emplace_back(Link(GetNextId(), startPinId, endPinId));
+    ActiveDoc()->links.back().Color = GetIconColor(GetLinkColor(startPin, endPin));
+    ActiveDoc()->isDirty = true;
 
     // UE4 行为：自动将新目标节点的 Flow 输出连到被断开的旧下游节点
     if (disconnectedPinId && endPin->Node)
@@ -101,7 +101,7 @@ void BlueprintEditor::CreateLinkWithFlowReconnect(
                 {
                     // 检查该 Flow 输出引脚是否空闲
                     bool hasExistingLink = false;
-                    for (const auto& lnk : m_Links)
+                    for (const auto& lnk : ActiveDoc()->links)
                     {
                         if (lnk.StartPinID == outPin.ID || lnk.EndPinID == outPin.ID)
                         {
@@ -114,8 +114,8 @@ void BlueprintEditor::CreateLinkWithFlowReconnect(
                         auto* disconnectedPin = FindPin(disconnectedPinId);
                         if (disconnectedPin)
                         {
-                            m_Links.emplace_back(Link(GetNextId(), outPin.ID, disconnectedPinId));
-                            m_Links.back().Color = GetIconColor(PinType::Flow);
+                            ActiveDoc()->links.emplace_back(Link(GetNextId(), outPin.ID, disconnectedPinId));
+                            ActiveDoc()->links.back().Color = GetIconColor(PinType::Flow);
                         }
                     }
                     break;  // 只尝试第一个 Flow 输出
@@ -290,7 +290,7 @@ void BlueprintEditor::ShowLeftPane(float paneWidth)
     ImGui::Spring(0.0f);
     if (ImGui::Button(ICON_FA_BOLT " Flow"))
     {
-        for (auto& link : m_Links)
+        for (auto& link : ActiveDoc()->links)
             ed::Flow(link.ID);
     }
     ImGui::Spring();
@@ -331,7 +331,7 @@ void BlueprintEditor::ShowLeftPane(float paneWidth)
     ImGui::Spacing(); ImGui::SameLine();
     ImGui::TextUnformatted("Nodes");
     ImGui::Indent();
-    for (auto& node : m_Nodes)
+    for (auto& node : ActiveDoc()->nodes)
     {
         ImGui::PushID(node.ID.AsPointer());
         auto start = ImGui::GetCursorScreenPos();
@@ -458,7 +458,7 @@ void BlueprintEditor::ShowLeftPane(float paneWidth)
     ImGui::Unindent();
 
     if (ImGui::IsKeyPressed(ImGuiKey_Z))
-        for (auto& link : m_Links)
+        for (auto& link : ActiveDoc()->links)
             ed::Flow(link.ID);
 
     if (ed::HasSelectionChanged())
@@ -506,18 +506,18 @@ void BlueprintEditor::OnFrame(float deltaTime)
     if (ActiveDoc())
     {
         std::string baseName;
-        if (m_CurrentFilePath.empty())
+        if (ActiveDoc()->filePath.empty())
             baseName = "[New]";
         else
         {
-            size_t lastSlash = m_CurrentFilePath.find_last_of("/\\");
-            baseName = (lastSlash != std::string::npos) ? m_CurrentFilePath.substr(lastSlash + 1) : m_CurrentFilePath;
+            size_t lastSlash = ActiveDoc()->filePath.find_last_of("/\\");
+            baseName = (lastSlash != std::string::npos) ? ActiveDoc()->filePath.substr(lastSlash + 1) : ActiveDoc()->filePath;
             size_t lastDot = baseName.find_last_of('.');
             if (lastDot != std::string::npos)
                 baseName = baseName.substr(0, lastDot);
         }
         std::string windowTitle = "Blueprint Editor - " + baseName;
-        if (m_IsDirty)
+        if (ActiveDoc()->isDirty)
             windowTitle += " *";
         SetTitle(windowTitle.c_str());
     }
@@ -577,7 +577,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
             ImGui::Separator();
             if (ImGui::MenuItem(ICON_FA_OBJECT_GROUP " Select All", "Ctrl+A"))
             {
-                for (auto& node : m_Nodes)
+                for (auto& node : ActiveDoc()->nodes)
                     ed::SelectNode(node.ID, true);
             }
             ImGui::Separator();
@@ -656,13 +656,13 @@ void BlueprintEditor::OnFrame(float deltaTime)
         // 显示当前文件名
         if (ActiveDoc())
         {
-            if (!m_CurrentFilePath.empty())
+            if (!ActiveDoc()->filePath.empty())
             {
-                std::string displayName = m_CurrentFilePath;
+                std::string displayName = ActiveDoc()->filePath;
                 size_t lastSlash = displayName.find_last_of("/\\");
                 if (lastSlash != std::string::npos)
                     displayName = displayName.substr(lastSlash + 1);
-                if (m_IsDirty)
+                if (ActiveDoc()->isDirty)
                     displayName += " \xe2\x80\xa2";  // bullet
                 ImGui::TextColored(ImVec4(0.55f, 0.75f, 1.0f, 0.90f), "%s", displayName.c_str());
                 ImGui::Separator();
@@ -683,7 +683,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         {
             ImGui::Separator();
             ImGui::TextColored(ImVec4(0.42f, 0.60f, 0.42f, 0.85f), "N:%d  L:%d",
-                               static_cast<int>(m_Nodes.size()), static_cast<int>(m_Links.size()));
+                               static_cast<int>(ActiveDoc()->nodes.size()), static_cast<int>(ActiveDoc()->links.size()));
         }
 
         ImGui::EndMenuBar();
@@ -730,7 +730,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
     {
         if (ActiveDoc())
         {
-            for (auto& node : m_Nodes)
+            for (auto& node : ActiveDoc()->nodes)
                 ed::SelectNode(node.ID, true);
         }
     }
@@ -918,14 +918,14 @@ void BlueprintEditor::OnFrame(float deltaTime)
     ed::Begin("Node editor", ImVec2(rightWidth, editorHeight));
     {
         // 加载文件后延迟设置节点位置（必须在 ed::Begin/End 之间）
-        if (m_NeedSetNodePositions)
+        if (ActiveDoc()->needSetNodePositions)
         {
-            m_NeedSetNodePositions = false;
+            ActiveDoc()->needSetNodePositions = false;
 
             // 从加载数据计算所有节点的包围盒
             ImRect contentBounds(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
 
-            for (const auto& pendNode : m_PendingLoadData.nodes)
+            for (const auto& pendNode : ActiveDoc()->pendingLoadData.nodes)
             {
                 auto it = pendNode.customProperties.find("__newEditorId");
                 if (it != pendNode.customProperties.end())
@@ -956,22 +956,22 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 }
             }
 
-            m_PendingLoadData.clear();
-            m_PendingContentBounds = contentBounds;
-            m_NeedNavigateToContent = 1;
+            ActiveDoc()->pendingLoadData.clear();
+            ActiveDoc()->pendingContentBounds = contentBounds;
+            ActiveDoc()->needNavigateToContent = 1;
         }
 
         // 延迟居中显示（倒计帧数，到 0 时触发）
-        if (m_NeedNavigateToContent > 0)
+        if (ActiveDoc()->needNavigateToContent > 0)
         {
-            m_NeedNavigateToContent--;
-            if (m_NeedNavigateToContent == 0)
+            ActiveDoc()->needNavigateToContent--;
+            if (ActiveDoc()->needNavigateToContent == 0)
             {
                 // 如果有预计算的 bounds（加载文件时），直接用它导航
-                if (m_PendingContentBounds.Min.x < m_PendingContentBounds.Max.x)
+                if (ActiveDoc()->pendingContentBounds.Min.x < ActiveDoc()->pendingContentBounds.Max.x)
                 {
-                    ed::NavigateToRect(m_PendingContentBounds.Min, m_PendingContentBounds.Max, true, 0);
-                    m_PendingContentBounds = ImRect();  // 清除
+                    ed::NavigateToRect(ActiveDoc()->pendingContentBounds.Min, ActiveDoc()->pendingContentBounds.Max, true, 0);
+                    ActiveDoc()->pendingContentBounds = ImRect();  // 清除
                 }
                 else
                     ed::NavigateToContent();
@@ -982,7 +982,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
         util::BlueprintNodeBuilder builder(m_HeaderBackground, GetTextureWidth(m_HeaderBackground), GetTextureHeight(m_HeaderBackground));
 
-        for (auto& node : m_Nodes)
+        for (auto& node : ActiveDoc()->nodes)
         {
             if (node.Type != NodeType::Blueprint && node.Type != NodeType::Simple)
                 continue;
@@ -1030,9 +1030,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 if (shouldHide && !pin.IsHidden)
                 {
                     ed::PinId pinId = pin.ID;
-                    m_Links.erase(std::remove_if(m_Links.begin(), m_Links.end(),
+                    ActiveDoc()->links.erase(std::remove_if(ActiveDoc()->links.begin(), ActiveDoc()->links.end(),
                         [pinId](const Link& l) { return l.StartPinID == pinId || l.EndPinID == pinId; }),
-                        m_Links.end());
+                        ActiveDoc()->links.end());
                 }
                 pin.IsHidden = shouldHide;
             };
@@ -1153,7 +1153,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                         if (input.Type == PinType::Bool)
                         {
                             if (ImGui::Checkbox("##value", &input.BoolValue))
-                                m_IsDirty = true;
+                                ActiveDoc()->isDirty = true;
                         }
                         else if (input.Type == PinType::Int)
                         {
@@ -1162,14 +1162,14 @@ void BlueprintEditor::OnFrame(float deltaTime)
                             if (ImGui::DragScalar("##value", ImGuiDataType_S64, &v, 1.0f))
                             {
                                 input.IntValue = static_cast<int64_t>(v);
-                                m_IsDirty = true;
+                                ActiveDoc()->isDirty = true;
                             }
                         }
                         else if (input.Type == PinType::Float)
                         {
                             ImGui::SetNextItemWidth(80.0f);
                             if (ImGui::DragFloat("##value", &input.FloatValue, 0.01f))
-                                m_IsDirty = true;
+                                ActiveDoc()->isDirty = true;
                         }
                         else if (input.Type == PinType::String)
                         {
@@ -1181,7 +1181,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                             if (ImGui::InputText("##value", buf.data(), buf.size()))
                             {
                                 input.StringValue = buf.data();
-                                m_IsDirty = true;
+                                ActiveDoc()->isDirty = true;
                             }
                         }
                         else if (input.Type == PinType::Object)
@@ -1195,7 +1195,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                             if (ImGui::InputText("##value", buf.data(), buf.size()))
                             {
                                 input.ObjectValue = buf.data();
-                                m_IsDirty = true;
+                                ActiveDoc()->isDirty = true;
                             }
                         }
                         else if (input.Type == PinType::Function)
@@ -1244,22 +1244,22 @@ void BlueprintEditor::OnFrame(float deltaTime)
                                 {
                                     // Remove all links connected to this pin
                                     ed::PinId pinId = input.ID;
-                                    m_Links.erase(std::remove_if(m_Links.begin(), m_Links.end(),
+                                    ActiveDoc()->links.erase(std::remove_if(ActiveDoc()->links.begin(), ActiveDoc()->links.end(),
                                         [pinId](const Link& l) { return l.StartPinID == pinId || l.EndPinID == pinId; }),
-                                        m_Links.end());
+                                        ActiveDoc()->links.end());
                                     node.Inputs[pinIdx].StringValue = "\x01REMOVE";
 
                                     // MakeMap: 同时标记删除配对的 Value 引脚
                                     if (isMakeMap && pinIdx + 1 < static_cast<int>(node.Inputs.size()))
                                     {
                                         ed::PinId valuePinId = node.Inputs[pinIdx + 1].ID;
-                                        m_Links.erase(std::remove_if(m_Links.begin(), m_Links.end(),
+                                        ActiveDoc()->links.erase(std::remove_if(ActiveDoc()->links.begin(), ActiveDoc()->links.end(),
                                             [valuePinId](const Link& l) { return l.StartPinID == valuePinId || l.EndPinID == valuePinId; }),
-                                            m_Links.end());
+                                            ActiveDoc()->links.end());
                                         node.Inputs[pinIdx + 1].StringValue = "\x01REMOVE";
                                     }
 
-                                    m_IsDirty = true;
+                                    ActiveDoc()->isDirty = true;
                                 }
                                 ImGui::PopStyleColor(3);
                                 ImGui::PopID();
@@ -1333,7 +1333,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                             }
                             BuildNode(&node);
                             ActiveDoc()->invalidateEditorIndices();  // 引脚指针可能失效，需要重建索引
-                            m_IsDirty = true;
+                            ActiveDoc()->isDirty = true;
                         }
                         ImGui::PopStyleColor(3);
                         ImGui::PopID();
@@ -1386,7 +1386,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                         }
                         BuildNode(&node);
                         ActiveDoc()->invalidateEditorIndices();  // 引脚指针可能失效，需要重建索引
-                        m_IsDirty = true;
+                        ActiveDoc()->isDirty = true;
                     }
                     ImGui::PopStyleColor(3);
                     ImGui::PopID();
@@ -1501,7 +1501,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         // ================================================================
         // Tree 风格节点
         // ================================================================
-        for (auto& node : m_Nodes)
+        for (auto& node : ActiveDoc()->nodes)
         {
             if (node.Type != NodeType::Tree)
                 continue;
@@ -1640,7 +1640,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         // ================================================================
         // Houdini 风格节点
         // ================================================================
-        for (auto& node : m_Nodes)
+        for (auto& node : ActiveDoc()->nodes)
         {
             if (node.Type != NodeType::Houdini)
                 continue;
@@ -1775,7 +1775,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         // ================================================================
         // Comment 节点
         // ================================================================
-        for (auto& node : m_Nodes)
+        for (auto& node : ActiveDoc()->nodes)
         {
             if (node.Type != NodeType::Comment)
                 continue;
@@ -1832,7 +1832,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         // ================================================================
         // 链接
         // ================================================================
-        for (auto& link : m_Links)
+        for (auto& link : ActiveDoc()->links)
         {
             // 跳过连接到隐藏引脚的 link（双重保险，正常情况下隐藏时已移除 link）
             auto* startPin = FindPin(link.StartPinID);
@@ -1958,11 +1958,11 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 {
                     if (ed::AcceptDeletedItem())
                     {
-                        auto id = std::find_if(m_Nodes.begin(), m_Nodes.end(), [nodeId](auto& node) { return node.ID == nodeId; });
-                        if (id != m_Nodes.end())
+                        auto id = std::find_if(ActiveDoc()->nodes.begin(), ActiveDoc()->nodes.end(), [nodeId](auto& node) { return node.ID == nodeId; });
+                        if (id != ActiveDoc()->nodes.end())
                         {
-                            m_Nodes.erase(id);
-                            m_IsDirty = true;
+                            ActiveDoc()->nodes.erase(id);
+                            ActiveDoc()->isDirty = true;
                         }
                     }
                 }
@@ -1972,11 +1972,11 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 {
                     if (ed::AcceptDeletedItem())
                     {
-                        auto id = std::find_if(m_Links.begin(), m_Links.end(), [linkId](auto& link) { return link.ID == linkId; });
-                        if (id != m_Links.end())
+                        auto id = std::find_if(ActiveDoc()->links.begin(), ActiveDoc()->links.end(), [linkId](auto& link) { return link.ID == linkId; });
+                        if (id != ActiveDoc()->links.end())
                         {
-                            m_Links.erase(id);
-                            m_IsDirty = true;
+                            ActiveDoc()->links.erase(id);
+                            ActiveDoc()->isDirty = true;
                         }
                     }
                 }
@@ -2060,7 +2060,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
             if (node)
             {
                 ed::SelectNode(contextNodeId, false);
-                for (const auto& link : m_Links)
+                for (const auto& link : ActiveDoc()->links)
                 {
                     for (const auto& pin : node->Inputs)
                     {
@@ -2164,7 +2164,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 pin->FloatValue = 0.0f;
                 pin->StringValue.clear();
                 pin->ObjectValue.clear();
-                m_IsDirty = true;
+                ActiveDoc()->isDirty = true;
             }
         }
 
@@ -2213,7 +2213,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
             BuildNodes();
 
             createNewNode = false;
-            m_IsDirty = true;
+            ActiveDoc()->isDirty = true;
 
             ed::SetNodePosition(node->ID, newNodePostion);
 
@@ -2279,9 +2279,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
 #else
                     isAbsolute = (!filePath.empty() && filePath[0] == '/');
 #endif
-                    if (!isAbsolute && !m_CurrentFilePath.empty())
+                    if (!isAbsolute && !ActiveDoc()->filePath.empty())
                     {
-                        std::string dir = m_CurrentFilePath;
+                        std::string dir = ActiveDoc()->filePath;
                         size_t lastSlash = dir.find_last_of("/\\");
                         if (lastSlash != std::string::npos)
                             dir = dir.substr(0, lastSlash + 1);
@@ -2314,8 +2314,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     // File 引脚为空，在执行日志中提示
                     if (ActiveDoc())
                     {
-                        m_ExecutionLog.push_back("[INFO] Double-clicked Execute Blueprint node, but File pin is empty.");
-                        m_ExecutionLogDirty = true;
+                        ActiveDoc()->executionLog.push_back("[INFO] Double-clicked Execute Blueprint node, but File pin is empty.");
+                        ActiveDoc()->executionLogDirty = true;
                     }
                 }
             }
@@ -2323,11 +2323,11 @@ void BlueprintEditor::OnFrame(float deltaTime)
     }
 
     // 触发执行后的 Flow 动画
-    if (!m_FlowLinks.empty())
+    if (!ActiveDoc()->flowLinks.empty())
     {
-        for (auto& linkId : m_FlowLinks)
+        for (auto& linkId : ActiveDoc()->flowLinks)
             ed::Flow(linkId);
-        m_FlowLinks.clear();
+        ActiveDoc()->flowLinks.clear();
     }
 
     ed::End();
@@ -2335,10 +2335,10 @@ void BlueprintEditor::OnFrame(float deltaTime)
     // ================================================================
     // 检测节点位置变化（拖拽移动节点 → 标记 dirty）
     // ================================================================
-    if (ActiveDoc() && !m_IsDirty)
+    if (ActiveDoc() && !ActiveDoc()->isDirty)
     {
         auto& lastPositions = ActiveDoc()->lastNodePositions;
-        for (const auto& node : m_Nodes)
+        for (const auto& node : ActiveDoc()->nodes)
         {
             ImVec2 curPos = ed::GetNodePosition(node.ID);
             auto it = lastPositions.find(node.ID);
@@ -2346,7 +2346,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
             {
                 if (it->second.x != curPos.x || it->second.y != curPos.y)
                 {
-                    m_IsDirty = true;
+                    ActiveDoc()->isDirty = true;
                     break;
                 }
             }
@@ -2357,7 +2357,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
     {
         auto& lastPositions = ActiveDoc()->lastNodePositions;
         lastPositions.clear();
-        for (const auto& node : m_Nodes)
+        for (const auto& node : ActiveDoc()->nodes)
             lastPositions[node.ID] = ed::GetNodePosition(node.ID);
     }
 
@@ -2368,7 +2368,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
     {
         m_ActiveDocIndex = m_PendingSwitchTabIndex;
         ed::SetCurrentEditor(ActiveDoc()->editorContext);
-        m_NeedNavigateToContent = 1;
+        ActiveDoc()->needNavigateToContent = 1;
         m_PendingSwitchTabIndex = -1;
     }
     else if (!m_PendingOpenFilePath.empty())
@@ -2467,7 +2467,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
         // 节点数
         char buf[256];
-        snprintf(buf, sizeof(buf), "Nodes: %d", static_cast<int>(m_Nodes.size()));
+        snprintf(buf, sizeof(buf), "Nodes: %d", static_cast<int>(ActiveDoc()->nodes.size()));
         dl->AddText(ImVec2(x, textY), IM_COL32(135, 160, 200, 210), buf);
         x += ImGui::CalcTextSize(buf).x + 8.0f;
 
@@ -2476,7 +2476,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         x += 8.0f;
 
         // 链接数
-        snprintf(buf, sizeof(buf), "Links: %d", static_cast<int>(m_Links.size()));
+        snprintf(buf, sizeof(buf), "Links: %d", static_cast<int>(ActiveDoc()->links.size()));
         dl->AddText(ImVec2(x, textY), IM_COL32(135, 160, 200, 210), buf);
         x += ImGui::CalcTextSize(buf).x + 8.0f;
 
@@ -2492,11 +2492,11 @@ void BlueprintEditor::OnFrame(float deltaTime)
         }
 
         // 右侧：文件名
-        if (!m_CurrentFilePath.empty())
+        if (!ActiveDoc()->filePath.empty())
         {
-            size_t lastSlash = m_CurrentFilePath.find_last_of("/\\");
-            std::string fileName = (lastSlash != std::string::npos) ? m_CurrentFilePath.substr(lastSlash + 1) : m_CurrentFilePath;
-            if (m_IsDirty) fileName += " \xe2\x80\xa2";  // bullet instead of *
+            size_t lastSlash = ActiveDoc()->filePath.find_last_of("/\\");
+            std::string fileName = (lastSlash != std::string::npos) ? ActiveDoc()->filePath.substr(lastSlash + 1) : ActiveDoc()->filePath;
+            if (ActiveDoc()->isDirty) fileName += " \xe2\x80\xa2";  // bullet instead of *
             float textW = ImGui::CalcTextSize(fileName.c_str()).x;
             dl->AddText(ImVec2(barMax.x - textW - 12.0f, textY), IM_COL32(120, 145, 180, 190), fileName.c_str());
         }
@@ -2637,7 +2637,7 @@ void BlueprintEditor::DrawNodeListPanel()
     ImGui::Spring(0.0f);
     if (ImGui::Button(ICON_FA_BOLT " Flow"))
     {
-        for (auto& link : m_Links)
+        for (auto& link : ActiveDoc()->links)
             ed::Flow(link.ID);
     }
     ImGui::Spring();
@@ -2700,7 +2700,7 @@ void BlueprintEditor::DrawNodeListPanel()
         ImGui::Dummy(ImVec2(paneWidth, sectionH));
     }
     ImGui::Indent();
-    for (auto& node : m_Nodes)
+    for (auto& node : ActiveDoc()->nodes)
     {
         // 过滤：如果有过滤文字，跳过不匹配的节点
         if (!lowerFilter.empty())
@@ -2846,7 +2846,7 @@ void BlueprintEditor::DrawNodeListPanel()
     ImGui::Unindent();
 
     if (ImGui::IsKeyPressed(ImGuiKey_Z))
-        for (auto& link : m_Links)
+        for (auto& link : ActiveDoc()->links)
             ed::Flow(link.ID);
 
     if (ed::HasSelectionChanged())
@@ -2907,10 +2907,10 @@ void BlueprintEditor::DrawExecutionPanel()
     ImGui::Spring(0.0f);
     if (ImGui::Button(ICON_FA_COPY " Copy Log", ImVec2(100, 0)))
     {
-        if (!m_ExecutionLog.empty())
+        if (!ActiveDoc()->executionLog.empty())
         {
             std::string allText;
-            for (const auto& line : m_ExecutionLog)
+            for (const auto& line : ActiveDoc()->executionLog)
             {
                 allText += line;
                 allText += '\n';
@@ -2921,20 +2921,20 @@ void BlueprintEditor::DrawExecutionPanel()
     ImGui::Spring(0.0f);
     if (ImGui::Button(ICON_FA_ERASER " Clear", ImVec2(80, 0)))
     {
-        m_ExecutionLog.clear();
-        m_ExecutionLogText.clear();
-        m_ExecutionLogDirty = false;
-        m_LastExecutionStatus.clear();
+        ActiveDoc()->executionLog.clear();
+        ActiveDoc()->executionLogText.clear();
+        ActiveDoc()->executionLogDirty = false;
+        ActiveDoc()->lastExecutionStatus.clear();
     }
     ImGui::Spring();
     ImGui::EndHorizontal();
 
     // 状态信息
-    if (!m_LastExecutionStatus.empty())
+    if (!ActiveDoc()->lastExecutionStatus.empty())
     {
-        bool isOk = m_LastExecutionStatus.find("OK") == 0;
+        bool isOk = ActiveDoc()->lastExecutionStatus.find("OK") == 0;
         ImGui::TextColored(isOk ? ImVec4(0.4f, 1.0f, 0.4f, 1.0f) : ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
-            "Status: %s", m_LastExecutionStatus.c_str());
+            "Status: %s", ActiveDoc()->lastExecutionStatus.c_str());
     }
 
     // 彩色日志输出区域
@@ -2944,16 +2944,16 @@ void BlueprintEditor::DrawExecutionPanel()
     ImGui::BeginChild("##ExecutionLog", ImVec2(paneWidth, logHeight), true,
         ImGuiWindowFlags_HorizontalScrollbar);
 
-    for (const auto& line : m_ExecutionLog)
+    for (const auto& line : ActiveDoc()->executionLog)
     {
         DrawColoredLogLine(line);
     }
 
     // 自动滚动到底部（新日志时）
-    if (m_ExecutionLogDirty)
+    if (ActiveDoc()->executionLogDirty)
     {
         ImGui::SetScrollHereY(1.0f);
-        m_ExecutionLogDirty = false;
+        ActiveDoc()->executionLogDirty = false;
     }
 
     ImGui::EndChild();
@@ -3014,8 +3014,8 @@ void BlueprintEditor::DrawTimerPanel()
     {
         std::string timerName(testName);
         ActiveDoc()->GetTimerManager().SetTimerByName(timerName, testInterval, testRepeat, [this, timerName]() {
-            m_ExecutionLog.push_back("[Timer:" + timerName + "] fired!");
-            m_ExecutionLogDirty = true;
+            ActiveDoc()->executionLog.push_back("[Timer:" + timerName + "] fired!");
+            ActiveDoc()->executionLogDirty = true;
             return true;
         });
     }

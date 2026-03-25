@@ -31,7 +31,7 @@ void BlueprintEditor::UpdateSearchResults()
     std::string lowerFilter = filter;
     for (auto& c : lowerFilter) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
-    for (const auto& node : m_Nodes)
+    for (const auto& node : ActiveDoc()->nodes)
     {
         // 匹配节点名
         std::string lowerName = node.Name;

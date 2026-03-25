@@ -515,23 +515,4 @@ struct BlueprintEditor : public Application
     // Default handler
     RTNodeHandler m_DefaultHandler;
 
-    // ---- 以下为兼容性别名，代理到 ActiveDoc() ----
-    // 让旧代码中 m_Nodes / m_Links 等访问透明转发（仅在有活跃文档时有效）
-    #define m_Nodes          (ActiveDoc()->nodes)
-    #define m_Links          (ActiveDoc()->links)
-    #define m_NextId         (ActiveDoc()->nextId)
-    #define m_NodeTouchTime  (ActiveDoc()->nodeTouchTime)
-    #define m_CurrentFilePath (ActiveDoc()->filePath)
-    #define m_IsDirty        (ActiveDoc()->isDirty)
-    #define m_NeedSetNodePositions (ActiveDoc()->needSetNodePositions)
-    #define m_NeedNavigateToContent (ActiveDoc()->needNavigateToContent)
-    #define m_PendingContentBounds (ActiveDoc()->pendingContentBounds)
-    #define m_PendingLoadData (ActiveDoc()->pendingLoadData)
-    #define m_ExecutionLog   (ActiveDoc()->executionLog)
-    #define m_ExecutionLogText (ActiveDoc()->executionLogText)
-    #define m_ExecutionLogDirty (ActiveDoc()->executionLogDirty)
-    #define m_IsExecuting    (ActiveDoc()->isExecuting)
-    #define m_LastExecutionStatus (ActiveDoc()->lastExecutionStatus)
-    #define m_FlowLinks      (ActiveDoc()->flowLinks)
-    #define m_PersistentRunner (ActiveDoc()->persistentRunner)
 };

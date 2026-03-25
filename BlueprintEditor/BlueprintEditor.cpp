@@ -10,7 +10,7 @@
 
 int BlueprintEditor::GetNextId()
 {
-    return m_NextId++;
+    return ActiveDoc()->nextId++;
 }
 
 ed::LinkId BlueprintEditor::GetNextLinkId()
@@ -24,13 +24,13 @@ ed::LinkId BlueprintEditor::GetNextLinkId()
 
 void BlueprintEditor::TouchNode(ed::NodeId id)
 {
-    m_NodeTouchTime[id] = m_TouchTime;
+    ActiveDoc()->nodeTouchTime[id] = m_TouchTime;
 }
 
 float BlueprintEditor::GetTouchProgress(ed::NodeId id)
 {
-    auto it = m_NodeTouchTime.find(id);
-    if (it != m_NodeTouchTime.end() && it->second > 0.0f)
+    auto it = ActiveDoc()->nodeTouchTime.find(id);
+    if (it != ActiveDoc()->nodeTouchTime.end() && it->second > 0.0f)
         return (m_TouchTime - it->second) / m_TouchTime;
 
     return 0.0f;
@@ -39,7 +39,7 @@ float BlueprintEditor::GetTouchProgress(ed::NodeId id)
 void BlueprintEditor::UpdateTouch()
 {
     const auto deltaTime = ImGui::GetIO().DeltaTime;
-    for (auto& entry : m_NodeTouchTime)
+    for (auto& entry : ActiveDoc()->nodeTouchTime)
     {
         if (entry.second > 0.0f)
             entry.second -= deltaTime;
@@ -154,7 +154,7 @@ void BlueprintEditor::BuildNode(Node* node)
 
 void BlueprintEditor::BuildNodes()
 {
-    for (auto& node : m_Nodes)
+    for (auto& node : ActiveDoc()->nodes)
         BuildNode(&node);
 }
 
@@ -250,8 +250,8 @@ Node* BlueprintEditor::SpawnNodeByDef(const std::string& defId)
     if (it != def->customProperties.end())
         ntype = ParseNodeType(it->second);
 
-    m_Nodes.emplace_back(GetNextId(), def->name.c_str(), color);
-    auto& node = m_Nodes.back();
+    ActiveDoc()->nodes.emplace_back(GetNextId(), def->name.c_str(), color);
+    auto& node = ActiveDoc()->nodes.back();
     node.Type = ntype;
     node.DefinitionId = defId;
 
@@ -534,7 +534,7 @@ RTBlueprintData BlueprintEditor::BuildRuntimeData()
     bp.metadata.description = "Built from editor state";
 
     // 转换节点
-    for (const auto& node : m_Nodes)
+    for (const auto& node : ActiveDoc()->nodes)
     {
         RTNodeInstance ni;
         ni.id = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(node.ID.AsPointer()));
@@ -582,7 +582,7 @@ RTBlueprintData BlueprintEditor::BuildRuntimeData()
     }
 
     // 转换链接
-    for (const auto& link : m_Links)
+    for (const auto& link : ActiveDoc()->links)
     {
         RTLinkInstance li;
         li.id = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(link.ID.AsPointer()));

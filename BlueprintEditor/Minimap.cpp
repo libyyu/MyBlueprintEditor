@@ -9,7 +9,7 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
 {
     if (!m_ShowMinimap) return;
     if (!ActiveDoc()) return;
-    if (m_Nodes.empty()) return;
+    if (ActiveDoc()->nodes.empty()) return;
 
     auto drawList = ImGui::GetWindowDrawList();
 
@@ -23,7 +23,7 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
     float canvasMinX = 1e9f, canvasMinY = 1e9f;
     float canvasMaxX = -1e9f, canvasMaxY = -1e9f;
 
-    for (const auto& node : m_Nodes)
+    for (const auto& node : ActiveDoc()->nodes)
     {
         ImVec2 pos = ed::GetNodePosition(node.ID);
         ImVec2 size = ed::GetNodeSize(node.ID);
@@ -92,7 +92,7 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
     }
 
     // 绘制链接（简化为直线）
-    for (const auto& link : m_Links)
+    for (const auto& link : ActiveDoc()->links)
     {
         auto* startPin = FindPin(link.StartPinID);
         auto* endPin = FindPin(link.EndPinID);
@@ -111,7 +111,7 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
     }
 
     // 绘制节点矩形
-    for (const auto& node : m_Nodes)
+    for (const auto& node : ActiveDoc()->nodes)
     {
         ImVec2 pos = ed::GetNodePosition(node.ID);
         ImVec2 size = ed::GetNodeSize(node.ID);

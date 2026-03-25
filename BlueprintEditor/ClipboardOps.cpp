@@ -40,7 +40,7 @@ void BlueprintEditor::CopySelectedNodes()
     std::unordered_map<uintptr_t, PinMapping> pinToClipMapping;
 
     // 复制节点数据到剪贴板
-    for (const auto& node : m_Nodes)
+    for (const auto& node : ActiveDoc()->nodes)
     {
         auto nodeKey = reinterpret_cast<uintptr_t>(node.ID.AsPointer());
         if (selectedSet.find(nodeKey) == selectedSet.end())
@@ -106,7 +106,7 @@ void BlueprintEditor::CopySelectedNodes()
     }
 
     // 复制选中节点之间的链接
-    for (const auto& link : m_Links)
+    for (const auto& link : ActiveDoc()->links)
     {
         auto startKey = reinterpret_cast<uintptr_t>(link.StartPinID.AsPointer());
         auto endKey = reinterpret_cast<uintptr_t>(link.EndPinID.AsPointer());
@@ -141,9 +141,9 @@ void BlueprintEditor::CopySelectedNodes()
     // 日志提示
     if (ActiveDoc())
     {
-        m_ExecutionLog.push_back("[INFO] Copied " + std::to_string(m_ClipboardNodes.size()) +
+        ActiveDoc()->executionLog.push_back("[INFO] Copied " + std::to_string(m_ClipboardNodes.size()) +
                                  " node(s) and " + std::to_string(m_ClipboardLinks.size()) + " link(s)");
-        m_ExecutionLogDirty = true;
+        ActiveDoc()->executionLogDirty = true;
     }
 }
 
@@ -180,8 +180,8 @@ void BlueprintEditor::PasteNodes(ImVec2 pastePosition)
         auto* def = m_NodeRegistry.getNodeDefinition(cn.definitionId);
 
         int newNodeId = GetNextId();
-        m_Nodes.emplace_back(newNodeId, cn.name.c_str(), cn.color);
-        auto& node = m_Nodes.back();
+        ActiveDoc()->nodes.emplace_back(newNodeId, cn.name.c_str(), cn.color);
+        auto& node = ActiveDoc()->nodes.back();
         node.Type = cn.type;
         node.DefinitionId = cn.definitionId;
         node.Size = cn.size;
@@ -257,23 +257,23 @@ void BlueprintEditor::PasteNodes(ImVec2 pastePosition)
         ed::PinId startPinId = srcInfo.outputPinIds[cl.srcPinIdx];
         ed::PinId endPinId = dstInfo.inputPinIds[cl.dstPinIdx];
 
-        m_Links.emplace_back(Link(GetNextId(), startPinId, endPinId));
+        ActiveDoc()->links.emplace_back(Link(GetNextId(), startPinId, endPinId));
 
         // 设置链接颜色（Any 引脚使用对端类型颜色）
         auto* startPin = FindPin(startPinId);
         auto* endPin   = FindPin(endPinId);
         if (startPin)
-            m_Links.back().Color = GetIconColor(GetLinkColor(startPin, endPin));
+            ActiveDoc()->links.back().Color = GetIconColor(GetLinkColor(startPin, endPin));
     }
 
-    m_IsDirty = true;
+    ActiveDoc()->isDirty = true;
 
     // 日志提示
     if (ActiveDoc())
     {
-        m_ExecutionLog.push_back("[INFO] Pasted " + std::to_string(m_ClipboardNodes.size()) +
+        ActiveDoc()->executionLog.push_back("[INFO] Pasted " + std::to_string(m_ClipboardNodes.size()) +
                                  " node(s) and " + std::to_string(m_ClipboardLinks.size()) + " link(s)");
-        m_ExecutionLogDirty = true;
+        ActiveDoc()->executionLogDirty = true;
     }
 }
 
@@ -324,8 +324,8 @@ void BlueprintEditor::CutSelectedNodes()
     // 日志提示
     if (ActiveDoc())
     {
-        m_ExecutionLog.push_back("[INFO] Cut " + std::to_string(m_ClipboardNodes.size()) + " node(s)");
-        m_ExecutionLogDirty = true;
+        ActiveDoc()->executionLog.push_back("[INFO] Cut " + std::to_string(m_ClipboardNodes.size()) + " node(s)");
+        ActiveDoc()->executionLogDirty = true;
     }
 }
 
@@ -415,5 +415,5 @@ void BlueprintEditor::AlignSelectedNodes(AlignMode mode)
     }
     }
 
-    m_IsDirty = true;
+    ActiveDoc()->isDirty = true;
 }
