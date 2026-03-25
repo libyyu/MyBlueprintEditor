@@ -101,6 +101,23 @@ public:
                   std::string&       outContent,
                   std::string&       outError) override
     {
+#if defined(BP_NODE_ENV)
+        // Node.js 测试环境（-DBP_NODE_ENV=1 构建）：
+        // NODERAWFS 已挂载，直接读本地文件
+        FILE* f = fopen(path.c_str(), "rb");
+        if (!f) {
+            outError = "File not found: " + path;
+            return false;
+        }
+        fseek(f, 0, SEEK_END);
+        long len = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        outContent.resize(static_cast<size_t>(len));
+        if (len > 0) fread(&outContent[0], 1, static_cast<size_t>(len), f);
+        fclose(f);
+        return true;
+#else
+        // 浏览器 / Unity WebGL 环境：从 StreamingAssets HTTP 服务器获取
         // 拼接 URL：StreamingAssets/<path>
         std::string url = std::string(BLUEPRINT_STREAMING_ASSETS_BASE) + "/" + path;
 
@@ -123,6 +140,7 @@ public:
                           static_cast<size_t>(size));
         free(buf);
         return true;
+#endif
     }
 
     bool WriteFile(const std::string& /*path*/,

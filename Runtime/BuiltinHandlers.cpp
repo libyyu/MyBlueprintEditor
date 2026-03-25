@@ -1996,23 +1996,38 @@ static void RegisterHandlers_Data(std::unordered_map<std::string, NodeHandler>& 
             }
             else
             {
-                // 尝试解析数字
-                try
+                // 尝试解析数字（不使用 try/catch，兼容 Emscripten -fno-exceptions）
+                bool hasDigit = !trimmed.empty();
+                for (char c : trimmed)
+                    if (!std::isdigit((unsigned char)c) && c != '.' && c != '-' && c != '+' && c != 'e' && c != 'E')
+                        { hasDigit = false; break; }
+                if (hasDigit && !trimmed.empty())
                 {
-                    if (trimmed.find('.') != std::string::npos)
+                    if (trimmed.find('.') != std::string::npos ||
+                        trimmed.find('e') != std::string::npos ||
+                        trimmed.find('E') != std::string::npos)
                     {
-                        double v = std::stod(trimmed);
-                        ctx.SetOutputValue("Value", Variant(v));
-                        valid = true;
+                        // Parse float manually via strtod (sets errno, no exceptions)
+                        char* endptr = nullptr;
+                        double v = std::strtod(trimmed.c_str(), &endptr);
+                        if (endptr != trimmed.c_str())
+                        {
+                            ctx.SetOutputValue("Value", Variant(v));
+                            valid = true;
+                        }
                     }
                     else
                     {
-                        int64_t v = std::stoll(trimmed);
-                        ctx.SetOutputValue("Value", Variant(v));
-                        valid = true;
+                        // Parse integer manually via strtoll (sets errno, no exceptions)
+                        char* endptr = nullptr;
+                        int64_t v = static_cast<int64_t>(std::strtoll(trimmed.c_str(), &endptr, 10));
+                        if (endptr != trimmed.c_str())
+                        {
+                            ctx.SetOutputValue("Value", Variant(v));
+                            valid = true;
+                        }
                     }
                 }
-                catch (...) {}
             }
         }
         if (!valid)
