@@ -8,24 +8,29 @@ setlocal enabledelayedexpansion
 ::   build.bat [platform] [options...]
 ::
 :: Platforms:
-::   windows       Windows x64, Win32+DX11, full editor (default)
+::   windows       Windows x64, Win32+DX11, full editor – static runtime (default)
+::   windows-dll   Windows x64, full editor + BlueprintRuntime as shared DLL
+::   dll           Windows x64, Runtime-only as shared DLL (no Editor)
 ::   wasm          WebAssembly via Emscripten (Runtime only, static)
 ::   android       Android ARM64-v8a (Runtime only)
-::   runtime       Windows host, Runtime-only build (no Editor)
+::   runtime       Windows host, Runtime-only build, static (no Editor)
 ::
 :: Options:
 ::   debug         Build Debug configuration (default: Release)
 ::   release       Build Release configuration
 ::   clean         Wipe build directory before building
 ::   noexamples    Skip building examples
-::   shared        Build BlueprintRuntime as a shared library
+::   shared        Force BlueprintRuntime as shared DLL (overrides platform default)
 ::   --ndk <path>  Android NDK root (required for android platform)
 ::   --api <N>     Android min API level (default: 21)
 ::   --emsdk <path> Emscripten SDK root (default: %EMSDK% env var)
 ::
 :: Examples:
-::   build.bat                          Windows Release (full editor)
-::   build.bat debug                    Windows Debug
+::   build.bat                          Windows Release, static runtime + full editor
+::   build.bat windows-dll              Windows Release, shared DLL + full editor
+::   build.bat dll                      Windows Release, Runtime DLL only
+::   build.bat dll debug                Windows Debug, Runtime DLL only
+::   build.bat debug                    Windows Debug, static runtime + full editor
 ::   build.bat wasm                     WASM Release (needs Emscripten)
 ::   build.bat android --ndk C:\ndk     Android Release
 ::   build.bat runtime shared           Runtime-only, shared DLL
@@ -49,10 +54,12 @@ set EMSDK_PATH=%EMSDK%
 :parse_args
 if "%~1"=="" goto :validate
 
-if /i "%~1"=="windows"    (set PLATFORM=windows&    shift & goto :parse_args)
-if /i "%~1"=="wasm"       (set PLATFORM=wasm&        shift & goto :parse_args)
-if /i "%~1"=="android"    (set PLATFORM=android&     shift & goto :parse_args)
-if /i "%~1"=="runtime"    (set PLATFORM=runtime&     shift & goto :parse_args)
+if /i "%~1"=="windows"     (set PLATFORM=windows&      shift & goto :parse_args)
+if /i "%~1"=="windows-dll" (set PLATFORM=windows-dll&  shift & goto :parse_args)
+if /i "%~1"=="dll"         (set PLATFORM=dll&           shift & goto :parse_args)
+if /i "%~1"=="wasm"        (set PLATFORM=wasm&          shift & goto :parse_args)
+if /i "%~1"=="android"     (set PLATFORM=android&       shift & goto :parse_args)
+if /i "%~1"=="runtime"     (set PLATFORM=runtime&       shift & goto :parse_args)
 
 if /i "%~1"=="debug"      (set BUILD_TYPE=Debug&     shift & goto :parse_args)
 if /i "%~1"=="release"    (set BUILD_TYPE=Release&   shift & goto :parse_args)
@@ -75,16 +82,18 @@ goto :show_help
 echo Usage: build.bat [platform] [options...]
 echo.
 echo Platforms:
-echo   windows      Windows x64, Win32+DX11, full editor (default)
+echo   windows      Windows x64, full editor, static runtime (default)
+echo   windows-dll  Windows x64, full editor + BlueprintRuntime.dll
+echo   dll          Windows x64, Runtime-only shared DLL (no Editor)
 echo   wasm         WebAssembly via Emscripten (Runtime only)
 echo   android      Android ARM64-v8a (Runtime only)
-echo   runtime      Windows host, Runtime-only (no Editor)
+echo   runtime      Windows host, Runtime-only static (no Editor)
 echo.
 echo Options:
 echo   debug / release     Build configuration (default: Release)
 echo   clean               Wipe build directory before building
 echo   noexamples          Skip building examples
-echo   shared              Build BlueprintRuntime as shared DLL
+echo   shared              Force shared DLL (overrides platform default)
 echo   --ndk ^<path^>        Android NDK root
 echo   --api ^<N^>           Android min API level (default: 21)
 echo   --emsdk ^<path^>      Emscripten SDK root
@@ -97,6 +106,22 @@ set BUILD_DIR=%PROJECT_DIR%\build-%PLATFORM%
 if /i "%PLATFORM%"=="windows" (
     set RUNTIME_ONLY=0
     set CMAKE_EXTRA=-A x64 -DBUILD_EXAMPLES=%BUILD_EXAMPLES% -DBUILD_SHARED_LIBS=%BUILD_SHARED%
+    goto :banner
+)
+
+if /i "%PLATFORM%"=="windows-dll" (
+    :: Full editor + shared DLL
+    set RUNTIME_ONLY=0
+    set BUILD_SHARED=ON
+    set CMAKE_EXTRA=-A x64 -DBUILD_EXAMPLES=%BUILD_EXAMPLES% -DBUILD_SHARED_LIBS=ON
+    goto :banner
+)
+
+if /i "%PLATFORM%"=="dll" (
+    :: Runtime-only shared DLL, no Editor
+    set RUNTIME_ONLY=1
+    set BUILD_SHARED=ON
+    set CMAKE_EXTRA=-A x64 -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=ON -DBUILD_EXAMPLES=%BUILD_EXAMPLES%
     goto :banner
 )
 
@@ -201,6 +226,21 @@ echo.
 echo ============================================
 echo  Build succeeded! (%PLATFORM% / %BUILD_TYPE%)
 echo  Output: %BUILD_DIR%\bin
+if /i "%PLATFORM%"=="windows-dll" (
+    echo  DLL:     %BUILD_DIR%\bin\%BUILD_TYPE%\BlueprintRuntime.dll
+    echo  Import:  %BUILD_DIR%\Runtime\%BUILD_TYPE%\BlueprintRuntime.lib
+)
+if /i "%PLATFORM%"=="dll" (
+    echo  DLL:     %BUILD_DIR%\bin\%BUILD_TYPE%\BlueprintRuntime.dll
+    echo  Import:  %BUILD_DIR%\Runtime\%BUILD_TYPE%\BlueprintRuntime.lib
+    echo  Header:  Runtime\BlueprintRuntime.h
+)
+if /i "%BUILD_SHARED%"=="ON" (
+    if /i "%PLATFORM%"=="windows" (
+        echo  DLL:     %BUILD_DIR%\bin\%BUILD_TYPE%\BlueprintRuntime.dll
+        echo  Import:  %BUILD_DIR%\Runtime\%BUILD_TYPE%\BlueprintRuntime.lib
+    )
+)
 if /i "%PLATFORM%"=="wasm" (
     echo  WASM lib: %BUILD_DIR%\Runtime\libBlueprintRuntime.a
     echo  ^> Drop into Assets/Plugins/WebGL/ for Unity

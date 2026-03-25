@@ -6,11 +6,13 @@
 #   ./build.sh [platform] [options...]
 #
 # Platforms:
-#   linux         Linux x64 (GLFW + OpenGL3) – default when no platform given
-#   macos         macOS (GLFW + OpenGL3)
+#   linux         Linux x64 (GLFW + OpenGL3) – default on Linux
+#   macos         macOS (GLFW + OpenGL3)     – default on macOS
+#   windows-dll   Windows x64 via MinGW-w64: full editor + shared DLL
+#   dll           Windows x64 via MinGW-w64: Runtime DLL only (no Editor)
 #   wasm          WebAssembly via Emscripten (Runtime only, static)
-#   android       Android ARM64-v8a (Runtime only, shared/static)
-#   ios           iOS arm64 (Runtime only, static)
+#   android       Android ARM64-v8a (Runtime only)
+#   ios           iOS arm64 (Runtime only, static; macOS host required)
 #   runtime       Current host – Runtime-only build (no Editor)
 #
 # Options:
@@ -26,6 +28,8 @@
 # Examples:
 #   ./build.sh                         # Linux Release
 #   ./build.sh macos debug             # macOS Debug
+#   ./build.sh windows-dll             # Windows DLL via MinGW-w64 (needs mingw)
+#   ./build.sh dll                     # Windows Runtime DLL only via MinGW-w64
 #   ./build.sh wasm                    # WASM Release (needs Emscripten)
 #   ./build.sh android --ndk ~/ndk     # Android Release
 #   ./build.sh ios                     # iOS Release (macOS host required)
@@ -58,7 +62,7 @@ EMSDK_PATH="${EMSDK:-}"
 # ── Argument parsing ──────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        linux|macos|wasm|android|ios|runtime)
+        linux|macos|wasm|android|ios|runtime|windows-dll|dll)
             PLATFORM="$1"; shift ;;
         debug)
             BUILD_TYPE="Debug"; shift ;;
@@ -94,6 +98,20 @@ if [[ -z "$PLATFORM" ]]; then
     info "No platform specified – detected: ${BOLD}${PLATFORM}${NC}"
 fi
 
+# ── Locate MinGW toolchain (for windows-dll / dll) ────────────────────────────
+find_mingw_toolchain() {
+    for candidate in \
+        "x86_64-w64-mingw32-gcc" \
+        "/usr/bin/x86_64-w64-mingw32-gcc" \
+        "/usr/local/bin/x86_64-w64-mingw32-gcc"; do
+        if command -v "$candidate" &>/dev/null; then
+            MINGW_PREFIX="${candidate%-gcc}"
+            return 0
+        fi
+    done
+    error "MinGW-w64 cross-compiler not found.\n  Install: apt install mingw-w64  /  brew install mingw-w64\n  Or use build.bat on a Windows host for a native MSVC build."
+}
+
 # ── Derive build directory & CMake flags ─────────────────────────────────────
 BUILD_DIR="${PROJECT_DIR}/build-${PLATFORM}"
 CMAKE_EXTRA_ARGS=()
@@ -113,6 +131,38 @@ case "$PLATFORM" in
             "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
             "-DBUILD_RUNTIME_ONLY=ON"
             "-DBUILD_SHARED_LIBS=${BUILD_SHARED}"
+            "-DBUILD_EXAMPLES=${BUILD_EXAMPLES}"
+        )
+        ;;
+
+    windows-dll)
+        # Full editor + shared DLL via MinGW-w64 cross-compile
+        find_mingw_toolchain
+        BUILD_SHARED="ON"
+        CMAKE_EXTRA_ARGS+=(
+            "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
+            "-DCMAKE_SYSTEM_NAME=Windows"
+            "-DCMAKE_C_COMPILER=${MINGW_PREFIX}-gcc"
+            "-DCMAKE_CXX_COMPILER=${MINGW_PREFIX}-g++"
+            "-DCMAKE_RC_COMPILER=${MINGW_PREFIX}-windres"
+            "-DBUILD_SHARED_LIBS=ON"
+            "-DBUILD_EXAMPLES=${BUILD_EXAMPLES}"
+        )
+        ;;
+
+    dll)
+        # Runtime-only shared DLL via MinGW-w64 cross-compile
+        find_mingw_toolchain
+        RUNTIME_ONLY=1
+        BUILD_SHARED="ON"
+        CMAKE_EXTRA_ARGS+=(
+            "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
+            "-DCMAKE_SYSTEM_NAME=Windows"
+            "-DCMAKE_C_COMPILER=${MINGW_PREFIX}-gcc"
+            "-DCMAKE_CXX_COMPILER=${MINGW_PREFIX}-g++"
+            "-DCMAKE_RC_COMPILER=${MINGW_PREFIX}-windres"
+            "-DBUILD_RUNTIME_ONLY=ON"
+            "-DBUILD_SHARED_LIBS=ON"
             "-DBUILD_EXAMPLES=${BUILD_EXAMPLES}"
         )
         ;;
