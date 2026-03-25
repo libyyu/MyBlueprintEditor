@@ -979,7 +979,7 @@ bool BlueprintRunner::FireConnectedNode(PinId inputPinId)
 
 void BlueprintRunner::Tick(float deltaTime)
 {
-    m_timerManager.Tick(deltaTime);
+    m_timerManager->Tick(deltaTime);
 
     // 清理 m_keepAliveRunners 中所有 timer 已全部触发完的子 runner。
     //

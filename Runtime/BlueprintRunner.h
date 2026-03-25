@@ -229,9 +229,14 @@ struct ExecutionResult
 class BLUEPRINT_API BlueprintRunner
 {
 public:
-    BlueprintRunner() : m_fileSystem(GetDefaultFileSystem()) {}
+    BlueprintRunner()
+        : m_fileSystem(GetDefaultFileSystem())
+        , m_timerManager(std::make_shared<FrameTimerManager>())
+    {}
     explicit BlueprintRunner(std::shared_ptr<IFileSystem> fs)
-        : m_fileSystem(fs ? std::move(fs) : GetDefaultFileSystem()) {}
+        : m_fileSystem(fs ? std::move(fs) : GetDefaultFileSystem())
+        , m_timerManager(std::make_shared<FrameTimerManager>())
+    {}
     ~BlueprintRunner() = default;
 
     // 获取/设置文件系统
@@ -347,12 +352,29 @@ public:
     void Tick(float deltaTime);
 
     // 获取计时器管理器（可读写）
-    // 如果设置了父 timer manager，则使用父级的（子蓝图场景）
-    FrameTimerManager&       GetTimerManager()       { return m_parentTimerManager ? *m_parentTimerManager : m_timerManager; }
-    const FrameTimerManager& GetTimerManager() const { return m_parentTimerManager ? *m_parentTimerManager : m_timerManager; }
+    // 如果设置了父 timer manager，优先使用父级（子蓝图场景）；
+    // 父已析构时 weak_ptr lock 失败，自动回退到自身的 m_timerManager。
+    FrameTimerManager& GetTimerManager()
+    {
+        if (auto p = m_parentTimerManager.lock()) return *p;
+        return *m_timerManager;
+    }
+    const FrameTimerManager& GetTimerManager() const
+    {
+        if (auto p = m_parentTimerManager.lock()) return *p;
+        return *m_timerManager;
+    }
 
-    // 设置父级 timer manager（用于子蓝图场景：子蓝图的 timer 注册到父 runner 的 manager 中）
-    void SetParentTimerManager(FrameTimerManager* parent) { m_parentTimerManager = parent; }
+    // 设置父级 timer manager（用于子蓝图场景）
+    // 使用 shared_ptr，子 runner 以 weak_ptr 持有，不延长父的生命周期；
+    // 父析构后 weak_ptr 自动失效，GetTimerManager() 回退到自身 manager。
+    void SetParentTimerManager(std::shared_ptr<FrameTimerManager> parent)
+    {
+        m_parentTimerManager = std::move(parent);
+    }
+
+    // 获取自身 timer manager 的 shared_ptr（供子蓝图调用 SetParentTimerManager）
+    std::shared_ptr<FrameTimerManager> GetTimerManagerPtr() { return m_timerManager; }
 
     // 通过输入引脚ID找到连接的源节点并执行（用于 Function/Delegate 引脚的异步回调触发）
     // 例如 SetTimer 的 Function Name 引脚连接了一个回调节点，timer 触发时调用此方法
@@ -442,11 +464,11 @@ private:
     // 日志回调
     std::function<void(const std::string&)>             m_logCallback;
 
-    // 主线程计时器管理器
-    FrameTimerManager                                   m_timerManager;
+    // 主线程计时器管理器（shared_ptr，可共享给子 runner）
+    std::shared_ptr<FrameTimerManager>                  m_timerManager;
 
-    // 父级 timer manager（子蓝图场景）
-    FrameTimerManager*                                  m_parentTimerManager = nullptr;
+    // 父级 timer manager（weak_ptr：借用，不拥有；父析构后自动失效）
+    std::weak_ptr<FrameTimerManager>                    m_parentTimerManager;
 
     // 保持子蓝图 runner 存活的容器
     std::vector<std::shared_ptr<BlueprintRunner>>       m_keepAliveRunners;

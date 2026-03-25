@@ -136,9 +136,9 @@ static void RegisterHandlers_Flow(
         {
             BlueprintRunner subRunner(runner.GetFileSystem());
             
-            // 子蓝图的 timer 注册到父 runner 的 TimerManager 中
-            // 这样子蓝图的 Delay/SetTimer 回调能被父 runner 的帧循环正确 tick
-            subRunner.SetParentTimerManager(&runner.GetTimerManager());
+            // 子蓝图以 weak_ptr 持有父的 timerManager；
+            // 父析构后 weak_ptr 失效，子自动回退到自身 manager，不会 UAF
+            subRunner.SetParentTimerManager(runner.GetTimerManagerPtr());
 
             std::vector<std::string> subLog;
             subRunner.SetLogCallback([&subLog, &ctx](const std::string& msg) {
@@ -211,9 +211,9 @@ static void RegisterHandlers_Flow(
 
             auto subRunner = std::make_shared<BlueprintRunner>(runner.GetFileSystem());
             
-            // 子蓝图的 timer 注册到父 runner 的 TimerManager 中
-            // 这样子蓝图的 Delay/SetTimer 回调能被父 runner 的帧循环正确 tick
-            subRunner->SetParentTimerManager(&runner.GetTimerManager());
+            // 子蓝图以 weak_ptr 持有父的 timerManager；
+            // 父析构后 weak_ptr 失效，子自动回退到自身 manager，不会 UAF
+            subRunner->SetParentTimerManager(runner.GetTimerManagerPtr());
 
             // 使用 shared_ptr 管理 subLog，保证异步 timer 回调时仍可访问
             auto subLog = std::make_shared<std::vector<std::string>>();
