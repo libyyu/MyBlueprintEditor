@@ -126,14 +126,11 @@ public:
     {
         if (definition.id.empty()) return false;
         
-        bool isNew = (m_nodeDefinitions.find(definition.id) == m_nodeDefinitions.end());
         m_nodeDefinitions[definition.id] = definition;
         
-        // 同步维护 allDefs 缓存
-        if (isNew)
-            m_allDefsCache.push_back(&m_nodeDefinitions[definition.id]);
-        else
-            rebuildAllDefsCache();
+        // 统一重建缓存：unordered_map 在 insert/rehash 时会使所有迭代器和指针失效，
+        // 因此无论新增还是更新都必须重建，避免缓存中残留野指针。
+        rebuildAllDefsCache();
         
         return true;
     }
