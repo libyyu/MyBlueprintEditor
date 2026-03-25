@@ -178,14 +178,51 @@ public:
     }
 
     // ------------------------------------------------------------------
-    // 行为层：日志
+    // 行为层：调试日志（仅用于运行时内部诊断，受 loggingEnabled 开关控制）
     // ------------------------------------------------------------------
 
+    /// Called for internal debug/diagnostic messages.
+    /// Gated by loggingEnabled – silent when false (default in Release builds).
     std::function<void(const std::string& message)> OnLog;
+
+    /// Master switch for internal debug logging.
+    /// Default: OFF in release (NDEBUG defined), ON otherwise.
+#if defined(NDEBUG)
+    bool loggingEnabled = false;
+#else
+    bool loggingEnabled = true;
+#endif
 
     void Log(const std::string& message) const
     {
-        if (OnLog) OnLog(message);
+        if (loggingEnabled && OnLog) OnLog(message);
+    }
+
+    // ------------------------------------------------------------------
+    // 行为层：Print（逻辑输出，第三方引擎可接管）
+    // ------------------------------------------------------------------
+
+    /// Called by PrintString / Log nodes.
+    /// Independent of loggingEnabled – always fires when set.
+    /// If not set, falls back to OnLog (if loggingEnabled), then stderr.
+    std::function<void(const std::string& message)> OnPrint;
+
+    void Print(const std::string& message) const
+    {
+        if (OnPrint)
+        {
+            OnPrint(message);
+        }
+        else if (loggingEnabled && OnLog)
+        {
+            OnLog(message);
+        }
+        else
+        {
+            // Last-resort fallback so output is never silently discarded
+            // when no callback is wired up at all.
+            fprintf(stderr, "[Blueprint] %s\n", message.c_str());
+        }
     }
 
     // ------------------------------------------------------------------
@@ -373,8 +410,23 @@ public:
     // 获取错误信息
     const std::string& GetLastError() const { return m_lastError; }
 
-    // 设置日志回调
+    // ------------------------------------------------------------------
+    // 日志 / 输出配置
+    // ------------------------------------------------------------------
+
+    /// Set callback for internal debug/diagnostic messages.
+    /// Has no effect when logging is disabled (see EnableLogging).
     void SetLogCallback(std::function<void(const std::string&)> callback);
+
+    /// Enable or disable internal debug logging (OnLog).
+    /// Default: OFF when NDEBUG is defined (Release), ON otherwise.
+    void EnableLogging(bool enable) { m_context.loggingEnabled = enable; }
+    bool IsLoggingEnabled() const   { return m_context.loggingEnabled; }
+
+    /// Set callback for PrintString / Log node output.
+    /// This is the "application-level" print channel that engines like Unity
+    /// should override.  Independent of EnableLogging.
+    void SetPrintCallback(std::function<void(const std::string&)> callback);
 
     // 重置执行状态（保留蓝图数据和处理器注册）
     void ResetState();
@@ -499,8 +551,9 @@ private:
     // 错误信息
     std::string                                         m_lastError;
 
-    // 日志回调
+    // 调试日志回调 / 逻辑输出回调
     std::function<void(const std::string&)>             m_logCallback;
+    std::function<void(const std::string&)>             m_printCallback;
 
     // 主线程计时器管理器（shared_ptr，可共享给子 runner）
     std::shared_ptr<FrameTimerManager>                  m_timerManager;

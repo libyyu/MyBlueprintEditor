@@ -130,12 +130,32 @@ BLUEPRINT_CAPI int     BP_GetVariableBool  (BP_Runner runner, const char* name);
 BLUEPRINT_CAPI int BP_GetVariableString(BP_Runner runner, const char* name, char* buf, int bufLen);
 
 // ---------------------------------------------------------------------------
-// Logging
+// Logging  (internal debug diagnostics – gated by BP_EnableLogging)
 // ---------------------------------------------------------------------------
 
-/// Register a callback that receives log messages from the runner.
-/// Pass NULL to clear. The callback is invoked on the calling thread.
+/// Register a callback that receives internal debug/diagnostic messages.
+/// Only fires when logging is enabled (see BP_EnableLogging).
+/// Pass NULL to clear.
 BLUEPRINT_CAPI void BP_SetLogCallback(BP_Runner runner, BP_LogCallback callback);
+
+/// Enable or disable internal debug logging.
+/// Default: 0 (disabled) when built with NDEBUG (Release), 1 otherwise.
+BLUEPRINT_CAPI void BP_EnableLogging(BP_Runner runner, int enable);
+
+/// Returns 1 if internal logging is currently enabled, 0 otherwise.
+BLUEPRINT_CAPI int BP_IsLoggingEnabled(BP_Runner runner);
+
+// ---------------------------------------------------------------------------
+// Print  (application-level output – PrintString / Log / FormatLog nodes)
+// ---------------------------------------------------------------------------
+
+/// Register a callback that receives output from PrintString / Log / FormatLog.
+/// This is the channel that game engines (Unity, etc.) should override.
+/// Independent of BP_EnableLogging – always fires when set.
+/// If not set, output falls back to the log callback (if logging enabled)
+/// and then to stderr.
+/// Pass NULL to clear.
+BLUEPRINT_CAPI void BP_SetPrintCallback(BP_Runner runner, BP_LogCallback callback);
 
 // ---------------------------------------------------------------------------
 // Error handling

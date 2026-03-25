@@ -122,9 +122,19 @@ namespace BlueprintRuntime
             [MarshalAs(UnmanagedType.LPStr)] string name,
             IntPtr buf, int bufLen);
 
-        // --- Logging ---
+        // --- Logging (internal debug diagnostics) ---
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
         public static extern void BP_SetLogCallback(IntPtr runner, LogCallbackDelegate callback);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void BP_EnableLogging(IntPtr runner, int enable);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BP_IsLoggingEnabled(IntPtr runner);
+
+        // --- Print (application-level output: PrintString / Log / FormatLog nodes) ---
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void BP_SetPrintCallback(IntPtr runner, LogCallbackDelegate callback);
 
         // --- Error ---
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
@@ -147,12 +157,23 @@ namespace BlueprintRuntime
         private IntPtr _handle;
         private bool   _disposed;
 
-        // Keep a strong reference to the delegate to prevent GC collection
-        // while the native side holds a function pointer.
+        // Keep a strong reference to delegates to prevent GC collection
+        // while the native side holds function pointers.
         private Native.LogCallbackDelegate _logDelegate;
+        private Native.LogCallbackDelegate _printDelegate;
 
-        /// <summary>Fired for every log message emitted by the blueprint.</summary>
+        /// <summary>
+        /// Fired for internal debug/diagnostic messages.
+        /// Only active when logging is enabled (see EnableLogging).
+        /// </summary>
         public event Action<string> OnLog;
+
+        /// <summary>
+        /// Fired by PrintString / Log / FormatLog nodes.
+        /// This is the application-level print channel – wire it to your
+        /// game console, UI log, or Debug.Log.  Independent of EnableLogging.
+        /// </summary>
+        public event Action<string> OnPrint;
 
         // ---------------------------------------------------------------------
         // Construction / disposal
@@ -164,9 +185,11 @@ namespace BlueprintRuntime
             if (_handle == IntPtr.Zero)
                 throw new InvalidOperationException("BP_CreateRunner returned null");
 
-            // Wire up the log callback immediately
-            _logDelegate = msg => OnLog?.Invoke(msg);
+            // Wire up callbacks – keep delegate refs alive to prevent GC
+            _logDelegate   = msg => OnLog?.Invoke(msg);
+            _printDelegate = msg => OnPrint?.Invoke(msg);
             Native.BP_SetLogCallback(_handle, _logDelegate);
+            Native.BP_SetPrintCallback(_handle, _printDelegate);
         }
 
         public void Dispose()
@@ -175,12 +198,14 @@ namespace BlueprintRuntime
             {
                 if (_handle != IntPtr.Zero)
                 {
-                    // Clear native callback before destroying to avoid dangling pointer
+                    // Clear native callbacks before destroying to avoid dangling pointers
                     Native.BP_SetLogCallback(_handle, null);
+                    Native.BP_SetPrintCallback(_handle, null);
                     Native.BP_DestroyRunner(_handle);
                     _handle = IntPtr.Zero;
                 }
-                _logDelegate = null;
+                _logDelegate   = null;
+                _printDelegate = null;
                 _disposed = true;
             }
         }
@@ -317,6 +342,25 @@ namespace BlueprintRuntime
         }
 
         // ---------------------------------------------------------------------
+        // Logging control
+        // ---------------------------------------------------------------------
+
+        /// <summary>
+        /// Enable or disable internal debug logging (OnLog callbacks).
+        /// Disabled by default in Release (NDEBUG) builds of the native library.
+        /// </summary>
+        public void EnableLogging(bool enable)
+        {
+            ThrowIfDisposed();
+            Native.BP_EnableLogging(_handle, enable ? 1 : 0);
+        }
+
+        public bool IsLoggingEnabled
+        {
+            get { ThrowIfDisposed(); return Native.BP_IsLoggingEnabled(_handle) != 0; }
+        }
+
+        // ---------------------------------------------------------------------
         // Error
         // ---------------------------------------------------------------------
 
@@ -391,7 +435,13 @@ namespace BlueprintRuntime
         protected virtual void Awake()
         {
             Runner = new BPRunner();
-            Runner.OnLog += msg => Debug.Log($"[Blueprint] {msg}");
+            // PrintString / Log / FormatLog → Unity console
+            Runner.OnPrint += msg => Debug.Log($"[Blueprint] {msg}");
+            // Internal debug log only in Editor / development builds
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Runner.EnableLogging(true);
+            Runner.OnLog += msg => Debug.Log($"[Blueprint:dbg] {msg}");
+#endif
 
             try
             {

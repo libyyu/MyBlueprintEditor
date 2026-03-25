@@ -201,16 +201,35 @@ BLUEPRINT_CAPI void BP_SetLogCallback(BP_Runner runner, BP_LogCallback callback)
     if (!runner) return;
     auto* w = asWrapper(runner);
     if (callback)
-    {
-        w->runner.SetLogCallback([callback](const std::string& msg)
-        {
-            callback(msg.c_str());
-        });
-    }
+        w->runner.SetLogCallback([callback](const std::string& msg) { callback(msg.c_str()); });
     else
-    {
         w->runner.SetLogCallback(nullptr);
-    }
+}
+
+BLUEPRINT_CAPI void BP_EnableLogging(BP_Runner runner, int enable)
+{
+    if (!runner) return;
+    asWrapper(runner)->runner.EnableLogging(enable != 0);
+}
+
+BLUEPRINT_CAPI int BP_IsLoggingEnabled(BP_Runner runner)
+{
+    if (!runner) return 0;
+    return asWrapper(runner)->runner.IsLoggingEnabled() ? 1 : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Print (application-level output)
+// ---------------------------------------------------------------------------
+
+BLUEPRINT_CAPI void BP_SetPrintCallback(BP_Runner runner, BP_LogCallback callback)
+{
+    if (!runner) return;
+    auto* w = asWrapper(runner);
+    if (callback)
+        w->runner.SetPrintCallback([callback](const std::string& msg) { callback(msg.c_str()); });
+    else
+        w->runner.SetPrintCallback(nullptr);
 }
 
 // ---------------------------------------------------------------------------

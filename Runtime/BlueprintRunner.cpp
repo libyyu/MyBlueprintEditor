@@ -552,6 +552,12 @@ void BlueprintRunner::SetLogCallback(std::function<void(const std::string&)> cal
     m_context.OnLog = m_logCallback;
 }
 
+void BlueprintRunner::SetPrintCallback(std::function<void(const std::string&)> callback)
+{
+    m_printCallback = std::move(callback);
+    m_context.OnPrint = m_printCallback;
+}
+
 void BlueprintRunner::ResetState()
 {
     m_state.pinValues.clear();

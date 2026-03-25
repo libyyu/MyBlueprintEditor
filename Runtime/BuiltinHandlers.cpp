@@ -1151,13 +1151,13 @@ static void RegisterHandlers_Debug(std::unordered_map<std::string, NodeHandler>&
 {
     handlers["PrintString"] = [](ExecutionContext& ctx) {
         auto str = ctx.GetInputValue("In String").asString();
-        ctx.Log("  >>> Print: \"" + str + "\"");
+        ctx.Print(str);
         return true;
     };
 
     handlers["Log"] = [](ExecutionContext& ctx) {
         auto msg = ctx.GetInputValue("Message").asString();
-        ctx.Log("  [LOG] " + msg);
+        ctx.Print(msg);
         return true;
     };
 
@@ -1166,7 +1166,7 @@ static void RegisterHandlers_Debug(std::unordered_map<std::string, NodeHandler>&
         auto message = ctx.GetInputValue("Message").asString();
         if (!condition)
         {
-            ctx.Log("  [ASSERT FAILED] " + (message.empty() ? "Assertion failed!" : message));
+            ctx.Print("[ASSERT FAILED] " + (message.empty() ? "Assertion failed!" : message));
             return false;  // 中断执行
         }
         ctx.Log("  [Assert] Passed");
@@ -1199,7 +1199,7 @@ static void RegisterHandlers_Debug(std::unordered_map<std::string, NodeHandler>&
                 }
             }
         }
-        ctx.Log("  [FORMAT] " + fmt);
+        ctx.Print(fmt);
         return true;
     };
 }
