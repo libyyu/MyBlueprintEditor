@@ -128,8 +128,10 @@ static void RegisterHandlers_Flow(
 
         ctx.Log("  [ExecuteBlueprint] Loaded " + std::to_string(importResult.data.nodes.size()) + " nodes");
 
-        // 从 runner 获取当前已注册的 handlers（安全，不依赖局部变量引用）
-        auto currentHandlers = runner.GetHandlers();
+        // 共享 handler 表：用 shared_ptr 包装避免异步 lambda 捕获时全量拷贝
+        // GetHandlers() 返回 const&，此处拷贝一次后共享给同步/异步两条路径
+        auto currentHandlers = std::make_shared<std::unordered_map<std::string, NodeHandler>>(
+            runner.GetHandlers());
 
         // 同步模式
         if (isSync)
@@ -160,7 +162,7 @@ static void RegisterHandlers_Flow(
                 subCtx.Log("  [Default Handler] pass-through");
                 return true;
             });
-            subRunner.RegisterHandlers(currentHandlers);
+            subRunner.RegisterHandlers(*currentHandlers);
 
             auto execResult = subRunner.Execute();
 
@@ -206,29 +208,30 @@ static void RegisterHandlers_Flow(
 
         auto sharedData = std::make_shared<BlueprintData>(std::move(importResult.data));
 
-        ctx.Delay(0.0f, [&ctx, &runner, sharedData, currentHandlers, completedPinId, resolvedPath]() {
-            ctx.Log("  [ExecuteBlueprint] Async: executing \"" + resolvedPath + "\"...");
+        ExecutionContext* pCtx = &ctx;
+        ctx.Delay(0.0f, [pCtx, &runner, sharedData, currentHandlers, completedPinId, resolvedPath]() {
+            pCtx->Log("  [ExecuteBlueprint] Async: executing \"" + resolvedPath + "\"...");
 
             auto subRunner = std::make_shared<BlueprintRunner>(runner.GetFileSystem());
-            
+
             // 子蓝图以 weak_ptr 持有父的 timerManager；
             // 父析构后 weak_ptr 失效，子自动回退到自身 manager，不会 UAF
             subRunner->SetParentTimerManager(runner.GetTimerManagerPtr());
 
             // 使用 shared_ptr 管理 subLog，保证异步 timer 回调时仍可访问
             auto subLog = std::make_shared<std::vector<std::string>>();
-            subRunner->SetLogCallback([subLog, &ctx](LogLevel lv, const std::string& msg) {
+            subRunner->SetLogCallback([subLog, pCtx](LogLevel lv, const std::string& msg) {
                 subLog->push_back(msg);
-                ctx.Log("    | " + msg, lv);
+                pCtx->Log("    | " + msg, lv);
             });
 
             if (!subRunner->Load(*sharedData))
             {
-                ctx.LogError("[ExecuteBlueprint:Async] Failed to load sub-blueprint");
-                ctx.SetOutputValue("Success", Variant(false));
-                ctx.SetOutputValue("Output", Variant(std::string("Async load failed")));
+                pCtx->LogError("[ExecuteBlueprint:Async] Failed to load sub-blueprint");
+                pCtx->SetOutputValue("Success", Variant(false));
+                pCtx->SetOutputValue("Output", Variant(std::string("Async load failed")));
                 if (completedPinId != 0)
-                    ctx.ActivateOutputFlow(completedPinId);
+                    pCtx->ActivateOutputFlow(completedPinId);
                 return;
             }
 
@@ -236,7 +239,7 @@ static void RegisterHandlers_Flow(
                 subCtx.Log("  [Default Handler] pass-through");
                 return true;
             });
-            subRunner->RegisterHandlers(currentHandlers);
+            subRunner->RegisterHandlers(*currentHandlers);
 
             auto execResult = subRunner->Execute();
 
@@ -247,12 +250,12 @@ static void RegisterHandlers_Flow(
                 outputText += line;
             }
 
-            ctx.Log("  [ExecuteBlueprint] Async result: " +
+            pCtx->Log("  [ExecuteBlueprint] Async result: " +
                 std::string(execResult.success ? "SUCCESS" : "FAILED") +
                 " (" + std::to_string(execResult.nodesExecuted) + " nodes executed)");
 
-            ctx.SetOutputValue("Success", Variant(execResult.success));
-            ctx.SetOutputValue("Output", Variant(outputText));
+            pCtx->SetOutputValue("Success", Variant(execResult.success));
+            pCtx->SetOutputValue("Output", Variant(outputText));
 
             // 将 subRunner 注册到父 runner 中保持存活
             // 子蓝图的 Delay/SetTimer 回调引用了 subRunner 的 context，
@@ -260,7 +263,7 @@ static void RegisterHandlers_Flow(
             runner.KeepAlive(subRunner);
 
             if (completedPinId != 0)
-                ctx.ActivateOutputFlow(completedPinId);
+                pCtx->ActivateOutputFlow(completedPinId);
         });
 
         return true;
@@ -284,7 +287,9 @@ static void RegisterHandlers_Flow(
         ctx.Log("  [WhileLoop] Starting");
         int iterations = 0;
         const int maxIterations = 10000;
-        while (ctx.GetInputValue("Condition").asBool())
+        // Re-evaluate Condition each iteration: re-execute upstream data nodes
+        // so that nodes like "Less", "Greater" etc. are recalculated each loop cycle.
+        while (ctx.EvaluateConditionPin("Condition"))
         {
             if (++iterations > maxIterations)
             {
@@ -322,11 +327,12 @@ static void RegisterHandlers_Flow(
             }
         }
 
-        auto timerHandle = ctx.Delay(duration, [&ctx, completedPinId]() {
+        ExecutionContext* pCtx = &ctx;
+        auto timerHandle = ctx.Delay(duration, [pCtx, completedPinId]() {
             auto finishTime = FrameTimerManager::GetCurrentUnixTime();
-            ctx.Log("  [Delay] Completed; finished:" + std::to_string(finishTime));
+            pCtx->Log("  [Delay] Completed; finished:" + std::to_string(finishTime));
             if (completedPinId != 0)
-                ctx.ActivateOutputFlow(completedPinId);
+                pCtx->ActivateOutputFlow(completedPinId);
         });
 
         ctx.SetOutputValue("TimerHandle", Variant(static_cast<int64_t>(timerHandle)));
@@ -577,10 +583,11 @@ static void RegisterHandlers_Action(
 
         ctx.Log("  [SetTimer] interval=" + std::to_string(interval) + "s, looping=" + (looping ? "true" : "false"));
 
-        auto timerHandle = ctx.SetTimer(interval, repeat, [&ctx, funcPinId, looping]() {
-            ctx.Log("[Timer] fired! looping=" + std::string(looping ? "true" : "false"));
+        ExecutionContext* pCtx = &ctx;
+        auto timerHandle = ctx.SetTimer(interval, repeat, [pCtx, funcPinId, looping]() {
+            pCtx->Log("[Timer] fired! looping=" + std::string(looping ? "true" : "false"));
             if (funcPinId != 0)
-                ctx.FireConnectedNode(funcPinId);
+                pCtx->FireConnectedNode(funcPinId);
 
             return looping;
         });

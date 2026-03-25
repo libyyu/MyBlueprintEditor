@@ -236,6 +236,10 @@ public:
     // 按引脚 ID 激活输出流
     bool ActivateOutputFlow(PinId pinId);
 
+    // 重新执行 pinName 对应输入引脚的上游数据节点，然后返回引脚值的 bool 结果。
+    // 用于 WhileLoop 等需要每次迭代重新求值条件的节点。
+    bool EvaluateConditionPin(const std::string& pinName);
+
     // 标记指定输出引脚的所有下游节点为"已被控制流接管"，
     // 主循环会跳过这些节点。用于异步节点（如 Delay）预先占位。
     void MarkDownstreamAsHandled(const std::string& pinName);

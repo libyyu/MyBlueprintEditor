@@ -655,7 +655,7 @@ void ExecutionContext::Log(const std::string& message, LogLevel level/* = LogLev
         else
         {
             // Last-resort fallback so output is never silently discarded.
-            fprintf(stderr, "[Editor]%s%s\n", LogLevelPrefix(level), message.c_str());
+            fprintf(stderr, "[Blueprint]%s%s\n", LogLevelPrefix(level), message.c_str());
         }
     }
 }
@@ -1048,5 +1048,44 @@ void BlueprintRunner::Tick(float deltaTime)
     }
 }
 
+// ============================================================================
+// ExecutionContext::EvaluateConditionPin
+// ============================================================================
+// Re-executes all upstream data nodes feeding into the named input pin,
+// propagates their output values, then returns GetInputValue(pinName).asBool().
+// Used by WhileLoop so the condition is re-evaluated each iteration rather
+// than using the stale value from the initial pin-value propagation pass.
+
+bool ExecutionContext::EvaluateConditionPin(const std::string& pinName)
+{
+    if (!m_runner) return GetInputValue(pinName).asBool();
+
+    // Find the PinId for the condition pin on the current node
+    auto it = m_state->pinNameToId.find(pinName);
+    if (it == m_state->pinNameToId.end())
+        return GetInputValue(pinName).asBool();
+
+    PinId condPinId = it->second;
+
+    // Find links going INTO this pin (upstream data nodes)
+    auto links = m_runner->m_blueprint.findLinksByPin(condPinId);
+    for (const auto* link : links)
+    {
+        if (!link || !link->isEnabled) continue;
+        if (link->endPinId != condPinId) continue;   // must be incoming
+
+        const NodeInstance* srcNode = m_runner->m_blueprint.findNodeByPin(link->startPinId);
+        if (!srcNode) continue;
+
+        // Re-execute the upstream data node and propagate its outputs
+        m_runner->executeNodeInternal(*srcNode);
+        m_runner->propagatePinValues(*srcNode);
+    }
+
+    return GetInputValue(pinName).asBool();
+}
+
+
 } // namespace Runtime
 } // namespace NodeEditor
+
