@@ -137,6 +137,30 @@
                 "height": 103
             },
             "isCollapsed": false
+        },
+        {
+            "id": 65,
+            "position": {
+                "x": 1576,
+                "y": 938
+            },
+            "size": {
+                "width": 377,
+                "height": 73
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 69,
+            "position": {
+                "x": 1208,
+                "y": 987
+            },
+            "size": {
+                "width": 293,
+                "height": 41
+            },
+            "isCollapsed": false
         }
     ],
     "viewInfo": {
@@ -500,6 +524,55 @@
                     "isExec": true
                 }
             ]
+        },
+        {
+            "id": 65,
+            "definitionId": "AppendString",
+            "definitionVersion": 1,
+            "name": "Append String",
+            "pins": [
+                {
+                    "id": 66,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "A",
+                    "defaultValue": "sub result:"
+                },
+                {
+                    "id": 67,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "B",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 68,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Result"
+                }
+            ]
+        },
+        {
+            "id": 69,
+            "definitionId": "BoolToString",
+            "definitionVersion": 1,
+            "name": "Bool to String",
+            "pins": [
+                {
+                    "id": 70,
+                    "kind": 0,
+                    "dataType": 1,
+                    "name": "Value",
+                    "defaultValue": false
+                },
+                {
+                    "id": 71,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Result"
+                }
+            ]
         }
     ],
     "links": [
@@ -579,6 +652,18 @@
             "id": 64,
             "startPinId": 43,
             "endPinId": 50,
+            "isEnabled": true
+        },
+        {
+            "id": 72,
+            "startPinId": 42,
+            "endPinId": 70,
+            "isEnabled": true
+        },
+        {
+            "id": 73,
+            "startPinId": 71,
+            "endPinId": 67,
             "isEnabled": true
         }
     ]
