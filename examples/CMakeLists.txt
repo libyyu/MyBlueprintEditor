@@ -68,21 +68,28 @@ add_simple_example(basic-interaction-example)
 # 运行时示例（纯控制台程序，只依赖 BlueprintRuntime，不依赖 ImGui/编辑器）
 # ============================================================================
 
-project(runtime-example)
-add_executable(runtime-example
-    ${CMAKE_CURRENT_SOURCE_DIR}/runtime-example/runtime-example.cpp
-)
-target_link_libraries(runtime-example PRIVATE BlueprintRuntime crude_json)
-target_include_directories(runtime-example PRIVATE
-    ${CMAKE_SOURCE_DIR}/Utils/Json   # crude_json.h
-)
-set_target_properties(runtime-example PROPERTIES
-    FOLDER "Examples"
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-    RUNTIME_OUTPUT_DIRECTORY "${EXAMPLE_OUTPUT_DIR}"
-    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${EXAMPLE_OUTPUT_DIR}"
-    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${EXAMPLE_OUTPUT_DIR}"
-)
+# ============================================================================
+# 运行时示例（纯控制台程序，只依赖 BlueprintRuntime，不依赖 ImGui/编辑器）
+# 注意：runtime-example 由根 CMakeLists.txt 无条件定义（BUILD_RUNTIME_ONLY 也会构建），
+#       此处仅在尚未定义时才补充定义，避免重复 target 冲突。
+# ============================================================================
+if(NOT TARGET runtime-example)
+    project(runtime-example)
+    add_executable(runtime-example
+        ${CMAKE_CURRENT_SOURCE_DIR}/runtime-example/runtime-example.cpp
+    )
+    target_link_libraries(runtime-example PRIVATE BlueprintRuntime crude_json)
+    target_include_directories(runtime-example PRIVATE
+        ${CMAKE_SOURCE_DIR}/Utils/Json   # crude_json.h
+    )
+    set_target_properties(runtime-example PROPERTIES
+        FOLDER "Examples"
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        RUNTIME_OUTPUT_DIRECTORY "${EXAMPLE_OUTPUT_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG "${EXAMPLE_OUTPUT_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${EXAMPLE_OUTPUT_DIR}"
+    )
+endif()
 
 message(STATUS "Examples will be built in: ${EXAMPLE_OUTPUT_DIR}")

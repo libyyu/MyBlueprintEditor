@@ -86,6 +86,30 @@ add_subdirectory(Utils/Json)
 add_subdirectory(Runtime)
 
 # ---------------------------------------------------------------------------
+# runtime-example — built unconditionally (runtime-only AND full builds)
+#   Use:  runtime-example --test [flow_test.json]
+# ---------------------------------------------------------------------------
+if(BUILD_EXAMPLES OR BUILD_RUNTIME_ONLY)
+    set(_RE_SRC
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/runtime-example/runtime-example.cpp
+    )
+    add_executable(runtime-example ${_RE_SRC})
+    target_link_libraries(runtime-example PRIVATE BlueprintRuntime crude_json)
+    target_include_directories(runtime-example PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Utils/Json
+    )
+    set_target_properties(runtime-example PROPERTIES
+        FOLDER "Examples"
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG   "${CMAKE_BINARY_DIR}/bin"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin"
+    )
+    message(STATUS "[runtime-example] target added (BUILD_RUNTIME_ONLY=${BUILD_RUNTIME_ONLY})")
+endif()
+
+# ---------------------------------------------------------------------------
 # Editor / Application / BlueprintEditor exe  (skipped when runtime-only)
 # ---------------------------------------------------------------------------
 if(NOT BUILD_RUNTIME_ONLY)
