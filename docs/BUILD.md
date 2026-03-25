@@ -115,10 +115,11 @@ cmake --build build-wasm
 
 1. Copy `build-wasm/Runtime/libBlueprintRuntime.a` to your Unity project's `Assets/Plugins/WebGL/` folder.
 2. In Unity Inspector, set the plugin's platform to **WebGL only**.
-3. Expose C functions with `extern "C"` for P/Invoke from C#:
+3. Place your `.json` blueprint files inside `Assets/StreamingAssets/` in Unity.
+4. Expose C functions with `extern "C"` for P/Invoke from C#:
 
 ```cpp
-// In your integration .cpp (compile with Emscripten as part of the Unity build)
+// In your integration .cpp (compiled as part of the Unity WebGL build)
 #include "BlueprintRunner.h"
 #include <emscripten.h>
 
@@ -127,18 +128,48 @@ extern "C" {
 EMSCRIPTEN_KEEPALIVE
 void Blueprint_Run(const char* jsonPath)
 {
+    // DefaultFileSystem automatically fetches from StreamingAssets/<jsonPath>
+    // via synchronous XHR – no manual initialisation needed.
     NodeEditor::Runtime::BlueprintRunner runner;
-    // ... set up and run
+    runner.LoadFromFile(jsonPath);   // e.g. "myblueprint.json"
+    runner.Execute();
 }
 
 } // extern "C"
 ```
 
-4. From C#:
+5. From C#:
 
 ```csharp
 [DllImport("__Internal")]
 private static extern void Blueprint_Run(string jsonPath);
+
+void Start() {
+    Blueprint_Run("myblueprint.json");
+}
+```
+
+#### Overriding the StreamingAssets base path
+
+By default files are fetched from `StreamingAssets/<path>`.  To change the base URL,
+pass the define at CMake configure time:
+
+```sh
+emcmake cmake -B build-wasm \
+    -DBUILD_RUNTIME_ONLY=ON \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_CXX_FLAGS="-DBLUEPRINT_STREAMING_ASSETS_BASE=\\\"MyGame/StreamingAssets\\\""
+```
+
+#### WriteFile on WebGL
+
+`DefaultFileSystem::WriteFile` returns `false` on WebGL (no persistent FS by default).
+If you need to save state, inject a custom `IFileSystem` backed by IDBFS:
+
+```cpp
+// Call once before any Blueprint_Run that writes files
+NodeEditor::Runtime::SetDefaultFileSystem(
+    std::make_shared<MyIdbfsFileSystem>());
 ```
 
 ---
@@ -175,37 +206,34 @@ target_link_libraries(MyTarget PRIVATE BlueprintRuntime)
 
 ## Custom File System
 
-`DefaultFileSystem` uses `std::fstream`.  On WebGL / Emscripten this maps to the
-Emscripten virtual FS, which requires explicit mounting.  For Unity WebGL, it is
-usually easier to provide a C++ shim that calls `UnityEngine.Resources.Load` via
-JavaScript glue:
+`DefaultFileSystem` already handles all three platforms out of the box:
+
+| Platform | Mechanism | ReadFile | WriteFile |
+|----------|-----------|----------|-----------|
+| Windows / Linux / macOS | `std::fstream` | ✅ | ✅ |
+| Emscripten / Unity WebGL | `emscripten_wget_data` (sync XHR from StreamingAssets) | ✅ | ❌ (returns false) |
+
+If you need different behaviour (e.g. IDBFS writes on WebGL, engine asset manager,
+encrypted pak), inherit `IFileSystem` and call `SetDefaultFileSystem()`:
 
 ```cpp
 #include "FileSystem.h"
-#include <emscripten.h>
 
-class UnityResourcesFileSystem : public NodeEditor::Runtime::IFileSystem
+class MyFS : public NodeEditor::Runtime::IFileSystem
 {
 public:
     bool ReadFile(const std::string& path, std::string& out, std::string& err) override
-    {
-        // Call Unity's resource loader via JavaScript
-        // (implement as EM_JS or emscripten_run_script)
-        // ...
-        return true;
-    }
-    bool WriteFile(const std::string&, const std::string&, std::string& err) override
-    {
-        err = "WriteFile not supported in Unity WebGL";
-        return false;
-    }
-    bool FileExists(const std::string& path) override { /* ... */ return false; }
+    { /* ... */ return true; }
+
+    bool WriteFile(const std::string& path, const std::string& content, std::string& err) override
+    { /* ... */ return true; }
+
+    bool FileExists(const std::string& path) override
+    { /* ... */ return false; }
 };
 
-// Call once at startup (before any Blueprint_Run calls):
-NodeEditor::Runtime::SetDefaultFileSystem(
-    std::make_shared<UnityResourcesFileSystem>());
+// Call once at startup:
+NodeEditor::Runtime::SetDefaultFileSystem(std::make_shared<MyFS>());
 ```
 
-To strip `DefaultFileSystem` entirely from the binary (saves a few KB), pass
-`-DBLUEPRINT_NO_FILESYSTEM=ON` to CMake.
+To strip `DefaultFileSystem` entirely from the binary, pass `-DBLUEPRINT_NO_FILESYSTEM=ON`.

@@ -56,20 +56,20 @@
 #endif
 
 // -----------------------------------------------------------------------
-// Emscripten / Unity WebGL guards
+// Emscripten / Unity WebGL notes
 // -----------------------------------------------------------------------
-
 #if defined(BLUEPRINT_PLATFORM_EMSCRIPTEN)
-    // Unity WebGL uses Emscripten; file I/O requires MEMFS or IDBFS.
-    // The DefaultFileSystem uses std::fstream which maps to Emscripten's
-    // virtual FS – this works but requires the caller to mount the correct
-    // FS backend (e.g. EM_ASM + FS.mount(MEMFS, ...) or Unity's own VFS).
-    // Define BLUEPRINT_NO_FILESYSTEM to compile out DefaultFileSystem and
-    // provide your own IFileSystem implementation at runtime via
-    // NodeEditor::Runtime::SetDefaultFileSystem().
-#   if !defined(BLUEPRINT_NO_FILESYSTEM)
-#       pragma message("BlueprintRuntime on Emscripten: DefaultFileSystem uses Emscripten VFS. " \
-            "Define BLUEPRINT_NO_FILESYSTEM and call SetDefaultFileSystem() to provide a custom " \
-            "Unity-compatible loader (e.g. UnityEngine.Resources).")
-#   endif
+    // DefaultFileSystem on Emscripten uses emscripten_wget_data() (synchronous XHR)
+    // to load files from Unity's StreamingAssets path.  No manual initialisation
+    // is required – just place your .json blueprint files in StreamingAssets/ and
+    // call BlueprintRunner::LoadFromFile("myblueprint.json") as normal.
+    //
+    // The base URL defaults to "StreamingAssets".  Override at compile time:
+    //   -DBLUEPRINT_STREAMING_ASSETS_BASE=\"MyGame/StreamingAssets\"
+    //
+    // WriteFile is intentionally unsupported (returns false).  If you need
+    // persistence, call SetDefaultFileSystem() with an IDBFS-backed implementation.
+    //
+    // Define BLUEPRINT_NO_FILESYSTEM to strip DefaultFileSystem entirely and
+    // supply your own IFileSystem via SetDefaultFileSystem().
 #endif

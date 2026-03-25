@@ -1,36 +1,40 @@
 // Runtime/FileSystem.h - 文件系统抽象接口
-// 该文件定义了文件读写的抽象接口，允许第三方引擎提供自定义的资源加载方式
+// 该文件定义了文件读写的抽象接口，允许第三方引擎提供自定义的资源加载方式。
 //
-// 使用方式:
-//   1. 默认使用 DefaultFileSystem（std::ifstream/std::ofstream 磁盘读写）
-//   2. 第三方引擎可继承 IFileSystem 并实现自己的资源加载逻辑
-//   3. 通过 SetFileSystem() 或构造函数注入自定义实现
+// 平台说明
+// --------
+// 普通平台（Windows / Linux / macOS）:
+//   DefaultFileSystem 使用 std::fstream 直接读写磁盘，开箱即用。
 //
-// 示例:
-//   class MyEngineFileSystem : public NodeEditor::Runtime::IFileSystem {
-//       bool ReadFile(const std::string& path, std::string& outContent, std::string& outError) override {
-//           // 使用引擎的资源管理器加载文件
-//           outContent = MyEngine::ResourceManager::LoadText(path);
-//           return !outContent.empty();
-//       }
-//       bool WriteFile(const std::string& path, const std::string& content, std::string& outError) override {
-//           return MyEngine::ResourceManager::SaveText(path, content);
-//       }
-//       bool FileExists(const std::string& path) override {
-//           return MyEngine::ResourceManager::Exists(path);
-//       }
-//   };
+// Emscripten / Unity WebGL:
+//   DefaultFileSystem 自动切换为基于 emscripten_wget_data() 的同步 HTTP
+//   加载实现，从 Unity 的 StreamingAssets 路径加载文件，无需任何额外初始化。
+//   - 读取路径自动补全为 StreamingAssets/<path>（可通过
+//     BLUEPRINT_STREAMING_ASSETS_BASE 宏在编译期覆盖，默认 "StreamingAssets"）
+//   - WriteFile 在 WebGL 下不支持（返回 false），如需持久化请自行注入实现
+//   - 若需要完全自定义加载，仍可调用 SetDefaultFileSystem() 注入任意 IFileSystem
 //
-//   auto fs = std::make_shared<MyEngineFileSystem>();
-//   NodeEditor::Runtime::SetDefaultFileSystem(fs);
+// BLUEPRINT_NO_FILESYSTEM:
+//   定义此宏可把整个 DefaultFileSystem 排除出编译（极度裁剪场景）。
+//   此时全局指针为 nullptr，调用方必须在使用前注入实现。
+//
+// 自定义示例:
+//   class MyFS : public NodeEditor::Runtime::IFileSystem { ... };
+//   NodeEditor::Runtime::SetDefaultFileSystem(std::make_shared<MyFS>());
 
 #pragma once
 
-#include "BlueprintExport.h"  // BLUEPRINT_API, BLUEPRINT_PLATFORM_EMSCRIPTEN
+#include "BlueprintExport.h"
 
 #include <string>
 #include <memory>
-#ifndef BLUEPRINT_NO_FILESYSTEM
+
+// 平台头文件
+#if defined(__EMSCRIPTEN__)
+#   include <emscripten.h>
+#   include <cstdlib>   // malloc / free
+#   include <cstring>   // memcpy
+#elif !defined(BLUEPRINT_NO_FILESYSTEM)
 #   include <fstream>
 #   include <sstream>
 #endif
@@ -49,35 +53,115 @@ public:
 
     // 读取文件内容到字符串
     // 返回 true 表示成功，false 表示失败（错误信息写入 outError）
-    virtual bool ReadFile(const std::string& path, std::string& outContent, std::string& outError) = 0;
+    virtual bool ReadFile(const std::string& path,
+                          std::string&       outContent,
+                          std::string&       outError) = 0;
 
     // 写入字符串内容到文件
     // 返回 true 表示成功，false 表示失败（错误信息写入 outError）
-    virtual bool WriteFile(const std::string& path, const std::string& content, std::string& outError) = 0;
+    virtual bool WriteFile(const std::string& path,
+                           const std::string& content,
+                           std::string&       outError) = 0;
 
     // 检查文件是否存在
     virtual bool FileExists(const std::string& path) = 0;
 };
 
 // ============================================================================
-// 默认文件系统实现（使用标准 C++ 文件流，直接磁盘读写）
-// 在 Emscripten/WebGL 下需要注意：std::fstream 映射到 Emscripten 的虚拟文件系统，
-// 需要通过 FS.mount(MEMFS/IDBFS, ...) 挂载才能正常工作。
-// 若定义了 BLUEPRINT_NO_FILESYSTEM，则不编译此实现，
-// 调用者须通过 SetDefaultFileSystem() 注入自定义 IFileSystem。
+// 默认文件系统实现
 // ============================================================================
 
 #if defined(BLUEPRINT_NO_FILESYSTEM)
 
-// 占位：不提供默认实现，运行时必须注入 IFileSystem
+// 极度裁剪模式：不提供默认实现，调用方须注入 IFileSystem
 // class DefaultFileSystem intentionally omitted.
 
-#else
+#else // !BLUEPRINT_NO_FILESYSTEM
 
 class BLUEPRINT_API DefaultFileSystem : public IFileSystem
 {
 public:
-    bool ReadFile(const std::string& path, std::string& outContent, std::string& outError) override
+
+#if defined(__EMSCRIPTEN__)
+    // ------------------------------------------------------------------
+    // Emscripten / Unity WebGL 实现
+    // ------------------------------------------------------------------
+    // 使用 emscripten_wget_data()（同步 XHR）从 StreamingAssets 加载文件。
+    // Unity WebGL 在构建时会把 StreamingAssets 发布到 HTTP 服务器，
+    // 路径格式为：  <base>/<relpath>
+    // 默认 base 为 "StreamingAssets"，可在编译期通过宏覆盖：
+    //   -DBLUEPRINT_STREAMING_ASSETS_BASE=\"MyGame/StreamingAssets\"
+    // ------------------------------------------------------------------
+
+#   ifndef BLUEPRINT_STREAMING_ASSETS_BASE
+#       define BLUEPRINT_STREAMING_ASSETS_BASE "StreamingAssets"
+#   endif
+
+    bool ReadFile(const std::string& path,
+                  std::string&       outContent,
+                  std::string&       outError) override
+    {
+        // 拼接 URL：StreamingAssets/<path>
+        std::string url = std::string(BLUEPRINT_STREAMING_ASSETS_BASE) + "/" + path;
+
+        void* buf  = nullptr;
+        int   size = 0;
+        int   err  = 0;
+
+        // 同步 XHR：阻塞直到完成（Unity WebGL 主线程可用，Worker 线程同样可用）
+        emscripten_wget_data(url.c_str(), &buf, &size, &err);
+
+        if (err != 0 || buf == nullptr || size <= 0)
+        {
+            outError = "Failed to fetch: " + url +
+                       " (emscripten_wget_data err=" + std::to_string(err) + ")";
+            if (buf) { free(buf); }
+            return false;
+        }
+
+        outContent.assign(static_cast<const char*>(buf),
+                          static_cast<size_t>(size));
+        free(buf);
+        return true;
+    }
+
+    bool WriteFile(const std::string& /*path*/,
+                   const std::string& /*content*/,
+                   std::string&       outError) override
+    {
+        // WebGL 无持久文件系统；如需写入请自行注入 IFileSystem 实现
+        // （可用 IDBFS / localStorage 桥接）
+        outError = "DefaultFileSystem::WriteFile is not supported on WebGL. "
+                   "Inject a custom IFileSystem via SetDefaultFileSystem().";
+        return false;
+    }
+
+    bool FileExists(const std::string& path) override
+    {
+        // 同步 HEAD 请求判断资源是否存在
+        std::string url = std::string(BLUEPRINT_STREAMING_ASSETS_BASE) + "/" + path;
+
+        // emscripten_wget_data 本身不提供 HEAD，用轻量 JS 检查
+        // 通过 EM_ASM_INT 发起同步 XMLHttpRequest HEAD
+        int status = EM_ASM_INT({
+            var url = UTF8ToString($0);
+            var xhr = new XMLHttpRequest();
+            xhr.open('HEAD', url, false);   // false = synchronous
+            try { xhr.send(); } catch(e) { return 0; }
+            return xhr.status;
+        }, url.c_str());
+
+        return (status >= 200 && status < 300);
+    }
+
+#else
+    // ------------------------------------------------------------------
+    // 普通平台（Windows / Linux / macOS）实现 —— std::fstream
+    // ------------------------------------------------------------------
+
+    bool ReadFile(const std::string& path,
+                  std::string&       outContent,
+                  std::string&       outError) override
     {
         std::ifstream file(path, std::ios::binary);
         if (!file.is_open())
@@ -87,12 +171,13 @@ public:
         }
         std::stringstream buffer;
         buffer << file.rdbuf();
-        file.close();
         outContent = buffer.str();
         return true;
     }
 
-    bool WriteFile(const std::string& path, const std::string& content, std::string& outError) override
+    bool WriteFile(const std::string& path,
+                   const std::string& content,
+                   std::string&       outError) override
     {
         std::ofstream file(path, std::ios::binary);
         if (!file.is_open())
@@ -101,7 +186,6 @@ public:
             return false;
         }
         file << content;
-        file.close();
         return true;
     }
 
@@ -110,36 +194,36 @@ public:
         std::ifstream file(path);
         return file.good();
     }
+
+#endif // __EMSCRIPTEN__
 };
 
 #endif // !BLUEPRINT_NO_FILESYSTEM
 
 // ============================================================================
-// 全局默认文件系统（单例模式）
+// 全局默认文件系统（单例）
 // ============================================================================
 
-// 获取当前全局默认文件系统
-// 如果未设置自定义实现，返回内置的 DefaultFileSystem
-// 注意：当 BLUEPRINT_NO_FILESYSTEM 定义时，初始值为 nullptr，
-//       必须在使用前调用 SetDefaultFileSystem() 注入实现。
+/// 获取全局 IFileSystem 引用（内部使用）
 inline std::shared_ptr<IFileSystem>& GetDefaultFileSystemRef()
 {
 #if defined(BLUEPRINT_NO_FILESYSTEM)
-    static std::shared_ptr<IFileSystem> s_defaultFS;  // nullptr – caller must inject
+    // 裁剪模式：初始 nullptr，调用方必须先 SetDefaultFileSystem()
+    static std::shared_ptr<IFileSystem> s_fs;
 #else
-    static std::shared_ptr<IFileSystem> s_defaultFS = std::make_shared<DefaultFileSystem>();
+    static std::shared_ptr<IFileSystem> s_fs =
+        std::make_shared<DefaultFileSystem>();
 #endif
-    return s_defaultFS;
+    return s_fs;
 }
 
-// 获取全局默认文件系统（只读）
+/// 获取当前全局文件系统
 inline std::shared_ptr<IFileSystem> GetDefaultFileSystem()
 {
     return GetDefaultFileSystemRef();
 }
 
-// 设置全局默认文件系统
-// 传入 nullptr 将恢复为内置的 DefaultFileSystem（若可用）
+/// 替换全局文件系统。传入 nullptr 则恢复为内置 DefaultFileSystem（若可用）。
 inline void SetDefaultFileSystem(std::shared_ptr<IFileSystem> fs)
 {
     if (fs)
