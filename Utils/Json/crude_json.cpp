@@ -517,7 +517,8 @@ private:
         int c;
         while (accept_character(c))
         {
-            CRUDE_ASSERT(c < 128); // #todo: convert characters > 127 to UTF-8
+            // c is in range [0, 255] (unsigned char); static_cast<char> preserves
+            // the bit pattern, so UTF-8 multi-byte sequences pass through intact.
             result.push_back(static_cast<char>(c));
         }
 
@@ -535,7 +536,10 @@ private:
         else if (expect('\"'))
             return false;
 
-        // #todo: Handle UTF-8 sequences.
+        // UTF-8 multi-byte sequences are passed through as-is.
+        // peek() returns unsigned char value (0-255), so high bytes (0x80-0xFF)
+        // are positive and accepted here; the raw bytes are appended unchanged,
+        // preserving the original UTF-8 encoding in the result string.
         return s((c = peek()) >= 0) && advance();
     }
 
@@ -791,7 +795,7 @@ private:
     int peek() const
     {
         if (!eof())
-            return *m_Cursor;
+            return static_cast<unsigned char>(*m_Cursor);  // cast to unsigned: UTF-8 high bytes (0x80-0xFF) must be positive, not negative
         else
             return -1;
     }

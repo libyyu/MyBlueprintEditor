@@ -678,24 +678,47 @@ static void RegisterHandlers_Action(
 static void RegisterHandlers_Math(std::unordered_map<std::string, NodeHandler>& handlers)
 {
     // --- Arithmetic ---
-    handlers["Add"] = [](ExecutionContext& ctx) {
-        double a = ctx.GetInputValue("A").asFloat();
-        double b = ctx.GetInputValue("B").asFloat();
-        ctx.SetOutputValue("Result", Variant(a + b));
+    // 类型提升规则：
+    //   - 两个操作数都是 Integer → 结果 Integer（保留整数精度，避免 float 格式化噪音）
+    //   - 任一是 Float → 结果 Float
+    //   - Unknown/Any 类型（如 GetVariable Any 输出）跟随另一操作数类型；
+    //     两者都是 Unknown 时回退到 Integer（整数是更常见的默认期望）
+    auto resolveArithType = [](const Variant& a, const Variant& b) -> PinDataType {
+        if (a.type == PinDataType::Float || b.type == PinDataType::Float)
+            return PinDataType::Float;
+        if (a.type == PinDataType::Integer || b.type == PinDataType::Integer)
+            return PinDataType::Integer;
+        // 两者都是 Unknown/Any：默认 Integer
+        return PinDataType::Integer;
+    };
+
+    handlers["Add"] = [resolveArithType](ExecutionContext& ctx) {
+        const Variant& va = ctx.GetInputValue("A");
+        const Variant& vb = ctx.GetInputValue("B");
+        if (resolveArithType(va, vb) == PinDataType::Integer)
+            ctx.SetOutputValue("Result", Variant(va.asInt() + vb.asInt()));
+        else
+            ctx.SetOutputValue("Result", Variant(va.asFloat() + vb.asFloat()));
         return true;
     };
 
-    handlers["Subtract"] = [](ExecutionContext& ctx) {
-        double a = ctx.GetInputValue("A").asFloat();
-        double b = ctx.GetInputValue("B").asFloat();
-        ctx.SetOutputValue("Result", Variant(a - b));
+    handlers["Subtract"] = [resolveArithType](ExecutionContext& ctx) {
+        const Variant& va = ctx.GetInputValue("A");
+        const Variant& vb = ctx.GetInputValue("B");
+        if (resolveArithType(va, vb) == PinDataType::Integer)
+            ctx.SetOutputValue("Result", Variant(va.asInt() - vb.asInt()));
+        else
+            ctx.SetOutputValue("Result", Variant(va.asFloat() - vb.asFloat()));
         return true;
     };
 
-    handlers["Multiply"] = [](ExecutionContext& ctx) {
-        double a = ctx.GetInputValue("A").asFloat();
-        double b = ctx.GetInputValue("B").asFloat();
-        ctx.SetOutputValue("Result", Variant(a * b));
+    handlers["Multiply"] = [resolveArithType](ExecutionContext& ctx) {
+        const Variant& va = ctx.GetInputValue("A");
+        const Variant& vb = ctx.GetInputValue("B");
+        if (resolveArithType(va, vb) == PinDataType::Integer)
+            ctx.SetOutputValue("Result", Variant(va.asInt() * vb.asInt()));
+        else
+            ctx.SetOutputValue("Result", Variant(va.asFloat() * vb.asFloat()));
         return true;
     };
 

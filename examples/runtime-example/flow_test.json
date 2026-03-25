@@ -53,7 +53,7 @@
       "position": {"x": 200, "y": 150},
       "pins": [
         {"id": 401, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "counter"},
-        {"id": 402, "kind": 1, "dataType": 1, "name": "Value"}
+        {"id": 402, "kind": 1, "dataType": 0, "name": "Value"}
       ]
     },
     {
@@ -89,7 +89,7 @@
       "position": {"x": 600, "y": 150},
       "pins": [
         {"id": 701, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "counter"},
-        {"id": 702, "kind": 1, "dataType": 1, "name": "Value"}
+        {"id": 702, "kind": 1, "dataType": 0, "name": "Value"}
       ]
     },
     {

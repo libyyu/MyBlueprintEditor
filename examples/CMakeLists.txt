@@ -72,7 +72,10 @@ project(runtime-example)
 add_executable(runtime-example
     ${CMAKE_CURRENT_SOURCE_DIR}/runtime-example/runtime-example.cpp
 )
-target_link_libraries(runtime-example PRIVATE BlueprintRuntime)
+target_link_libraries(runtime-example PRIVATE BlueprintRuntime crude_json)
+target_include_directories(runtime-example PRIVATE
+    ${CMAKE_SOURCE_DIR}/Utils/Json   # crude_json.h
+)
 set_target_properties(runtime-example PROPERTIES
     FOLDER "Examples"
     CXX_STANDARD 17
