@@ -50,14 +50,22 @@
 
 #if defined(__EMSCRIPTEN__)
 #   include <emscripten.h>
-#   define BLUEPRINT_CAPI EMSCRIPTEN_KEEPALIVE
+#   define BLUEPRINT_CAPI_EXPORT EMSCRIPTEN_KEEPALIVE
+#   define BLUEPRINT_CAPI_CALL
 #elif defined(_WIN32) || defined(_WIN64)
-#   define BLUEPRINT_CAPI __declspec(dllexport) __cdecl
+#   define BLUEPRINT_CAPI_EXPORT __declspec(dllexport)
+#   define BLUEPRINT_CAPI_CALL   __cdecl
 #elif defined(__GNUC__) || defined(__clang__)
-#   define BLUEPRINT_CAPI __attribute__((visibility("default")))
+#   define BLUEPRINT_CAPI_EXPORT __attribute__((visibility("default")))
+#   define BLUEPRINT_CAPI_CALL
 #else
-#   define BLUEPRINT_CAPI
+#   define BLUEPRINT_CAPI_EXPORT
+#   define BLUEPRINT_CAPI_CALL
 #endif
+
+// Use: BLUEPRINT_CAPI_EXPORT return_type BLUEPRINT_CAPI_CALL funcname(args);
+// For brevity, we provide a combined macro that works for most cases:
+#define BLUEPRINT_CAPI BLUEPRINT_CAPI_EXPORT
 
 // ---------------------------------------------------------------------------
 // Opaque handle
