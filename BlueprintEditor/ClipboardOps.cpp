@@ -156,6 +156,8 @@ void BlueprintEditor::PasteNodes(ImVec2 pastePosition)
     if (!ActiveDoc()) return;
     if (m_ClipboardNodes.empty()) return;
 
+    PushUndoState();  // 粘贴前保存快照
+
     // 偏移量：从剪贴板质心到粘贴位置
     ImVec2 offset;
     offset.x = pastePosition.x - m_ClipboardCenter.x;
@@ -305,6 +307,8 @@ void BlueprintEditor::DuplicateSelectedNodes()
 void BlueprintEditor::CutSelectedNodes()
 {
     if (!ActiveDoc()) return;
+
+    PushUndoState();  // 剪切前保存快照
 
     // 先复制
     CopySelectedNodes();

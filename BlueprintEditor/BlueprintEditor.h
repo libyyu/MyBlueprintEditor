@@ -154,6 +154,22 @@ struct VarDragPayload
 static constexpr const char* VAR_DRAG_DROP_TYPE = "BP_VARIABLE";
 
 // ============================================================================
+// Undo/Redo 快照
+// ============================================================================
+
+// 一次操作前的完整文档快照（节点/链接/变量/ID计数/节点位置）
+struct UndoState
+{
+    std::deque<Node>                             nodes;
+    std::deque<Link>                             links;
+    std::vector<RTVariableDefinition>            variables;
+    int                                          nextId = 1;
+    std::map<ed::NodeId, ImVec2, NodeIdLess>     nodePositions; // 快照捕获时的节点位置
+};
+
+static constexpr int kMaxUndoSteps = 50;
+
+// ============================================================================
 // 蓝图文档（每个标签页一个实例）
 // ============================================================================
 
@@ -217,6 +233,14 @@ struct BlueprintDocument
 
     // 变量列表（蓝图级别的变量定义，可在 Get/Set Variable 节点中引用）
     std::vector<RTVariableDefinition> variables;
+
+    // ---- Undo / Redo ----
+    std::deque<UndoState> undoStack;   // 最多 kMaxUndoSteps 步
+    std::deque<UndoState> redoStack;
+
+    // 恢复快照后，延迟一帧通过 ed::SetNodePosition 恢复节点位置
+    bool                                       pendingRestorePositions = false;
+    std::map<ed::NodeId, ImVec2, NodeIdLess>   pendingRestoreNodePos;
 
     // ---- 编辑器侧哈希索引（O(1) 查找加速） ----
     // 调用 rebuildEditorIndices() 重建；数据变更后调用 invalidateEditorIndices()
@@ -442,6 +466,13 @@ struct BlueprintEditor : public Application
     Pin*  FindPin(ed::PinId id);
     bool  IsPinLinked(ed::PinId id);
     bool  CanCreateLink(Pin* a, Pin* b);
+
+    // Undo / Redo
+    void  PushUndoState();           // 在修改操作之前调用，保存当前快照
+    void  Undo();
+    void  Redo();
+    bool  CanUndo();
+    bool  CanRedo();
 
     // 自动类型转换节点辅助
     // 返回能将 from 类型转为 to 类型的内置节点 definitionId，无则返回空串

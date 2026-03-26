@@ -49,6 +49,8 @@ void BlueprintEditor::CreateLinkWithFlowReconnect(
     Pin* startPin, ed::PinId startPinId,
     Pin* endPin,   ed::PinId endPinId)
 {
+    PushUndoState();   // 连线前保存快照
+
     ed::PinId disconnectedPinId = 0;  // 被断开的对端引脚
 
     // Flow 输出引脚只允许一对一连接：删除旧链接，记录被断开的对端
@@ -457,10 +459,6 @@ void BlueprintEditor::ShowLeftPane(float paneWidth)
     for (int i = 0; i < linkCount; ++i) ImGui::Text("Link (%p)", selectedLinks[i].AsPointer());
     ImGui::Unindent();
 
-    if (ImGui::IsKeyPressed(ImGuiKey_Z))
-        for (auto& link : ActiveDoc()->links)
-            ed::Flow(link.ID);
-
     if (ed::HasSelectionChanged())
         ++changeCount;
 
@@ -563,6 +561,12 @@ void BlueprintEditor::OnFrame(float deltaTime)
         }
         if (ImGui::BeginMenu(ICON_FA_PEN " Edit"))
         {
+            // Undo / Redo
+            if (ImGui::MenuItem(ICON_FA_ARROW_ROTATE_LEFT " Undo", "Ctrl+Z", false, CanUndo()))
+                Undo();
+            if (ImGui::MenuItem(ICON_FA_ARROWS_ROTATE " Redo", "Ctrl+Y", false, CanRedo()))
+                Redo();
+            ImGui::Separator();
             if (ImGui::MenuItem(ICON_FA_COPY " Copy", "Ctrl+C"))
                 CopySelectedNodes();
             if (ImGui::MenuItem(ICON_FA_PASTE " Paste", "Ctrl+V"))
@@ -724,6 +728,10 @@ void BlueprintEditor::OnFrame(float deltaTime)
         CutSelectedNodes();
     if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_D))
         DuplicateSelectedNodes();
+    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z))
+        Undo();
+    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Y))
+        Redo();
     if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_F))
         OpenSearchOverlay();
     if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A))
@@ -959,6 +967,15 @@ void BlueprintEditor::OnFrame(float deltaTime)
             ActiveDoc()->pendingLoadData.clear();
             ActiveDoc()->pendingContentBounds = contentBounds;
             ActiveDoc()->needNavigateToContent = 1;
+        }
+
+        // Undo/Redo 恢复节点位置
+        if (ActiveDoc()->pendingRestorePositions)
+        {
+            ActiveDoc()->pendingRestorePositions = false;
+            for (const auto& kv : ActiveDoc()->pendingRestoreNodePos)
+                ed::SetNodePosition(kv.first, kv.second);
+            ActiveDoc()->pendingRestoreNodePos.clear();
         }
 
         // 延迟居中显示（倒计帧数，到 0 时触发）
@@ -2003,11 +2020,14 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
             if (ed::BeginDelete())
             {
+                bool deletePushed = false;  // 一次 BeginDelete 只 push 一次 undo
+
                 ed::NodeId nodeId = 0;
                 while (ed::QueryDeletedNode(&nodeId))
                 {
                     if (ed::AcceptDeletedItem())
                     {
+                        if (!deletePushed) { PushUndoState(); deletePushed = true; }
                         auto id = std::find_if(ActiveDoc()->nodes.begin(), ActiveDoc()->nodes.end(), [nodeId](auto& node) { return node.ID == nodeId; });
                         if (id != ActiveDoc()->nodes.end())
                         {
@@ -2022,6 +2042,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 {
                     if (ed::AcceptDeletedItem())
                     {
+                        if (!deletePushed) { PushUndoState(); deletePushed = true; }
                         auto id = std::find_if(ActiveDoc()->links.begin(), ActiveDoc()->links.end(), [linkId](auto& link) { return link.ID == linkId; });
                         if (id != ActiveDoc()->links.end())
                         {
@@ -2136,6 +2157,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         ImGui::Separator();
         if (ImGui::MenuItem(ICON_FA_TRASH_CAN " Delete"))
         {
+            PushUndoState();  // 删除前保存快照
             // 删除所有选中的节点（而不是仅删除右键点击的节点）
             int selCount = ed::GetSelectedObjectCount();
             if (selCount > 0)
@@ -2237,7 +2259,10 @@ void BlueprintEditor::OnFrame(float deltaTime)
             ImGui::Text("Unknown link: %p", contextLinkId.AsPointer());
         ImGui::Separator();
         if (ImGui::MenuItem(ICON_FA_TRASH_CAN " Delete"))
+        {
+            PushUndoState();
             ed::DeleteLink(contextLinkId);
+        }
         ImGui::EndPopup();
     }
 
@@ -2256,7 +2281,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
             ImGui::Separator();
         }
 
-        Node* node = ShowCreateNodeMenu();
+        Node* node = ShowCreateNodeMenu();   // PushUndoState 在 ShowCreateNodeMenu 内部调用
 
         if (node)
         {
@@ -3064,6 +3089,7 @@ void BlueprintEditor::DrawVariablePanel()
 
             if (!dup)
             {
+                PushUndoState();  // 新增变量前保存快照
                 RTVariableDefinition var;
                 var.name      = newVarName;
                 var.dataType  = typeValues[newVarTypeIdx];
@@ -3168,6 +3194,7 @@ void BlueprintEditor::DrawVariablePanel()
                     if (j != i && doc->variables[j].name == nameBuf) { dup = true; break; }
                 if (!dup)
                 {
+                    PushUndoState();  // 重命名前保存快照
                     var.name = nameBuf;
                     doc->isDirty = true;
                 }
@@ -3199,6 +3226,7 @@ void BlueprintEditor::DrawVariablePanel()
                 ImGui::SameLine();
                 if (ImGui::Selectable(typeNames[t], var.dataType == typeValues[t]))
                 {
+                    PushUndoState();  // 类型修改前保存快照
                     var.dataType = typeValues[t];
                     doc->isDirty = true;
                     ImGui::CloseCurrentPopup();
@@ -3235,6 +3263,7 @@ void BlueprintEditor::DrawVariablePanel()
     // 延迟删除
     if (deleteIdx >= 0)
     {
+        PushUndoState();  // 删除变量前保存快照
         doc->variables.erase(doc->variables.begin() + deleteIdx);
         doc->isDirty = true;
     }

@@ -99,6 +99,112 @@ bool BlueprintEditor::IsPinLinked(ed::PinId id)
     return doc->pinLinkedCache.count(pid) > 0;
 }
 
+bool BlueprintEditor::CanUndo()
+{
+    auto* doc = ActiveDoc();
+    return doc && !doc->undoStack.empty();
+}
+
+bool BlueprintEditor::CanRedo()
+{
+    auto* doc = ActiveDoc();
+    return doc && !doc->redoStack.empty();
+}
+
+void BlueprintEditor::PushUndoState()
+{
+    auto* doc = ActiveDoc();
+    if (!doc) return;
+
+    UndoState state;
+    state.nodes     = doc->nodes;
+    state.links     = doc->links;
+    state.variables = doc->variables;
+    state.nextId    = doc->nextId;
+
+    // 捕获所有节点的当前位置（必须在 ed::Begin/End 之间调用才有效；
+    // 如果在 Begin/End 外调用，ed::GetNodePosition 返回 (0,0)，此时位置已记录在
+    // lastNodePositions 里，用它作为 fallback）
+    for (const auto& node : doc->nodes)
+    {
+        ImVec2 pos = ed::GetNodePosition(node.ID);
+        if (pos.x == 0.0f && pos.y == 0.0f)
+        {
+            // fallback: 用上一帧追踪到的位置
+            auto it = doc->lastNodePositions.find(node.ID);
+            if (it != doc->lastNodePositions.end())
+                pos = it->second;
+        }
+        state.nodePositions[node.ID] = pos;
+    }
+
+    doc->undoStack.push_back(std::move(state));
+    if ((int)doc->undoStack.size() > kMaxUndoSteps)
+        doc->undoStack.pop_front();
+
+    // 新操作清空 redo 栈
+    doc->redoStack.clear();
+}
+
+// 从 from 恢复到 doc，并把当前状态推入 to
+static void ApplyUndoRedo(BlueprintDocument* doc,
+                          std::deque<UndoState>& from,
+                          std::deque<UndoState>& to)
+{
+    if (!doc || from.empty()) return;
+
+    // 保存当前状态到目标栈（undo 时推入 redo，redo 时推入 undo）
+    UndoState cur;
+    cur.nodes     = doc->nodes;
+    cur.links     = doc->links;
+    cur.variables = doc->variables;
+    cur.nextId    = doc->nextId;
+    for (const auto& node : doc->nodes)
+    {
+        ImVec2 pos = ed::GetNodePosition(node.ID);
+        if (pos.x == 0.0f && pos.y == 0.0f)
+        {
+            auto it = doc->lastNodePositions.find(node.ID);
+            if (it != doc->lastNodePositions.end())
+                pos = it->second;
+        }
+        cur.nodePositions[node.ID] = pos;
+    }
+    to.push_back(std::move(cur));
+    if ((int)to.size() > kMaxUndoSteps)
+        to.pop_front();
+
+    // 恢复目标快照
+    UndoState& target = from.back();
+    doc->nodes        = target.nodes;
+    doc->links        = target.links;
+    doc->variables    = target.variables;
+    doc->nextId       = target.nextId;
+
+    // 节点位置延迟恢复（需要在 ed::Begin/End 内调用 SetNodePosition）
+    doc->pendingRestorePositions = true;
+    doc->pendingRestoreNodePos   = target.nodePositions;
+
+    from.pop_back();
+
+    doc->isDirty = true;
+    doc->invalidateEditorIndices();
+}
+
+void BlueprintEditor::Undo()
+{
+    auto* doc = ActiveDoc();
+    if (!doc || doc->undoStack.empty()) return;
+    ApplyUndoRedo(doc, doc->undoStack, doc->redoStack);
+}
+
+void BlueprintEditor::Redo()
+{
+    auto* doc = ActiveDoc();
+    if (!doc || doc->redoStack.empty()) return;
+    ApplyUndoRedo(doc, doc->redoStack, doc->undoStack);
+}
+
 bool BlueprintEditor::CanCreateLink(Pin* a, Pin* b)
 {
     if (!a || !b || a == b || a->Kind == b->Kind || a->Node == b->Node)
@@ -165,6 +271,8 @@ Node* BlueprintEditor::InsertConversionNode(
     Pin* startPin, ed::PinId startPinId,
     Pin* endPin,   ed::PinId endPinId)
 {
+    PushUndoState();   // 插入转换节点前保存快照
+
     std::string defId = GetConversionNode(startPin->Type, endPin->Type);
     if (defId.empty()) return nullptr;
 
@@ -527,6 +635,7 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
             // 显示节点名和分类标签
             if (ImGui::MenuItem(d->name.c_str()))
             {
+                PushUndoState();
                 result = SpawnNodeByDef(d->id);
                 if (result)
                     FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d->id));
@@ -570,6 +679,7 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
         {
             if (ImGui::MenuItem(d->name.c_str()))
             {
+                PushUndoState();
                 result = SpawnNodeByDef(d->id);
                 if (result)
                     FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d->id));
