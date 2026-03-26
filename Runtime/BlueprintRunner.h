@@ -10,6 +10,13 @@
 #pragma once
 #include "BlueprintExport.h"
 
+// MSVC C4251: 'member': class 'std::...' needs to have dll-interface
+// Safe to suppress when DLL and consumer share the same CRT/compiler.
+#ifdef _MSC_VER
+#   pragma warning(push)
+#   pragma warning(disable: 4251)
+#endif
+
 #include "BlueprintData.h"
 #include "NodeDefinition.h"
 #include "FrameTimerManager.h"
@@ -635,3 +642,7 @@ private:
 
 } // namespace Runtime
 } // namespace NodeEditor
+
+#ifdef _MSC_VER
+#   pragma warning(pop)
+#endif

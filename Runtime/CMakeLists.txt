@@ -150,6 +150,19 @@ set_target_properties(BlueprintRuntime PROPERTIES
     POSITION_INDEPENDENT_CODE ON  # required for shared libs on Linux/macOS
 )
 
+# Shared library: output .dll/.so/.dylib alongside executables (bin/ directory)
+# so that BlueprintEditor.exe can find BlueprintRuntime.dll at runtime.
+if(_RUNTIME_LIB_TYPE STREQUAL "SHARED")
+    set_target_properties(BlueprintRuntime PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY           "${CMAKE_BINARY_DIR}/bin"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG     "${CMAKE_BINARY_DIR}/bin"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE   "${CMAKE_BINARY_DIR}/bin"
+        LIBRARY_OUTPUT_DIRECTORY           "${CMAKE_BINARY_DIR}/bin"
+        LIBRARY_OUTPUT_DIRECTORY_DEBUG     "${CMAKE_BINARY_DIR}/bin"
+        LIBRARY_OUTPUT_DIRECTORY_RELEASE   "${CMAKE_BINARY_DIR}/bin"
+    )
+endif()
+
 if(EMSCRIPTEN)
     # Unity WebGL compile flags
     target_compile_options(BlueprintRuntime PUBLIC

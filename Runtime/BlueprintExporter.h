@@ -10,6 +10,11 @@
 #pragma once
 #include "BlueprintExport.h"
 
+#ifdef _MSC_VER
+#   pragma warning(push)
+#   pragma warning(disable: 4251)
+#endif
+
 #include "BlueprintData.h"
 #include "FileSystem.h"
 #include <string>
