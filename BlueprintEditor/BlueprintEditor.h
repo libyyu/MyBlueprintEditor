@@ -443,6 +443,14 @@ struct BlueprintEditor : public Application
     bool  IsPinLinked(ed::PinId id);
     bool  CanCreateLink(Pin* a, Pin* b);
 
+    // 自动类型转换节点辅助
+    // 返回能将 from 类型转为 to 类型的内置节点 definitionId，无则返回空串
+    static std::string GetConversionNode(PinType from, PinType to);
+    // 在 startPin → endPin 之间插入一个转换节点，自动连好两端
+    // 返回生成的转换节点指针（失败返回 nullptr）
+    Node* InsertConversionNode(Pin* startPin, ed::PinId startPinId,
+                               Pin* endPin,   ed::PinId endPinId);
+
     // ------------------------------------------------------------------
     // 节点构建
     // ------------------------------------------------------------------

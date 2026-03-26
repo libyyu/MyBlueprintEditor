@@ -134,6 +134,79 @@ bool BlueprintEditor::CanCreateLink(Pin* a, Pin* b)
 }
 
 // ============================================================================
+// 自动类型转换辅助
+// ============================================================================
+
+std::string BlueprintEditor::GetConversionNode(PinType from, PinType to)
+{
+    // 转换表：(from, to) → definitionId
+    // 覆盖所有已注册的 Conversion 节点
+    static const struct { PinType from; PinType to; const char* defId; } kTable[] = {
+        { PinType::Int,    PinType::Float,  "IntToFloat"    },
+        { PinType::Float,  PinType::Int,    "FloatToInt"    },
+        { PinType::Float,  PinType::Bool,   "FloatToBool"   },
+        { PinType::Int,    PinType::String, "IntToString"   },
+        { PinType::Float,  PinType::String, "FloatToString" },
+        { PinType::Bool,   PinType::String, "BoolToString"  },
+        { PinType::String, PinType::Int,    "StringToInt"   },
+        { PinType::String, PinType::Float,  "StringToFloat" },
+        // Int/Bool 互转（CanCreateLink 已允许隐式连接，这里也提供节点）
+        { PinType::Bool,   PinType::Int,    "IntToFloat"    }, // Bool→Int 最近似 pass-through
+        // 间接路径（如 Bool→Float 走 FloatToBool 反向不行，保持 CanCreateLink 逻辑）
+    };
+
+    for (const auto& entry : kTable)
+        if (entry.from == from && entry.to == to)
+            return entry.defId;
+    return {};
+}
+
+Node* BlueprintEditor::InsertConversionNode(
+    Pin* startPin, ed::PinId startPinId,
+    Pin* endPin,   ed::PinId endPinId)
+{
+    std::string defId = GetConversionNode(startPin->Type, endPin->Type);
+    if (defId.empty()) return nullptr;
+
+    // 计算插入位置（两端节点中点）
+    ImVec2 startPos = ed::GetNodePosition(startPin->Node->ID);
+    ImVec2 endPos   = ed::GetNodePosition(endPin->Node->ID);
+    ImVec2 midPos   = ImVec2((startPos.x + endPos.x) * 0.5f,
+                             (startPos.y + endPos.y) * 0.5f);
+
+    // 生成转换节点
+    Node* conv = SpawnNodeByDef(defId);
+    if (!conv) return nullptr;
+
+    BuildNodes();
+    ActiveDoc()->isDirty = true;
+    ed::SetNodePosition(conv->ID, midPos);
+
+    // 找转换节点的首个 input 和首个 output
+    Pin* convIn  = conv->Inputs.empty()  ? nullptr : &conv->Inputs.front();
+    Pin* convOut = conv->Outputs.empty() ? nullptr : &conv->Outputs.front();
+    if (!convIn || !convOut) return conv;
+
+    // 先断开 endPin 上已有的同类型链接（保持 input 单一来源语义）
+    {
+        auto& links = ActiveDoc()->links;
+        links.erase(std::remove_if(links.begin(), links.end(), [&](const Link& l) {
+            return l.EndPinID == endPinId;
+        }), links.end());
+    }
+
+    // startPin → convIn
+    ActiveDoc()->links.emplace_back(Link(GetNextId(), startPinId, convIn->ID));
+    ActiveDoc()->links.back().Color = GetIconColor(GetLinkColor(startPin, convIn));
+
+    // convOut → endPin
+    ActiveDoc()->links.emplace_back(Link(GetNextId(), convOut->ID, endPinId));
+    ActiveDoc()->links.back().Color = GetIconColor(GetLinkColor(convOut, endPin));
+
+    return conv;
+}
+
+// ============================================================================
 // 节点构建
 // ============================================================================
 

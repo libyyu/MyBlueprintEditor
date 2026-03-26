@@ -1949,8 +1949,22 @@ void BlueprintEditor::OnFrame(float deltaTime)
                             }
                             else
                             {
-                                showLabel("x Incompatible Pin Type", ImColor(45, 32, 32, 180));
-                                ed::RejectNewItem(ImColor(255, 128, 128), 1.0f);
+                                // 检查是否有内置转换节点可以自动插入
+                                std::string convDef = GetConversionNode(startPin->Type, endPin->Type);
+                                if (!convDef.empty())
+                                {
+                                    showLabel(("+ Auto-convert via " + convDef).c_str(),
+                                              ImColor(32, 45, 45, 180));
+                                    if (ed::AcceptNewItem(ImColor(100, 200, 255), 4.0f))
+                                    {
+                                        InsertConversionNode(startPin, startPinId, endPin, endPinId);
+                                    }
+                                }
+                                else
+                                {
+                                    showLabel("x Incompatible Pin Type", ImColor(45, 32, 32, 180));
+                                    ed::RejectNewItem(ImColor(255, 128, 128), 1.0f);
+                                }
                             }
                         }
                         else
