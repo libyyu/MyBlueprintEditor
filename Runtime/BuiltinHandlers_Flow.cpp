@@ -79,14 +79,18 @@ void RegisterHandlers_Flow(
         }
 
         // 如果路径是相对路径，基于 basePath 解析
+        // basePath 可能是目录路径（"bin/data"）或文件路径（"bin/data/foo.json"）
+        // 统一处理：若末尾已有 '/' 或 '\' 则直接拼接，否则先加 '/' 再拼
         std::string resolvedPath = filePath;
         if (!basePath.empty() && 
             filePath.find(':') == std::string::npos && 
             filePath[0] != '/' && filePath[0] != '\\')
         {
-            size_t lastSlash = basePath.find_last_of("/\\");
-            if (lastSlash != std::string::npos)
-                resolvedPath = basePath.substr(0, lastSlash + 1) + filePath;
+            char last = basePath.back();
+            if (last == '/' || last == '\\')
+                resolvedPath = basePath + filePath;
+            else
+                resolvedPath = basePath + '/' + filePath;
         }
 
         ctx.Log("  [ExecuteBlueprint] Resolved: \"" + resolvedPath + "\"");
