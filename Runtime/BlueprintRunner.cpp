@@ -308,6 +308,17 @@ ExecutionResult BlueprintRunner::Execute()
         return result;
     }
 
+    // 设置运行状态（Stopped 状态不允许执行）
+    {
+        RunState prev = m_runState.load();
+        if (prev == RunState::Stopped)
+        {
+            result.errorMessage = "Runner is stopped; call ResetState() before Execute()";
+            return result;
+        }
+        m_runState.store(RunState::Running);
+    }
+
     auto startTime = std::chrono::high_resolution_clock::now();
 
     // 拓扑排序（使用缓存）
@@ -379,7 +390,16 @@ ExecutionResult BlueprintRunner::Execute()
 
     auto endTime = std::chrono::high_resolution_clock::now();
     result.elapsedMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
-    result.success = true;
+    if (m_runState.load() == RunState::Stopped)
+    {
+        result.success = false;
+        result.errorMessage = "Execution stopped by Stop()";
+    }
+    else
+    {
+        result.success = true;
+        m_runState.store(RunState::Idle);
+    }
 
     return result;
 }
@@ -597,6 +617,35 @@ void BlueprintRunner::ResetState()
             }
         }
     }
+    m_runState.store(RunState::Idle);
+}
+
+// ============================================================================
+// 运行时控制：Stop / Pause / Resume
+// ============================================================================
+
+void BlueprintRunner::Stop()
+{
+    m_runState.store(RunState::Stopped);
+    // 清除所有计时器，停止 Tick 推进
+    GetTimerManager().ClearAllTimers();
+    // 重置异步计数（所有挂起操作视为已取消）
+    m_pendingAsyncCount = 0;
+    m_keepAliveRunners.clear();
+}
+
+void BlueprintRunner::Pause()
+{
+    // 只有 Running 状态才能 Pause
+    RunState expected = RunState::Running;
+    m_runState.compare_exchange_strong(expected, RunState::Paused);
+}
+
+void BlueprintRunner::Resume()
+{
+    // 只有 Paused 状态才能 Resume
+    RunState expected = RunState::Paused;
+    m_runState.compare_exchange_strong(expected, RunState::Running);
 }
 
 bool ExecutionContext::FireConnectedNode(PinId inputPinId)
@@ -1073,6 +1122,13 @@ bool BlueprintRunner::FireConnectedNode(PinId inputPinId)
 
 void BlueprintRunner::Tick(float deltaTime)
 {
+    // Paused 或 Stopped 时不推进计时器
+    {
+        RunState s = m_runState.load();
+        if (s == RunState::Paused || s == RunState::Stopped)
+            return;
+    }
+
 #ifndef __EMSCRIPTEN__
     // 先消费后台线程 dispatch 回来的主线程任务
     MainThreadDispatcher::Get().DrainQueue();

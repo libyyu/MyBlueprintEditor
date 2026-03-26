@@ -20,6 +20,7 @@
 #include <functional>
 #include <memory>
 #include <queue>
+#include <atomic>
 
 // 前置声明（编辑器类在全局命名空间）
 struct BlueprintEditor;
@@ -443,6 +444,26 @@ public:
     void ResetState();
 
     // ------------------------------------------------------------------
+    // 运行时控制（Stop / Pause / Resume）
+    // ------------------------------------------------------------------
+
+    // 停止执行：清空所有计时器，重置到 Idle 状态
+    // 安全地从任意线程调用；正在执行的节点会在当前节点完成后停止
+    void Stop();
+
+    // 暂停：Tick 不再推进计时器（但不清除它们）
+    void Pause();
+
+    // 恢复：继续 Tick 推进计时器
+    void Resume();
+
+    // 状态查询
+    bool IsRunning() const { return m_runState.load() == RunState::Running; }
+    bool IsPaused()  const { return m_runState.load() == RunState::Paused;  }
+    bool IsStopped() const { return m_runState.load() == RunState::Stopped; }
+    bool IsIdle()    const { return m_runState.load() == RunState::Idle;    }
+
+    // ------------------------------------------------------------------
     // 主线程计时器（由外部每帧调用 Tick 驱动）
     // ------------------------------------------------------------------
 
@@ -578,6 +599,10 @@ private:
     // 正在进行的异步操作计数（timer、网络、IO 等）
     // AcquireAsync/ReleaseAsync 维护；Tick() 用于判断是否可回收
     int                                                 m_pendingAsyncCount = 0;
+
+    // 运行时控制状态
+    enum class RunState { Idle, Running, Paused, Stopped };
+    std::atomic<RunState>                               m_runState { RunState::Idle };
 
     // 缓存：拓扑排序结果
     mutable std::vector<NodeId>                         m_topoCache;

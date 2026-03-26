@@ -179,15 +179,49 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
     ImGui::TextUnformatted("Execution");
 
     // ── 工具栏 ──────────────────────────────────────────────────────────
+    auto& runner = ActiveDoc()->persistentRunner;
+    bool isRunning = runner.IsRunning();
+    bool isPaused  = runner.IsPaused();
+    bool isStopped = runner.IsStopped();
+    bool isIdle    = runner.IsIdle();
+
     ImGui::BeginHorizontal("ExecButtons", ImVec2(paneWidth, 0));
-    bool isExec = ActiveDoc()->isExecuting;
-    if (isExec) ImGui::BeginDisabled();
-    if (ImGui::Button(ICON_FA_PLAY " Run", ImVec2(70, 0)))
+
+    // Run（Idle / Stopped 时可点击）
+    if (!isIdle && !isStopped) ImGui::BeginDisabled();
+    if (ImGui::Button(ICON_FA_PLAY " Run", ImVec2(60, 0)))
+    {
+        if (isStopped) runner.ResetState();  // 停止后需 reset 才能再次执行
         ExecuteBlueprint();
-    if (isExec) ImGui::EndDisabled();
+    }
+    if (!isIdle && !isStopped) ImGui::EndDisabled();
 
     ImGui::Spring(0.0f);
-    if (ImGui::Button(ICON_FA_COPY " Copy", ImVec2(70, 0)))
+
+    // Pause / Resume 切换（Running 时显示 Pause，Paused 时显示 Resume）
+    if (!isRunning && !isPaused) ImGui::BeginDisabled();
+    if (isPaused)
+    {
+        if (ImGui::Button(ICON_FA_PLAY " Resume", ImVec2(80, 0)))
+            runner.Resume();
+    }
+    else
+    {
+        if (ImGui::Button(ICON_FA_PAUSE " Pause", ImVec2(70, 0)))
+            runner.Pause();
+    }
+    if (!isRunning && !isPaused) ImGui::EndDisabled();
+
+    ImGui::Spring(0.0f);
+
+    // Stop（Running 或 Paused 时可点击）
+    if (isIdle || isStopped) ImGui::BeginDisabled();
+    if (ImGui::Button(ICON_FA_STOP " Stop", ImVec2(60, 0)))
+        runner.Stop();
+    if (isIdle || isStopped) ImGui::EndDisabled();
+
+    ImGui::Spring(0.0f);
+    if (ImGui::Button(ICON_FA_COPY " Copy", ImVec2(55, 0)))
     {
         if (!ActiveDoc()->executionLog.empty())
         {
@@ -198,7 +232,7 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
         }
     }
     ImGui::Spring(0.0f);
-    if (ImGui::Button(ICON_FA_ERASER " Clear", ImVec2(70, 0)))
+    if (ImGui::Button(ICON_FA_ERASER " Clear", ImVec2(55, 0)))
     {
         ActiveDoc()->executionLog.clear();
         ActiveDoc()->executionLogDirty = false;
@@ -207,6 +241,17 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
     }
     ImGui::Spring();
     ImGui::EndHorizontal();
+
+    // 运行状态指示条
+    {
+        ImVec4 stateCol;
+        const char* stateText;
+        if (isRunning)      { stateCol = ImVec4(0.2f, 0.8f, 0.2f, 1.0f);  stateText = ICON_FA_CIRCLE_PLAY  " Running..."; }
+        else if (isPaused)  { stateCol = ImVec4(1.0f, 0.7f, 0.1f, 1.0f);  stateText = ICON_FA_PAUSE " Paused";     }
+        else if (isStopped) { stateCol = ImVec4(1.0f, 0.3f, 0.3f, 1.0f);  stateText = ICON_FA_CIRCLE_STOP  " Stopped";    }
+        else                { stateCol = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);  stateText = "Idle";       }
+        ImGui::TextColored(stateCol, "%s", stateText);
+    }
 
     // ── 状态摘要 ─────────────────────────────────────────────────────────
     if (!ActiveDoc()->lastExecutionStatus.empty())
