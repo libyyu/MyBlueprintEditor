@@ -1111,7 +1111,25 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     builder.EndHeader();
                 }
 
-                if (!node.isCollapsed)
+                if (node.isCollapsed)
+                {
+                    // 折叠时：静默注册所有引脚（保持连线锚点有效），但不渲染任何内容
+                    for (auto& input : node.Inputs)
+                    {
+                        if (input.IsHidden) continue;
+                        builder.Input(input.ID);
+                        ImGui::Dummy(ImVec2(0, 0));
+                        builder.EndInput();
+                    }
+                    for (auto& output : node.Outputs)
+                    {
+                        if (output.IsHidden || output.Type == PinType::Delegate) continue;
+                        builder.Output(output.ID);
+                        ImGui::Dummy(ImVec2(0, 0));
+                        builder.EndOutput();
+                    }
+                }
+                else
                 {
                 for (auto& input : node.Inputs)
                 {
@@ -1450,7 +1468,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     builder.EndOutput();
                 }
 
-                } // if (!node.isCollapsed)
+                } // if (!node.isCollapsed) else
 
             builder.End();
 
