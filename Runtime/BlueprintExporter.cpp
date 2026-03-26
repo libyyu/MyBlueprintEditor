@@ -37,9 +37,9 @@ std::string escapeJson(const std::string& str)
         case '\r': oss << "\\r"; break;
         case '\t': oss << "\\t"; break;
         default:
-            if ('\x00' <= c && c <= '\x1f')
+            if (static_cast<unsigned char>(c) <= 0x1f)
             {
-                oss << "\\u" << std::hex << std::setw(4) << std::setfill('0') << (int)c;
+                oss << "\\u" << std::hex << std::setw(4) << std::setfill('0') << static_cast<int>(static_cast<unsigned char>(c));
             }
             else
             {

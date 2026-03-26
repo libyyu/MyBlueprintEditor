@@ -1786,6 +1786,13 @@ void BlueprintEditor::DrawNodeListPanel()
             ImGui::EndTabItem();
         }
 
+        // ── Details Tab ─────────────────────────────────────────────────────
+        if (ImGui::BeginTabItem(ICON_FA_CIRCLE_INFO " Details"))
+        {
+            DrawDetailsPanel();
+            ImGui::EndTabItem();
+        }
+
         ImGui::EndTabBar();
     }
 }
@@ -2024,6 +2031,386 @@ void BlueprintEditor::DrawVariablePanel()
         PushUndoState();  // 删除变量前保存快照
         doc->variables.erase(doc->variables.begin() + deleteIdx);
         doc->isDirty = true;
+    }
+}
+
+// ============================================================================
+// Details 面板（选中节点的属性检查器）
+// ============================================================================
+
+void BlueprintEditor::DrawDetailsPanel()
+{
+    auto* doc = ActiveDoc();
+    if (!doc) return;
+
+    float paneWidth = ImGui::GetContentRegionAvail().x;
+
+    // 获取选中的节点
+    std::vector<ed::NodeId> selectedNodes;
+    selectedNodes.resize(ed::GetSelectedObjectCount());
+    int nodeCount = ed::GetSelectedNodes(selectedNodes.data(), static_cast<int>(selectedNodes.size()));
+    selectedNodes.resize(nodeCount);
+
+    if (selectedNodes.empty())
+    {
+        ImGui::Spacing();
+        ImGui::TextDisabled("  No node selected.");
+        ImGui::TextDisabled("  Select a node on the canvas");
+        ImGui::TextDisabled("  to view its details.");
+        return;
+    }
+
+    if (selectedNodes.size() > 1)
+    {
+        ImGui::Spacing();
+        ImGui::TextDisabled("  %d nodes selected.", static_cast<int>(selectedNodes.size()));
+        ImGui::TextDisabled("  Select a single node to edit.");
+        return;
+    }
+
+    // 单节点选中 —— 显示详细属性
+    Node* node = FindNode(selectedNodes[0]);
+    if (!node) return;
+
+    // 类型→名称映射
+    auto pinTypeStr = [](PinType t) -> const char* {
+        switch (t) {
+        case PinType::Flow:     return "Flow";
+        case PinType::Bool:     return "Bool";
+        case PinType::Int:      return "Int";
+        case PinType::Float:    return "Float";
+        case PinType::String:   return "String";
+        case PinType::Object:   return "Object";
+        case PinType::Function: return "Function";
+        case PinType::Delegate: return "Delegate";
+        case PinType::Array:    return "Array";
+        case PinType::Map:      return "Map";
+        case PinType::Any:      return "Any";
+        default:                return "Unknown";
+        }
+    };
+
+    // ── 节点基本信息 ─────────────────────────────────────────────────────
+    {
+        auto* drawList = ImGui::GetWindowDrawList();
+        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+        float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+        ImU32 colL = IM_COL32(35, 48, 68, 210);
+        ImU32 colR = IM_COL32(28, 36, 52, 180);
+        drawList->AddRectFilledMultiColor(
+            cursorPos,
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+            colL, colR, colR, colL);
+        drawList->AddText(
+            ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
+            IM_COL32(160, 195, 240, 230), ICON_FA_CUBE " Node Info");
+        ImGui::Dummy(ImVec2(paneWidth, sectionH));
+    }
+
+    ImGui::Indent(8.0f);
+
+    // 名称
+    ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "Name:");
+    ImGui::SameLine(90.0f);
+    ImGui::TextUnformatted(node->Name.c_str());
+
+    // ID
+    ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "ID:");
+    ImGui::SameLine(90.0f);
+    ImGui::Text("%llu", static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(node->ID.AsPointer())));
+
+    // 定义 ID
+    ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "Definition:");
+    ImGui::SameLine(90.0f);
+    ImGui::TextUnformatted(node->DefinitionId.c_str());
+
+    // 从注册表查找节点定义
+    const RTNodeDef* def = m_NodeRegistry.getNodeDefinition(node->DefinitionId);
+
+    // 类别
+    if (def && !def->category.empty())
+    {
+        ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "Category:");
+        ImGui::SameLine(90.0f);
+        ImGui::TextUnformatted(def->category.c_str());
+    }
+
+    // 节点类型
+    {
+        const char* typeStr = "Blueprint";
+        switch (node->Type)
+        {
+        case NodeType::Simple:    typeStr = "Simple";    break;
+        case NodeType::Tree:      typeStr = "Tree";      break;
+        case NodeType::Houdini:   typeStr = "Houdini";   break;
+        case NodeType::Comment:   typeStr = "Comment";   break;
+        default: break;
+        }
+        ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "Type:");
+        ImGui::SameLine(90.0f);
+        ImGui::TextUnformatted(typeStr);
+    }
+
+    // 描述
+    if (def && !def->description.empty())
+    {
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "Description:");
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.70f, 0.72f, 0.78f, 1.0f));
+        ImGui::TextWrapped("%s", def->description.c_str());
+        ImGui::PopStyleColor();
+    }
+
+    // 纯函数标记
+    if (def)
+    {
+        ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "Pure:");
+        ImGui::SameLine(90.0f);
+        ImGui::TextColored(def->isPure ? ImVec4(0.35f, 0.85f, 0.45f, 1.0f) : ImVec4(0.85f, 0.55f, 0.35f, 1.0f),
+            "%s", def->isPure ? "Yes" : "No");
+    }
+
+    // 错误状态
+    if (node->HasError)
+    {
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(0.95f, 0.35f, 0.35f, 1.0f), ICON_FA_TRIANGLE_EXCLAMATION " Error: %s", node->ErrorMessage.c_str());
+    }
+
+    ImGui::Unindent(8.0f);
+
+    // ── 输入引脚 ─────────────────────────────────────────────────────────
+    if (!node->Inputs.empty())
+    {
+        ImGui::Spacing();
+        {
+            auto* drawList = ImGui::GetWindowDrawList();
+            ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+            float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+            ImU32 colL = IM_COL32(40, 55, 35, 210);
+            ImU32 colR = IM_COL32(30, 42, 28, 180);
+            drawList->AddRectFilledMultiColor(
+                cursorPos,
+                ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+                colL, colR, colR, colL);
+            drawList->AddText(
+                ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
+                IM_COL32(150, 210, 160, 230), ICON_FA_ARROW_RIGHT " Inputs");
+            ImGui::Dummy(ImVec2(paneWidth, sectionH));
+        }
+
+        ImGui::Indent(8.0f);
+        for (auto& pin : node->Inputs)
+        {
+            if (pin.IsOrphaned || pin.IsHidden) continue;
+            if (pin.Type == PinType::Flow) continue;  // Flow 引脚无值可编辑
+
+            ImGui::PushID(pin.ID.AsPointer());
+
+            // 引脚类型色标
+            ImColor pinColor = GetIconColor(pin.Type);
+            auto* dl = ImGui::GetWindowDrawList();
+            ImVec2 dotPos = ImGui::GetCursorScreenPos() + ImVec2(2.0f, ImGui::GetTextLineHeight() * 0.5f - 3.0f);
+            dl->AddCircleFilled(dotPos + ImVec2(3, 3), 4.0f, pinColor);
+            ImGui::Dummy(ImVec2(10.0f, ImGui::GetTextLineHeight()));
+            ImGui::SameLine(0, 2.0f);
+
+            // 引脚名和类型
+            ImGui::TextColored(ImVec4(0.75f, 0.80f, 0.90f, 1.0f), "%s", pin.Name.c_str());
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.50f, 0.55f, 0.60f, 0.80f), "[%s]", pinTypeStr(pin.Type));
+
+            // 连线状态
+            bool linked = IsPinLinked(pin.ID);
+            if (linked)
+            {
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.35f, 0.70f, 0.95f, 0.80f), ICON_FA_LINK);
+            }
+
+            // 值编辑控件（仅在未连线时可编辑）
+            if (!linked)
+            {
+                float editWidth = paneWidth - 24.0f;
+                switch (pin.Type)
+                {
+                case PinType::Bool:
+                {
+                    bool val = pin.BoolValue;
+                    if (ImGui::Checkbox("##val", &val))
+                    {
+                        PushUndoState();
+                        pin.BoolValue = val;
+                        doc->isDirty = true;
+                    }
+                    break;
+                }
+                case PinType::Int:
+                {
+                    int ival = static_cast<int>(pin.IntValue);
+                    ImGui::SetNextItemWidth(editWidth);
+                    if (ImGui::DragInt("##val", &ival, 1.0f))
+                    {
+                        PushUndoState();
+                        pin.IntValue = ival;
+                        doc->isDirty = true;
+                    }
+                    break;
+                }
+                case PinType::Float:
+                {
+                    float fval = pin.FloatValue;
+                    ImGui::SetNextItemWidth(editWidth);
+                    if (ImGui::DragFloat("##val", &fval, 0.1f))
+                    {
+                        PushUndoState();
+                        pin.FloatValue = fval;
+                        doc->isDirty = true;
+                    }
+                    break;
+                }
+                case PinType::String:
+                {
+                    uintptr_t pinKey = reinterpret_cast<uintptr_t>(pin.ID.AsPointer());
+                    auto& buf = doc->pinStringBuffers[pinKey];
+                    // 初始化缓冲区
+                    if (buf[0] == '\0' && !pin.StringValue.empty())
+                        snprintf(buf.data(), buf.size(), "%s", pin.StringValue.c_str());
+                    ImGui::SetNextItemWidth(editWidth);
+                    if (ImGui::InputText("##val", buf.data(), buf.size(), ImGuiInputTextFlags_EnterReturnsTrue))
+                    {
+                        PushUndoState();
+                        pin.StringValue = buf.data();
+                        doc->isDirty = true;
+                    }
+                    break;
+                }
+                case PinType::Object:
+                {
+                    uintptr_t pinKey = reinterpret_cast<uintptr_t>(pin.ID.AsPointer());
+                    auto& buf = doc->pinObjectBuffers[pinKey];
+                    if (buf[0] == '\0' && !pin.ObjectValue.empty())
+                        snprintf(buf.data(), buf.size(), "%s", pin.ObjectValue.c_str());
+                    ImGui::SetNextItemWidth(editWidth);
+                    if (ImGui::InputText("##val", buf.data(), buf.size(), ImGuiInputTextFlags_EnterReturnsTrue))
+                    {
+                        PushUndoState();
+                        pin.ObjectValue = buf.data();
+                        doc->isDirty = true;
+                    }
+                    break;
+                }
+                default:
+                    ImGui::TextDisabled("  (no editor)");
+                    break;
+                }
+            }
+            else
+            {
+                ImGui::TextDisabled("  (linked)");
+            }
+
+            ImGui::PopID();
+        }
+        ImGui::Unindent(8.0f);
+    }
+
+    // ── 输出引脚 ─────────────────────────────────────────────────────────
+    if (!node->Outputs.empty())
+    {
+        ImGui::Spacing();
+        {
+            auto* drawList = ImGui::GetWindowDrawList();
+            ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+            float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+            ImU32 colL = IM_COL32(55, 40, 35, 210);
+            ImU32 colR = IM_COL32(42, 30, 28, 180);
+            drawList->AddRectFilledMultiColor(
+                cursorPos,
+                ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+                colL, colR, colR, colL);
+            drawList->AddText(
+                ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
+                IM_COL32(210, 160, 150, 230), ICON_FA_ARROW_LEFT " Outputs");
+            ImGui::Dummy(ImVec2(paneWidth, sectionH));
+        }
+
+        ImGui::Indent(8.0f);
+        for (const auto& pin : node->Outputs)
+        {
+            if (pin.IsOrphaned || pin.IsHidden) continue;
+            if (pin.Type == PinType::Flow) continue;
+
+            ImGui::PushID(pin.ID.AsPointer());
+
+            // 色标
+            ImColor pinColor = GetIconColor(pin.Type);
+            auto* dl = ImGui::GetWindowDrawList();
+            ImVec2 dotPos = ImGui::GetCursorScreenPos() + ImVec2(2.0f, ImGui::GetTextLineHeight() * 0.5f - 3.0f);
+            dl->AddCircleFilled(dotPos + ImVec2(3, 3), 4.0f, pinColor);
+            ImGui::Dummy(ImVec2(10.0f, ImGui::GetTextLineHeight()));
+            ImGui::SameLine(0, 2.0f);
+
+            ImGui::TextColored(ImVec4(0.75f, 0.80f, 0.90f, 1.0f), "%s", pin.Name.c_str());
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.50f, 0.55f, 0.60f, 0.80f), "[%s]", pinTypeStr(pin.Type));
+
+            // 上次执行的输出值（只读）
+            uint64_t pinIdVal = reinterpret_cast<uintptr_t>(pin.ID.AsPointer());
+            auto it = doc->lastExecutionResult.outputValues.find(pinIdVal);
+            if (it != doc->lastExecutionResult.outputValues.end())
+            {
+                std::string valStr = it->second.asString();
+                ImGui::TextColored(ImVec4(0.55f, 0.85f, 0.65f, 1.0f), "  = %s", valStr.c_str());
+            }
+            else
+            {
+                // 也从 runner 的 pinValues 尝试获取
+                auto val = doc->persistentRunner.GetPinValue(pinIdVal);
+                if (val.type != RTPinDataType::Unknown)
+                {
+                    std::string valStr = val.asString();
+                    ImGui::TextColored(ImVec4(0.55f, 0.85f, 0.65f, 0.80f), "  = %s", valStr.c_str());
+                }
+                else
+                {
+                    ImGui::TextDisabled("  (no value)");
+                }
+            }
+
+            ImGui::PopID();
+        }
+        ImGui::Unindent(8.0f);
+    }
+
+    // ── 自定义属性（来自 NodeDefinition） ────────────────────────────────
+    if (def && !def->customProperties.empty())
+    {
+        ImGui::Spacing();
+        {
+            auto* drawList = ImGui::GetWindowDrawList();
+            ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+            float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+            ImU32 colL = IM_COL32(45, 35, 55, 210);
+            ImU32 colR = IM_COL32(35, 28, 42, 180);
+            drawList->AddRectFilledMultiColor(
+                cursorPos,
+                ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+                colL, colR, colR, colL);
+            drawList->AddText(
+                ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
+                IM_COL32(190, 170, 220, 230), ICON_FA_GEAR " Properties");
+            ImGui::Dummy(ImVec2(paneWidth, sectionH));
+        }
+
+        ImGui::Indent(8.0f);
+        for (const auto& kv : def->customProperties)
+        {
+            ImGui::TextColored(ImVec4(0.60f, 0.65f, 0.80f, 1.0f), "%s:", kv.first.c_str());
+            ImGui::SameLine();
+            ImGui::TextUnformatted(kv.second.c_str());
+        }
+        ImGui::Unindent(8.0f);
     }
 }
 

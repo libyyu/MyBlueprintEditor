@@ -562,7 +562,9 @@ struct BlueprintEditor : public Application
     void    ShowLeftPane(float paneWidth);             // 旧版左侧面板（已不使用）
     void    DrawNodeListPanel();                       // 右侧节点列表/变量面板（嵌入式）
     void    DrawVariablePanel();                       // 变量面板（在 DrawNodeListPanel TabBar 内调用）
+    void    DrawDetailsPanel();                        // Details 面板（选中节点的属性检查器）
     void    DrawExecutionPanel();                      // 底部执行输出面板（嵌入式）
+    void    DrawWatchPanel(float paneWidth);           // Watch 面板（运行时变量/引脚值监控）
     void    DrawTimerPanel();                          // 计时器监控浮动面板
 
     // ------------------------------------------------------------------

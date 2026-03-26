@@ -195,7 +195,11 @@ void RegisterHandlers_Flow(
         auto sharedData = std::make_shared<BlueprintData>(std::move(importResult.data));
 
         ExecutionContext* pCtx = &ctx;
-        ctx.Delay(0.0f, [pCtx, &runner, sharedData, currentHandlers, completedPinId, resolvedPath]() {
+        // 捕获 alive 标志，在回调时检查 runner 是否仍存活
+        auto alive = runner.GetAliveFlag();
+        ctx.Delay(0.0f, [pCtx, &runner, sharedData, currentHandlers, completedPinId, resolvedPath, alive]() {
+            // 检查 runner 是否已析构
+            if (!alive->load(std::memory_order_acquire)) return;
             pCtx->Log("  [ExecuteBlueprint] Async: executing \"" + resolvedPath + "\"...");
 
             auto subRunner = std::make_shared<BlueprintRunner>(runner.GetFileSystem());
@@ -295,7 +299,7 @@ void RegisterHandlers_Flow(
     };
 
     // Delay — 依赖：runner 的 timer
-    handlers["Delay"] = [](ExecutionContext& ctx) {
+    handlers["Delay"] = [&runner](ExecutionContext& ctx) {
         double dur = ctx.GetInputValue("Duration").asFloat();
         float duration = static_cast<float>(dur);
         auto currentTime = FrameTimerManager::GetCurrentUnixTime();
@@ -318,7 +322,11 @@ void RegisterHandlers_Flow(
         }
 
         ExecutionContext* pCtx = &ctx;
-        auto timerHandle = ctx.Delay(duration, [pCtx, completedPinId]() {
+        // 捕获 alive 标志，在回调时检查 runner 是否仍存活
+        auto alive = runner.GetAliveFlag();
+        auto timerHandle = ctx.Delay(duration, [pCtx, completedPinId, alive]() {
+            // 检查 runner 是否已析构
+            if (!alive->load(std::memory_order_acquire)) return;
             auto finishTime = FrameTimerManager::GetCurrentUnixTime();
             pCtx->Log("  [Delay] Completed; finished:" + std::to_string(finishTime));
             if (completedPinId != 0)
