@@ -427,8 +427,14 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
             auto it = rtNode.customProperties.find("__color");
             if (it != rtNode.customProperties.end() && it->second.size() == 6)
             {
-                unsigned int r = 0, g = 0, b = 0;
-                sscanf(it->second.c_str(), "%02X%02X%02X", &r, &g, &b);
+                // 用 strtoul 替代 sscanf，避免 MSVC C4996 安全警告
+                const char* hex = it->second.c_str();
+                char buf[3] = { hex[0], hex[1], '\0' };
+                unsigned int r = static_cast<unsigned int>(std::strtoul(buf, nullptr, 16));
+                buf[0] = hex[2]; buf[1] = hex[3];
+                unsigned int g = static_cast<unsigned int>(std::strtoul(buf, nullptr, 16));
+                buf[0] = hex[4]; buf[1] = hex[5];
+                unsigned int b = static_cast<unsigned int>(std::strtoul(buf, nullptr, 16));
                 node.Color = ImColor((int)r, (int)g, (int)b);
             }
             else
