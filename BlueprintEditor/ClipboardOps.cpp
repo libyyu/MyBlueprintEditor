@@ -351,6 +351,8 @@ void BlueprintEditor::AlignSelectedNodes(AlignMode mode)
 
     if (nodeCount < 2) return;
 
+    PushUndoState();  // 对齐前保存快照
+
     // 收集选中节点的位置和尺寸
     struct NodeRect { ed::NodeId id; ImVec2 pos; ImVec2 size; };
     std::vector<NodeRect> rects;

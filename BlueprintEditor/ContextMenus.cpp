@@ -182,6 +182,7 @@ void BlueprintEditor::DrawContextMenus(
         {
             if (ImGui::MenuItem(ICON_FA_ARROWS_ROTATE " Reset Value"))
             {
+                PushUndoState();
                 pin->BoolValue = false;
                 pin->IntValue = 0;
                 pin->FloatValue = 0.0f;

@@ -87,6 +87,7 @@ void BlueprintEditor::CreateLinkWithFlowReconnect(
     }
 
     // 创建新链接
+    PushUndoState();
     ActiveDoc()->links.emplace_back(Link(GetNextId(), startPinId, endPinId));
     ActiveDoc()->links.back().Color = GetIconColor(GetLinkColor(startPin, endPin));
     ActiveDoc()->isDirty = true;
@@ -1168,6 +1169,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         auto spawnVarNode = [&](const char* defId)
         {
             ed::SetCurrentEditor(ActiveDoc()->editorContext);
+            PushUndoState();  // 变量拖拽生成节点前保存快照
             Node* node = SpawnNodeByDef(defId);
             if (node)
             {
@@ -1202,6 +1204,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         auto spawnAndClose = [&](const char* defId)
         {
             ed::SetCurrentEditor(ActiveDoc()->editorContext);
+            PushUndoState();  // 变量拖拽生成节点前保存快照
             Node* node = SpawnNodeByDef(defId);
             if (node)
             {
