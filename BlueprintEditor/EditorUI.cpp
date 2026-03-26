@@ -2649,208 +2649,436 @@ void BlueprintEditor::DrawNodeListPanel()
     if (showStyleEditor)
         ShowStyleEditor(&showStyleEditor);
 
-    // 节点过滤器
-    char* nodeFilterBuf = ActiveDoc()->nodeFilterBuf;
-    ImGui::SetNextItemWidth(paneWidth);
-    ImGui::InputTextWithHint("##NodeFilter", ICON_FA_MAGNIFYING_GLASS " Filter nodes...", nodeFilterBuf, 128);
-
-    std::string nodeFilter(nodeFilterBuf);
-    // 转小写
-    std::string lowerFilter = nodeFilter;
-    for (auto& c : lowerFilter)
-        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-
-    // 选中节点信息
-    std::vector<ed::NodeId> selectedNodes;
-    std::vector<ed::LinkId> selectedLinks;
-    selectedNodes.resize(ed::GetSelectedObjectCount());
-    selectedLinks.resize(ed::GetSelectedObjectCount());
-
-    int nodeCount = ed::GetSelectedNodes(selectedNodes.data(), static_cast<int>(selectedNodes.size()));
-    int linkCount = ed::GetSelectedLinks(selectedLinks.data(), static_cast<int>(selectedLinks.size()));
-
-    selectedNodes.resize(nodeCount);
-    selectedLinks.resize(linkCount);
-
-    int saveIconWidth     = GetTextureWidth(m_SaveIcon);
-    int saveIconHeight    = GetTextureHeight(m_SaveIcon);
-    int restoreIconWidth  = GetTextureWidth(m_RestoreIcon);
-    int restoreIconHeight = GetTextureHeight(m_RestoreIcon);
-
-    if (saveIconWidth <= 0)    saveIconWidth    = 24;
-    if (saveIconHeight <= 0)   saveIconHeight   = 24;
-    if (restoreIconWidth <= 0) restoreIconWidth = 24;
-    if (restoreIconHeight <= 0) restoreIconHeight = 24;
-
-    // 节点列表（带美化标题）
+    // ── Tab Bar：Nodes / Variables ──────────────────────────────────────────
+    if (ImGui::BeginTabBar("##InspectorTabs"))
     {
-        auto* drawList = ImGui::GetWindowDrawList();
-        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-        float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-        ImU32 colL = IM_COL32(35, 48, 68, 210);
-        ImU32 colR = IM_COL32(28, 36, 52, 180);
-        drawList->AddRectFilledMultiColor(
-            cursorPos,
-            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-            colL, colR, colR, colL);
-        drawList->AddText(
-            ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-            IM_COL32(160, 195, 240, 230),
-            nodeFilter.empty() ? ICON_FA_CUBES " Nodes" : ICON_FA_CUBES " Nodes (filtered)");
-        ImGui::Dummy(ImVec2(paneWidth, sectionH));
-    }
-    ImGui::Indent();
-    for (auto& node : ActiveDoc()->nodes)
-    {
-        // 过滤：如果有过滤文字，跳过不匹配的节点
-        if (!lowerFilter.empty())
+        // ── Nodes Tab ───────────────────────────────────────────────────────
+        if (ImGui::BeginTabItem(ICON_FA_CUBES " Nodes"))
         {
-            std::string lowerName = node.Name;
-            for (auto& c : lowerName)
+            // 节点过滤器
+            char* nodeFilterBuf = ActiveDoc()->nodeFilterBuf;
+            ImGui::SetNextItemWidth(paneWidth);
+            ImGui::InputTextWithHint("##NodeFilter", ICON_FA_MAGNIFYING_GLASS " Filter nodes...", nodeFilterBuf, 128);
+
+            std::string nodeFilter(nodeFilterBuf);
+            std::string lowerFilter = nodeFilter;
+            for (auto& c : lowerFilter)
                 c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-            if (lowerName.find(lowerFilter) == std::string::npos)
-                continue;
-        }
-        ImGui::PushID(node.ID.AsPointer());
-        auto start = ImGui::GetCursorScreenPos();
 
-        if (const auto progress = GetTouchProgress(node.ID))
-        {
-            ImGui::GetWindowDrawList()->AddLine(
-                start + ImVec2(-8, 0),
-                start + ImVec2(-8, ImGui::GetTextLineHeight()),
-                IM_COL32(255, 0, 0, 255 - (int)(255 * progress)), 4.0f);
-        }
+            // 选中节点信息
+            std::vector<ed::NodeId> selectedNodes;
+            std::vector<ed::LinkId> selectedLinks;
+            selectedNodes.resize(ed::GetSelectedObjectCount());
+            selectedLinks.resize(ed::GetSelectedObjectCount());
 
-        bool isSelected = std::find(selectedNodes.begin(), selectedNodes.end(), node.ID) != selectedNodes.end();
-# if IMGUI_VERSION_NUM >= 18967
-        ImGui::SetNextItemAllowOverlap();
-# endif
-        if (ImGui::Selectable((node.Name + "##" + std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer()))).c_str(), &isSelected))
-        {
-            if (io.KeyCtrl)
+            int nodeCount = ed::GetSelectedNodes(selectedNodes.data(), static_cast<int>(selectedNodes.size()));
+            int linkCount = ed::GetSelectedLinks(selectedLinks.data(), static_cast<int>(selectedLinks.size()));
+
+            selectedNodes.resize(nodeCount);
+            selectedLinks.resize(linkCount);
+
+            int saveIconWidth     = GetTextureWidth(m_SaveIcon);
+            int saveIconHeight    = GetTextureHeight(m_SaveIcon);
+            int restoreIconWidth  = GetTextureWidth(m_RestoreIcon);
+            int restoreIconHeight = GetTextureHeight(m_RestoreIcon);
+
+            if (saveIconWidth <= 0)    saveIconWidth    = 24;
+            if (saveIconHeight <= 0)   saveIconHeight   = 24;
+            if (restoreIconWidth <= 0) restoreIconWidth = 24;
+            if (restoreIconHeight <= 0) restoreIconHeight = 24;
+
+            // 节点列表
             {
-                if (isSelected)
-                    ed::SelectNode(node.ID, true);
+                auto* drawList = ImGui::GetWindowDrawList();
+                ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+                float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+                ImU32 colL = IM_COL32(35, 48, 68, 210);
+                ImU32 colR = IM_COL32(28, 36, 52, 180);
+                drawList->AddRectFilledMultiColor(
+                    cursorPos,
+                    ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+                    colL, colR, colR, colL);
+                drawList->AddText(
+                    ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
+                    IM_COL32(160, 195, 240, 230),
+                    nodeFilter.empty() ? ICON_FA_CUBES " Nodes" : ICON_FA_CUBES " Nodes (filtered)");
+                ImGui::Dummy(ImVec2(paneWidth, sectionH));
+            }
+            ImGui::Indent();
+            for (auto& node : ActiveDoc()->nodes)
+            {
+                if (!lowerFilter.empty())
+                {
+                    std::string lowerName = node.Name;
+                    for (auto& c : lowerName)
+                        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                    if (lowerName.find(lowerFilter) == std::string::npos)
+                        continue;
+                }
+                ImGui::PushID(node.ID.AsPointer());
+                auto start = ImGui::GetCursorScreenPos();
+
+                if (const auto progress = GetTouchProgress(node.ID))
+                {
+                    ImGui::GetWindowDrawList()->AddLine(
+                        start + ImVec2(-8, 0),
+                        start + ImVec2(-8, ImGui::GetTextLineHeight()),
+                        IM_COL32(255, 0, 0, 255 - (int)(255 * progress)), 4.0f);
+                }
+
+                bool isSelected = std::find(selectedNodes.begin(), selectedNodes.end(), node.ID) != selectedNodes.end();
+#if IMGUI_VERSION_NUM >= 18967
+                ImGui::SetNextItemAllowOverlap();
+#endif
+                if (ImGui::Selectable((node.Name + "##" + std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer()))).c_str(), &isSelected))
+                {
+                    if (io.KeyCtrl)
+                    {
+                        if (isSelected) ed::SelectNode(node.ID, true);
+                        else            ed::DeselectNode(node.ID);
+                    }
+                    else
+                        ed::SelectNode(node.ID, false);
+                    ed::NavigateToSelection();
+                }
+                if (ImGui::IsItemHovered() && !node.State.empty())
+                    ImGui::SetTooltip("State: %s", node.State.c_str());
+
+                auto id = std::string("(") + std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer())) + ")";
+                auto textSize = ImGui::CalcTextSize(id.c_str(), nullptr);
+                auto iconPanelPos = start + ImVec2(
+                    paneWidth - ImGui::GetStyle().FramePadding.x - ImGui::GetStyle().IndentSpacing - saveIconWidth - restoreIconWidth - ImGui::GetStyle().ItemInnerSpacing.x,
+                    (ImGui::GetTextLineHeight() - saveIconHeight) / 2);
+                ImGui::GetWindowDrawList()->AddText(
+                    ImVec2(iconPanelPos.x - textSize.x - ImGui::GetStyle().ItemInnerSpacing.x, start.y),
+                    IM_COL32(255, 255, 255, 255), id.c_str(), nullptr);
+
+                auto drawList = ImGui::GetWindowDrawList();
+                ImGui::SetCursorScreenPos(iconPanelPos);
+#if IMGUI_VERSION_NUM < 18967
+                ImGui::SetItemAllowOverlap();
+#else
+                ImGui::SetNextItemAllowOverlap();
+#endif
+                if (node.SavedState.empty())
+                {
+                    if (ImGui::InvisibleButton("save", ImVec2((float)saveIconWidth, (float)saveIconHeight)))
+                        node.SavedState = node.State;
+                    if (ImGui::IsItemActive())
+                        drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,96));
+                    else if (ImGui::IsItemHovered())
+                        drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,255));
+                    else
+                        drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,160));
+                }
                 else
-                    ed::DeselectNode(node.ID);
+                {
+                    ImGui::Dummy(ImVec2((float)saveIconWidth, (float)saveIconHeight));
+                    drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,32));
+                }
+
+                ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+#if IMGUI_VERSION_NUM < 18967
+                ImGui::SetItemAllowOverlap();
+#else
+                ImGui::SetNextItemAllowOverlap();
+#endif
+                if (!node.SavedState.empty())
+                {
+                    if (ImGui::InvisibleButton("restore", ImVec2((float)restoreIconWidth, (float)restoreIconHeight)))
+                    {
+                        node.State = node.SavedState;
+                        ed::RestoreNodeState(node.ID);
+                        node.SavedState.clear();
+                    }
+                    if (ImGui::IsItemActive())
+                        drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,96));
+                    else if (ImGui::IsItemHovered())
+                        drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,255));
+                    else
+                        drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,160));
+                }
+                else
+                {
+                    ImGui::Dummy(ImVec2((float)restoreIconWidth, (float)restoreIconHeight));
+                    drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,32));
+                }
+
+                ImGui::SameLine(0, 0);
+#if IMGUI_VERSION_NUM < 18967
+                ImGui::SetItemAllowOverlap();
+#endif
+                ImGui::Dummy(ImVec2(0, (float)restoreIconHeight));
+                ImGui::PopID();
             }
-            else
-                ed::SelectNode(node.ID, false);
+            ImGui::Unindent();
 
-            ed::NavigateToSelection();
-        }
-        if (ImGui::IsItemHovered() && !node.State.empty())
-            ImGui::SetTooltip("State: %s", node.State.c_str());
-
-        auto id = std::string("(") + std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer())) + ")";
-        auto textSize = ImGui::CalcTextSize(id.c_str(), nullptr);
-        auto iconPanelPos = start + ImVec2(
-            paneWidth - ImGui::GetStyle().FramePadding.x - ImGui::GetStyle().IndentSpacing - saveIconWidth - restoreIconWidth - ImGui::GetStyle().ItemInnerSpacing.x * 1,
-            (ImGui::GetTextLineHeight() - saveIconHeight) / 2);
-        ImGui::GetWindowDrawList()->AddText(
-            ImVec2(iconPanelPos.x - textSize.x - ImGui::GetStyle().ItemInnerSpacing.x, start.y),
-            IM_COL32(255, 255, 255, 255), id.c_str(), nullptr);
-
-        auto drawList = ImGui::GetWindowDrawList();
-        ImGui::SetCursorScreenPos(iconPanelPos);
-# if IMGUI_VERSION_NUM < 18967
-        ImGui::SetItemAllowOverlap();
-# else
-        ImGui::SetNextItemAllowOverlap();
-# endif
-        if (node.SavedState.empty())
-        {
-            if (ImGui::InvisibleButton("save", ImVec2((float)saveIconWidth, (float)saveIconHeight)))
-                node.SavedState = node.State;
-
-            if (ImGui::IsItemActive())
-                drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 96));
-            else if (ImGui::IsItemHovered())
-                drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 255));
-            else
-                drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 160));
-        }
-        else
-        {
-            ImGui::Dummy(ImVec2((float)saveIconWidth, (float)saveIconHeight));
-            drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 32));
-        }
-
-        ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-# if IMGUI_VERSION_NUM < 18967
-        ImGui::SetItemAllowOverlap();
-# else
-        ImGui::SetNextItemAllowOverlap();
-# endif
-        if (!node.SavedState.empty())
-        {
-            if (ImGui::InvisibleButton("restore", ImVec2((float)restoreIconWidth, (float)restoreIconHeight)))
+            // 选择信息
+            static int changeCount = 0;
             {
-                node.State = node.SavedState;
-                ed::RestoreNodeState(node.ID);
-                node.SavedState.clear();
+                auto* drawList = ImGui::GetWindowDrawList();
+                ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+                float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+                ImU32 colL = IM_COL32(35, 48, 68, 210);
+                ImU32 colR = IM_COL32(28, 36, 52, 180);
+                drawList->AddRectFilledMultiColor(
+                    cursorPos,
+                    ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+                    colL, colR, colR, colL);
+                drawList->AddText(
+                    ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
+                    IM_COL32(160, 195, 240, 230), ICON_FA_HAND_POINTER " Selection");
+                ImGui::Dummy(ImVec2(paneWidth, sectionH));
             }
+            ImGui::BeginHorizontal("Selection Stats", ImVec2(paneWidth, 0));
+            ImGui::Text("Changed %d time%s", changeCount, changeCount > 1 ? "s" : "");
+            ImGui::Spring();
+            if (ImGui::Button(ICON_FA_XMARK " Deselect"))
+                ed::ClearSelection();
+            ImGui::EndHorizontal();
+            ImGui::Indent();
+            for (int i = 0; i < nodeCount; ++i) ImGui::Text("Node (%p)", selectedNodes[i].AsPointer());
+            for (int i = 0; i < linkCount; ++i) ImGui::Text("Link (%p)", selectedLinks[i].AsPointer());
+            ImGui::Unindent();
 
-            if (ImGui::IsItemActive())
-                drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 96));
-            else if (ImGui::IsItemHovered())
-                drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 255));
-            else
-                drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 160));
+            if (ImGui::IsKeyPressed(ImGuiKey_Z))
+                for (auto& link : ActiveDoc()->links)
+                    ed::Flow(link.ID);
+
+            if (ed::HasSelectionChanged())
+                ++changeCount;
+
+            ImGui::EndTabItem();
         }
-        else
+
+        // ── Variables Tab ───────────────────────────────────────────────────
+        if (ImGui::BeginTabItem(ICON_FA_LAYER_GROUP " Variables"))
         {
-            ImGui::Dummy(ImVec2((float)restoreIconWidth, (float)restoreIconHeight));
-            drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 32));
+            DrawVariablePanel();
+            ImGui::EndTabItem();
         }
 
-        ImGui::SameLine(0, 0);
-# if IMGUI_VERSION_NUM < 18967
-        ImGui::SetItemAllowOverlap();
-# endif
-        ImGui::Dummy(ImVec2(0, (float)restoreIconHeight));
+        ImGui::EndTabBar();
+    }
+}
+
+// ============================================================================
+// 变量面板（在 DrawNodeListPanel 的 Variables Tab 内调用）
+// ============================================================================
+
+void BlueprintEditor::DrawVariablePanel()
+{
+    
+
+    auto* doc = ActiveDoc();
+    if (!doc) return;
+
+    float paneWidth = ImGui::GetContentRegionAvail().x;
+
+    // ── 工具栏：添加变量 + 类型选择 ─────────────────────────────────────
+    // 用于"新建变量"的临时状态（每个文档独立存储在 doc 里，这里用 static 仅做弹窗控制）
+    static bool showAddPopup = false;
+    static char newVarName[64] = {};
+    static int  newVarTypeIdx = 1; // 默认 Boolean
+
+    if (ImGui::Button(ICON_FA_PLUS " Add Variable"))
+    {
+        memset(newVarName, 0, sizeof(newVarName));
+        newVarTypeIdx = 1;
+        showAddPopup = true;
+        ImGui::OpenPopup("##AddVariable");
+    }
+
+    // ── 新建变量弹窗 ──────────────────────────────────────────────────────
+    if (ImGui::BeginPopup("##AddVariable"))
+    {
+        ImGui::TextUnformatted("New Variable");
+        ImGui::Separator();
+
+        ImGui::SetNextItemWidth(160.0f);
+        ImGui::InputTextWithHint("##VarName", "Variable name...", newVarName, sizeof(newVarName));
+
+        const char* typeNames[] = { "Unknown", "Boolean", "Integer", "Float", "String", "Object", "Array", "Map", "Any" };
+        const RTPinDataType typeValues[] = {
+            RTPinDataType::Unknown, RTPinDataType::Boolean, RTPinDataType::Integer,
+            RTPinDataType::Float, RTPinDataType::String, RTPinDataType::Object,
+            RTPinDataType::Array, RTPinDataType::Map, RTPinDataType::Any
+        };
+        ImGui::SetNextItemWidth(160.0f);
+        ImGui::Combo("##VarType", &newVarTypeIdx, typeNames, IM_ARRAYSIZE(typeNames));
+
+        ImGui::Spacing();
+        bool canAdd = (newVarName[0] != '\0');
+        if (!canAdd) ImGui::BeginDisabled();
+        if (ImGui::Button("Add") && canAdd)
+        {
+            // 检查重名
+            bool dup = false;
+            for (auto& v : doc->variables)
+                if (v.name == newVarName) { dup = true; break; }
+
+            if (!dup)
+            {
+                RTVariableDefinition var;
+                var.name      = newVarName;
+                var.dataType  = typeValues[newVarTypeIdx];
+                var.isExposed = true;
+                doc->variables.push_back(std::move(var));
+                doc->isDirty = true;
+                ImGui::CloseCurrentPopup();
+                showAddPopup = false;
+            }
+            else
+            {
+                ImGui::TextColored(ImVec4(1,0.4f,0.4f,1), "Name already exists!");
+            }
+        }
+        if (!canAdd) ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+        {
+            ImGui::CloseCurrentPopup();
+            showAddPopup = false;
+        }
+        ImGui::EndPopup();
+    }
+
+    ImGui::Spacing();
+
+    if (doc->variables.empty())
+    {
+        ImGui::TextDisabled("No variables defined.");
+        ImGui::TextDisabled("Click '" ICON_FA_PLUS " Add Variable' to create one.");
+        return;
+    }
+
+    // ── 变量列表 ──────────────────────────────────────────────────────────
+    // 类型名映射
+    auto typeToStr = [](RTPinDataType t) -> const char* {
+        switch (t) {
+        case RTPinDataType::Boolean: return "Bool";
+        case RTPinDataType::Integer: return "Int";
+        case RTPinDataType::Float:   return "Float";
+        case RTPinDataType::String:  return "String";
+        case RTPinDataType::Object:  return "Object";
+        case RTPinDataType::Array:   return "Array";
+        case RTPinDataType::Map:     return "Map";
+        case RTPinDataType::Any:     return "Any";
+        default:                   return "Unknown";
+        }
+    };
+
+    // 类型颜色
+    auto typeColor = [](RTPinDataType t) -> ImVec4 {
+        switch (t) {
+        case RTPinDataType::Boolean: return ImVec4(0.9f, 0.4f, 0.4f, 1.0f);
+        case RTPinDataType::Integer: return ImVec4(0.4f, 0.8f, 0.4f, 1.0f);
+        case RTPinDataType::Float:   return ImVec4(0.4f, 0.7f, 1.0f, 1.0f);
+        case RTPinDataType::String:  return ImVec4(1.0f, 0.8f, 0.3f, 1.0f);
+        case RTPinDataType::Object:  return ImVec4(0.8f, 0.5f, 1.0f, 1.0f);
+        case RTPinDataType::Array:   return ImVec4(0.5f, 1.0f, 0.8f, 1.0f);
+        case RTPinDataType::Map:     return ImVec4(1.0f, 0.6f, 0.2f, 1.0f);
+        default:                   return ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+        }
+    };
+
+    int deleteIdx = -1;  // 待删除的变量下标（延迟删除，避免迭代时修改容器）
+
+    for (int i = 0; i < (int)doc->variables.size(); ++i)
+    {
+        auto& var = doc->variables[i];
+        ImGui::PushID(i);
+
+        // 类型色标
+        ImVec2 dotPos = ImGui::GetCursorScreenPos() + ImVec2(4.0f, ImGui::GetTextLineHeight() * 0.5f - 4.0f);
+        ImGui::GetWindowDrawList()->AddCircleFilled(dotPos + ImVec2(4,4), 5.0f, ImGui::ColorConvertFloat4ToU32(typeColor(var.dataType)));
+        ImGui::Dummy(ImVec2(14.0f, ImGui::GetTextLineHeight()));
+        ImGui::SameLine(0, 2.0f);
+
+        // 变量名（可内联重命名）
+        char nameBuf[64];
+        snprintf(nameBuf, sizeof(nameBuf), "%s", var.name.c_str());
+        ImGui::SetNextItemWidth(paneWidth - 80.0f);
+        if (ImGui::InputText("##vname", nameBuf, sizeof(nameBuf), ImGuiInputTextFlags_EnterReturnsTrue))
+        {
+            if (nameBuf[0] != '\0' && var.name != nameBuf)
+            {
+                // 检查重名
+                bool dup = false;
+                for (int j = 0; j < (int)doc->variables.size(); ++j)
+                    if (j != i && doc->variables[j].name == nameBuf) { dup = true; break; }
+                if (!dup)
+                {
+                    var.name = nameBuf;
+                    doc->isDirty = true;
+                }
+            }
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Press Enter to rename");
+
+        ImGui::SameLine();
+
+        // 类型标签（点击切换类型）
+        ImGui::TextColored(typeColor(var.dataType), "[%s]", typeToStr(var.dataType));
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Click to change type");
+        if (ImGui::IsItemClicked())
+            ImGui::OpenPopup("##VarType");
+
+        if (ImGui::BeginPopup("##VarType"))
+        {
+            const char* typeNames[] = { "Boolean", "Integer", "Float", "String", "Object", "Array", "Map", "Any" };
+            const RTPinDataType typeValues[] = {
+                RTPinDataType::Boolean, RTPinDataType::Integer, RTPinDataType::Float,
+                RTPinDataType::String, RTPinDataType::Object, RTPinDataType::Array,
+                RTPinDataType::Map, RTPinDataType::Any
+            };
+            for (int t = 0; t < IM_ARRAYSIZE(typeNames); ++t)
+            {
+                ImGui::TextColored(typeColor(typeValues[t]), "●");
+                ImGui::SameLine();
+                if (ImGui::Selectable(typeNames[t], var.dataType == typeValues[t]))
+                {
+                    var.dataType = typeValues[t];
+                    doc->isDirty = true;
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+            ImGui::EndPopup();
+        }
+
+        ImGui::SameLine();
+
+        // 删除按钮
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0,0,0,0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f,0.2f,0.2f,0.6f));
+        if (ImGui::SmallButton(ICON_FA_TRASH_CAN))
+            deleteIdx = i;
+        ImGui::PopStyleColor(2);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Delete variable");
+
+        // Tooltip：展示变量详情
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+        {
+            ImGui::BeginTooltip();
+            ImGui::Text("Name:     %s", var.name.c_str());
+            ImGui::Text("Type:     %s", typeToStr(var.dataType));
+            ImGui::Text("Exposed:  %s", var.isExposed ? "Yes" : "No");
+            if (!var.tooltip.empty()) ImGui::Text("Tip: %s", var.tooltip.c_str());
+            ImGui::EndTooltip();
+        }
 
         ImGui::PopID();
     }
-    ImGui::Unindent();
 
-    // 选择信息
-    static int changeCount = 0;
-
+    // 延迟删除
+    if (deleteIdx >= 0)
     {
-        auto* drawList = ImGui::GetWindowDrawList();
-        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-        float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-        ImU32 colL = IM_COL32(35, 48, 68, 210);
-        ImU32 colR = IM_COL32(28, 36, 52, 180);
-        drawList->AddRectFilledMultiColor(
-            cursorPos,
-            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-            colL, colR, colR, colL);
-        drawList->AddText(
-            ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-            IM_COL32(160, 195, 240, 230), ICON_FA_HAND_POINTER " Selection");
-        ImGui::Dummy(ImVec2(paneWidth, sectionH));
+        doc->variables.erase(doc->variables.begin() + deleteIdx);
+        doc->isDirty = true;
     }
-
-    ImGui::BeginHorizontal("Selection Stats", ImVec2(paneWidth, 0));
-    ImGui::Text("Changed %d time%s", changeCount, changeCount > 1 ? "s" : "");
-    ImGui::Spring();
-    if (ImGui::Button(ICON_FA_XMARK " Deselect"))
-        ed::ClearSelection();
-    ImGui::EndHorizontal();
-    ImGui::Indent();
-    for (int i = 0; i < nodeCount; ++i) ImGui::Text("Node (%p)", selectedNodes[i].AsPointer());
-    for (int i = 0; i < linkCount; ++i) ImGui::Text("Link (%p)", selectedLinks[i].AsPointer());
-    ImGui::Unindent();
-
-    if (ImGui::IsKeyPressed(ImGuiKey_Z))
-        for (auto& link : ActiveDoc()->links)
-            ed::Flow(link.ID);
-
-    if (ed::HasSelectionChanged())
-        ++changeCount;
 }
 
 // ============================================================================

@@ -592,6 +592,9 @@ RTBlueprintData BlueprintEditor::BuildRuntimeData()
         bp.links.push_back(li);
     }
 
+    // 转换变量
+    bp.variables = ActiveDoc()->variables;
+
     return bp;
 }
 

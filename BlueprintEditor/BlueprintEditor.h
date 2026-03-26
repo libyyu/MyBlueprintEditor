@@ -44,6 +44,7 @@ typedef NodeEditor::Runtime::PinInfo            RTPinInfo;
 typedef NodeEditor::Runtime::PinDataType        RTPinDataType;
 typedef NodeEditor::Runtime::NodeDefinition     RTNodeDef;
 typedef NodeEditor::Runtime::PinDefinition      RTPinDef;
+typedef NodeEditor::Runtime::VariableDefinition RTVariableDefinition;
 typedef NodeEditor::Runtime::NodeCategory       RTNodeCategory;
 typedef NodeEditor::Runtime::DefaultNodeRegistry RTNodeRegistry;
 typedef NodeEditor::Runtime::NodeHandler        RTNodeHandler;
@@ -197,6 +198,9 @@ struct BlueprintDocument
 
     // 节点过滤器（每个文档独立，切换文档后保留各自的过滤状态）
     char nodeFilterBuf[128] = {};
+
+    // 变量列表（蓝图级别的变量定义，可在 Get/Set Variable 节点中引用）
+    std::vector<RTVariableDefinition> variables;
 
     // ---- 编辑器侧哈希索引（O(1) 查找加速） ----
     // 调用 rebuildEditorIndices() 重建；数据变更后调用 invalidateEditorIndices()
@@ -457,7 +461,8 @@ struct BlueprintEditor : public Application
                                         Pin* endPin, ed::PinId endPinId);  // 创建链接 + UE4 Flow 自动重连
     void    ShowStyleEditor(bool* show = nullptr);
     void    ShowLeftPane(float paneWidth);             // 旧版左侧面板（已不使用）
-    void    DrawNodeListPanel();                       // 左侧节点列表面板（嵌入式）
+    void    DrawNodeListPanel();                       // 右侧节点列表/变量面板（嵌入式）
+    void    DrawVariablePanel();                       // 变量面板（在 DrawNodeListPanel TabBar 内调用）
     void    DrawExecutionPanel();                      // 底部执行输出面板（嵌入式）
     void    DrawTimerPanel();                          // 计时器监控浮动面板
 

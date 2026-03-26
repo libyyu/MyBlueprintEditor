@@ -760,6 +760,9 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
             }
         }
     }
+
+    // 加载变量定义
+    ActiveDoc()->variables = data.variables;
 }
 
 // ============================================================================
