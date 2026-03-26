@@ -1302,6 +1302,12 @@ void BlueprintEditor::OnFrame(float deltaTime)
         DrawMinimap(editorMin, editorMax);
 
     // ================================================================
+    // 缩放条（右下角浮动可交互 widget）
+    // ================================================================
+    if (ActiveDoc() && editorMax.x > editorMin.x)
+        DrawZoomBar(editorMin, editorMax);
+
+    // ================================================================
     // 画布节点搜索覆盖层（Ctrl+F）
     // ================================================================
     DrawSearchOverlay();
