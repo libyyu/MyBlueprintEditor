@@ -418,6 +418,29 @@ struct BlueprintEditor : public Application
     void  NavigateToSearchResult(int index);
     void  DrawSearchOverlay();
 
+    // Create Node 菜单缓存（性能优化）
+    // ------------------------------------------------------------------
+    struct CategoryMenuNode {
+        std::map<std::string, CategoryMenuNode>  children;
+        std::vector<const RTNodeDef*>            directNodes;
+    };
+    // 缓存的分类树
+    std::map<std::string, CategoryMenuNode>   m_CachedRootChildren;
+    std::vector<std::string>                  m_CachedRootOrder;
+    std::unordered_map<std::string, std::string> m_CachedCatIdToName;
+    size_t                                    m_CachedDefCount = 0;  // 用于检测 registry 变化
+    // 缓存的搜索结果
+    std::string                               m_CachedSearchFilter;
+    std::vector<const RTNodeDef*>             m_CachedSearchResults;
+    // 左侧 Nodes 面板的 tolower 名字缓存
+    // key = node.ID pointer, value = { name_lower, defId_lower }
+    struct NodeFilterCache {
+        std::string nameLower;
+        std::string defIdLower;
+    };
+    std::unordered_map<uintptr_t, NodeFilterCache> m_NodeFilterCache;
+    std::string                               m_LastNodeFilter;
+
     // ------------------------------------------------------------------
     // 缩放条（ZoomBar）
     // ------------------------------------------------------------------

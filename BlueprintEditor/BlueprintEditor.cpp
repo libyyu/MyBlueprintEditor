@@ -539,20 +539,22 @@ void BlueprintEditor::FixupSpecialPinTypes(Node* node, const RTNodeDef* def)
 
 // 辅助：递归构建多级分类菜单
 // categoryTree 结构: map<子分类名, pair<子树, 该层直属节点列表>>
-struct CategoryMenuNode
-{
-    std::map<std::string, CategoryMenuNode>  children;     // 子分类
-    std::vector<const RTNodeDef*>            directNodes;  // 直属该层的节点（指针，避免拷贝）
-};
+// ============================================================================
+// Create Node 菜单（带缓存，性能优化版）
+// ============================================================================
 
-// 将所有节点按 category 路径组织成树状结构
-static void BuildCategoryTree(const std::vector<const RTNodeDef*>& allDefs,
-                              const std::vector<RTNodeCategory>& categories,
-                              std::map<std::string, CategoryMenuNode>& rootChildren,
-                              std::vector<std::string>& rootOrder)
+// 辅助：将 allDefs 按 category 路径填入缓存树
+static void RebuildCategoryTree(
+    const std::vector<const RTNodeDef*>& allDefs,
+    const std::vector<RTNodeCategory>& categories,
+    std::map<std::string, BlueprintEditor::CategoryMenuNode>& rootChildren,
+    std::vector<std::string>& rootOrder,
+    std::unordered_map<std::string, std::string>& catIdToName)
 {
-    // 收集已注册的顶级分类顺序
-    std::unordered_map<std::string, std::string> catIdToName; // id -> display name
+    rootChildren.clear();
+    rootOrder.clear();
+    catIdToName.clear();
+
     for (const auto& cat : categories)
     {
         catIdToName[cat.id] = cat.name;
@@ -563,7 +565,6 @@ static void BuildCategoryTree(const std::vector<const RTNodeDef*>& allDefs,
     {
         if (d->category.empty()) continue;
 
-        // 按 '/' 拆分 category 路径
         std::vector<std::string> parts;
         std::string seg;
         for (char c : d->category)
@@ -579,15 +580,13 @@ static void BuildCategoryTree(const std::vector<const RTNodeDef*>& allDefs,
         if (!seg.empty()) parts.push_back(seg);
         if (parts.empty()) continue;
 
-        // 确保顶级分类在 rootOrder 中
         bool found = false;
         for (const auto& r : rootOrder)
             if (r == parts[0]) { found = true; break; }
         if (!found)
             rootOrder.push_back(parts[0]);
 
-        // 逐层插入树
-        CategoryMenuNode* node = &rootChildren[parts[0]];
+        BlueprintEditor::CategoryMenuNode* node = &rootChildren[parts[0]];
         for (size_t i = 1; i < parts.size(); ++i)
             node = &node->children[parts[i]];
 
@@ -599,90 +598,120 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
 {
     Node* result = nullptr;
 
-    // 构建分类树
     const auto& allDefsRef = m_NodeRegistry.getAllNodeDefinitions();
-    // 拷贝到局部 vector 以便排序（仅排序指针，开销极小）
-    std::vector<const RTNodeDef*> allDefs(allDefsRef.begin(), allDefsRef.end());
-    auto categories = m_NodeRegistry.getAllCategories();
+    size_t defCount = allDefsRef.size();
 
-    std::map<std::string, CategoryMenuNode> rootChildren;
-    std::vector<std::string> rootOrder;
-    BuildCategoryTree(allDefs, categories, rootChildren, rootOrder);
+    // ── 懒加载分类树（仅 registry 变化时重建） ──────────────────────────
+    if (defCount != m_CachedDefCount)
+    {
+        std::vector<const RTNodeDef*> allDefs(allDefsRef.begin(), allDefsRef.end());
+        auto categories = m_NodeRegistry.getAllCategories();
+        RebuildCategoryTree(allDefs, categories,
+                            m_CachedRootChildren, m_CachedRootOrder, m_CachedCatIdToName);
+        m_CachedDefCount = defCount;
+        // 搜索缓存也失效
+        m_CachedSearchFilter = "\xFF";  // 强制下次重算
+    }
 
-    // 分类 id -> 显示名
-    std::unordered_map<std::string, std::string> catIdToName;
-    for (const auto& cat : categories)
-        catIdToName[cat.id] = cat.name;
-
-    // ---- 搜索过滤框（置顶） ----
+    // ── 搜索框 ────────────────────────────────────────────────────────────
     static char searchBuf[128] = "";
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-    ImGui::InputTextWithHint("##search", ICON_FA_MAGNIFYING_GLASS " Search nodes...", searchBuf, sizeof(searchBuf));
+    bool searchChanged = ImGui::InputTextWithHint(
+        "##search", ICON_FA_MAGNIFYING_GLASS " Search nodes...", searchBuf, sizeof(searchBuf));
+
     std::string filter(searchBuf);
 
     if (!filter.empty())
     {
-        // 有搜索关键词时：只显示过滤后的平铺节点列表
         ImGui::Separator();
 
-        std::string lower_filter = filter;
-        for (auto& c : lower_filter) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-
-        // 排序节点（按指针的 name 字段排序）
-        std::sort(allDefs.begin(), allDefs.end(),
-            [](const RTNodeDef* a, const RTNodeDef* b) { return a->name < b->name; });
-
-        int shown = 0;
-        for (const auto* d : allDefs)
+        // ── 缓存搜索结果（仅 filter 变化时重算） ─────────────────────────
+        if (filter != m_CachedSearchFilter)
         {
-            std::string lower_name = d->name;
-            for (auto& c : lower_name) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-            if (lower_name.find(lower_filter) == std::string::npos)
-                continue;
+            m_CachedSearchFilter = filter;
+            m_CachedSearchResults.clear();
 
-            // 显示节点名和分类标签
+            std::string lower_filter = filter;
+            for (auto& c : lower_filter) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+            for (const auto* d : allDefsRef)
+            {
+                // 匹配名字
+                std::string lower_name = d->name;
+                for (auto& c : lower_name) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                bool hit = (lower_name.find(lower_filter) != std::string::npos);
+
+                // 也匹配 id（如 "BoolToInt"）
+                if (!hit)
+                {
+                    std::string lower_id = d->id;
+                    for (auto& c : lower_id) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                    hit = (lower_id.find(lower_filter) != std::string::npos);
+                }
+
+                // 匹配 category
+                if (!hit)
+                {
+                    std::string lower_cat = d->category;
+                    for (auto& c : lower_cat) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                    hit = (lower_cat.find(lower_filter) != std::string::npos);
+                }
+
+                if (hit)
+                    m_CachedSearchResults.push_back(d);
+            }
+
+            // 排序：名字字母序
+            std::sort(m_CachedSearchResults.begin(), m_CachedSearchResults.end(),
+                [](const RTNodeDef* a, const RTNodeDef* b) { return a->name < b->name; });
+        }
+
+        // ── 渲染搜索结果（直接遍历缓存，无 tolower） ──────────────────────
+        for (const auto* d : m_CachedSearchResults)
+        {
             if (ImGui::MenuItem(d->name.c_str()))
             {
                 PushUndoState();
                 result = SpawnNodeByDef(d->id);
                 if (result)
                     FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d->id));
-                searchBuf[0] = '\0';  // 创建后清空搜索
+                searchBuf[0] = '\0';
+                m_CachedSearchFilter.clear();
             }
             if (!d->category.empty() && ImGui::IsItemHovered())
                 ImGui::SetTooltip("Category: %s", d->category.c_str());
-
-            ++shown;
         }
 
-        if (shown == 0)
+        if (m_CachedSearchResults.empty())
             ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "No matching nodes");
 
         return result;
     }
+    else
+    {
+        // filter 清空时重置缓存
+        if (!m_CachedSearchFilter.empty())
+            m_CachedSearchFilter.clear();
+    }
 
     ImGui::Separator();
 
-    // 递归渲染菜单的 lambda
+    // ── 按分类树渲染（直接用缓存） ────────────────────────────────────────
     std::function<void(const CategoryMenuNode&)> renderMenu;
     renderMenu = [&](const CategoryMenuNode& menuNode)
     {
-        // 先渲染子分类
         for (const auto& child : menuNode.children)
         {
-            const std::string& subName = child.first;
-            if (ImGui::BeginMenu(subName.c_str()))
+            if (ImGui::BeginMenu(child.first.c_str()))
             {
                 renderMenu(child.second);
                 ImGui::EndMenu();
             }
         }
 
-        // 如果同时有子分类和直属节点，加分隔线
         if (!menuNode.children.empty() && !menuNode.directNodes.empty())
             ImGui::Separator();
 
-        // 渲染直属节点
         for (const auto* d : menuNode.directNodes)
         {
             if (ImGui::MenuItem(d->name.c_str()))
@@ -695,14 +724,14 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
         }
     };
 
-    // 按注册顺序渲染顶级菜单
-    for (const auto& rootId : rootOrder)
+    for (const auto& rootId : m_CachedRootOrder)
     {
-        auto it = rootChildren.find(rootId);
-        if (it == rootChildren.end()) continue;
+        auto it = m_CachedRootChildren.find(rootId);
+        if (it == m_CachedRootChildren.end()) continue;
 
-        auto nameIt = catIdToName.find(rootId);
-        const char* displayName = (nameIt != catIdToName.end()) ? nameIt->second.c_str() : rootId.c_str();
+        auto nameIt = m_CachedCatIdToName.find(rootId);
+        const char* displayName = (nameIt != m_CachedCatIdToName.end()) ?
+            nameIt->second.c_str() : rootId.c_str();
 
         if (ImGui::BeginMenu(displayName))
         {

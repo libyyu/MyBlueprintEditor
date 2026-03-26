@@ -1606,15 +1606,41 @@ void BlueprintEditor::DrawNodeListPanel()
                     nodeFilter.empty() ? ICON_FA_CUBES " Nodes" : ICON_FA_CUBES " Nodes (filtered)");
                 ImGui::Dummy(ImVec2(paneWidth, sectionH));
             }
+            // 节点过滤缓存：只在 filter 或节点列表变化时重建 tolower 映射
+            if (lowerFilter != m_LastNodeFilter)
+            {
+                m_LastNodeFilter = lowerFilter;
+                m_NodeFilterCache.clear();
+            }
+            if (!lowerFilter.empty())
+            {
+                for (const auto& n : ActiveDoc()->nodes)
+                {
+                    uintptr_t key = reinterpret_cast<uintptr_t>(n.ID.AsPointer());
+                    if (m_NodeFilterCache.find(key) == m_NodeFilterCache.end())
+                    {
+                        NodeFilterCache fc;
+                        fc.nameLower = n.Name;
+                        for (auto& c : fc.nameLower)
+                            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                        fc.defIdLower = n.DefinitionId;
+                        for (auto& c : fc.defIdLower)
+                            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                        m_NodeFilterCache[key] = std::move(fc);
+                    }
+                }
+            }
+
             ImGui::Indent();
             for (auto& node : ActiveDoc()->nodes)
             {
                 if (!lowerFilter.empty())
                 {
-                    std::string lowerName = node.Name;
-                    for (auto& c : lowerName)
-                        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-                    if (lowerName.find(lowerFilter) == std::string::npos)
+                    uintptr_t key = reinterpret_cast<uintptr_t>(node.ID.AsPointer());
+                    auto it = m_NodeFilterCache.find(key);
+                    if (it == m_NodeFilterCache.end()) continue;
+                    if (it->second.nameLower.find(lowerFilter) == std::string::npos &&
+                        it->second.defIdLower.find(lowerFilter) == std::string::npos)
                         continue;
                 }
                 ImGui::PushID(node.ID.AsPointer());
