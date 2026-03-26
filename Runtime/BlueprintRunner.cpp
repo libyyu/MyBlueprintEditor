@@ -350,6 +350,7 @@ ExecutionResult BlueprintRunner::Execute()
             result.errorMessage = "Execution failed at node '" + node->name +
                 "' (id=" + std::to_string(node->id) + ")";
             result.nodesExecuted++;
+            result.executedNodeIds.push_back(node->id);
 
             auto endTime = std::chrono::high_resolution_clock::now();
             result.elapsedMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
@@ -357,6 +358,7 @@ ExecutionResult BlueprintRunner::Execute()
         }
 
         result.nodesExecuted++;
+        result.executedNodeIds.push_back(node->id);
     }
 
     // 收集所有输出引脚的最终值
@@ -436,6 +438,7 @@ ExecutionResult BlueprintRunner::ExecuteNodes(const std::vector<NodeId>& nodeIds
             return result;
         }
         result.nodesExecuted++;
+        result.executedNodeIds.push_back(node->id);
     }
 
     auto endTime = std::chrono::high_resolution_clock::now();

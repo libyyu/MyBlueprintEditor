@@ -299,6 +299,7 @@ struct ExecutionResult
     std::vector<std::string>    warnings;
     int                         nodesExecuted = 0;      // 执行了多少个节点
     double                      elapsedMs = 0.0;        // 执行耗时(毫秒)
+    std::vector<NodeId>         executedNodeIds;        // 实际执行的节点 ID 列表（按顺序）
 
     // 获取最终的输出值（通过引脚ID）
     std::unordered_map<PinId, Variant> outputValues;

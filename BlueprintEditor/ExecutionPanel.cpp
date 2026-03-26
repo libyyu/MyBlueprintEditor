@@ -126,6 +126,7 @@ void BlueprintEditor::ExecuteBlueprint()
     // 4. 执行
     auto startTime = std::chrono::high_resolution_clock::now();
     auto result = ActiveDoc()->persistentRunner.Execute();
+    ActiveDoc()->lastExecutionResult = result;  // 保存执行结果供面板展示
     auto endTime = std::chrono::high_resolution_clock::now();
     double elapsed = std::chrono::duration<double, std::milli>(endTime - startTime).count();
 
@@ -146,16 +147,13 @@ void BlueprintEditor::ExecuteBlueprint()
     ActiveDoc()->executionLog.push_back("  Elapsed: " + std::to_string(elapsed) + " ms");
     ActiveDoc()->executionLog.push_back("========================================");
 
-    // 5. 执行可视化 —— 高亮已执行的节点 & 触发 Flow 动画
-    // 将所有节点标记为高亮（实际运行器会执行拓扑排序后的节点）
-    if (result.success)
+    // 5. 执行可视化 —— 精确高亮已执行的节点 & 触发 Flow 动画
+    ActiveDoc()->executedNodeHighlight.clear();
+    for (const auto& runtimeId : result.executedNodeIds)
     {
-        ActiveDoc()->executedNodeHighlight.clear();
-        for (const auto& node : ActiveDoc()->nodes)
-        {
-            uint64_t nid = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(node.ID.AsPointer()));
-            ActiveDoc()->executedNodeHighlight[nid] = 3.0f;  // 3 秒高亮
-        }
+        // runtime NodeId → editor NodeId 映射：通过 definitionId 比对
+        // runtime node id = reinterpret_cast<uintptr_t>(editorNode.ID.AsPointer())
+        ActiveDoc()->executedNodeHighlight[runtimeId] = 3.0f;  // 3 秒高亮
     }
 
     for (const auto& link : ActiveDoc()->links)
@@ -180,61 +178,148 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
     ImGui::Spacing(); ImGui::SameLine();
     ImGui::TextUnformatted("Execution");
 
+    // ── 工具栏 ──────────────────────────────────────────────────────────
     ImGui::BeginHorizontal("ExecButtons", ImVec2(paneWidth, 0));
-    if (ImGui::Button(ICON_FA_PLAY " Execute", ImVec2(90, 0)))
-    {
+    bool isExec = ActiveDoc()->isExecuting;
+    if (isExec) ImGui::BeginDisabled();
+    if (ImGui::Button(ICON_FA_PLAY " Run", ImVec2(70, 0)))
         ExecuteBlueprint();
-    }
+    if (isExec) ImGui::EndDisabled();
+
     ImGui::Spring(0.0f);
-    if (ImGui::Button(ICON_FA_COPY " Copy Log", ImVec2(100, 0)))
+    if (ImGui::Button(ICON_FA_COPY " Copy", ImVec2(70, 0)))
     {
         if (!ActiveDoc()->executionLog.empty())
         {
             std::string allText;
             for (const auto& line : ActiveDoc()->executionLog)
-            {
-                allText += line;
-                allText += '\n';
-            }
+            { allText += line; allText += '\n'; }
             ImGui::SetClipboardText(allText.c_str());
         }
     }
     ImGui::Spring(0.0f);
-    if (ImGui::Button(ICON_FA_ERASER " Clear", ImVec2(80, 0)))
+    if (ImGui::Button(ICON_FA_ERASER " Clear", ImVec2(70, 0)))
     {
         ActiveDoc()->executionLog.clear();
-        ActiveDoc()->executionLogText.clear();
         ActiveDoc()->executionLogDirty = false;
         ActiveDoc()->lastExecutionStatus.clear();
+        ActiveDoc()->lastExecutionResult = RTExecutionResult{};
     }
     ImGui::Spring();
     ImGui::EndHorizontal();
 
+    // ── 状态摘要 ─────────────────────────────────────────────────────────
     if (!ActiveDoc()->lastExecutionStatus.empty())
     {
-        bool isOk = ActiveDoc()->lastExecutionStatus.find("OK") == 0;
-        ImGui::TextColored(isOk ? ImVec4(0.4f, 1.0f, 0.4f, 1.0f) : ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
-            "Status: %s", ActiveDoc()->lastExecutionStatus.c_str());
+        bool isOk = ActiveDoc()->lastExecutionStatus.rfind("OK", 0) == 0;
+        ImGui::TextColored(
+            isOk ? ImVec4(0.3f, 1.0f, 0.3f, 1.0f) : ImVec4(1.0f, 0.35f, 0.35f, 1.0f),
+            "%s  %s", isOk ? ICON_FA_CIRCLE_CHECK : ICON_FA_CIRCLE_XMARK,
+            ActiveDoc()->lastExecutionStatus.c_str());
     }
 
-    // 彩色日志输出区域
-    float logHeight = ImGui::GetContentRegionAvail().y;
-    if (logHeight < 60.0f) logHeight = 60.0f;
-
-    ImGui::BeginChild("##ExecutionLog", ImVec2(paneWidth, logHeight), true,
-        ImGuiWindowFlags_HorizontalScrollbar);
-
-    for (const auto& line : ActiveDoc()->executionLog)
+    const auto& res = ActiveDoc()->lastExecutionResult;
+    if (res.nodesExecuted > 0)
     {
-        DrawColoredLogLine(line);
+        ImGui::SameLine(0, 16);
+        ImGui::TextDisabled("%d nodes  %.1f ms",
+            res.nodesExecuted, res.elapsedMs);
     }
 
-    // 自动滚动到底部
-    if (ActiveDoc()->executionLogDirty)
+    // ── Tab: Log | Nodes ─────────────────────────────────────────────────
+    if (ImGui::BeginTabBar("##ExecTabs"))
     {
-        ImGui::SetScrollHereY(1.0f);
-        ActiveDoc()->executionLogDirty = false;
-    }
+        // ── Tab: Log ────────────────────────────────────────────────────
+        if (ImGui::BeginTabItem(ICON_FA_TERMINAL " Log"))
+        {
+            // 过滤框
+            ImGui::SetNextItemWidth(paneWidth - 16.0f);
+            ImGui::InputTextWithHint("##LogFilter", ICON_FA_MAGNIFYING_GLASS " Filter...",
+                ActiveDoc()->execLogFilter, sizeof(ActiveDoc()->execLogFilter));
 
-    ImGui::EndChild();
+            float logH = ImGui::GetContentRegionAvail().y - 4.0f;
+            if (logH < 40.0f) logH = 40.0f;
+            ImGui::BeginChild("##ExecLog", ImVec2(paneWidth, logH), true,
+                ImGuiWindowFlags_HorizontalScrollbar);
+
+            std::string filter(ActiveDoc()->execLogFilter);
+            for (const auto& line : ActiveDoc()->executionLog)
+            {
+                if (!filter.empty() && line.find(filter) == std::string::npos)
+                    continue;
+                DrawColoredLogLine(line);
+            }
+
+            if (ActiveDoc()->executionLogDirty)
+            {
+                ImGui::SetScrollHereY(1.0f);
+                ActiveDoc()->executionLogDirty = false;
+            }
+            ImGui::EndChild();
+            ImGui::EndTabItem();
+        }
+
+        // ── Tab: Nodes ───────────────────────────────────────────────────
+        if (ImGui::BeginTabItem(ICON_FA_DIAGRAM_PROJECT " Nodes"))
+        {
+            if (res.executedNodeIds.empty())
+            {
+                ImGui::TextDisabled("No execution data yet. Press Run.");
+            }
+            else
+            {
+                ImGui::Text("Executed %d node(s) in %.2f ms:",
+                    res.nodesExecuted, res.elapsedMs);
+                ImGui::Separator();
+
+                float nodeH = ImGui::GetContentRegionAvail().y - 4.0f;
+                if (nodeH < 40.0f) nodeH = 40.0f;
+                ImGui::BeginChild("##ExecNodes", ImVec2(paneWidth, nodeH), false);
+
+                for (int i = 0; i < (int)res.executedNodeIds.size(); ++i)
+                {
+                    uint64_t rid = res.executedNodeIds[i];
+
+                    // 找对应的编辑器节点名
+                    std::string nodeName;
+                    ed::NodeId edId = 0;
+                    for (const auto& n : ActiveDoc()->nodes)
+                    {
+                        uint64_t eid = static_cast<uint64_t>(
+                            reinterpret_cast<uintptr_t>(n.ID.AsPointer()));
+                        if (eid == rid)
+                        {
+                            nodeName = n.Name.empty() ? n.DefinitionId : n.Name;
+                            edId = n.ID;
+                            break;
+                        }
+                    }
+
+                    // 行着色：最后一个=红色(失败结束点) or 绿色
+                    bool isLast = (i == (int)res.executedNodeIds.size() - 1);
+                    ImVec4 rowCol = ImVec4(0.85f, 0.85f, 0.85f, 1.0f);
+                    if (isLast && !res.success)
+                        rowCol = ImVec4(1.0f, 0.4f, 0.4f, 1.0f);
+
+                    ImGui::TextColored(rowCol, "%3d. %s",
+                        i + 1, nodeName.empty() ?
+                            ("[id=" + std::to_string(rid) + "]").c_str() :
+                            nodeName.c_str());
+
+                    // 悬停时高亮对应节点
+                    if (edId && ImGui::IsItemHovered())
+                    {
+                        ActiveDoc()->executedNodeHighlight[rid] = 1.5f;
+                        if (ImGui::IsItemClicked())
+                            ed::SelectNode(edId, false);
+                    }
+                }
+
+                ImGui::EndChild();
+            }
+            ImGui::EndTabItem();
+        }
+
+        ImGui::EndTabBar();
+    }
 }
