@@ -263,9 +263,10 @@ std::string BlueprintEditor::GetConversionNode(PinType from, PinType to)
         { PinType::Bool,   PinType::String, "BoolToString"  },
         { PinType::String, PinType::Int,    "StringToInt"   },
         { PinType::String, PinType::Float,  "StringToFloat" },
-        // Int/Bool 互转（CanCreateLink 已允许隐式连接，这里也提供节点）
-        { PinType::Bool,   PinType::Int,    "IntToFloat"    }, // Bool→Int 最近似 pass-through
-        // 间接路径（如 Bool→Float 走 FloatToBool 反向不行，保持 CanCreateLink 逻辑）
+        // 新增：Bool ↔ Int / Bool → Float（本批新增节点）
+        { PinType::Bool,   PinType::Int,    "BoolToInt"     },
+        { PinType::Int,    PinType::Bool,   "IntToBool"     },
+        { PinType::Bool,   PinType::Float,  "BoolToFloat"   },
     };
 
     for (const auto& entry : kTable)

@@ -224,6 +224,13 @@ struct BlueprintDocument
     VarDragPayload pendingVarPayload  = {};      // 拖拽的变量信息
     ImVec2         pendingVarDropPos  = {};      // 放置时的屏幕坐标
 
+    // 节点拖拽位置 Undo 状态（在位置变化检测处使用）
+    bool           nodeDragUndoPushed = false;  // 本次拖拽是否已 push 过快照
+
+    // Comment 节点内联编辑状态
+    ed::NodeId     editingCommentId   = 0;         // 当前正在编辑标题的 Comment 节点 ID
+    char           commentEditBuf[256] = {};        // 编辑缓冲区
+
     // 内联编辑控件字符串缓冲区（按 PinId 索引，文档切换时自然隔离）
     std::unordered_map<uintptr_t, std::array<char, 128>> pinStringBuffers;
     std::unordered_map<uintptr_t, std::array<char, 128>> pinObjectBuffers;

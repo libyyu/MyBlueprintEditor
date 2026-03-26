@@ -852,23 +852,84 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
 
         // ================================================================
         // Comment 节点
+        // 支持：双击标题进入编辑、Enter/Esc 确认/取消、颜色存储于 node.Color
         // ================================================================
+        {
+            // 处理双击进入编辑状态
+            ed::NodeId dblNode = ed::GetDoubleClickedNode();
+            if (dblNode)
+            {
+                Node* n = FindNode(dblNode);
+                if (n && n->Type == NodeType::Comment)
+                {
+                    ActiveDoc()->editingCommentId = dblNode;
+                    snprintf(ActiveDoc()->commentEditBuf,
+                             sizeof(ActiveDoc()->commentEditBuf),
+                             "%s", n->Name.c_str());
+                }
+            }
+        }
+
         for (auto& node : ActiveDoc()->nodes)
         {
             if (node.Type != NodeType::Comment)
                 continue;
 
-            const float commentAlpha = 0.75f;
+            // 节点背景色：使用 node.Color（默认 #FFFFFF40）
+            ImColor bgColor   = ImColor(node.Color.Value.x, node.Color.Value.y,
+                                        node.Color.Value.z, 0.25f);
+            ImColor bordColor = ImColor(node.Color.Value.x, node.Color.Value.y,
+                                        node.Color.Value.z, 0.5f);
 
+            const float commentAlpha = 0.85f;
             ImGui::PushStyleVar(ImGuiStyleVar_Alpha, commentAlpha);
-            ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(255, 255, 255, 64));
-            ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(255, 255, 255, 64));
+            ed::PushStyleColor(ed::StyleColor_NodeBg,     bgColor);
+            ed::PushStyleColor(ed::StyleColor_NodeBorder, bordColor);
             ed::BeginNode(node.ID);
             ImGui::PushID(node.ID.AsPointer());
             ImGui::BeginVertical("content");
             ImGui::BeginHorizontal("horizontal");
             ImGui::Spring(1);
-            ImGui::TextUnformatted(node.Name.c_str());
+
+            bool isEditing = (ActiveDoc()->editingCommentId == node.ID);
+            if (isEditing)
+            {
+                // 内联文本编辑框
+                ImGui::SetNextItemWidth(std::max(120.0f, node.Size.x - 32.0f));
+                ImGui::SetKeyboardFocusHere();
+                if (ImGui::InputText("##commentedit",
+                                     ActiveDoc()->commentEditBuf,
+                                     sizeof(ActiveDoc()->commentEditBuf),
+                                     ImGuiInputTextFlags_EnterReturnsTrue |
+                                     ImGuiInputTextFlags_AutoSelectAll))
+                {
+                    // Enter 确认
+                    PushUndoState();
+                    node.Name = ActiveDoc()->commentEditBuf;
+                    ActiveDoc()->isDirty = true;
+                    ActiveDoc()->editingCommentId = 0;
+                }
+                if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+                {
+                    // Esc 取消
+                    ActiveDoc()->editingCommentId = 0;
+                }
+                // 点击其他地方也确认
+                if (!ImGui::IsItemActive() && !ImGui::IsItemFocused() &&
+                    ImGui::IsMouseClicked(0))
+                {
+                    PushUndoState();
+                    node.Name = ActiveDoc()->commentEditBuf;
+                    ActiveDoc()->isDirty = true;
+                    ActiveDoc()->editingCommentId = 0;
+                }
+                ed::EnableShortcuts(false);
+            }
+            else
+            {
+                ImGui::TextUnformatted(node.Name.c_str());
+            }
+
             ImGui::Spring(1);
             ImGui::EndHorizontal();
             ed::Group(node.Size);
@@ -881,27 +942,22 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
             if (ed::BeginGroupHint(node.ID))
             {
                 auto bgAlpha = static_cast<int>(ImGui::GetStyle().Alpha * 255);
-
-                auto min = ed::GetGroupMin();
+                auto min     = ed::GetGroupMin();
 
                 ImGui::SetCursorScreenPos(min - ImVec2(-8, ImGui::GetTextLineHeightWithSpacing() + 4));
                 ImGui::BeginGroup();
                 ImGui::TextUnformatted(node.Name.c_str());
                 ImGui::EndGroup();
 
-                auto drawList = ed::GetHintBackgroundDrawList();
-
+                auto drawList        = ed::GetHintBackgroundDrawList();
                 auto hintBounds      = ImGui_GetItemRect();
                 auto hintFrameBounds = ImRect_Expanded(hintBounds, 8, 4);
 
                 drawList->AddRectFilled(
-                    hintFrameBounds.GetTL(),
-                    hintFrameBounds.GetBR(),
+                    hintFrameBounds.GetTL(), hintFrameBounds.GetBR(),
                     IM_COL32(255, 255, 255, 64 * bgAlpha / 255), 4.0f);
-
                 drawList->AddRect(
-                    hintFrameBounds.GetTL(),
-                    hintFrameBounds.GetBR(),
+                    hintFrameBounds.GetTL(), hintFrameBounds.GetBR(),
                     IM_COL32(255, 255, 255, 128 * bgAlpha / 255), 4.0f);
             }
             ed::EndGroupHint();

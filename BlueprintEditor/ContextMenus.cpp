@@ -230,8 +230,30 @@ void BlueprintEditor::DrawContextMenus(
                 ImVec2 canvasPos = ed::ScreenToCanvas(newNodePostion);
                 PasteNodes(canvasPos);
             }
-            ImGui::Separator();
         }
+
+        // 快捷：添加注释框
+        if (ImGui::MenuItem(ICON_FA_PENCIL " Add Comment"))
+        {
+            PushUndoState();
+            Node* cmt = SpawnNodeByDef("Comment");
+            if (cmt)
+            {
+                cmt->Name = "Comment";
+                cmt->Size = ImVec2(300, 200);
+                BuildNodes();
+                ActiveDoc()->isDirty = true;
+                ed::SetNodePosition(cmt->ID, newNodePostion);
+                // 立即进入编辑状态
+                ActiveDoc()->editingCommentId = cmt->ID;
+                snprintf(ActiveDoc()->commentEditBuf,
+                         sizeof(ActiveDoc()->commentEditBuf), "Comment");
+            }
+            createNewNode = false;
+            ImGui::CloseCurrentPopup();
+        }
+        if (!m_ClipboardNodes.empty() || true)
+            ImGui::Separator();
 
         Node* node = ShowCreateNodeMenu();   // PushUndoState 在 ShowCreateNodeMenu 内部调用
 

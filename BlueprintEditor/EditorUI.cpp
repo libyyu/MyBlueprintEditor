@@ -1127,24 +1127,43 @@ void BlueprintEditor::OnFrame(float deltaTime)
     ed::End();
 
     // ================================================================
-    // 检测节点位置变化（拖拽移动节点 → 标记 dirty）
+    // 检测节点位置变化（拖拽移动节点 → 标记 dirty + Undo 快照）
+    //
+    // 策略：
+    //   • 检测到位置变化 + 鼠标左键按下 → 视为拖拽进行中
+    //     若本次拖拽尚未 push，先 push 快照再标 dirty（只 push 一次）
+    //   • 鼠标左键释放 → 重置 nodeDragUndoPushed，下次拖拽重新计
     // ================================================================
-    if (ActiveDoc() && !ActiveDoc()->isDirty)
+    if (ActiveDoc())
     {
         auto& lastPositions = ActiveDoc()->lastNodePositions;
+        bool posChanged = false;
         for (const auto& node : ActiveDoc()->nodes)
         {
             ImVec2 curPos = ed::GetNodePosition(node.ID);
             auto it = lastPositions.find(node.ID);
-            if (it != lastPositions.end())
+            if (it != lastPositions.end() &&
+                (it->second.x != curPos.x || it->second.y != curPos.y))
             {
-                if (it->second.x != curPos.x || it->second.y != curPos.y)
-                {
-                    ActiveDoc()->isDirty = true;
-                    break;
-                }
+                posChanged = true;
+                break;
             }
         }
+
+        if (posChanged)
+        {
+            // 鼠标按下 → 拖拽进行中，push 一次快照
+            if (io.MouseDown[0] && !ActiveDoc()->nodeDragUndoPushed)
+            {
+                PushUndoState();
+                ActiveDoc()->nodeDragUndoPushed = true;
+            }
+            ActiveDoc()->isDirty = true;
+        }
+
+        // 鼠标左键释放 → 本次拖拽结束，重置标志
+        if (ImGui::IsMouseReleased(0))
+            ActiveDoc()->nodeDragUndoPushed = false;
     }
     // 更新上一帧节点位置快照
     if (ActiveDoc())
