@@ -216,8 +216,16 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
 
                         if (input.Type == PinType::Bool)
                         {
+                            // 点击前暂存旧值，点击后 push（快照包含旧值）再写新值
+                            bool prevVal = input.BoolValue;
                             if (ImGui::Checkbox("##value", &input.BoolValue))
+                            {
+                                bool newVal = input.BoolValue;
+                                input.BoolValue = prevVal;   // 先恢复
+                                PushUndoState();             // 快照（记录旧值）
+                                input.BoolValue = newVal;    // 再应用新值
                                 ActiveDoc()->isDirty = true;
+                            }
                         }
                         else if (input.Type == PinType::Int)
                         {
@@ -228,12 +236,14 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 input.IntValue = static_cast<int64_t>(v);
                                 ActiveDoc()->isDirty = true;
                             }
+                            if (ImGui::IsItemActivated()) PushUndoState();  // 拖拽开始帧保存
                         }
                         else if (input.Type == PinType::Float)
                         {
                             ImGui::SetNextItemWidth(80.0f);
                             if (ImGui::DragFloat("##value", &input.FloatValue, 0.01f))
                                 ActiveDoc()->isDirty = true;
+                            if (ImGui::IsItemActivated()) PushUndoState();  // 拖拽开始帧保存
                         }
                         else if (input.Type == PinType::String)
                         {
@@ -247,6 +257,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 input.StringValue = buf.data();
                                 ActiveDoc()->isDirty = true;
                             }
+                            if (ImGui::IsItemActivated()) PushUndoState();  // 输入框获焦时保存
                         }
                         else if (input.Type == PinType::Object)
                         {
@@ -261,6 +272,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 input.ObjectValue = buf.data();
                                 ActiveDoc()->isDirty = true;
                             }
+                            if (ImGui::IsItemActivated()) PushUndoState();  // 输入框获焦时保存
                         }
                         else if (input.Type == PinType::Function)
                         {
