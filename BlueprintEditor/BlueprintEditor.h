@@ -527,6 +527,19 @@ struct BlueprintEditor : public Application
     void    DrawTimerPanel();                          // 计时器监控浮动面板
 
     // ------------------------------------------------------------------
+    // 拆分自 EditorUI.cpp 的子渲染函数
+    // NodeRenderer.cpp / LinkRenderer.cpp / ContextMenus.cpp
+    // ------------------------------------------------------------------
+    void    DrawNodes(util::BlueprintNodeBuilder& builder);   // 所有节点渲染（Blueprint/Simple/Tree/Houdini/Comment）
+    void    DrawLinks();                                       // 链接渲染 + BeginCreate/BeginDelete
+    void    DrawContextMenus(ImVec2 openPopupPosition,         // 四种右键菜单
+                             ed::NodeId& contextNodeId,
+                             ed::PinId&  contextPinId,
+                             ed::LinkId& contextLinkId,
+                             bool&       createNewNode,
+                             Pin*&       newNodeLinkPin);
+
+    // ------------------------------------------------------------------
     // 文件操作
     // ------------------------------------------------------------------
     void    NewFile();                                  // 新建蓝图（新标签页）
