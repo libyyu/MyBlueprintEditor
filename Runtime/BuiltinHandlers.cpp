@@ -18,18 +18,18 @@
 
 #include "BuiltinHandlers.h"
 
-#include "BuiltinHandlers_Flow.h"
-#include "BuiltinHandlers_Action.h"
-#include "BuiltinHandlers_Math.h"
-#include "BuiltinHandlers_Debug.h"
-#include "BuiltinHandlers_String.h"
-#include "BuiltinHandlers_Map.h"
-#include "BuiltinHandlers_Array.h"
-#include "BuiltinHandlers_Tree.h"
-#include "BuiltinHandlers_Houdini.h"
-#include "BuiltinHandlers_Time.h"
-#include "BuiltinHandlers_Data.h"
-#include "BuiltinHandlers_Misc.h"
+#include "handlers/BuiltinHandlers_Flow.h"
+#include "handlers/BuiltinHandlers_Action.h"
+#include "handlers/BuiltinHandlers_Math.h"
+#include "handlers/BuiltinHandlers_Debug.h"
+#include "handlers/BuiltinHandlers_String.h"
+#include "handlers/BuiltinHandlers_Map.h"
+#include "handlers/BuiltinHandlers_Array.h"
+#include "handlers/BuiltinHandlers_Tree.h"
+#include "handlers/BuiltinHandlers_Houdini.h"
+#include "handlers/BuiltinHandlers_Time.h"
+#include "handlers/BuiltinHandlers_Data.h"
+#include "handlers/BuiltinHandlers_Misc.h"
 
 namespace NodeEditor {
 namespace Runtime {

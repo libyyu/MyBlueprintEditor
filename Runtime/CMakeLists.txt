@@ -63,18 +63,18 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinNodeDefs.cpp
     # BuiltinHandlers – split by category
     ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers_Flow.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers_Action.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers_Math.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers_Debug.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers_String.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers_Map.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers_Array.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers_Tree.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers_Houdini.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers_Time.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers_Data.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers_Misc.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Flow.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Action.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Math.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Debug.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_String.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Map.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Array.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Tree.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Houdini.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Time.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Data.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Misc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FileSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintCAPI.cpp
 )
