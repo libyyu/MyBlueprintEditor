@@ -191,6 +191,13 @@ struct BlueprintDocument
     Pin*       newNodeLinkPin     = nullptr;
     Pin*       newLinkPin         = nullptr;
 
+    // 内联编辑控件字符串缓冲区（按 PinId 索引，文档切换时自然隔离）
+    std::unordered_map<uintptr_t, std::array<char, 128>> pinStringBuffers;
+    std::unordered_map<uintptr_t, std::array<char, 128>> pinObjectBuffers;
+
+    // 节点过滤器（每个文档独立，切换文档后保留各自的过滤状态）
+    char nodeFilterBuf[128] = {};
+
     // ---- 编辑器侧哈希索引（O(1) 查找加速） ----
     // 调用 rebuildEditorIndices() 重建；数据变更后调用 invalidateEditorIndices()
     mutable std::unordered_map<uint64_t, size_t>      nodeIdIndex;    // NodeId → nodes[] 下标

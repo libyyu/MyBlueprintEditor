@@ -1148,7 +1148,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     {
                         ImGui::PushID(input.ID.AsPointer());
 
-                        static std::unordered_map<uintptr_t, std::array<char, 128>> s_StringBuffers;
+                        auto& s_StringBuffers = ActiveDoc()->pinStringBuffers;
 
                         if (input.Type == PinType::Bool)
                         {
@@ -1186,7 +1186,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                         }
                         else if (input.Type == PinType::Object)
                         {
-                            static std::unordered_map<uintptr_t, std::array<char, 128>> s_ObjectBuffers;
+                            auto& s_ObjectBuffers = ActiveDoc()->pinObjectBuffers;
                             auto key = reinterpret_cast<uintptr_t>(input.ID.AsPointer());
                             auto& buf = s_ObjectBuffers[key];
                             if (buf[0] == '\0' && !input.ObjectValue.empty())
@@ -2650,9 +2650,9 @@ void BlueprintEditor::DrawNodeListPanel()
         ShowStyleEditor(&showStyleEditor);
 
     // 节点过滤器
-    static char nodeFilterBuf[128] = {};
+    char* nodeFilterBuf = ActiveDoc()->nodeFilterBuf;
     ImGui::SetNextItemWidth(paneWidth);
-    ImGui::InputTextWithHint("##NodeFilter", ICON_FA_MAGNIFYING_GLASS " Filter nodes...", nodeFilterBuf, sizeof(nodeFilterBuf));
+    ImGui::InputTextWithHint("##NodeFilter", ICON_FA_MAGNIFYING_GLASS " Filter nodes...", nodeFilterBuf, 128);
 
     std::string nodeFilter(nodeFilterBuf);
     // 转小写
