@@ -1,5 +1,7 @@
 // Runtime/BuiltinHandlers_Array.cpp -- Array 节点处理器
 #include "BuiltinHandlers_Array.h"
+#include <algorithm>
+#include <unordered_set>
 
 namespace NodeEditor {
 namespace Runtime {
@@ -162,6 +164,135 @@ void RegisterHandlers_Array(std::unordered_map<std::string, NodeHandler>& handle
             }
         }
         ctx.SetOutputValue("Array", Variant(std::move(elements)));
+        return true;
+    };
+
+    // ── ArrayFind ─────────────────────────────────────────────────────────
+    handlers["ArrayFind"] = [](ExecutionContext& ctx) {
+        const auto& arr = ctx.GetInputValue("Array").arrayValue;
+        const Variant& target = ctx.GetInputValue("Element");
+        for (int64_t i = 0; i < (int64_t)arr.size(); ++i)
+        {
+            if (arr[i].asString() == target.asString())
+            {
+                ctx.SetOutputValue("Index", Variant(i));
+                ctx.SetOutputValue("Found", Variant(true));
+                return true;
+            }
+        }
+        ctx.SetOutputValue("Index", Variant(int64_t(-1)));
+        ctx.SetOutputValue("Found", Variant(false));
+        return true;
+    };
+
+    // ── ArraySlice ────────────────────────────────────────────────────────
+    handlers["ArraySlice"] = [](ExecutionContext& ctx) {
+        const auto& arr = ctx.GetInputValue("Array").arrayValue;
+        int64_t sz    = static_cast<int64_t>(arr.size());
+        int64_t start = ctx.GetInputValue("Start").asInt();
+        int64_t end   = ctx.GetInputValue("End").asInt();
+        if (start < 0) start = std::max(int64_t(0), sz + start);
+        if (end   < 0) end   = std::max(int64_t(0), sz + end);
+        start = std::clamp(start, int64_t(0), sz);
+        end   = std::clamp(end,   int64_t(0), sz);
+        std::vector<Variant> result(arr.begin() + start, arr.begin() + end);
+        ctx.SetOutputValue("Result", Variant(std::move(result)));
+        return true;
+    };
+
+    // ── ArrayConcat ───────────────────────────────────────────────────────
+    handlers["ArrayConcat"] = [](ExecutionContext& ctx) {
+        auto a = ctx.GetInputValue("Array A").arrayValue;
+        const auto& b = ctx.GetInputValue("Array B").arrayValue;
+        a.insert(a.end(), b.begin(), b.end());
+        ctx.SetOutputValue("Result", Variant(std::move(a)));
+        return true;
+    };
+
+    // ── ArrayUnique ───────────────────────────────────────────────────────
+    handlers["ArrayUnique"] = [](ExecutionContext& ctx) {
+        const auto& arr = ctx.GetInputValue("Array").arrayValue;
+        std::vector<Variant> result;
+        std::unordered_set<std::string> seen;
+        for (const auto& v : arr)
+        {
+            std::string key = v.asString();
+            if (seen.insert(key).second)
+                result.push_back(v);
+        }
+        ctx.SetOutputValue("Result", Variant(std::move(result)));
+        return true;
+    };
+
+    // ── ArraySort ─────────────────────────────────────────────────────────
+    handlers["ArraySort"] = [](ExecutionContext& ctx) {
+        auto arr  = ctx.GetInputValue("Array").arrayValue;
+        bool desc = ctx.GetInputValue("Descending").asBool();
+        std::sort(arr.begin(), arr.end(), [desc](const Variant& a, const Variant& b) {
+            // 同质数组：优先数值比较，否则字符串比较
+            if (a.type == PinDataType::Float || b.type == PinDataType::Float ||
+                a.type == PinDataType::Integer || b.type == PinDataType::Integer)
+            {
+                double fa = a.asFloat(), fb = b.asFloat();
+                return desc ? fa > fb : fa < fb;
+            }
+            std::string sa = a.asString(), sb = b.asString();
+            return desc ? sa > sb : sa < sb;
+        });
+        ctx.ActivateOutputFlow("");
+        ctx.SetOutputValue("Array", Variant(std::move(arr)));
+        return true;
+    };
+
+    // ── ArrayFirst ────────────────────────────────────────────────────────
+    handlers["ArrayFirst"] = [](ExecutionContext& ctx) {
+        const auto& arr = ctx.GetInputValue("Array").arrayValue;
+        if (!arr.empty())
+        {
+            ctx.SetOutputValue("Element", arr.front());
+            ctx.SetOutputValue("Valid", Variant(true));
+        }
+        else
+        {
+            ctx.SetOutputValue("Element", Variant());
+            ctx.SetOutputValue("Valid", Variant(false));
+        }
+        return true;
+    };
+
+    // ── ArrayLast ─────────────────────────────────────────────────────────
+    handlers["ArrayLast"] = [](ExecutionContext& ctx) {
+        const auto& arr = ctx.GetInputValue("Array").arrayValue;
+        if (!arr.empty())
+        {
+            ctx.SetOutputValue("Element", arr.back());
+            ctx.SetOutputValue("Valid", Variant(true));
+        }
+        else
+        {
+            ctx.SetOutputValue("Element", Variant());
+            ctx.SetOutputValue("Valid", Variant(false));
+        }
+        return true;
+    };
+
+    // ── ArrayRemove (by value) ────────────────────────────────────────────
+    handlers["ArrayRemove"] = [](ExecutionContext& ctx) {
+        auto arr = ctx.GetInputValue("Array").arrayValue;
+        const std::string target = ctx.GetInputValue("Element").asString();
+        bool removed = false;
+        for (auto it = arr.begin(); it != arr.end(); ++it)
+        {
+            if (it->asString() == target)
+            {
+                arr.erase(it);
+                removed = true;
+                break;
+            }
+        }
+        ctx.ActivateOutputFlow("");
+        ctx.SetOutputValue("Array",   Variant(std::move(arr)));
+        ctx.SetOutputValue("Removed", Variant(removed));
         return true;
     };
 }

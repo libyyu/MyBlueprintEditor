@@ -152,6 +152,19 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
           MakePin("Last Index", PinDataType::Integer), MakeFlowPin("Break") },
         { MakeFlowPin("Loop Body"), MakePin("Index", PinDataType::Integer),
           MakeFlowPin("Completed") });
+
+    // Switch on Bool — 根据 Bool 值二选一
+    reg("SwitchOnBool", "Switch on Bool", "Flow",
+        { MakeFlowPin(""), MakePin("Condition", PinDataType::Boolean) },
+        { MakeFlowPin("True"), MakeFlowPin("False") });
+
+    // Switch on String — 字符串多分支
+    reg("SwitchOnString", "Switch on String", "Flow",
+        { MakeFlowPin(""), MakePin("Selection", PinDataType::String),
+          MakePin("Case 0", PinDataType::String), MakePin("Case 1", PinDataType::String),
+          MakePin("Case 2", PinDataType::String) },
+        { MakeFlowPin("Case 0"), MakeFlowPin("Case 1"),
+          MakeFlowPin("Case 2"), MakeFlowPin("Default") });
 }
 
 static void RegisterNodeDefs_Action(INodeRegistry& registry)
@@ -310,6 +323,21 @@ static void RegisterNodeDefs_Math(INodeRegistry& registry)
     reg("FloatToString", "Float to String", "Math/Conversion",
         { MakePin("Value", PinDataType::Float) },
         { MakePin("Result", PinDataType::String) },
+        "80C3F8", "Simple");
+
+    reg("BoolToInt", "Bool to Int", "Math/Conversion",
+        { MakePin("Value", PinDataType::Boolean) },
+        { MakePin("Result", PinDataType::Integer) },
+        "80C3F8", "Simple");
+
+    reg("IntToBool", "Int to Bool", "Math/Conversion",
+        { MakePin("Value", PinDataType::Integer) },
+        { MakePin("Result", PinDataType::Boolean) },
+        "80C3F8", "Simple");
+
+    reg("BoolToFloat", "Bool to Float", "Math/Conversion",
+        { MakePin("Value", PinDataType::Boolean) },
+        { MakePin("Result", PinDataType::Float) },
         "80C3F8", "Simple");
 
     // --- Functions (Math/Functions) ---
@@ -756,6 +784,54 @@ static void RegisterNodeDefs_Array(INodeRegistry& registry)
         auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("MakeArray"));
         if (d) d->customProperties["dynamicInputs"] = "Any";
     }
+
+    // Array Find — 查找第一个匹配元素的索引（纯查询，不修改数组）
+    reg("ArrayFind", "Array Find", "Misc/Array",
+        { MakePin("Array", PinDataType::Array), MakePin("Element", PinDataType::Any) },
+        { MakePin("Index", PinDataType::Integer), MakePin("Found", PinDataType::Boolean) },
+        "", "Simple");
+
+    // Array Slice — 返回子数组 [Start, End)（不含 End）
+    reg("ArraySlice", "Array Slice", "Misc/Array",
+        { MakePin("Array", PinDataType::Array),
+          MakePin("Start", PinDataType::Integer), MakePin("End", PinDataType::Integer) },
+        { MakePin("Result", PinDataType::Array) },
+        "", "Simple");
+
+    // Array Concat — 拼接两个数组
+    reg("ArrayConcat", "Array Concat", "Misc/Array",
+        { MakePin("Array A", PinDataType::Array), MakePin("Array B", PinDataType::Array) },
+        { MakePin("Result", PinDataType::Array) },
+        "", "Simple");
+
+    // Array Unique — 去重（保留第一次出现顺序）
+    reg("ArrayUnique", "Array Unique", "Misc/Array",
+        { MakePin("Array", PinDataType::Array) },
+        { MakePin("Result", PinDataType::Array) },
+        "", "Simple");
+
+    // Array Sort — 排序（仅支持同质数组：全 Int / 全 Float / 全 String）
+    reg("ArraySort", "Array Sort", "Misc/Array",
+        { MakeFlowPin(""), MakePin("Array", PinDataType::Array),
+          MakePin("Descending", PinDataType::Boolean) },
+        { MakeFlowPin(""), MakePin("Array", PinDataType::Array) });
+
+    // Array Last — 获取最后一个元素
+    reg("ArrayLast", "Array Last", "Misc/Array",
+        { MakePin("Array", PinDataType::Array) },
+        { MakePin("Element", PinDataType::Any), MakePin("Valid", PinDataType::Boolean) },
+        "", "Simple");
+
+    // Array First — 获取第一个元素
+    reg("ArrayFirst", "Array First", "Misc/Array",
+        { MakePin("Array", PinDataType::Array) },
+        { MakePin("Element", PinDataType::Any), MakePin("Valid", PinDataType::Boolean) },
+        "", "Simple");
+
+    // Array Remove — 删除第一个匹配的元素（按值查找）
+    reg("ArrayRemove", "Array Remove", "Misc/Array",
+        { MakeFlowPin(""), MakePin("Array", PinDataType::Array), MakePin("Element", PinDataType::Any) },
+        { MakeFlowPin(""), MakePin("Array", PinDataType::Array), MakePin("Removed", PinDataType::Boolean) });
 }
 
 static void RegisterNodeDefs_Map(INodeRegistry& registry)
@@ -994,6 +1070,26 @@ static void RegisterNodeDefs_Misc(INodeRegistry& registry)
         { MakePin("Value", PinDataType::String) },
         { MakePin("Result", PinDataType::String) },
         "", "Simple");
+
+    // EventBus.Emit — 广播一个具名事件（携带可选 payload）
+    reg("EventBusEmit", "EventBus: Emit", "Misc/EventBus",
+        { MakeFlowPin(""), MakePin("Event", PinDataType::String),
+          MakePin("Payload", PinDataType::Any) },
+        { MakeFlowPin("") },
+        "F5A623");
+
+    // EventBus.Subscribe — 监听具名事件（每次触发时激活 On Event 输出）
+    reg("EventBusSubscribe", "EventBus: Subscribe", "Misc/EventBus",
+        { MakeFlowPin("Enable"), MakeFlowPin("Disable"),
+          MakePin("Event", PinDataType::String) },
+        { MakeFlowPin("On Event"), MakePin("Payload", PinDataType::Any) },
+        "F5A623");
+
+    // EventBus.Clear — 移除某个事件的全部监听者
+    reg("EventBusClear", "EventBus: Clear", "Misc/EventBus",
+        { MakeFlowPin(""), MakePin("Event", PinDataType::String) },
+        { MakeFlowPin("") },
+        "F5A623");
 }
 
 // ============================================================================

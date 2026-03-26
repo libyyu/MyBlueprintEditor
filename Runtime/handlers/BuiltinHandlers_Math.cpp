@@ -472,6 +472,25 @@ void RegisterHandlers_Math(std::unordered_map<std::string, NodeHandler>& handler
         ctx.SetOutputValue("Result", Variant(std::exp(v)));
         return true;
     };
+
+    // ── Conversion 补充 ───────────────────────────────────────────────────
+    handlers["BoolToInt"] = [](ExecutionContext& ctx) {
+        bool v = ctx.GetInputValue("Value").asBool();
+        ctx.SetOutputValue("Result", Variant(static_cast<int64_t>(v ? 1 : 0)));
+        return true;
+    };
+
+    handlers["IntToBool"] = [](ExecutionContext& ctx) {
+        int64_t v = ctx.GetInputValue("Value").asInt();
+        ctx.SetOutputValue("Result", Variant(v != 0));
+        return true;
+    };
+
+    handlers["BoolToFloat"] = [](ExecutionContext& ctx) {
+        bool v = ctx.GetInputValue("Value").asBool();
+        ctx.SetOutputValue("Result", Variant(v ? 1.0 : 0.0));
+        return true;
+    };
 }
 
 } // namespace Runtime

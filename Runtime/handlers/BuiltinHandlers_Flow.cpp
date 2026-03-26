@@ -550,6 +550,31 @@ void RegisterHandlers_Flow(
         ctx.ActivateOutputFlow("Completed");
         return true;
     };
+
+    // ── SwitchOnBool ───────────────────────────────────────────────────────
+    handlers["SwitchOnBool"] = [](ExecutionContext& ctx) {
+        bool cond = ctx.GetInputValue("Condition").asBool();
+        ctx.ActivateOutputFlow(cond ? "True" : "False");
+        return true;
+    };
+
+    // ── SwitchOnString ─────────────────────────────────────────────────────
+    handlers["SwitchOnString"] = [](ExecutionContext& ctx) {
+        std::string sel = ctx.GetInputValue("Selection").asString();
+        // Case 0/1/2 是输入引脚，存放期望的字符串值
+        for (int i = 0; i < 3; ++i)
+        {
+            std::string pinName = "Case " + std::to_string(i);
+            std::string caseVal = ctx.GetInputValue(pinName.c_str()).asString();
+            if (sel == caseVal)
+            {
+                ctx.ActivateOutputFlow(pinName.c_str());
+                return true;
+            }
+        }
+        ctx.ActivateOutputFlow("Default");
+        return true;
+    };
 }
 
 } // namespace Runtime

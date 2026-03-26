@@ -75,6 +75,57 @@ void RegisterHandlers_Misc(std::unordered_map<std::string, NodeHandler>& handler
         }
         return true;
     };
+
+    // ── EventBus ──────────────────────────────────────────────────────────
+    // 简化实现：Emit 将 payload 写入 "__eventbus_<Event>" 变量，
+    // Subscribe 在收到 Enable 激活后持续监听（每帧 Poll 模式由 runner 调用）。
+    // 当前版本：Emit 立即触发所有已激活的 Subscribe 节点（同步广播）。
+
+    handlers["EventBusEmit"] = [](ExecutionContext& ctx) {
+        std::string evtName = ctx.GetInputValue("Event").asString();
+        if (evtName.empty()) { ctx.ActivateOutputFlow(""); return true; }
+        Variant payload = ctx.GetInputValue("Payload");
+        // 存储最新 payload 到全局变量（供 Subscribe 读取）
+        ctx.SetVariable("__eventbus_payload_" + evtName, payload);
+        // 写一个计数器作为"脉冲"标志，Subscribe 靠检测它变化来触发
+        Variant counter = ctx.GetVariable("__eventbus_counter_" + evtName);
+        int64_t cnt = counter.asInt() + 1;
+        ctx.SetVariable("__eventbus_counter_" + evtName, Variant(cnt));
+        ctx.Log("[EventBus] Emit: " + evtName + " (counter=" + std::to_string(cnt) + ")");
+        ctx.ActivateOutputFlow("");
+        return true;
+    };
+
+    handlers["EventBusSubscribe"] = [](ExecutionContext& ctx) {
+        // 通过以节点 id 为前缀的变量记录上次看到的 counter，
+        // 与全局 counter 对比判断是否有新事件。
+        std::string evtName = ctx.GetInputValue("Event").asString();
+        if (evtName.empty()) return true;
+        const auto* node = ctx.GetCurrentNode();
+        std::string nodeKey = "__sub_" + (node ? std::to_string(node->id) : "0") + "_" + evtName;
+        int64_t globalCnt = ctx.GetVariable("__eventbus_counter_" + evtName).asInt();
+        int64_t lastCnt   = ctx.GetVariable(nodeKey).asInt();
+        if (globalCnt != lastCnt)
+        {
+            ctx.SetVariable(nodeKey, Variant(globalCnt));
+            Variant payload = ctx.GetVariable("__eventbus_payload_" + evtName);
+            ctx.SetOutputValue("Payload", payload);
+            ctx.Log("[EventBus] Subscribe fired: " + evtName);
+            ctx.ActivateOutputFlow("On Event");
+        }
+        return true;
+    };
+
+    handlers["EventBusClear"] = [](ExecutionContext& ctx) {
+        std::string evtName = ctx.GetInputValue("Event").asString();
+        if (!evtName.empty())
+        {
+            ctx.SetVariable("__eventbus_counter_" + evtName, Variant(int64_t(0)));
+            ctx.SetVariable("__eventbus_payload_" + evtName, Variant());
+        }
+        ctx.ActivateOutputFlow("");
+        return true;
+    };
 }
 
 // ============================================================================
