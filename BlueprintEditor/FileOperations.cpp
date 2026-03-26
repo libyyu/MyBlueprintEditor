@@ -408,6 +408,13 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
         }
         
         auto& node = ActiveDoc()->nodes.back();
+
+        // 恢复编辑器扩展状态
+        {
+            auto it = rtNode.customProperties.find("__collapsed");
+            if (it != rtNode.customProperties.end() && it->second == "1")
+                node.isCollapsed = true;
+        }
         
         // 创建引脚
         for (const auto& rtPin : rtNode.pins)

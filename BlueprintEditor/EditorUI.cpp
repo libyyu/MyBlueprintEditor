@@ -1054,10 +1054,26 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 {
                     builder.Header(node.Color);
                         ImGui::Spring(0);
+                        // 折叠/展开小按钮（紧贴节点名左侧）
+                        {
+                            ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0,0,0,0));
+                            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1,1,1,0.15f));
+                            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(1,1,1,0.25f));
+                            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2,2));
+                            const char* collapseIcon = node.isCollapsed ? ">" : "v";
+                            if (ImGui::SmallButton(collapseIcon))
+                            {
+                                node.isCollapsed = !node.isCollapsed;
+                                ActiveDoc()->isDirty = true;
+                            }
+                            ImGui::PopStyleVar();
+                            ImGui::PopStyleColor(3);
+                        }
+                        ImGui::Spring(0, 4.0f);
                         ImGui::TextUnformatted(node.Name.c_str());
                         ImGui::Spring(1);
                         ImGui::Dummy(ImVec2(0, 28));
-                        if (hasOutputDelegates)
+                        if (hasOutputDelegates && !node.isCollapsed)
                         {
                             ImGui::BeginVertical("delegates", ImVec2(0, 28));
                             ImGui::Spring(1, 0);
@@ -1085,8 +1101,6 @@ void BlueprintEditor::OnFrame(float deltaTime)
                                 ImGui::EndHorizontal();
                                 ImGui::PopStyleVar();
                                 ed::EndPin();
-
-                                //DrawItemRect(ImColor(255, 0, 0));
                             }
                             ImGui::Spring(1, 0);
                             ImGui::EndVertical();
@@ -1097,6 +1111,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     builder.EndHeader();
                 }
 
+                if (!node.isCollapsed)
+                {
                 for (auto& input : node.Inputs)
                 {
                     if (input.IsHidden)
@@ -1433,6 +1449,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     ImGui::PopStyleVar();
                     builder.EndOutput();
                 }
+
+                } // if (!node.isCollapsed)
 
             builder.End();
 

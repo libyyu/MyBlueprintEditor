@@ -88,6 +88,9 @@ struct Node
     int         DynamicInputFixedCount = 0;           // number of fixed (non-removable) input pins
     bool        HasDynamicInputs = false;             // whether dynamic inputs are enabled
 
+    // 折叠状态（双击标题栏或点折叠按钮切换）
+    bool        isCollapsed = false;                  // 折叠时只显示标题栏，隐藏所有引脚
+
     // 错误状态（UE4 风格）
     bool        HasError = false;                     // 节点是否有错误
     std::string ErrorMessage;                         // 错误描述信息
