@@ -227,6 +227,25 @@ public:
     TimerHandle SetTimerByName(const std::string& name, float interval, int repeatCount, TimerCallback callback);
 
     // ------------------------------------------------------------------
+    // 行为层：异步调度
+    // ------------------------------------------------------------------
+
+    // 在后台线程执行 background()，完成后将 onComplete(ctx) dispatch 回主线程执行。
+    //
+    // 规则：
+    //   - background 不能访问 ExecutionContext / 任何蓝图状态（线程不安全）
+    //   - background 只操作通过捕获传入的纯数据（shared_ptr 等）
+    //   - onComplete 在主线程 Tick 期间执行，可安全访问 ctx
+    //   - AcquireAsync / ReleaseAsync 由 RunAsync 内部自动管理，无需手动调用
+    //
+    // Emscripten 下：background() 和 onComplete(*this) 在当前线程同步执行。
+    // 非 Emscripten 下：background() 在新线程执行，完成后通过
+    //   MainThreadDispatcher 投递 onComplete，由 BlueprintRunner::Tick 消费。
+    void RunAsync(
+        std::function<void()>                    background,
+        std::function<void(ExecutionContext&)>   onComplete);
+
+    // ------------------------------------------------------------------
     // 行为层：控制流
     // ------------------------------------------------------------------
 

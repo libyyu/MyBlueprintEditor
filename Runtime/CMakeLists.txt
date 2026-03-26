@@ -59,6 +59,7 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintExporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintRunner.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FrameTimerManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/MainThreadDispatcher.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinNodeDefs.cpp
     # BuiltinHandlers – split by category
     ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers.cpp
@@ -87,6 +88,7 @@ set(RUNTIME_PUBLIC_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintExporter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintRunner.h
     ${CMAKE_CURRENT_SOURCE_DIR}/FrameTimerManager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/MainThreadDispatcher.h
     ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinNodeDefs.h
     ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers.h
     ${CMAKE_CURRENT_SOURCE_DIR}/FileSystem.h

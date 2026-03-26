@@ -2,11 +2,15 @@
 
 #include "BlueprintRunner.h"
 #include "BlueprintExporter.h"
+#include "MainThreadDispatcher.h"
 #include <sstream>
 #include <chrono>
 #include <algorithm>
 #include <cassert>
 #include <unordered_set>
+#ifndef __EMSCRIPTEN__
+#  include <thread>
+#endif
 
 namespace NodeEditor {
 namespace Runtime {
@@ -686,6 +690,63 @@ TimerHandle ExecutionContext::Delay(float seconds, const std::function<void()>& 
         wrapCallbackWithContextRestore([callback]() -> bool { callback(); return false; }));
 }
 
+// ============================================================================
+// RunAsync — 后台线程执行 + 主线程回调
+// ============================================================================
+
+void ExecutionContext::RunAsync(
+    std::function<void()>                  background,
+    std::function<void(ExecutionContext&)> onComplete)
+{
+#ifdef __EMSCRIPTEN__
+    // Emscripten：单线程，直接同步执行
+    if (background) background();
+    if (onComplete) onComplete(*this);
+#else
+    if (!m_runner) return;
+
+    // 保存执行上下文快照（与 wrapCallbackWithContextRestore 逻辑一致）
+    auto savedNode        = m_state->currentNode;
+    auto savedPinNameToId = m_state->pinNameToId;
+    auto savedNodeData    = m_state->nodeData;
+
+    m_runner->AcquireAsync();
+    BlueprintRunner* runner = m_runner;
+
+    // 后台线程：只执行纯计算，不接触 ctx
+    std::thread([this, runner,
+                 bg       = std::move(background),
+                 done     = std::move(onComplete),
+                 savedNode, savedPinNameToId, savedNodeData]() mutable
+    {
+        if (bg) bg();
+
+        // 完成后 dispatch 回主线程
+        MainThreadDispatcher::Get().Post(
+            [this, runner, done = std::move(done),
+             savedNode, savedPinNameToId, savedNodeData]() mutable
+            {
+                // 恢复执行上下文状态（同 wrapCallbackWithContextRestore）
+                auto prevNode        = m_state->currentNode;
+                auto prevPinNameToId = m_state->pinNameToId;
+                auto prevNodeData    = m_state->nodeData;
+
+                m_state->currentNode  = savedNode;
+                m_state->pinNameToId  = savedPinNameToId;
+                m_state->nodeData     = savedNodeData;
+
+                if (done) done(*this);
+
+                m_state->currentNode  = prevNode;
+                m_state->pinNameToId  = prevPinNameToId;
+                m_state->nodeData     = prevNodeData;
+
+                if (runner) runner->ReleaseAsync();
+            });
+    }).detach();
+#endif
+}
+
 TimerHandle ExecutionContext::SetTimer(float seconds, TimerCallback callback)
 {
     if (!m_runner) return InvalidTimerHandle;
@@ -1009,6 +1070,11 @@ bool BlueprintRunner::FireConnectedNode(PinId inputPinId)
 
 void BlueprintRunner::Tick(float deltaTime)
 {
+#ifndef __EMSCRIPTEN__
+    // 先消费后台线程 dispatch 回来的主线程任务
+    MainThreadDispatcher::Get().DrainQueue();
+#endif
+
     m_timerManager->Tick(deltaTime);
 
     // 清理 m_keepAliveRunners 中所有 timer 已全部触发完的子 runner。
