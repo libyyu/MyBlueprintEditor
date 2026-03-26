@@ -143,6 +143,17 @@ static inline void DrawColoredLogLine(const std::string& line)
 }
 
 // ============================================================================
+// 变量拖拽 Payload（变量面板 → 画布）
+// ============================================================================
+
+struct VarDragPayload
+{
+    char varName[64]  = {};
+    int  dataType     = 0;   // RTPinDataType as int
+};
+static constexpr const char* VAR_DRAG_DROP_TYPE = "BP_VARIABLE";
+
+// ============================================================================
 // 蓝图文档（每个标签页一个实例）
 // ============================================================================
 
@@ -191,6 +202,11 @@ struct BlueprintDocument
     bool       createNewNode      = false;
     Pin*       newNodeLinkPin     = nullptr;
     Pin*       newLinkPin         = nullptr;
+
+    // 变量拖拽到画布的待处理状态
+    bool           pendingVarDrop     = false;  // 有待处理的拖拽放置
+    VarDragPayload pendingVarPayload  = {};      // 拖拽的变量信息
+    ImVec2         pendingVarDropPos  = {};      // 放置时的屏幕坐标
 
     // 内联编辑控件字符串缓冲区（按 PinId 索引，文档切换时自然隔离）
     std::unordered_map<uintptr_t, std::array<char, 128>> pinStringBuffers;

@@ -2366,6 +2366,33 @@ void BlueprintEditor::OnFrame(float deltaTime)
         ActiveDoc()->flowLinks.clear();
     }
 
+    // ================================================================
+    // 变量拖拽放置（在 ed::End 之前，画布仍在 Begin/End 块内）
+    // ================================================================
+    // 用 InvisibleButton 覆盖整个编辑器区域，作为 DragDropTarget
+    {
+        ImVec2 editorMin = ImGui::GetItemRectMin();
+        ImVec2 editorMax = ImGui::GetItemRectMax();
+        ImGui::SetCursorScreenPos(editorMin);
+        ImGui::InvisibleButton("##canvas_drop_target", editorMax - editorMin,
+                               ImGuiButtonFlags_None);
+        if (ImGui::BeginDragDropTarget())
+        {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(VAR_DRAG_DROP_TYPE))
+            {
+                auto* p = static_cast<const VarDragPayload*>(payload->Data);
+                auto* doc = ActiveDoc();
+                if (doc)
+                {
+                    doc->pendingVarDrop    = true;
+                    doc->pendingVarPayload = *p;
+                    doc->pendingVarDropPos = ImGui::GetMousePos();
+                }
+            }
+            ImGui::EndDragDropTarget();
+        }
+    }
+
     ed::End();
 
     // ================================================================
@@ -2395,6 +2422,74 @@ void BlueprintEditor::OnFrame(float deltaTime)
         lastPositions.clear();
         for (const auto& node : ActiveDoc()->nodes)
             lastPositions[node.ID] = ed::GetNodePosition(node.ID);
+    }
+
+    // ================================================================
+    // 延迟处理变量拖拽放置（必须在 ed::End() 之后执行）
+    // ================================================================
+    if (ActiveDoc() && ActiveDoc()->pendingVarDrop)
+    {
+        ActiveDoc()->pendingVarDrop = false;
+
+        const VarDragPayload& vp  = ActiveDoc()->pendingVarPayload;
+        ImVec2                dropPos   = ActiveDoc()->pendingVarDropPos;
+        bool                  shiftHeld = ImGui::GetIO().KeyShift;
+
+        auto spawnVarNode = [&](const char* defId)
+        {
+            ed::SetCurrentEditor(ActiveDoc()->editorContext);
+            Node* node = SpawnNodeByDef(defId);
+            if (node)
+            {
+                BuildNodes();
+                ActiveDoc()->isDirty = true;
+                for (auto& pin : node->Inputs)
+                    if (pin.Name == "Name") { pin.StringValue = vp.varName; break; }
+                ed::SetNodePosition(node->ID, ed::ScreenToCanvas(dropPos));
+            }
+        };
+
+        if (shiftHeld)
+        {
+            // Shift+拖拽：直接生成 SetVariable
+            spawnVarNode("SetVariable");
+        }
+        else
+        {
+            // 无修饰键：弹出 Get/Set 选择菜单
+            ImGui::SetNextWindowPos(dropPos, ImGuiCond_Always);
+            ImGui::OpenPopup("##VarDropMenu");
+        }
+    }
+
+    // 变量 Get/Set 选择弹窗
+    if (ActiveDoc() && ImGui::BeginPopup("##VarDropMenu"))
+    {
+        const VarDragPayload& vp = ActiveDoc()->pendingVarPayload;
+        ImGui::TextDisabled("Variable: %s", vp.varName);
+        ImGui::Separator();
+
+        auto spawnAndClose = [&](const char* defId)
+        {
+            ed::SetCurrentEditor(ActiveDoc()->editorContext);
+            Node* node = SpawnNodeByDef(defId);
+            if (node)
+            {
+                BuildNodes();
+                ActiveDoc()->isDirty = true;
+                for (auto& pin : node->Inputs)
+                    if (pin.Name == "Name") { pin.StringValue = vp.varName; break; }
+                ed::SetNodePosition(node->ID, ed::ScreenToCanvas(ActiveDoc()->pendingVarDropPos));
+            }
+            ImGui::CloseCurrentPopup();
+        };
+
+        if (ImGui::MenuItem(ICON_FA_EYE " Get Variable"))
+            spawnAndClose("GetVariable");
+        if (ImGui::MenuItem(ICON_FA_PEN " Set Variable"))
+            spawnAndClose("SetVariable");
+
+        ImGui::EndPopup();
     }
 
     // ================================================================
@@ -3025,10 +3120,24 @@ void BlueprintEditor::DrawVariablePanel()
         auto& var = doc->variables[i];
         ImGui::PushID(i);
 
-        // 类型色标
+        // 类型色标（同时作为拖拽手柄）
         ImVec2 dotPos = ImGui::GetCursorScreenPos() + ImVec2(4.0f, ImGui::GetTextLineHeight() * 0.5f - 4.0f);
         ImGui::GetWindowDrawList()->AddCircleFilled(dotPos + ImVec2(4,4), 5.0f, ImGui::ColorConvertFloat4ToU32(typeColor(var.dataType)));
         ImGui::Dummy(ImVec2(14.0f, ImGui::GetTextLineHeight()));
+
+        // 拖拽源：从色标或变量名开始拖拽
+        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+        {
+            VarDragPayload payload;
+            snprintf(payload.varName, sizeof(payload.varName), "%s", var.name.c_str());
+            payload.dataType = static_cast<int>(var.dataType);
+            ImGui::SetDragDropPayload(VAR_DRAG_DROP_TYPE, &payload, sizeof(payload));
+            // 拖拽预览提示
+            ImGui::TextColored(typeColor(var.dataType), "● %s  [%s]", var.name.c_str(), typeToStr(var.dataType));
+            ImGui::TextDisabled("Drop → Get node   Shift+Drop → Set node");
+            ImGui::EndDragDropSource();
+        }
+
         ImGui::SameLine(0, 2.0f);
 
         // 变量名（可内联重命名）
