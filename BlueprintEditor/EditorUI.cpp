@@ -1060,7 +1060,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1,1,1,0.15f));
                             ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(1,1,1,0.25f));
                             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2,2));
-                            const char* collapseIcon = node.isCollapsed ? ">" : "v";
+                            const char* collapseIcon = node.isCollapsed ? ICON_FA_CARET_RIGHT : ICON_FA_CARET_DOWN;
                             if (ImGui::SmallButton(collapseIcon))
                             {
                                 node.isCollapsed = !node.isCollapsed;

@@ -82,6 +82,10 @@
 #define ICON_FA_UNLINK             "\xef\x84\xa7"  // U+f127  (break link)
 #define ICON_FA_LAYER_GROUP        "\xef\x97\x82"  // U+f5fd
 
+// --- Collapse / Expand ---
+#define ICON_FA_CARET_DOWN         "\xef\x83\x97"  // U+f0d7
+#define ICON_FA_CARET_RIGHT        "\xef\x83\x9a"  // U+f0da
+
 // --- Misc ---
 #define ICON_FA_PLUS               "\x2b"           // U+002b
 #define ICON_FA_MINUS              "\xef\x81\xa8"  // U+f068

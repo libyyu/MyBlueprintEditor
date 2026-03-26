@@ -78,9 +78,8 @@ void RegisterHandlers_Flow(
             return true;
         }
 
-        // 如果路径是相对路径，基于 basePath 解析
-        // basePath 可能是目录路径（"bin/data"）或文件路径（"bin/data/foo.json"）
-        // 统一处理：若末尾已有 '/' 或 '\' 则直接拼接，否则先加 '/' 再拼
+        // 如果路径是相对路径，基于 basePath（目录路径）解析
+        // basePath 约定为目录路径（如 "C:/examples/sample" 或 "."），由调用方保证
         std::string resolvedPath = filePath;
         if (!basePath.empty() && 
             filePath.find(':') == std::string::npos && 
@@ -124,8 +123,13 @@ void RegisterHandlers_Flow(
             // 父析构后 weak_ptr 失效，子自动回退到自身 manager，不会 UAF
             subRunner.SetParentTimerManager(runner.GetTimerManagerPtr());
 
+            // subLog 只收集用户可见的 Print 输出（用于填充 Output 引脚）
+            // verbose 节点执行日志仅转发给父蓝图显示，不放入 Output
             std::vector<std::string> subLog;
-            subRunner.SetLogCallback([&subLog, &ctx](LogLevel lv, const std::string& msg) {
+            subRunner.SetLogCallback([&ctx](LogLevel lv, const std::string& msg) {
+                ctx.Log("    | " + msg, lv);
+            });
+            subRunner.SetPrintCallback([&subLog, &ctx](LogLevel lv, const std::string& msg) {
                 subLog.push_back(msg);
                 ctx.Log("    | " + msg, lv);
             });
@@ -200,9 +204,13 @@ void RegisterHandlers_Flow(
             // 父析构后 weak_ptr 失效，子自动回退到自身 manager，不会 UAF
             subRunner->SetParentTimerManager(runner.GetTimerManagerPtr());
 
-            // 使用 shared_ptr 管理 subLog，保证异步 timer 回调时仍可访问
+            // subLog 只收集用户可见的 Print 输出（用于填充 Output 引脚）
+            // verbose 节点执行日志仅转发给父蓝图显示，不放入 Output
             auto subLog = std::make_shared<std::vector<std::string>>();
-            subRunner->SetLogCallback([subLog, pCtx](LogLevel lv, const std::string& msg) {
+            subRunner->SetLogCallback([pCtx](LogLevel lv, const std::string& msg) {
+                pCtx->Log("    | " + msg, lv);
+            });
+            subRunner->SetPrintCallback([subLog, pCtx](LogLevel lv, const std::string& msg) {
                 subLog->push_back(msg);
                 pCtx->Log("    | " + msg, lv);
             });

@@ -463,6 +463,7 @@ static int runBlueprintFromFile(const std::string& filePath, float maxTimeSec, i
 
     BlueprintRunner runner;
     runner.SetLogCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
+    runner.SetPrintCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
 
     bool isEditorFile = (fileName.size() > 12 && fileName.substr(fileName.size()-12) == ".editor.json");
 
@@ -650,6 +651,7 @@ int main(int argc, char* argv[])
     std::cout << "--- Step 2: Runtime — load only Runtime file and execute ---" << std::endl;
     BlueprintRunner runner;
     runner.SetLogCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
+    runner.SetPrintCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
 
     if (!runner.LoadFromFile("blueprint.json"))
     {

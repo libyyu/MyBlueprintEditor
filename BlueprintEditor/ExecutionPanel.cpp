@@ -107,11 +107,18 @@ void BlueprintEditor::ExecuteBlueprint()
         return;
     }
 
-    // 3. 用当前文件路径重新注册 handlers（确保 ExecuteBlueprint 节点能解析子蓝图的相对路径）
+    // 3. 用当前文件所在目录重新注册 handlers（确保 ExecuteBlueprint 节点能解析子蓝图的相对路径）
+    //    basePath 约定为目录路径，需从完整文件路径中提取目录部分
     {
-        std::string currentPath = ActiveDoc()->filePath;  // 当前蓝图文件路径
+        std::string basePath;
+        const std::string& fp = ActiveDoc()->filePath;
+        auto pos = fp.find_last_of("/\\");
+        if (pos != std::string::npos)
+            basePath = fp.substr(0, pos);  // "C:/foo/bar/NLoop.json" → "C:/foo/bar"
+        else
+            basePath = ".";               // 无目录分隔符时使用当前目录
         ::NodeEditor::Runtime::RegisterBuiltinHandlers(
-            ActiveDoc()->persistentRunner, currentPath, &m_HandlerRegistry);
+            ActiveDoc()->persistentRunner, basePath, &m_HandlerRegistry);
     }
     if (m_DefaultHandler)
         ActiveDoc()->persistentRunner.SetDefaultHandler(m_DefaultHandler);
