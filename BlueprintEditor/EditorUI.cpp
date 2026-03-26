@@ -1352,6 +1352,19 @@ void BlueprintEditor::OnFrame(float deltaTime)
             x += ImGui::CalcTextSize(buf).x + 8.0f;
         }
 
+        // 缩放比例
+        {
+            dl->AddLine(ImVec2(x, barMin.y + 4.0f), ImVec2(x, barMax.y - 4.0f), IM_COL32(60, 70, 90, 120));
+            x += 8.0f;
+            float zoom = ed::GetCurrentZoom();
+            snprintf(buf, sizeof(buf), ICON_FA_MAGNIFYING_GLASS " %.0f%%", zoom * 100.0f);
+            ImU32 zoomCol = IM_COL32(135, 160, 200, 210);
+            if (zoom < 0.3f)       zoomCol = IM_COL32(220, 140,  80, 230);  // 过小：橙色警示
+            else if (zoom > 2.0f)  zoomCol = IM_COL32(140, 220, 140, 230);  // 过大：绿色
+            dl->AddText(ImVec2(x, textY), zoomCol, buf);
+            x += ImGui::CalcTextSize(buf).x + 8.0f;
+        }
+
         // 右侧：文件名
         if (!ActiveDoc()->filePath.empty())
         {
