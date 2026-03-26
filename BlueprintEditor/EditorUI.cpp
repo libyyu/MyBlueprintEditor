@@ -3046,10 +3046,10 @@ void BlueprintEditor::DrawVariablePanel()
     float paneWidth = ImGui::GetContentRegionAvail().x;
 
     // ── 工具栏：添加变量 + 类型选择 ─────────────────────────────────────
-    // 用于"新建变量"的临时状态（每个文档独立存储在 doc 里，这里用 static 仅做弹窗控制）
-    static bool showAddPopup = false;
-    static char newVarName[64] = {};
-    static int  newVarTypeIdx = 1; // 默认 Boolean
+    // 新建变量弹窗状态存在 doc 里，多文档切换互不干扰
+    bool& showAddPopup = doc->varAddPopupOpen;
+    char* newVarName   = doc->varNewName;
+    int&  newVarTypeIdx = doc->varNewTypeIdx;
 
     if (ImGui::Button(ICON_FA_PLUS " Add Variable"))
     {

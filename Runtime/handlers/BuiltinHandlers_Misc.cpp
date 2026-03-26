@@ -56,6 +56,25 @@ void RegisterHandlers_Misc(std::unordered_map<std::string, NodeHandler>& handler
         ctx.SetOutputValue("Result", Variant(ctx.GetInputValue("Value").asString()));
         return true;
     };
+
+    // Message 节点：无输入引脚，输出引脚 "Message" 的值来自 pin 的 defaultValue。
+    // 由于 runtime 只把 Input 引脚的 defaultValue 注入 pinValues，
+    // Output 引脚需要 handler 手动读取 defaultValue 并写入 pinValues。
+    handlers["Message"] = [](ExecutionContext& ctx) {
+        const auto* node = ctx.GetCurrentNode();
+        if (!node) return true;
+        for (const auto& pin : node->pins)
+        {
+            if (pin.kind == PinKind::Output && !pin.isExec)
+            {
+                if (pin.defaultValue.type != PinDataType::Unknown)
+                    ctx.SetOutputValue(pin.id, pin.defaultValue);
+                else
+                    ctx.SetOutputValue(pin.id, Variant(std::string("")));
+            }
+        }
+        return true;
+    };
 }
 
 // ============================================================================

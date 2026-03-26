@@ -187,6 +187,13 @@ static void ApplyUndoRedo(BlueprintDocument* doc,
 
     from.pop_back();
 
+    // 关键：快照恢复后重建 Pin::Node 指针（deque 重新分配，旧指针全部失效）
+    for (auto& node : doc->nodes)
+    {
+        for (auto& pin : node.Inputs)  { pin.Node = &node; pin.Kind = PinKind::Input; }
+        for (auto& pin : node.Outputs) { pin.Node = &node; pin.Kind = PinKind::Output; }
+    }
+
     doc->isDirty = true;
     doc->invalidateEditorIndices();
 }

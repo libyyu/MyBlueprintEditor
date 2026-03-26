@@ -231,6 +231,11 @@ struct BlueprintDocument
     // 节点过滤器（每个文档独立，切换文档后保留各自的过滤状态）
     char nodeFilterBuf[128] = {};
 
+    // 变量面板新建弹窗状态（每个文档独立，避免多文档 static 污染）
+    bool varAddPopupOpen   = false;
+    char varNewName[64]    = {};
+    int  varNewTypeIdx     = 1;        // 默认 Boolean
+
     // 变量列表（蓝图级别的变量定义，可在 Get/Set Variable 节点中引用）
     std::vector<RTVariableDefinition> variables;
 
