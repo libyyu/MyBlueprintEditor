@@ -93,7 +93,14 @@ struct CommentRegion
 // 修改规则：
 //   - 新增可选字段（向后兼容）→ 不递增
 //   - 修改已有字段语义 / 删除字段 / 改变引脚格式 → 递增
-constexpr int BLUEPRINT_CURRENT_SCHEMA_VERSION = 1;
+//
+// 版本历史：
+//   v1 — 初始版本。isCollapsed 存在 customProperties["__collapsed"]；
+//         variables 字段可能缺失。
+//   v2 — isCollapsed 升为 NodeInstance 顶层字段（runtime JSON 对齐 editor JSON）；
+//         variables 顶层数组标准化（缺失时补空数组）；
+//         customProperties["__collapsed"] 废弃，迁移时自动转换并移除。
+constexpr int BLUEPRINT_CURRENT_SCHEMA_VERSION = 2;
 
 // ============================================================================
 // 蓝图元数据

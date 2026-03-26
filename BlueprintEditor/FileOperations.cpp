@@ -409,11 +409,16 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
         
         auto& node = ActiveDoc()->nodes.back();
 
-        // 恢复编辑器扩展状态
+        // 恢复折叠状态：v2+ 读顶层 isCollapsed；v1 兼容读 customProperties["__collapsed"]
+        // （schema 迁移通常在 importRuntimeFromString 里已处理，此处 fallback 仅防御性保留）
         {
-            auto it = rtNode.customProperties.find("__collapsed");
-            if (it != rtNode.customProperties.end() && it->second == "1")
-                node.isCollapsed = true;
+            node.isCollapsed = rtNode.isCollapsed;
+            if (!node.isCollapsed)
+            {
+                auto it = rtNode.customProperties.find("__collapsed");
+                if (it != rtNode.customProperties.end() && it->second == "1")
+                    node.isCollapsed = true;
+            }
         }
         
         // 创建引脚

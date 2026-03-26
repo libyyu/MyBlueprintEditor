@@ -80,6 +80,42 @@ bool getJsonBool(const crude_json::value& obj, const char* key, bool defaultVal 
 } // anonymous namespace
 
 // ============================================================================
+// Schema 迁移
+// ============================================================================
+
+// v1 → v2：
+//   1. customProperties["__collapsed"] == "1"  →  node.isCollapsed = true，删除该 key
+//   2. variables 顶层数组缺失时补空（已由解析逻辑默认处理，此处仅标记版本）
+static void MigrateV1ToV2(BlueprintData& data)
+{
+    for (auto& node : data.nodes)
+    {
+        auto it = node.customProperties.find("__collapsed");
+        if (it != node.customProperties.end())
+        {
+            if (it->second == "1")
+                node.isCollapsed = true;
+            node.customProperties.erase(it);
+        }
+    }
+    data.metadata.schemaVersion = 2;
+}
+
+// 迁移入口：从 fromVersion 逐步升级到 BLUEPRINT_CURRENT_SCHEMA_VERSION
+// 新增版本时只需在此追加 if (from < N) { MigrateV(N-1)ToVN(data); from = N; }
+static void ApplySchemaMigrations(BlueprintData& data, int fromVersion)
+{
+    int from = (fromVersion == 0) ? 1 : fromVersion; // 0 视为 v1
+
+    if (from < 2) { MigrateV1ToV2(data); from = 2; }
+
+    // 未来版本：
+    // if (from < 3) { MigrateV2ToV3(data); from = 3; }
+
+    (void)from; // 消除末尾未使用警告
+}
+
+// ============================================================================
 // JsonBlueprintExporter — Runtime 文件导出
 // ============================================================================
 
@@ -239,6 +275,14 @@ std::string JsonBlueprintExporter::exportRuntimeToString(const BlueprintData& da
             oss << ","; writeNewline();
             writeIndent();
             oss << "\"isEnabled\": false";
+        }
+
+        // 折叠状态（v2+，仅在 true 时写入，默认 false）
+        if (node.isCollapsed)
+        {
+            oss << ","; writeNewline();
+            writeIndent();
+            oss << "\"isCollapsed\": true";
         }
         
         // 节点数据（配置参数，如常量值）
@@ -1110,6 +1154,13 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
             }),
             links.end()
         );
+    }
+
+    // ---- Schema 迁移（在所有数据解析完成后执行）----
+    {
+        int fileSchema = result.data.metadata.schemaVersion;
+        if (fileSchema < BLUEPRINT_CURRENT_SCHEMA_VERSION)
+            ApplySchemaMigrations(result.data, fileSchema);
     }
 
     result.success = true;

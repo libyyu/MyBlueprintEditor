@@ -541,9 +541,8 @@ RTBlueprintData BlueprintEditor::BuildRuntimeData()
         ni.definitionId = node.DefinitionId.empty() ? node.Name : node.DefinitionId;
         ni.name = node.Name;
         ni.isEnabled = true;
-        // 保存编辑器扩展状态
-        if (node.isCollapsed)
-            ni.customProperties["__collapsed"] = "1";
+        // 保存折叠状态到顶层字段（v2+），不再写 customProperties["__collapsed"]
+        ni.isCollapsed = node.isCollapsed;
 
         // 输入引脚
         for (const auto& pin : node.Inputs)
