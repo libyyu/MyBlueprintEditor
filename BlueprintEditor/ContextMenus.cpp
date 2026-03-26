@@ -105,6 +105,68 @@ void BlueprintEditor::DrawContextMenus(
                 }
             }
         }
+        // Comment 节点专属操作
+        if (node && node->Type == NodeType::Comment)
+        {
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(0.9f, 0.8f, 0.3f, 1.0f), ICON_FA_PENCIL " Comment");
+
+            // 重命名
+            if (ImGui::MenuItem(ICON_FA_PEN " Rename"))
+            {
+                ActiveDoc()->editingCommentId = node->ID;
+                snprintf(ActiveDoc()->commentEditBuf,
+                         sizeof(ActiveDoc()->commentEditBuf),
+                         "%s", node->Name.c_str());
+                ImGui::CloseCurrentPopup();
+            }
+
+            // 颜色预设
+            ImGui::Text("Color:");
+            ImGui::SameLine();
+            struct ColorPreset { const char* label; ImVec4 col; };
+            static const ColorPreset kPresets[] = {
+                { "White",  { 1.00f, 1.00f, 1.00f, 1.0f } },
+                { "Yellow", { 1.00f, 0.85f, 0.20f, 1.0f } },
+                { "Green",  { 0.30f, 0.85f, 0.40f, 1.0f } },
+                { "Blue",   { 0.25f, 0.55f, 1.00f, 1.0f } },
+                { "Red",    { 0.90f, 0.25f, 0.25f, 1.0f } },
+                { "Purple", { 0.65f, 0.30f, 0.90f, 1.0f } },
+            };
+            for (const auto& p : kPresets)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                    ImVec4(p.col.x, p.col.y, p.col.z, 0.7f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                    ImVec4(p.col.x, p.col.y, p.col.z, 1.0f));
+                ImGui::PushID(p.label);
+                if (ImGui::Button("   "))
+                {
+                    PushUndoState();
+                    node->Color = ImColor(p.col.x, p.col.y, p.col.z, 1.0f);
+                    ActiveDoc()->isDirty = true;
+                }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s", p.label);
+                ImGui::PopID();
+                ImGui::PopStyleColor(2);
+                ImGui::SameLine(0, 4);
+            }
+            ImGui::NewLine();
+
+            // 自定义颜色 ColorEdit3
+            ImVec4 col4 = node->Color.Value;
+            ImGui::SetNextItemWidth(200.0f);
+            if (ImGui::ColorEdit3("##commentcol", &col4.x,
+                                  ImGuiColorEditFlags_NoInputs |
+                                  ImGuiColorEditFlags_DisplayHex))
+            {
+                if (ImGui::IsItemActivated()) PushUndoState();
+                node->Color = ImColor(col4.x, col4.y, col4.z, 1.0f);
+                ActiveDoc()->isDirty = true;
+            }
+        }
+
         ImGui::Separator();
         if (ImGui::MenuItem(ICON_FA_TRASH_CAN " Delete"))
         {

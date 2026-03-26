@@ -420,6 +420,23 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
                     node.isCollapsed = true;
             }
         }
+
+        // 恢复 Comment 节点颜色
+        if (node.Type == NodeType::Comment)
+        {
+            auto it = rtNode.customProperties.find("__color");
+            if (it != rtNode.customProperties.end() && it->second.size() == 6)
+            {
+                unsigned int r = 0, g = 0, b = 0;
+                sscanf(it->second.c_str(), "%02X%02X%02X", &r, &g, &b);
+                node.Color = ImColor((int)r, (int)g, (int)b);
+            }
+            else
+            {
+                // 默认白色
+                node.Color = ImColor(255, 255, 255);
+            }
+        }
         
         // 创建引脚
         for (const auto& rtPin : rtNode.pins)

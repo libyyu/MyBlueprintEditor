@@ -735,6 +735,17 @@ RTBlueprintData BlueprintEditor::BuildRuntimeData()
         // 保存折叠状态到顶层字段（v2+），不再写 customProperties["__collapsed"]
         ni.isCollapsed = node.isCollapsed;
 
+        // Comment 节点颜色：序列化为 customProperties["__color"] = "RRGGBB"
+        if (node.Type == NodeType::Comment)
+        {
+            int r = static_cast<int>(node.Color.Value.x * 255.0f);
+            int g = static_cast<int>(node.Color.Value.y * 255.0f);
+            int b = static_cast<int>(node.Color.Value.z * 255.0f);
+            char colorBuf[8];
+            snprintf(colorBuf, sizeof(colorBuf), "%02X%02X%02X", r, g, b);
+            ni.customProperties["__color"] = colorBuf;
+        }
+
         // 输入引脚
         for (const auto& pin : node.Inputs)
         {
