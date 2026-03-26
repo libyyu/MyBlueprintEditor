@@ -13,11 +13,13 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
 
     auto drawList = ImGui::GetWindowDrawList();
 
-    // 小地图位置：编辑器区域右下角
+    // 小地图位置：编辑器区域右下角，在缩放条和状态栏上方
     float mapSize = m_MinimapSize;
     float padding = 10.0f;
-    ImVec2 mapMin(editorMax.x - mapSize - padding, editorMax.y - mapSize - padding);
-    ImVec2 mapMax(editorMax.x - padding, editorMax.y - padding);
+    // 底部需要避开状态栏(22px) + 缩放条(26px) + 间距(8px+6px)
+    float bottomReserve = 62.0f; // 22(状态栏) + 26(缩放条) + 8(间距) + 6(缩放条与状态栏间距)
+    ImVec2 mapMin(editorMax.x - mapSize - padding, editorMax.y - mapSize - bottomReserve);
+    ImVec2 mapMax(editorMax.x - padding, editorMax.y - bottomReserve);
 
     // 计算所有节点的边界框（画布坐标）
     float canvasMinX = 1e9f, canvasMinY = 1e9f;
