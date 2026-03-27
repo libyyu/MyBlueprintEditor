@@ -1,6 +1,28 @@
 // ExecutionPanel.cpp -- 蓝图执行 & 执行面板 UI
 #include "BlueprintEditor.h"
 #include "BuiltinHandlers.h"
+#include <ctime>
+#include <chrono>
+
+// 返回 "HH:MM:SS.mmm" 格式的时间戳字符串
+static std::string NowTimestamp()
+{
+    using namespace std::chrono;
+    auto now   = system_clock::now();
+    auto ms    = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
+    std::time_t t = system_clock::to_time_t(now);
+    struct tm tm_local{};
+#ifdef _WIN32
+    localtime_s(&tm_local, &t);
+#else
+    localtime_r(&t, &tm_local);
+#endif
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%02d:%02d:%02d.%03d",
+             tm_local.tm_hour, tm_local.tm_min, tm_local.tm_sec,
+             static_cast<int>(ms.count()));
+    return buf;
+}
 
 // ============================================================================
 // 执行蓝图
@@ -12,8 +34,9 @@ void BlueprintEditor::ExecuteBlueprint()
     ActiveDoc()->flowLinks.clear();
     ActiveDoc()->isExecuting = true;
 
+    std::string ts = NowTimestamp();
     ActiveDoc()->executionLog.push_back("========================================");
-    ActiveDoc()->executionLog.push_back("  Blueprint Execution Started");
+    ActiveDoc()->executionLog.push_back("  [" + ts + "] Blueprint Execution Started");
     ActiveDoc()->executionLog.push_back("========================================");
 
     // ================================================================
@@ -136,9 +159,10 @@ void BlueprintEditor::ExecuteBlueprint()
 
     ActiveDoc()->executionLog.push_back("");
     ActiveDoc()->executionLog.push_back("========================================");
+    std::string ts2 = NowTimestamp();
     if (result.success)
     {
-        ActiveDoc()->executionLog.push_back("  Execution Completed Successfully!");
+        ActiveDoc()->executionLog.push_back("  [" + ts2 + "] Completed Successfully!");
         char statusBuf[128];
         snprintf(statusBuf, sizeof(statusBuf), "OK (%d nodes, %.2fms)",
                  result.nodesExecuted, elapsed);
@@ -146,11 +170,13 @@ void BlueprintEditor::ExecuteBlueprint()
     }
     else
     {
-        ActiveDoc()->executionLog.push_back("  Execution FAILED: " + result.errorMessage);
+        ActiveDoc()->executionLog.push_back("  [" + ts2 + "] FAILED: " + result.errorMessage);
         ActiveDoc()->lastExecutionStatus = "FAILED: " + result.errorMessage;
     }
     ActiveDoc()->executionLog.push_back("  Nodes executed: " + std::to_string(result.nodesExecuted));
-    ActiveDoc()->executionLog.push_back("  Elapsed: " + std::to_string(elapsed) + " ms");
+    char elapsedBuf[32];
+    snprintf(elapsedBuf, sizeof(elapsedBuf), "%.3f ms", elapsed);
+    ActiveDoc()->executionLog.push_back("  Elapsed: " + std::string(elapsedBuf));
     ActiveDoc()->executionLog.push_back("========================================");
 
     // 5. 执行可视化 —— 精确高亮已执行的节点 & 触发 Flow 动画

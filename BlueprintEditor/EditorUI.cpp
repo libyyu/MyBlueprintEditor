@@ -1352,14 +1352,38 @@ void BlueprintEditor::OnFrame(float deltaTime)
             x += ImGui::CalcTextSize(buf).x + 8.0f;
         }
 
-        // 右侧：文件名
+        // 右侧：上次执行状态 + 文件名
+        float rightX = barMax.x - 12.0f;
+
+        // 文件名（最右）
         if (!ActiveDoc()->filePath.empty())
         {
             size_t lastSlash = ActiveDoc()->filePath.find_last_of("/\\");
             std::string fileName = (lastSlash != std::string::npos) ? ActiveDoc()->filePath.substr(lastSlash + 1) : ActiveDoc()->filePath;
-            if (ActiveDoc()->isDirty) fileName += " \xe2\x80\xa2";  // bullet instead of *
+            if (ActiveDoc()->isDirty) fileName += " \xe2\x80\xa2";  // bullet
             float textW = ImGui::CalcTextSize(fileName.c_str()).x;
-            dl->AddText(ImVec2(barMax.x - textW - 12.0f, textY), IM_COL32(120, 145, 180, 190), fileName.c_str());
+            rightX -= textW;
+            dl->AddText(ImVec2(rightX, textY), IM_COL32(120, 145, 180, 190), fileName.c_str());
+            rightX -= 16.0f;
+            dl->AddLine(ImVec2(rightX, barMin.y + 4.0f), ImVec2(rightX, barMax.y - 4.0f), IM_COL32(60, 70, 90, 120));
+            rightX -= 8.0f;
+        }
+
+        // 上次执行状态（文件名左侧）
+        if (!ActiveDoc()->lastExecutionStatus.empty())
+        {
+            const auto& status = ActiveDoc()->lastExecutionStatus;
+            ImU32 statusCol;
+            if (status.rfind("OK", 0) == 0)
+                statusCol = IM_COL32(80, 220, 100, 230);
+            else if (status.rfind("FAILED", 0) == 0 || status.rfind("Load Failed", 0) == 0)
+                statusCol = IM_COL32(230, 80, 80, 230);
+            else
+                statusCol = IM_COL32(200, 190, 120, 220);
+            std::string statusLabel = ICON_FA_PLAY " " + status;
+            float textW = ImGui::CalcTextSize(statusLabel.c_str()).x;
+            rightX -= textW;
+            dl->AddText(ImVec2(rightX, textY), statusCol, statusLabel.c_str());
         }
     }
 
