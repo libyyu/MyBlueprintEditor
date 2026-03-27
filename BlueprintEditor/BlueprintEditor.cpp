@@ -3,6 +3,7 @@
 #include <map>
 #include <functional>
 #include <algorithm>
+#include "../Runtime/ScriptNodeLoader.h"
 
 // ============================================================================
 // ID 管理
@@ -921,6 +922,9 @@ void BlueprintEditor::OnStart()
 
     // 加载最近文件列表
     LoadRecentFiles();
+
+    // 加载外部自定义节点定义（文件不存在时静默跳过）
+    ::NodeEditor::Runtime::LoadCustomNodesFromFile(m_NodeRegistry, "data/custom_nodes.json");
 
     // 设置初始标题
     SetTitle("Blueprint Editor - [New]");

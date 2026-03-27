@@ -265,6 +265,9 @@ public:
     void MarkDownstreamAsHandled(const std::string& pinName);
     void MarkDownstreamAsHandled(PinId pinId);
 
+    // 请求暂停当前 runner（供调试节点使用）
+    void PauseRunner();
+
     // 通过输入引脚 ID 找到连接的源节点并执行
     bool FireConnectedNode(PinId inputPinId);
 

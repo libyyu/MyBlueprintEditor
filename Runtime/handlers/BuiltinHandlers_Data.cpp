@@ -184,6 +184,70 @@ void RegisterHandlers_Data(std::unordered_map<std::string, NodeHandler>& handler
         ctx.SetOutputValue("String", Variant(result));
         return true;
     };
+
+    // ============================================================================
+    // Conversion 节点处理器
+    // ============================================================================
+
+    handlers["IntToFloat"] = [](ExecutionContext& ctx) {
+        int64_t v = ctx.GetInputValue("Value").asInt();
+        ctx.SetOutputValue("Result", Variant(static_cast<double>(v)));
+        return true;
+    };
+
+    handlers["FloatToInt"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value").asFloat();
+        ctx.SetOutputValue("Result", Variant(static_cast<int64_t>(v)));
+        return true;
+    };
+
+    handlers["IntToString"] = [](ExecutionContext& ctx) {
+        int64_t v = ctx.GetInputValue("Value").asInt();
+        ctx.SetOutputValue("Result", Variant(std::to_string(v)));
+        return true;
+    };
+
+    handlers["FloatToString"] = [](ExecutionContext& ctx) {
+        double v = ctx.GetInputValue("Value").asFloat();
+        ctx.SetOutputValue("Result", Variant(std::to_string(v)));
+        return true;
+    };
+
+    handlers["StringToInt"] = [](ExecutionContext& ctx) {
+        std::string s = ctx.GetInputValue("Value").asString();
+        char* endptr = nullptr;
+        int64_t v = static_cast<int64_t>(std::strtoll(s.c_str(), &endptr, 10));
+        if (endptr == s.c_str()) v = 0;
+        ctx.SetOutputValue("Result", Variant(v));
+        return true;
+    };
+
+    handlers["StringToFloat"] = [](ExecutionContext& ctx) {
+        std::string s = ctx.GetInputValue("Value").asString();
+        char* endptr = nullptr;
+        double v = std::strtod(s.c_str(), &endptr);
+        if (endptr == s.c_str()) v = 0.0;
+        ctx.SetOutputValue("Result", Variant(v));
+        return true;
+    };
+
+    handlers["BoolToInt"] = [](ExecutionContext& ctx) {
+        bool b = ctx.GetInputValue("Value").asBool();
+        ctx.SetOutputValue("Result", Variant(static_cast<int64_t>(b ? 1 : 0)));
+        return true;
+    };
+
+    handlers["IntToBool"] = [](ExecutionContext& ctx) {
+        int64_t v = ctx.GetInputValue("Value").asInt();
+        ctx.SetOutputValue("Result", Variant(v != 0));
+        return true;
+    };
+
+    handlers["ToString"] = [](ExecutionContext& ctx) {
+        auto val = ctx.GetInputValue("Value");
+        ctx.SetOutputValue("Result", Variant(val.asString()));
+        return true;
+    };
 }
 
 // ============================================================================

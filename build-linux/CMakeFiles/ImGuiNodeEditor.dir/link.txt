@@ -1,0 +1,2 @@
+/usr/bin/ar qc libImGuiNodeEditor.a CMakeFiles/ImGuiNodeEditor.dir/Editor/Core/imgui_node_editor.cpp.o CMakeFiles/ImGuiNodeEditor.dir/Editor/Core/imgui_node_editor_api.cpp.o CMakeFiles/ImGuiNodeEditor.dir/Editor/Core/imgui_canvas.cpp.o CMakeFiles/ImGuiNodeEditor.dir/UI/Builders/NodeBuilder.cpp.o
+/usr/bin/ranlib libImGuiNodeEditor.a

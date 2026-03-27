@@ -655,6 +655,12 @@ bool ExecutionContext::FireConnectedNode(PinId inputPinId)
     return false;
 }
 
+void ExecutionContext::PauseRunner()
+{
+    if (m_runner)
+        m_runner->Pause();
+}
+
 // ============================================================================
 // Timer context 辅助：保存/恢复 context 状态的 RAII guard + 统一包装
 // ============================================================================

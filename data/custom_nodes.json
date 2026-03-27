@@ -1,0 +1,17 @@
+{
+  "nodes": [
+    {
+      "id": "Custom.HelloWorld",
+      "name": "Hello World",
+      "category": "Custom",
+      "color": "40C080",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "Name", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "", "type": "Flow", "isExec": true}
+      ]
+    }
+  ]
+}

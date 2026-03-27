@@ -114,6 +114,30 @@ void RegisterHandlers_Action(
         ctx.SetOutputValue("Return Value", Variant(true));
         return true;
     };
+
+    // ============================================================================
+    // Event 节点处理器
+    // ============================================================================
+
+    handlers["OnBeginPlay"] = [](ExecutionContext& ctx) {
+        ctx.Log("  [OnBeginPlay] triggered");
+        ctx.ActivateOutputFlow("");
+        return true;
+    };
+
+    handlers["OnTick"] = [](ExecutionContext& ctx) {
+        ctx.Log("  [OnTick] triggered");
+        ctx.SetOutputValue("DeltaTime", Variant(0.0));
+        ctx.ActivateOutputFlow("");
+        return true;
+    };
+
+    handlers["CustomEventNode"] = [](ExecutionContext& ctx) {
+        ctx.Log("  [CustomEvent] triggered");
+        ctx.SetOutputValue("EventName", Variant(std::string("")));
+        ctx.ActivateOutputFlow("");
+        return true;
+    };
 }
 
 } // namespace Runtime

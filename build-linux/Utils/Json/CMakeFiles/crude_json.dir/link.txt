@@ -1,0 +1,2 @@
+/usr/bin/ar qc libcrude_json.a CMakeFiles/crude_json.dir/crude_json.cpp.o
+/usr/bin/ranlib libcrude_json.a
