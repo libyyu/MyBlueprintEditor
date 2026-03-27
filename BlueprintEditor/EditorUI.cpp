@@ -563,6 +563,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
     // ================================================================
     if (ImGui::BeginMenuBar())
     {
+        bool hasProj = m_Project.IsOpen();
+        bool hasDoc  = (ActiveDoc() != nullptr);
+
         if (ImGui::BeginMenu(ICON_FA_FILE " File"))
         {
             // ── 工程 ──────────────────────────────────────────────────────
@@ -570,47 +573,48 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 NewProject();
             if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Open Project..."))
                 OpenProject();
-            if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK " Save Project", nullptr, false, m_Project.IsOpen()))
+            if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK " Save Project", nullptr, false, hasProj))
                 SaveProject();
-            if (ImGui::MenuItem(ICON_FA_FILE_EXPORT " Save Project As...", nullptr, false, m_Project.IsOpen()))
+            if (ImGui::MenuItem(ICON_FA_FILE_EXPORT " Save Project As...", nullptr, false, hasProj))
                 SaveProjectAs();
             ImGui::Separator();
-            // ── 蓝图 ──────────────────────────────────────────────────────
-            if (ImGui::MenuItem(ICON_FA_FILE " New Actor Blueprint", "Ctrl+N"))
+            // ── 蓝图（仅有工程时可用）─────────────────────────────────────
+            if (ImGui::MenuItem(ICON_FA_FILE " New Actor Blueprint", "Ctrl+N", false, hasProj))
                 NewFile(RTBlueprintClass::Actor);
-            if (ImGui::MenuItem(ICON_FA_CUBE " New Function Library"))
+            if (ImGui::MenuItem(ICON_FA_CUBE " New Function Library", nullptr, false, hasProj))
                 NewFile(RTBlueprintClass::FunctionLibrary);
-            if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Open Blueprint...", "Ctrl+O"))
+            if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Open Blueprint...", "Ctrl+O", false, hasProj))
                 OpenFile();
-            if (ImGui::BeginMenu(ICON_FA_CLOCK_ROTATE_LEFT " Recent Files"))
+            if (hasProj)
             {
-                DrawRecentFilesMenu();
-                ImGui::EndMenu();
+                if (ImGui::BeginMenu(ICON_FA_CLOCK_ROTATE_LEFT " Recent Files"))
+                {
+                    DrawRecentFilesMenu();
+                    ImGui::EndMenu();
+                }
             }
             ImGui::Separator();
-            if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK " Save", "Ctrl+S"))
+            if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK " Save", "Ctrl+S", false, hasDoc))
                 SaveFile();
-            if (ImGui::MenuItem(ICON_FA_FILE_EXPORT " Save As...", "Ctrl+Shift+S"))
+            if (ImGui::MenuItem(ICON_FA_FILE_EXPORT " Save As...", "Ctrl+Shift+S", false, hasDoc))
                 SaveFileAs();
             ImGui::Separator();
-            if (ImGui::MenuItem(ICON_FA_XMARK " Close Tab", "Ctrl+W"))
+            if (ImGui::MenuItem(ICON_FA_XMARK " Close Tab", "Ctrl+W", false, hasDoc))
             {
-                if (!m_Documents.empty())
+                if (ActiveDoc()->isDirty)
                 {
-                    if (ActiveDoc() && ActiveDoc()->isDirty)
-                    {
-                        m_PendingCloseTabIndex = m_ActiveDocIndex;
-                        m_ShowUnsavedDialog = true;
-                    }
-                    else
-                        CloseDocument(m_ActiveDocIndex);
+                    m_PendingCloseTabIndex = m_ActiveDocIndex;
+                    m_ShowUnsavedDialog = true;
                 }
+                else
+                    CloseDocument(m_ActiveDocIndex);
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu(ICON_FA_PEN " Edit"))
+
+        // Edit 菜单：完全依赖文档，无文档时整体禁用
+        if (ImGui::BeginMenu(ICON_FA_PEN " Edit", hasDoc))
         {
-            // Undo / Redo
             if (ImGui::MenuItem(ICON_FA_ARROW_ROTATE_LEFT " Undo", "Ctrl+Z", false, CanUndo()))
                 Undo();
             if (ImGui::MenuItem(ICON_FA_ARROWS_ROTATE " Redo", "Ctrl+Y", false, CanRedo()))
@@ -650,33 +654,39 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 OpenSearchOverlay();
             ImGui::EndMenu();
         }
+
+        // View 菜单：部分条目依赖文档
         if (ImGui::BeginMenu(ICON_FA_EYE " View"))
         {
-            ImGui::MenuItem(ICON_FA_LIST " Node List", nullptr, &m_ShowNodeListWindow);
-            ImGui::MenuItem(ICON_FA_TERMINAL " Execution Output", nullptr, &m_ShowExecutionWindow);
-            ImGui::MenuItem(ICON_FA_STOPWATCH " Timer Monitor", nullptr, &m_ShowTimerWindow);
-            ImGui::MenuItem(ICON_FA_MAP " Minimap", nullptr, &m_ShowMinimap);
-            ImGui::MenuItem(ICON_FA_TABLE_CELLS " Show Ordinals", nullptr, &m_ShowOrdinals);
-            ImGui::Separator();
-            if (ImGui::MenuItem(ICON_FA_EXPAND " Zoom to Content"))
-                ed::NavigateToContent();
+            if (hasDoc)
+            {
+                ImGui::MenuItem(ICON_FA_LIST " Node List", nullptr, &m_ShowNodeListWindow);
+                ImGui::MenuItem(ICON_FA_TERMINAL " Execution Output", nullptr, &m_ShowExecutionWindow);
+                ImGui::MenuItem(ICON_FA_STOPWATCH " Timer Monitor", nullptr, &m_ShowTimerWindow);
+                ImGui::MenuItem(ICON_FA_MAP " Minimap", nullptr, &m_ShowMinimap);
+                ImGui::MenuItem(ICON_FA_TABLE_CELLS " Show Ordinals", nullptr, &m_ShowOrdinals);
+                ImGui::Separator();
+                if (ImGui::MenuItem(ICON_FA_EXPAND " Zoom to Content"))
+                    ed::NavigateToContent();
+                ImGui::Separator();
+            }
             if (ImGui::MenuItem(ICON_FA_PALETTE " Style Editor"))
                 m_ShowStyleEditorWindow = true;
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu(ICON_FA_BOLT " Run"))
+
+        // Run 菜单：整体依赖文档
+        if (ImGui::BeginMenu(ICON_FA_BOLT " Run", hasDoc))
         {
             if (ImGui::MenuItem(ICON_FA_PLAY " Execute Blueprint", "F5"))
                 ExecuteBlueprint();
             ImGui::Separator();
             ImGui::MenuItem(ICON_FA_STOPWATCH " Timer Monitor", nullptr, &m_ShowTimerWindow);
             if (ImGui::MenuItem(ICON_FA_ERASER " Clear Execution Highlight"))
-            {
-                if (ActiveDoc())
-                    ActiveDoc()->executedNodeHighlight.clear();
-            }
+                ActiveDoc()->executedNodeHighlight.clear();
             ImGui::EndMenu();
         }
+
         if (ImGui::BeginMenu(ICON_FA_CIRCLE_QUESTION " Help"))
         {
             ImGui::TextColored(ImVec4(0.45f, 0.70f, 0.95f, 1.00f), ICON_FA_KEYBOARD " Keyboard Shortcuts");
@@ -707,7 +717,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         ImGui::Separator();
 
         // 显示当前文件名
-        if (ActiveDoc())
+        if (hasDoc)
         {
             if (!ActiveDoc()->filePath.empty())
             {
