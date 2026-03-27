@@ -139,9 +139,7 @@ if(BLUEPRINT_LUA)
         file(GLOB LUA54_SOURCES "${LUA54_SRC_DIR}/*.c")
         list(REMOVE_ITEM LUA54_SOURCES "${LUA54_SRC_DIR}/lua.c" "${LUA54_SRC_DIR}/luac.c")
 
-        set(_LUA_TARGET_NAME "lua54_${_LUA_LIB_TYPE}")
-        string(TOLOWER "${_LUA_TARGET_NAME}" _LUA_TARGET_NAME)
-        # Normalize: lua54_static or lua54_shared
+        set(_LUA_TARGET_NAME "lua54")
         if(NOT TARGET ${_LUA_TARGET_NAME})
             add_library(${_LUA_TARGET_NAME} ${_LUA_LIB_TYPE} ${LUA54_SOURCES})
             target_include_directories(${_LUA_TARGET_NAME}
