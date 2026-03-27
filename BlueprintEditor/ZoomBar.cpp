@@ -16,21 +16,21 @@ static constexpr float kMarginB     = 28.0f;   // 距底部（在状态栏上方
 static constexpr float kThumbR      = 5.0f;    // 滑块圆半径
 static constexpr float kTrackH      = 3.0f;    // 滑轨高度
 
+// ── 缓存的对数常量（避免每帧重复计算 log） ─────────────────────────────────
+static const float kLogMin  = std::log(kZoomMin);
+static const float kLogMax  = std::log(kZoomMax);
+static const float kLogSpan = kLogMax - kLogMin;   // logMax - logMin
+
 // ── 辅助：zoom → 滑轨 t（对数映射，中间=100%） ────────────────────────────
 static float ZoomToT(float zoom)
 {
-    // log 映射让 100% 在中间，小值段和大值段各占一半
-    float logMin = std::log(kZoomMin);
-    float logMax = std::log(kZoomMax);
     float logVal = std::log(ImClamp(zoom, kZoomMin, kZoomMax));
-    return (logVal - logMin) / (logMax - logMin);
+    return (logVal - kLogMin) / kLogSpan;
 }
 
 static float TToZoom(float t)
 {
-    float logMin = std::log(kZoomMin);
-    float logMax = std::log(kZoomMax);
-    return std::exp(logMin + t * (logMax - logMin));
+    return std::exp(kLogMin + t * kLogSpan);
 }
 
 // ── 核心实现 ─────────────────────────────────────────────────────────────────

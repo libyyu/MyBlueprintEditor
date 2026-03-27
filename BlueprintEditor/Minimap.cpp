@@ -13,11 +13,13 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
 
     auto drawList = ImGui::GetWindowDrawList();
 
-    // 小地图位置：编辑器区域右下角
+    // 小地图位置：编辑器区域右下角，在缩放条和状态栏上方
     float mapSize = m_MinimapSize;
     float padding = 10.0f;
-    ImVec2 mapMin(editorMax.x - mapSize - padding, editorMax.y - mapSize - padding);
-    ImVec2 mapMax(editorMax.x - padding, editorMax.y - padding);
+    // 底部需要避开状态栏(22px) + 缩放条(26px) + 间距(8px+6px)
+    float bottomReserve = 62.0f; // 22(状态栏) + 26(缩放条) + 8(间距) + 6(缩放条与状态栏间距)
+    ImVec2 mapMin(editorMax.x - mapSize - padding, editorMax.y - mapSize - bottomReserve);
+    ImVec2 mapMax(editorMax.x - padding, editorMax.y - bottomReserve);
 
     // 计算所有节点的边界框（画布坐标）
     float canvasMinX = 1e9f, canvasMinY = 1e9f;
@@ -81,14 +83,17 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
         ImVec2(mapMax.x - 1, mapMax.y - 1),
         IM_COL32(80, 100, 140, 30), 5.0f);
 
-    // 收集选中节点
+    // 收集选中节点（用 unordered_set 加速后续 O(1) 查找）
     int selCount = ed::GetSelectedObjectCount();
-    std::vector<ed::NodeId> selectedNodeIds;
+    std::vector<ed::NodeId> selNodeBuf;
+    std::unordered_set<uintptr_t> selectedNodeSet;
     if (selCount > 0)
     {
-        selectedNodeIds.resize(selCount);
-        int nodeCount = ed::GetSelectedNodes(selectedNodeIds.data(), selCount);
-        selectedNodeIds.resize(nodeCount);
+        selNodeBuf.resize(selCount);
+        int nodeCount = ed::GetSelectedNodes(selNodeBuf.data(), selCount);
+        selNodeBuf.resize(nodeCount);
+        for (const auto& id : selNodeBuf)
+            selectedNodeSet.insert(reinterpret_cast<uintptr_t>(id.AsPointer()));
     }
 
     // 绘制链接（简化为直线）
@@ -143,11 +148,8 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
         drawList->AddRectFilled(rectMin, rectMax, fillColor, 1.0f);
 
         // 选中节点高亮边框
-        bool isSelected = false;
-        for (const auto& selId : selectedNodeIds)
-        {
-            if (selId == node.ID) { isSelected = true; break; }
-        }
+        bool isSelected = selectedNodeSet.count(
+            reinterpret_cast<uintptr_t>(node.ID.AsPointer())) > 0;
         if (isSelected)
             drawList->AddRect(rectMin, rectMax, IM_COL32(100, 170, 255, 220), 1.0f, 0, 1.5f);
     }

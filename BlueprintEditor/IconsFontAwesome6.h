@@ -115,3 +115,9 @@
 #define ICON_FA_ROTATE             "\xef\x8b\xb1"  // U+f2f1
 #define ICON_FA_UP_DOWN_LEFT_RIGHT "\xef\x81\x87"  // U+f047  (move)
 #define ICON_FA_HAND_POINTER       "\xef\x89\x9a"  // U+f25a
+
+// --- Details / Watch ---
+#define ICON_FA_RECTANGLE_LIST     "\xef\x80\xa2"  // U+f022  (details panel)
+#define ICON_FA_BINOCULARS         "\xef\x87\xa5"  // U+f1e5  (watch window - was f1e5, actually)
+#define ICON_FA_TAGS               "\xef\x80\xac"  // U+f02c  (properties)
+#define ICON_FA_ID_CARD            "\xef\x8b\x82"  // U+f2c2  (identity / details)

@@ -49,6 +49,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # ---------------------------------------------------------------------------
 # Options
 # ---------------------------------------------------------------------------
+option(BUILD_SHARED_LIBS       "Build BlueprintRuntime as shared library (.dll/.so/.dylib)" ON)
 option(BUILD_RUNTIME_ONLY      "Build only BlueprintRuntime (no Editor / Application)" OFF)
 option(BUILD_EXAMPLES          "Build example applications" ON)
 option(BLUEPRINT_NO_FILESYSTEM "Exclude DefaultFileSystem from BlueprintRuntime" OFF)

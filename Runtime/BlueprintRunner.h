@@ -10,6 +10,13 @@
 #pragma once
 #include "BlueprintExport.h"
 
+// MSVC C4251: 'member': class 'std::...' needs to have dll-interface
+// Safe to suppress when DLL and consumer share the same CRT/compiler.
+#ifdef _MSC_VER
+#   pragma warning(push)
+#   pragma warning(disable: 4251)
+#endif
+
 #include "BlueprintData.h"
 #include "NodeDefinition.h"
 #include "FrameTimerManager.h"
@@ -319,12 +326,17 @@ public:
     BlueprintRunner()
         : m_fileSystem(GetDefaultFileSystem())
         , m_timerManager(std::make_shared<FrameTimerManager>())
+        , m_alive(std::make_shared<std::atomic<bool>>(true))
     {}
     explicit BlueprintRunner(std::shared_ptr<IFileSystem> fs)
         : m_fileSystem(fs ? std::move(fs) : GetDefaultFileSystem())
         , m_timerManager(std::make_shared<FrameTimerManager>())
+        , m_alive(std::make_shared<std::atomic<bool>>(true))
     {}
-    ~BlueprintRunner() = default;
+    ~BlueprintRunner();
+
+    // 获取存活标志（用于异步回调安全检查）
+    std::shared_ptr<std::atomic<bool>> GetAliveFlag() const { return m_alive; }
 
     // 获取/设置文件系统
     std::shared_ptr<IFileSystem> GetFileSystem() const { return m_fileSystem; }
@@ -517,14 +529,15 @@ public:
     // 完成或取消时调用 ReleaseAsync()。
     // Tick() 依靠 HasPendingAsync() == false 来决定是否回收子 runner。
     // ----------------------------------------------------------------
-    void AcquireAsync() { ++m_pendingAsyncCount; }
+    void AcquireAsync() { m_pendingAsyncCount.fetch_add(1, std::memory_order_acq_rel); }
     void ReleaseAsync()
     {
-        if (m_pendingAsyncCount > 0)
-            --m_pendingAsyncCount;
+        int prev = m_pendingAsyncCount.fetch_sub(1, std::memory_order_acq_rel);
+        if (prev <= 0)
+            m_pendingAsyncCount.store(0, std::memory_order_release); // 防止减到负数
     }
-    bool HasPendingAsync() const { return m_pendingAsyncCount > 0; }
-    int  PendingAsyncCount() const { return m_pendingAsyncCount; }
+    bool HasPendingAsync() const { return m_pendingAsyncCount.load(std::memory_order_acquire) > 0; }
+    int  PendingAsyncCount() const { return m_pendingAsyncCount.load(std::memory_order_acquire); }
 
     // RAII 封装：构造时 Acquire，析构时 Release（支持移动，不可拷贝）
     struct AsyncGuard
@@ -562,6 +575,10 @@ public:
 private:
     friend class ExecutionContext;
     friend struct ::BlueprintEditor;  // 仅编辑器可设置 m_withEditor
+
+    // 存活标志：shared_ptr<atomic<bool>>，供异步回调检查 runner 是否已析构
+    // 构造时为 true，析构时设为 false；异步回调持有 shared_ptr 副本，可安全判断
+    std::shared_ptr<std::atomic<bool>>                  m_alive;
 
     // 是否在编辑器环境下运行
     bool                                                m_withEditor = false;
@@ -601,7 +618,8 @@ private:
 
     // 正在进行的异步操作计数（timer、网络、IO 等）
     // AcquireAsync/ReleaseAsync 维护；Tick() 用于判断是否可回收
-    int                                                 m_pendingAsyncCount = 0;
+    // 使用 atomic：AcquireAsync/ReleaseAsync 可能从后台线程调用
+    std::atomic<int>                                    m_pendingAsyncCount { 0 };
 
     // 运行时控制状态
     enum class RunState { Idle, Running, Paused, Stopped };
@@ -638,3 +656,7 @@ private:
 
 } // namespace Runtime
 } // namespace NodeEditor
+
+#ifdef _MSC_VER
+#   pragma warning(pop)
+#endif

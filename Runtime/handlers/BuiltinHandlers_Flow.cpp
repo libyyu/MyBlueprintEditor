@@ -124,14 +124,16 @@ void RegisterHandlers_Flow(
             subRunner.SetParentTimerManager(runner.GetTimerManagerPtr());
 
             // subLog 只收集用户可见的 Print 输出（用于填充 Output 引脚）
-            // verbose 节点执行日志仅转发给父蓝图显示，不放入 Output
+            // verbose 节点执行日志和 Print 输出都通过 ctx.Print() 转发给父蓝图显示
+            // 注意：必须用 Print() 而非 Log()，因为 Log() 受 loggingEnabled 门控，
+            // Release 模式下默认关闭，会导致子蓝图输出被静默丢弃
             std::vector<std::string> subLog;
             subRunner.SetLogCallback([&ctx](LogLevel lv, const std::string& msg) {
-                ctx.Log("    | " + msg, lv);
+                ctx.Print("    | " + msg, lv);
             });
             subRunner.SetPrintCallback([&subLog, &ctx](LogLevel lv, const std::string& msg) {
                 subLog.push_back(msg);
-                ctx.Log("    | " + msg, lv);
+                ctx.Print("    | " + msg, lv);
             });
 
             if (!subRunner.Load(importResult.data))
@@ -152,8 +154,8 @@ void RegisterHandlers_Flow(
 
             auto execResult = subRunner.Execute();
 
-            ctx.Log("  [ExecuteBlueprint] Sync result: " + std::string(execResult.success ? "SUCCESS" : "FAILED") +
-                    " (" + std::to_string(execResult.nodesExecuted) + " nodes executed)");
+            ctx.Print("  [ExecuteBlueprint] Sync result: " + std::string(execResult.success ? "SUCCESS" : "FAILED") +
+                    " (" + std::to_string(execResult.nodesExecuted) + " nodes executed)", LogLevel::Verbose);
 
             ctx.SetOutputValue("Success", Variant(execResult.success));
 
@@ -195,7 +197,11 @@ void RegisterHandlers_Flow(
         auto sharedData = std::make_shared<BlueprintData>(std::move(importResult.data));
 
         ExecutionContext* pCtx = &ctx;
-        ctx.Delay(0.0f, [pCtx, &runner, sharedData, currentHandlers, completedPinId, resolvedPath]() {
+        // 捕获 alive 标志，在回调时检查 runner 是否仍存活
+        auto alive = runner.GetAliveFlag();
+        ctx.Delay(0.0f, [pCtx, &runner, sharedData, currentHandlers, completedPinId, resolvedPath, alive]() {
+            // 检查 runner 是否已析构
+            if (!alive->load(std::memory_order_acquire)) return;
             pCtx->Log("  [ExecuteBlueprint] Async: executing \"" + resolvedPath + "\"...");
 
             auto subRunner = std::make_shared<BlueprintRunner>(runner.GetFileSystem());
@@ -205,14 +211,24 @@ void RegisterHandlers_Flow(
             subRunner->SetParentTimerManager(runner.GetTimerManagerPtr());
 
             // subLog 只收集用户可见的 Print 输出（用于填充 Output 引脚）
-            // verbose 节点执行日志仅转发给父蓝图显示，不放入 Output
+            // verbose 节点执行日志和 Print 输出都通过 pCtx->Print() 转发给父蓝图显示
+            // 注意：必须用 Print() 而非 Log()，因为 Log() 受 loggingEnabled 门控，
+            // Release 模式下默认关闭，会导致子蓝图输出被静默丢弃
             auto subLog = std::make_shared<std::vector<std::string>>();
             subRunner->SetLogCallback([pCtx](LogLevel lv, const std::string& msg) {
-                pCtx->Log("    | " + msg, lv);
+                pCtx->Print("    | " + msg, lv);
             });
             subRunner->SetPrintCallback([subLog, pCtx](LogLevel lv, const std::string& msg) {
                 subLog->push_back(msg);
-                pCtx->Log("    | " + msg, lv);
+                pCtx->Print("    | " + msg, lv);
+                // 动态更新 Output 引脚值（子蓝图内异步 Delay/Timer 触发的 Print 也会被收集）
+                std::string outputText;
+                for (const auto& line : *subLog)
+                {
+                    if (!outputText.empty()) outputText += "\n";
+                    outputText += line;
+                }
+                pCtx->SetOutputValue("Output", Variant(outputText));
             });
 
             if (!subRunner->Load(*sharedData))
@@ -240,9 +256,9 @@ void RegisterHandlers_Flow(
                 outputText += line;
             }
 
-            pCtx->Log("  [ExecuteBlueprint] Async result: " +
+            pCtx->Print("  [ExecuteBlueprint] Async result: " +
                 std::string(execResult.success ? "SUCCESS" : "FAILED") +
-                " (" + std::to_string(execResult.nodesExecuted) + " nodes executed)");
+                " (" + std::to_string(execResult.nodesExecuted) + " nodes executed)", LogLevel::Verbose);
 
             pCtx->SetOutputValue("Success", Variant(execResult.success));
             pCtx->SetOutputValue("Output", Variant(outputText));
@@ -295,7 +311,7 @@ void RegisterHandlers_Flow(
     };
 
     // Delay — 依赖：runner 的 timer
-    handlers["Delay"] = [](ExecutionContext& ctx) {
+    handlers["Delay"] = [&runner](ExecutionContext& ctx) {
         double dur = ctx.GetInputValue("Duration").asFloat();
         float duration = static_cast<float>(dur);
         auto currentTime = FrameTimerManager::GetCurrentUnixTime();
@@ -318,7 +334,11 @@ void RegisterHandlers_Flow(
         }
 
         ExecutionContext* pCtx = &ctx;
-        auto timerHandle = ctx.Delay(duration, [pCtx, completedPinId]() {
+        // 捕获 alive 标志，在回调时检查 runner 是否仍存活
+        auto alive = runner.GetAliveFlag();
+        auto timerHandle = ctx.Delay(duration, [pCtx, completedPinId, alive]() {
+            // 检查 runner 是否已析构
+            if (!alive->load(std::memory_order_acquire)) return;
             auto finishTime = FrameTimerManager::GetCurrentUnixTime();
             pCtx->Log("  [Delay] Completed; finished:" + std::to_string(finishTime));
             if (completedPinId != 0)

@@ -19,6 +19,17 @@ namespace Runtime {
 // 加载
 // ============================================================================
 
+BlueprintRunner::~BlueprintRunner()
+{
+    // 标记 runner 已析构，异步回调通过 m_alive 检查可安全跳过
+    if (m_alive)
+        m_alive->store(false, std::memory_order_release);
+
+    // 清除所有计时器，防止回调触发时访问已析构的成员
+    m_timerManager->ClearAllTimers();
+    m_keepAliveRunners.clear();
+}
+
 bool BlueprintRunner::IsWithEditor() const
 {
     return m_withEditor;
@@ -128,13 +139,6 @@ bool BlueprintRunner::buildTopologicalOrder(std::vector<NodeId>& order) const
 
     // 确保 BlueprintData 索引已建好
     m_blueprint.ensureIndices();
-
-    // 建立 nodeId -> index 映射（使用已有索引）
-    std::unordered_map<NodeId, size_t> idToIndex;
-    for (size_t i = 0; i < m_blueprint.nodes.size(); ++i)
-    {
-        idToIndex[m_blueprint.nodes[i].id] = i;
-    }
 
     size_t n = m_blueprint.nodes.size();
 
@@ -597,7 +601,7 @@ void BlueprintRunner::ResetState()
 
     // 清理保持存活的子蓝图 runner，重置异步计数
     m_keepAliveRunners.clear();
-    m_pendingAsyncCount = 0;
+    m_pendingAsyncCount.store(0, std::memory_order_release);
 
     // 重新初始化默认值
     if (m_loaded)
@@ -630,7 +634,7 @@ void BlueprintRunner::Stop()
     // 清除所有计时器，停止 Tick 推进
     GetTimerManager().ClearAllTimers();
     // 重置异步计数（所有挂起操作视为已取消）
-    m_pendingAsyncCount = 0;
+    m_pendingAsyncCount.store(0, std::memory_order_release);
     m_keepAliveRunners.clear();
 }
 
@@ -678,26 +682,35 @@ TimerCallback ExecutionContext::wrapCallbackWithContextRestore(TimerCallback cal
         m_runner->AcquireAsync();
 
     BlueprintRunner* runner = m_runner;
+    // 捕获 alive 标志的 shared_ptr 副本，用于在回调时检查 runner 是否仍存活
+    auto alive = runner ? runner->GetAliveFlag() : nullptr;
+    NodeExecutionState* state = m_state;
 
-    return [this, runner, callback = std::move(callback),
+    return [state, runner, alive, callback = std::move(callback),
             savedNode, savedPinNameToId, savedNodeData]() mutable -> bool
     {
+        // 检查 runner 是否已析构
+        if (alive && !alive->load(std::memory_order_acquire))
+        {
+            return false; // runner 已销毁，放弃执行
+        }
+
         // 保存当前状态
-        auto prevNode        = m_state->currentNode;
-        auto prevPinNameToId = m_state->pinNameToId;
-        auto prevNodeData    = m_state->nodeData;
+        auto prevNode        = state->currentNode;
+        auto prevPinNameToId = state->pinNameToId;
+        auto prevNodeData    = state->nodeData;
 
         // 恢复注册时的状态
-        m_state->currentNode  = savedNode;
-        m_state->pinNameToId  = savedPinNameToId;
-        m_state->nodeData     = savedNodeData;
+        state->currentNode  = savedNode;
+        state->pinNameToId  = savedPinNameToId;
+        state->nodeData     = savedNodeData;
 
         const bool ret = callback();
 
         // 恢复调用前的状态
-        m_state->currentNode  = prevNode;
-        m_state->pinNameToId  = prevPinNameToId;
-        m_state->nodeData     = prevNodeData;
+        state->currentNode  = prevNode;
+        state->pinNameToId  = prevPinNameToId;
+        state->nodeData     = prevNodeData;
 
         if (!ret && runner)
             runner->ReleaseAsync();
@@ -770,9 +783,13 @@ void ExecutionContext::RunAsync(
 
     m_runner->AcquireAsync();
     BlueprintRunner* runner = m_runner;
+    // 捕获 alive 标志的 shared_ptr 副本，用于在回调时检查 runner 是否仍存活
+    auto alive = runner->GetAliveFlag();
+    NodeExecutionState* state = m_state;
+    ExecutionContext* ctx = this;
 
     // 后台线程：只执行纯计算，不接触 ctx
-    std::thread([this, runner,
+    std::thread([ctx, state, runner, alive,
                  bg       = std::move(background),
                  done     = std::move(onComplete),
                  savedNode, savedPinNameToId, savedNodeData]() mutable
@@ -781,23 +798,29 @@ void ExecutionContext::RunAsync(
 
         // 完成后 dispatch 回主线程
         MainThreadDispatcher::Get().Post(
-            [this, runner, done = std::move(done),
+            [ctx, state, runner, alive, done = std::move(done),
              savedNode, savedPinNameToId, savedNodeData]() mutable
             {
+                // 检查 runner 是否已析构
+                if (!alive->load(std::memory_order_acquire))
+                {
+                    return; // runner 已销毁，放弃执行
+                }
+
                 // 恢复执行上下文状态（同 wrapCallbackWithContextRestore）
-                auto prevNode        = m_state->currentNode;
-                auto prevPinNameToId = m_state->pinNameToId;
-                auto prevNodeData    = m_state->nodeData;
+                auto prevNode        = state->currentNode;
+                auto prevPinNameToId = state->pinNameToId;
+                auto prevNodeData    = state->nodeData;
 
-                m_state->currentNode  = savedNode;
-                m_state->pinNameToId  = savedPinNameToId;
-                m_state->nodeData     = savedNodeData;
+                state->currentNode  = savedNode;
+                state->pinNameToId  = savedPinNameToId;
+                state->nodeData     = savedNodeData;
 
-                if (done) done(*this);
+                if (done) done(*ctx);
 
-                m_state->currentNode  = prevNode;
-                m_state->pinNameToId  = prevPinNameToId;
-                m_state->nodeData     = prevNodeData;
+                state->currentNode  = prevNode;
+                state->pinNameToId  = prevPinNameToId;
+                state->nodeData     = prevNodeData;
 
                 if (runner) runner->ReleaseAsync();
             });
@@ -1042,8 +1065,9 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
                 ", def=" + node->definitionId + ")");
         }
 
-        // 记录执行前 m_flowExecutedNodes 的快照，用于检测内层递归新增的节点
-        auto snapshotBefore = m_flowExecutedNodes;
+        // 记录执行前 m_flowExecutedNodes 的大小，用于检测内层递归新增的节点
+        // （比之前的全量拷贝 snapshot 高效得多，避免 ForLoop 等高频循环中的 O(N²) 开销）
+        auto snapshotSize = m_flowExecutedNodes.size();
 
         // 设置触发该节点的输入引脚 ID（仅直接目标节点有此信息）
         auto activatedIt = nodeToActivatedInputPin.find(id);
@@ -1064,11 +1088,11 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
 
         // 如果该节点的 handler 通过 ActivateOutputFlow 递归执行了更多节点，
         // 把这些新增节点加入 executedHere，在当前循环中跳过（防止重复执行）
-        if (m_flowExecutedNodes.size() > snapshotBefore.size() + 1)
+        if (m_flowExecutedNodes.size() > snapshotSize + 1)
         {
             for (auto flowId : m_flowExecutedNodes)
             {
-                if (flowId != id && !snapshotBefore.count(flowId))
+                if (flowId != id && executedHere.find(flowId) == executedHere.end())
                     executedHere.insert(flowId);
             }
         }

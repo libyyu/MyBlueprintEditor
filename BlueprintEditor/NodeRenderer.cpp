@@ -76,8 +76,10 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
 
             bool hasOutputDelegates = false;
             for (auto& output : node.Outputs)
+            {
                 if (output.Type == PinType::Delegate)
-                    hasOutputDelegates = true;
+                { hasOutputDelegates = true; break; }
+            }
 
             builder.Begin(node.ID);
                 if (!isSimple)

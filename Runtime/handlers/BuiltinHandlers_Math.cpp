@@ -186,7 +186,7 @@ void RegisterHandlers_Math(std::unordered_map<std::string, NodeHandler>& handler
 
     handlers["RandomInRange"] = [](ExecutionContext& ctx) {
         double lo = ctx.GetInputValue("Min").asFloat();
-        double hi = ctx.GetInputValue("B").asFloat();
+        double hi = ctx.GetInputValue("Max").asFloat();
         double v = lo + (static_cast<double>(rand()) / RAND_MAX) * (hi - lo);
         ctx.SetOutputValue("Value", Variant(v));
         return true;

@@ -98,6 +98,10 @@ void BlueprintEditor::ExecuteBlueprint()
         ActiveDoc()->executionLog.push_back(msg);
         ActiveDoc()->executionLogDirty = true;
     });
+    ActiveDoc()->persistentRunner.SetPrintCallback([this](::NodeEditor::Runtime::LogLevel /*level*/, const std::string& msg) {
+        ActiveDoc()->executionLog.push_back(msg);
+        ActiveDoc()->executionLogDirty = true;
+    });
 
     if (!ActiveDoc()->persistentRunner.Load(bp))
     {
@@ -135,8 +139,10 @@ void BlueprintEditor::ExecuteBlueprint()
     if (result.success)
     {
         ActiveDoc()->executionLog.push_back("  Execution Completed Successfully!");
-        ActiveDoc()->lastExecutionStatus = "OK (" + std::to_string(result.nodesExecuted) + " nodes, " +
-            std::to_string(elapsed).substr(0, std::to_string(elapsed).find('.') + 3) + "ms)";
+        char statusBuf[128];
+        snprintf(statusBuf, sizeof(statusBuf), "OK (%d nodes, %.2fms)",
+                 result.nodesExecuted, elapsed);
+        ActiveDoc()->lastExecutionStatus = statusBuf;
     }
     else
     {
@@ -250,6 +256,10 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
         if (!ActiveDoc()->executionLog.empty())
         {
             std::string allText;
+            size_t totalLen = 0;
+            for (const auto& line : ActiveDoc()->executionLog)
+                totalLen += line.size() + 1;   // +1 for '\n'
+            allText.reserve(totalLen);
             for (const auto& line : ActiveDoc()->executionLog)
             { allText += line; allText += '\n'; }
             ImGui::SetClipboardText(allText.c_str());
@@ -419,6 +429,335 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
             ImGui::EndTabItem();
         }
 
+        // ── Tab: Watch ───────────────────────────────────────────────────
+        if (ImGui::BeginTabItem(ICON_FA_EYE " Watch"))
+        {
+            DrawWatchPanel(paneWidth);
+            ImGui::EndTabItem();
+        }
+
         ImGui::EndTabBar();
     }
+}
+
+// ============================================================================
+// Watch 面板（运行时变量/引脚值监控）
+// ============================================================================
+
+void BlueprintEditor::DrawWatchPanel(float paneWidth)
+{
+    auto* doc = ActiveDoc();
+    if (!doc) return;
+
+    auto& runner = doc->persistentRunner;
+    const auto& allVars = runner.GetAllVariables();
+    const auto& res = doc->lastExecutionResult;
+
+    // Variant 类型→可读名称
+    auto dataTypeStr = [](RTPinDataType t) -> const char* {
+        switch (t) {
+        case RTPinDataType::Boolean: return "Bool";
+        case RTPinDataType::Integer: return "Int";
+        case RTPinDataType::Float:   return "Float";
+        case RTPinDataType::String:  return "String";
+        case RTPinDataType::Object:  return "Object";
+        case RTPinDataType::Array:   return "Array";
+        case RTPinDataType::Map:     return "Map";
+        case RTPinDataType::Any:     return "Any";
+        default:                     return "Unknown";
+        }
+    };
+
+    // Variant 类型→颜色
+    auto dataTypeColor = [](RTPinDataType t) -> ImVec4 {
+        switch (t) {
+        case RTPinDataType::Boolean: return ImVec4(0.9f, 0.4f, 0.4f, 1.0f);
+        case RTPinDataType::Integer: return ImVec4(0.4f, 0.8f, 0.4f, 1.0f);
+        case RTPinDataType::Float:   return ImVec4(0.4f, 0.7f, 1.0f, 1.0f);
+        case RTPinDataType::String:  return ImVec4(1.0f, 0.8f, 0.3f, 1.0f);
+        case RTPinDataType::Object:  return ImVec4(0.8f, 0.5f, 1.0f, 1.0f);
+        case RTPinDataType::Array:   return ImVec4(0.5f, 1.0f, 0.8f, 1.0f);
+        case RTPinDataType::Map:     return ImVec4(1.0f, 0.6f, 0.2f, 1.0f);
+        default:                     return ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+        }
+    };
+
+    float watchH = ImGui::GetContentRegionAvail().y - 4.0f;
+    if (watchH < 40.0f) watchH = 40.0f;
+    ImGui::BeginChild("##WatchContent", ImVec2(paneWidth, watchH), false);
+
+    // ── Section 1: Blueprint Variables ───────────────────────────────────
+    {
+        auto* drawList = ImGui::GetWindowDrawList();
+        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+        float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+        ImU32 colL = IM_COL32(35, 52, 60, 210);
+        ImU32 colR = IM_COL32(28, 40, 48, 180);
+        drawList->AddRectFilledMultiColor(
+            cursorPos,
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+            colL, colR, colR, colL);
+        drawList->AddText(
+            ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
+            IM_COL32(140, 210, 220, 230), ICON_FA_LAYER_GROUP " Variables");
+
+        // 变量数量标签
+        char countBuf[32];
+        snprintf(countBuf, sizeof(countBuf), "(%d)", static_cast<int>(allVars.size()));
+        float countW = ImGui::CalcTextSize(countBuf).x;
+        drawList->AddText(
+            ImVec2(cursorPos.x + paneWidth - countW - 10.0f, cursorPos.y + 2.0f),
+            IM_COL32(100, 140, 150, 180), countBuf);
+
+        ImGui::Dummy(ImVec2(paneWidth, sectionH));
+    }
+
+    if (allVars.empty())
+    {
+        ImGui::TextDisabled("  No runtime variables.");
+        ImGui::TextDisabled("  Execute the blueprint to populate.");
+    }
+    else
+    {
+        // 使用表格展示变量
+        if (ImGui::BeginTable("##WatchVars", 3,
+            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+        {
+            ImGui::TableSetupColumn("Name",  ImGuiTableColumnFlags_WidthStretch, 0.35f);
+            ImGui::TableSetupColumn("Type",  ImGuiTableColumnFlags_WidthFixed, 50.0f);
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch, 0.50f);
+            ImGui::TableHeadersRow();
+
+            for (const auto& kv : allVars)
+            {
+                ImGui::TableNextRow();
+
+                // Name
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(kv.first.c_str());
+
+                // Type
+                ImGui::TableNextColumn();
+                ImVec4 tCol = dataTypeColor(kv.second.type);
+                ImGui::TextColored(tCol, "%s", dataTypeStr(kv.second.type));
+
+                // Value
+                ImGui::TableNextColumn();
+                std::string valStr = kv.second.asString();
+                if (valStr.size() > 80)
+                    valStr = valStr.substr(0, 77) + "...";
+                ImGui::TextColored(ImVec4(0.85f, 0.88f, 0.95f, 1.0f), "%s", valStr.c_str());
+            }
+
+            ImGui::EndTable();
+        }
+    }
+
+    // ── Section 2: Selected Node Pin Values ─────────────────────────────
+    ImGui::Spacing();
+    {
+        auto* drawList = ImGui::GetWindowDrawList();
+        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+        float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+        ImU32 colL = IM_COL32(50, 42, 35, 210);
+        ImU32 colR = IM_COL32(38, 32, 28, 180);
+        drawList->AddRectFilledMultiColor(
+            cursorPos,
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+            colL, colR, colR, colL);
+        drawList->AddText(
+            ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
+            IM_COL32(220, 190, 140, 230), ICON_FA_CUBE " Selected Node Pins");
+        ImGui::Dummy(ImVec2(paneWidth, sectionH));
+    }
+
+    // 获取选中节点
+    std::vector<ed::NodeId> selectedNodes;
+    selectedNodes.resize(ed::GetSelectedObjectCount());
+    int selCount = ed::GetSelectedNodes(selectedNodes.data(), static_cast<int>(selectedNodes.size()));
+    selectedNodes.resize(selCount);
+
+    if (selectedNodes.empty())
+    {
+        ImGui::TextDisabled("  Select a node to watch its pin values.");
+    }
+    else
+    {
+        for (const auto& selNodeId : selectedNodes)
+        {
+            Node* node = FindNode(selNodeId);
+            if (!node) continue;
+
+            // 节点标题
+            ImGui::TextColored(ImVec4(0.70f, 0.85f, 1.0f, 1.0f), ICON_FA_CUBE " %s", node->Name.c_str());
+
+            uint64_t nodeIdVal = reinterpret_cast<uintptr_t>(node->ID.AsPointer());
+
+            // 检查该节点是否在上次执行中被执行过
+            bool wasExecuted = false;
+            for (auto rid : res.executedNodeIds)
+            {
+                if (rid == nodeIdVal) { wasExecuted = true; break; }
+            }
+
+            if (!wasExecuted && res.nodesExecuted > 0)
+            {
+                ImGui::TextDisabled("    (not executed in last run)");
+                continue;
+            }
+
+            if (res.nodesExecuted == 0)
+            {
+                ImGui::TextDisabled("    (no execution data)");
+                continue;
+            }
+
+            // 输入引脚值
+            bool hasAnyPinValue = false;
+            for (const auto& pin : node->Inputs)
+            {
+                if (pin.Type == PinType::Flow) continue;
+                uint64_t pinId = reinterpret_cast<uintptr_t>(pin.ID.AsPointer());
+
+                // 从执行结果查找
+                auto it = res.outputValues.find(pinId);
+                RTVariant val;
+                if (it != res.outputValues.end())
+                    val = it->second;
+                else
+                    val = runner.GetPinValue(pinId);
+
+                if (val.type != RTPinDataType::Unknown)
+                {
+                    hasAnyPinValue = true;
+                    ImVec4 tCol = dataTypeColor(val.type);
+                    std::string valStr = val.asString();
+                    if (valStr.size() > 60) valStr = valStr.substr(0, 57) + "...";
+                    ImGui::TextColored(ImVec4(0.50f, 0.55f, 0.65f, 1.0f), "    " ICON_FA_ARROW_RIGHT " %s:", pin.Name.c_str());
+                    ImGui::SameLine();
+                    ImGui::TextColored(tCol, "%s", valStr.c_str());
+                }
+            }
+
+            // 输出引脚值
+            for (const auto& pin : node->Outputs)
+            {
+                if (pin.Type == PinType::Flow) continue;
+                uint64_t pinId = reinterpret_cast<uintptr_t>(pin.ID.AsPointer());
+
+                auto it = res.outputValues.find(pinId);
+                RTVariant val;
+                if (it != res.outputValues.end())
+                    val = it->second;
+                else
+                    val = runner.GetPinValue(pinId);
+
+                if (val.type != RTPinDataType::Unknown)
+                {
+                    hasAnyPinValue = true;
+                    ImVec4 tCol = dataTypeColor(val.type);
+                    std::string valStr = val.asString();
+                    if (valStr.size() > 60) valStr = valStr.substr(0, 57) + "...";
+                    ImGui::TextColored(ImVec4(0.50f, 0.55f, 0.65f, 1.0f), "    " ICON_FA_ARROW_LEFT " %s:", pin.Name.c_str());
+                    ImGui::SameLine();
+                    ImGui::TextColored(tCol, "%s", valStr.c_str());
+                }
+            }
+
+            if (!hasAnyPinValue)
+                ImGui::TextDisabled("    (no pin values captured)");
+
+            ImGui::Spacing();
+        }
+    }
+
+    // ── Section 3: Output Values Summary ────────────────────────────────
+    if (!res.outputValues.empty())
+    {
+        ImGui::Spacing();
+        {
+            auto* drawList = ImGui::GetWindowDrawList();
+            ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+            float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+            ImU32 colL = IM_COL32(35, 42, 55, 210);
+            ImU32 colR = IM_COL32(28, 32, 42, 180);
+            drawList->AddRectFilledMultiColor(
+                cursorPos,
+                ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+                colL, colR, colR, colL);
+
+            char titleBuf[64];
+            snprintf(titleBuf, sizeof(titleBuf), ICON_FA_CIRCLE_CHECK " All Output Values (%d)",
+                static_cast<int>(res.outputValues.size()));
+            drawList->AddText(
+                ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
+                IM_COL32(140, 170, 220, 230), titleBuf);
+            ImGui::Dummy(ImVec2(paneWidth, sectionH));
+        }
+
+        if (ImGui::BeginTable("##WatchOutputs", 3,
+            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+        {
+            ImGui::TableSetupColumn("Pin",   ImGuiTableColumnFlags_WidthStretch, 0.35f);
+            ImGui::TableSetupColumn("Type",  ImGuiTableColumnFlags_WidthFixed, 50.0f);
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch, 0.50f);
+            ImGui::TableHeadersRow();
+
+            for (const auto& kv : res.outputValues)
+            {
+                ImGui::TableNextRow();
+
+                // Pin ID → 找节点和引脚名
+                std::string pinLabel;
+                for (const auto& n : doc->nodes)
+                {
+                    bool found = false;
+                    for (const auto& p : n.Outputs)
+                    {
+                        uint64_t pid = reinterpret_cast<uintptr_t>(p.ID.AsPointer());
+                        if (pid == kv.first)
+                        {
+                            pinLabel = n.Name + "." + p.Name;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) break;
+                    for (const auto& p : n.Inputs)
+                    {
+                        uint64_t pid = reinterpret_cast<uintptr_t>(p.ID.AsPointer());
+                        if (pid == kv.first)
+                        {
+                            pinLabel = n.Name + "." + p.Name;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) break;
+                }
+
+                // Pin Name
+                ImGui::TableNextColumn();
+                if (pinLabel.empty())
+                    ImGui::Text("pin#%llu", static_cast<unsigned long long>(kv.first));
+                else
+                    ImGui::TextUnformatted(pinLabel.c_str());
+
+                // Type
+                ImGui::TableNextColumn();
+                ImVec4 tCol = dataTypeColor(kv.second.type);
+                ImGui::TextColored(tCol, "%s", dataTypeStr(kv.second.type));
+
+                // Value
+                ImGui::TableNextColumn();
+                std::string valStr = kv.second.asString();
+                if (valStr.size() > 80) valStr = valStr.substr(0, 77) + "...";
+                ImGui::TextColored(ImVec4(0.85f, 0.88f, 0.95f, 1.0f), "%s", valStr.c_str());
+            }
+
+            ImGui::EndTable();
+        }
+    }
+
+    ImGui::EndChild();
 }
