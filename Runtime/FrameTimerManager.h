@@ -125,6 +125,9 @@ public:
     // 活跃计时器数量
     int GetActiveTimerCount() const;
 
+    // 判断是否没有活跃的计时器
+    bool IsEmpty() const { return GetActiveTimerCount() == 0; }
+
     // 获取所有计时器（供 UI 显示）
     const std::vector<FrameTimerEntry>& GetAllTimers() const { return m_timers; }
 
