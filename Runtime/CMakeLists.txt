@@ -104,6 +104,17 @@ set(RUNTIME_PUBLIC_HEADERS
 option(BLUEPRINT_LUA "Enable Lua scripting support (requires Lua 5.4)" OFF)
 
 if(BLUEPRINT_LUA)
+    # --- Determine Lua library type: STATIC for iOS/Emscripten, SHARED otherwise ---
+    # iOS and Emscripten/WebGL cannot use shared libraries; all other platforms
+    # (Windows, Linux, macOS, Android) use a shared Lua library to reduce
+    # binary size and allow runtime updates.
+    if(EMSCRIPTEN OR (CMAKE_SYSTEM_NAME STREQUAL "iOS"))
+        set(_LUA_LIB_TYPE STATIC)
+    else()
+        set(_LUA_LIB_TYPE SHARED)
+    endif()
+    message(STATUS "[BlueprintRuntime] Lua library type: ${_LUA_LIB_TYPE}")
+
     # --- Locate Lua 5.4 ---
     # Priority: find_package first (system / vcpkg / user-installed),
     # fall back to FetchContent if not found.
@@ -121,36 +132,87 @@ if(BLUEPRINT_LUA)
         )
         FetchContent_MakeAvailable(lua54)
 
-        # Build Lua as a static library from source
+        # Build Lua from source (STATIC or SHARED depending on platform)
         set(LUA54_SRC_DIR "${lua54_SOURCE_DIR}/src")
 
         # Collect Lua core sources (exclude lua.c and luac.c which are standalone executables)
         file(GLOB LUA54_SOURCES "${LUA54_SRC_DIR}/*.c")
         list(REMOVE_ITEM LUA54_SOURCES "${LUA54_SRC_DIR}/lua.c" "${LUA54_SRC_DIR}/luac.c")
 
-        if(NOT TARGET lua54_static)
-            add_library(lua54_static STATIC ${LUA54_SOURCES})
-            target_include_directories(lua54_static PUBLIC "${LUA54_SRC_DIR}")
+        set(_LUA_TARGET_NAME "lua54_${_LUA_LIB_TYPE}")
+        string(TOLOWER "${_LUA_TARGET_NAME}" _LUA_TARGET_NAME)
+        # Normalize: lua54_static or lua54_shared
+        if(NOT TARGET ${_LUA_TARGET_NAME})
+            add_library(${_LUA_TARGET_NAME} ${_LUA_LIB_TYPE} ${LUA54_SOURCES})
+            target_include_directories(${_LUA_TARGET_NAME}
+                PUBLIC
+                    $<BUILD_INTERFACE:${LUA54_SRC_DIR}>
+                    $<INSTALL_INTERFACE:include/lua54>
+            )
 
             # Platform-specific defines
             if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
-                target_compile_definitions(lua54_static PRIVATE LUA_USE_LINUX)
-            elseif(APPLE)
-                target_compile_definitions(lua54_static PRIVATE LUA_USE_MACOSX)
+                target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE LUA_USE_LINUX)
+            elseif(APPLE AND NOT (CMAKE_SYSTEM_NAME STREQUAL "iOS"))
+                target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE LUA_USE_MACOSX)
+            endif()
+
+            # SHARED library: export symbols
+            if(_LUA_LIB_TYPE STREQUAL "SHARED")
+                # Lua 5.4 uses LUA_BUILD_AS_DLL to toggle __declspec(dllexport/dllimport)
+                # on Windows; on GCC/Clang we use visibility attributes.
+                if(MSVC)
+                    target_compile_definitions(${_LUA_TARGET_NAME}
+                        PRIVATE LUA_BUILD_AS_DLL    # exporting (building the DLL)
+                    )
+                    # Consumers also need LUA_BUILD_AS_DLL so that lua.h resolves
+                    # to __declspec(dllimport).  However, luaconf.h checks LUA_CORE/LUA_LIB
+                    # to decide export vs import, so consumers only need LUA_BUILD_AS_DLL
+                    # (without LUA_CORE/LUA_LIB → they get dllimport).
+                    # We set it PUBLIC so BlueprintRuntime (consumer) sees it too.
+                    target_compile_definitions(${_LUA_TARGET_NAME}
+                        PUBLIC LUA_BUILD_AS_DLL
+                    )
+                else()
+                    target_compile_options(${_LUA_TARGET_NAME} PRIVATE
+                        -fvisibility=default   # Lua needs all API symbols visible
+                    )
+                endif()
+
+                # Output the Lua shared library alongside BlueprintRuntime / executables
+                set_target_properties(${_LUA_TARGET_NAME} PROPERTIES
+                    RUNTIME_OUTPUT_DIRECTORY           "${CMAKE_BINARY_DIR}/bin"
+                    RUNTIME_OUTPUT_DIRECTORY_DEBUG     "${CMAKE_BINARY_DIR}/bin"
+                    RUNTIME_OUTPUT_DIRECTORY_RELEASE   "${CMAKE_BINARY_DIR}/bin"
+                    LIBRARY_OUTPUT_DIRECTORY           "${CMAKE_BINARY_DIR}/bin"
+                    LIBRARY_OUTPUT_DIRECTORY_DEBUG     "${CMAKE_BINARY_DIR}/bin"
+                    LIBRARY_OUTPUT_DIRECTORY_RELEASE   "${CMAKE_BINARY_DIR}/bin"
+                )
+
+                # macOS: set install name
+                if(APPLE)
+                    set_target_properties(${_LUA_TARGET_NAME} PROPERTIES
+                        MACOSX_RPATH ON
+                        INSTALL_NAME_DIR "@rpath"
+                    )
+                endif()
             endif()
 
             # Suppress warnings in third-party Lua code
             if(MSVC)
-                target_compile_options(lua54_static PRIVATE /W0 /utf-8)
+                target_compile_options(${_LUA_TARGET_NAME} PRIVATE /W0 /utf-8)
             else()
-                target_compile_options(lua54_static PRIVATE -w)
+                target_compile_options(${_LUA_TARGET_NAME} PRIVATE -w)
             endif()
 
-            set_property(TARGET lua54_static PROPERTY FOLDER "External")
+            set_property(TARGET ${_LUA_TARGET_NAME} PROPERTY FOLDER "External")
+            # Set C standard for Lua (pure C code)
+            set_property(TARGET ${_LUA_TARGET_NAME} PROPERTY C_STANDARD 99)
+            set_property(TARGET ${_LUA_TARGET_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
         endif()
 
         # Provide variables compatible with FindLua
-        set(LUA_LIBRARIES lua54_static)
+        set(LUA_LIBRARIES ${_LUA_TARGET_NAME})
         set(LUA_INCLUDE_DIR "${LUA54_SRC_DIR}")
     endif()
 
@@ -183,10 +245,16 @@ target_link_libraries(BlueprintRuntime PUBLIC crude_json)
 
 # Lua scripting (conditional)
 if(BLUEPRINT_LUA)
-    target_link_libraries(BlueprintRuntime PRIVATE ${LUA_LIBRARIES})
+    # SHARED Lua: link PUBLIC so consumers get the import library / RPATH.
+    # STATIC Lua: link PRIVATE (Lua symbols are baked into BlueprintRuntime).
+    if(_LUA_LIB_TYPE STREQUAL "SHARED")
+        target_link_libraries(BlueprintRuntime PUBLIC ${LUA_LIBRARIES})
+    else()
+        target_link_libraries(BlueprintRuntime PRIVATE ${LUA_LIBRARIES})
+    endif()
     target_include_directories(BlueprintRuntime PRIVATE ${LUA_INCLUDE_DIR})
     target_compile_definitions(BlueprintRuntime PUBLIC BLUEPRINT_HAS_LUA)
-    message(STATUS "[BlueprintRuntime] Lua scripting enabled (include: ${LUA_INCLUDE_DIR})")
+    message(STATUS "[BlueprintRuntime] Lua scripting enabled (${_LUA_LIB_TYPE}, include: ${LUA_INCLUDE_DIR})")
 endif()
 
 # ---------------------------------------------------------------------------
@@ -310,6 +378,27 @@ install(TARGETS BlueprintRuntime crude_json
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}   # .dll on Windows
 )
+
+# Install Lua library when built from FetchContent
+if(BLUEPRINT_LUA AND TARGET ${LUA_LIBRARIES})
+    install(TARGETS ${LUA_LIBRARIES}
+        EXPORT BlueprintRuntimeTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+    # Install Lua headers for consumers
+    if(DEFINED LUA54_SRC_DIR)
+        install(FILES
+            "${LUA54_SRC_DIR}/lua.h"
+            "${LUA54_SRC_DIR}/luaconf.h"
+            "${LUA54_SRC_DIR}/lualib.h"
+            "${LUA54_SRC_DIR}/lauxlib.h"
+            "${LUA54_SRC_DIR}/lua.hpp"
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/lua54
+        )
+    endif()
+endif()
 
 install(FILES ${RUNTIME_PUBLIC_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/BlueprintRuntime
