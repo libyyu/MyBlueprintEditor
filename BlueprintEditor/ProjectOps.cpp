@@ -15,7 +15,7 @@ void BlueprintEditor::NewProject()
 {
     m_ShowNewProjectDialog = true;
     memset(m_NewProjNameBuf, 0, sizeof(m_NewProjNameBuf));
-    strncpy(m_NewProjNameBuf, "NewProject", sizeof(m_NewProjNameBuf) - 1);
+    snprintf(m_NewProjNameBuf, sizeof(m_NewProjNameBuf), "%s", "NewProject");
 }
 
 // ============================================================================

@@ -65,15 +65,15 @@ using namespace ax;
 using ax::Widgets::IconType;
 
 // ============================================================================
-// 辅助函数
+// 辅助函数（实现在 EditorUtils.cpp）
 // ============================================================================
 
-static inline ImRect ImGui_GetItemRect()
+inline ImRect ImGui_GetItemRect()
 {
     return ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
 }
 
-static inline ImRect ImRect_Expanded(const ImRect& rect, float x, float y)
+inline ImRect ImRect_Expanded(const ImRect& rect, float x, float y)
 {
     auto result = rect;
     result.Min.x -= x;
@@ -83,72 +83,11 @@ static inline ImRect ImRect_Expanded(const ImRect& rect, float x, float y)
     return result;
 }
 
-static bool Splitter(const char* str_id, bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size = -1.0f)
-{
-    using namespace ImGui;
-    ImGuiContext& g = *GImGui;
-    ImGuiWindow* window = g.CurrentWindow;
-    ImGuiID id = window->GetID(str_id);
-    ImRect bb;
-    bb.Min = window->DC.CursorPos + (split_vertically ? ImVec2(*size1, 0.0f) : ImVec2(0.0f, *size1));
-    bb.Max = bb.Min + CalcItemSize(split_vertically ? ImVec2(thickness, splitter_long_axis_size) : ImVec2(splitter_long_axis_size, thickness), 0.0f, 0.0f);
-    bool result = SplitterBehavior(bb, id, split_vertically ? ImGuiAxis_X : ImGuiAxis_Y, size1, size2, min_size1, min_size2, 4.0f);
+// 分割条（实现在 EditorUtils.cpp）
+bool Splitter(const char* str_id, bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size = -1.0f);
 
-    // 视觉反馈：悬停/拖动时绘制强调色线条
-    bool hovered = g.HoveredId == id;
-    bool active  = g.ActiveId  == id;
-    if (hovered || active)
-    {
-        ImU32 lineCol = active  ? IM_COL32(75, 140, 190, 220)
-                                : IM_COL32(60, 110, 160, 140);
-        auto* dl = GetWindowDrawList();
-        if (split_vertically)
-        {
-            float cx = (bb.Min.x + bb.Max.x) * 0.5f;
-            dl->AddLine(ImVec2(cx, bb.Min.y), ImVec2(cx, bb.Max.y), lineCol, 2.0f);
-        }
-        else
-        {
-            float cy = (bb.Min.y + bb.Max.y) * 0.5f;
-            dl->AddLine(ImVec2(bb.Min.x, cy), ImVec2(bb.Max.x, cy), lineCol, 2.0f);
-        }
-    }
-    return result;
-}
-
-// 彩色日志行渲染辅助（共享于 DrawExecutionPanel 和 ShowExecutionPanel）
-static inline void DrawColoredLogLine(const std::string& line)
-{
-    static const ImVec4 colError   (0.95f, 0.32f, 0.32f, 1.00f);
-    static const ImVec4 colWarn    (0.95f, 0.72f, 0.28f, 1.00f);
-    static const ImVec4 colInfo    (0.38f, 0.68f, 0.95f, 1.00f);
-    static const ImVec4 colSuccess (0.35f, 0.88f, 0.42f, 1.00f);
-    static const ImVec4 colSeparator(0.45f, 0.48f, 0.56f, 0.70f);
-    static const ImVec4 colDim     (0.50f, 0.52f, 0.58f, 0.90f);
-    static const ImVec4 colDefault (0.82f, 0.84f, 0.90f, 1.00f);
-
-    const ImVec4* color = &colDefault;
-
-    if (line.find("[ERROR]") != std::string::npos)
-        color = &colError;
-    else if (line.find("[WARN]") != std::string::npos)
-        color = &colWarn;
-    else if (line.find("[INFO]") != std::string::npos || line.find("[Timer:") != std::string::npos)
-        color = &colInfo;
-    else if (line.find("Completed Successfully") != std::string::npos)
-        color = &colSuccess;
-    else if (line.find("FAILED") != std::string::npos || line.find("ABORTED") != std::string::npos)
-        color = &colError;
-    else if (line.find("========") != std::string::npos)
-        color = &colSeparator;
-    else if (line.find("Nodes:") == 0 || line.find("Links:") == 0 ||
-             line.find("Validation:") == 0 || line.find("Elapsed:") != std::string::npos)
-        color = &colDim;
-
-    ImGui::PushStyleColor(ImGuiCol_Text, *color);
-    ImGui::TextUnformatted(line.c_str());
-    ImGui::PopStyleColor();
-}
+// 彩色日志行渲染辅助（实现在 EditorUtils.cpp）
+void DrawColoredLogLine(const std::string& line);
 
 // ============================================================================
 // 变量拖拽 Payload（变量面板 → 画布）
@@ -181,8 +120,18 @@ static constexpr int kMaxUndoSteps = 50;
 // 蓝图文档（每个标签页一个实例）
 // ============================================================================
 
-struct BlueprintDocument
+class BlueprintDocument
 {
+public:
+    BlueprintDocument() = default;
+    ~BlueprintDocument() = default;
+
+    // 不可复制（含 ed::EditorContext* 和 RTBlueprintRunner）
+    BlueprintDocument(const BlueprintDocument&) = delete;
+    BlueprintDocument& operator=(const BlueprintDocument&) = delete;
+    BlueprintDocument(BlueprintDocument&&) = default;
+    BlueprintDocument& operator=(BlueprintDocument&&) = default;
+
     // 编辑器上下文（每个文档独立的节点编辑器画布）
     ed::EditorContext*  editorContext = nullptr;
 

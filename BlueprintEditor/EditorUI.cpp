@@ -309,199 +309,13 @@ void BlueprintEditor::ShowStyleEditor(bool* show)
 }
 
 // ============================================================================
-// 左侧面板
+// ShowLeftPane — 已废弃，由 DrawNodeListPanel() 替代
+// 保留空实现以防外部还有调用点（编译期可发现后删除声明）
 // ============================================================================
 
-void BlueprintEditor::ShowLeftPane(float paneWidth)
+void BlueprintEditor::ShowLeftPane(float /*paneWidth*/)
 {
-    auto& io = ImGui::GetIO();
-
-    ImGui::BeginChild("Selection", ImVec2(paneWidth, 0));
-
-    paneWidth = ImGui::GetContentRegionAvail().x;
-
-    static bool showStyleEditor = false;
-    ImGui::BeginHorizontal("Style Editor", ImVec2(paneWidth, 0));
-    ImGui::Spring(0.0f, 0.0f);
-    if (ImGui::Button(ICON_FA_EXPAND " Zoom"))
-        ed::NavigateToContent();
-    ImGui::Spring(0.0f);
-    if (ImGui::Button(ICON_FA_BOLT " Flow"))
-    {
-        for (auto& link : ActiveDoc()->links)
-            ed::Flow(link.ID);
-    }
-    ImGui::Spring();
-    if (ImGui::Button(ICON_FA_PALETTE " Style"))
-        showStyleEditor = true;
-    ImGui::EndHorizontal();
-    ImGui::Checkbox(ICON_FA_TABLE_CELLS " Ordinals", &m_ShowOrdinals);
-
-    if (showStyleEditor)
-        ShowStyleEditor(&showStyleEditor);
-
-    std::vector<ed::NodeId> selectedNodes;
-    std::vector<ed::LinkId> selectedLinks;
-    selectedNodes.resize(ed::GetSelectedObjectCount());
-    selectedLinks.resize(ed::GetSelectedObjectCount());
-
-    int nodeCount = ed::GetSelectedNodes(selectedNodes.data(), static_cast<int>(selectedNodes.size()));
-    int linkCount = ed::GetSelectedLinks(selectedLinks.data(), static_cast<int>(selectedLinks.size()));
-
-    selectedNodes.resize(nodeCount);
-    selectedLinks.resize(linkCount);
-
-    int saveIconWidth     = GetTextureWidth(m_SaveIcon);
-    int saveIconHeight    = GetTextureHeight(m_SaveIcon);
-    int restoreIconWidth  = GetTextureWidth(m_RestoreIcon);
-    int restoreIconHeight = GetTextureHeight(m_RestoreIcon);
-
-    // 防御性检查：纹理加载失败时使用默认尺寸，避免 InvisibleButton(0,0) 导致崩溃
-    if (saveIconWidth <= 0)    saveIconWidth    = 24;
-    if (saveIconHeight <= 0)   saveIconHeight   = 24;
-    if (restoreIconWidth <= 0) restoreIconWidth = 24;
-    if (restoreIconHeight <= 0) restoreIconHeight = 24;
-
-    ImGui::GetWindowDrawList()->AddRectFilled(
-        ImGui::GetCursorScreenPos(),
-        ImGui::GetCursorScreenPos() + ImVec2(paneWidth, ImGui::GetTextLineHeight()),
-        ImColor(ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]), ImGui::GetTextLineHeight() * 0.25f);
-    ImGui::Spacing(); ImGui::SameLine();
-    ImGui::TextUnformatted("Nodes");
-    ImGui::Indent();
-    for (auto& node : ActiveDoc()->nodes)
-    {
-        ImGui::PushID(node.ID.AsPointer());
-        auto start = ImGui::GetCursorScreenPos();
-
-        if (const auto progress = GetTouchProgress(node.ID))
-        {
-            ImGui::GetWindowDrawList()->AddLine(
-                start + ImVec2(-8, 0),
-                start + ImVec2(-8, ImGui::GetTextLineHeight()),
-                IM_COL32(255, 0, 0, 255 - (int)(255 * progress)), 4.0f);
-        }
-
-        bool isSelected = std::find(selectedNodes.begin(), selectedNodes.end(), node.ID) != selectedNodes.end();
-# if IMGUI_VERSION_NUM >= 18967
-        ImGui::SetNextItemAllowOverlap();
-# endif
-        if (ImGui::Selectable((node.Name + "##" + std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer()))).c_str(), &isSelected))
-        {
-            if (io.KeyCtrl)
-            {
-                if (isSelected)
-                    ed::SelectNode(node.ID, true);
-                else
-                    ed::DeselectNode(node.ID);
-            }
-            else
-                ed::SelectNode(node.ID, false);
-
-            ed::NavigateToSelection();
-        }
-        if (ImGui::IsItemHovered() && !node.State.empty())
-            ImGui::SetTooltip("State: %s", node.State.c_str());
-
-        auto id = std::string("(") + std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer())) + ")";
-        auto textSize = ImGui::CalcTextSize(id.c_str(), nullptr);
-        auto iconPanelPos = start + ImVec2(
-            paneWidth - ImGui::GetStyle().FramePadding.x - ImGui::GetStyle().IndentSpacing - saveIconWidth - restoreIconWidth - ImGui::GetStyle().ItemInnerSpacing.x * 1,
-            (ImGui::GetTextLineHeight() - saveIconHeight) / 2);
-        ImGui::GetWindowDrawList()->AddText(
-            ImVec2(iconPanelPos.x - textSize.x - ImGui::GetStyle().ItemInnerSpacing.x, start.y),
-            IM_COL32(255, 255, 255, 255), id.c_str(), nullptr);
-
-        auto drawList = ImGui::GetWindowDrawList();
-        ImGui::SetCursorScreenPos(iconPanelPos);
-# if IMGUI_VERSION_NUM < 18967
-        ImGui::SetItemAllowOverlap();
-# else
-        ImGui::SetNextItemAllowOverlap();
-# endif
-        if (node.SavedState.empty())
-        {
-            if (ImGui::InvisibleButton("save", ImVec2((float)saveIconWidth, (float)saveIconHeight)))
-                node.SavedState = node.State;
-
-            if (ImGui::IsItemActive())
-                drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 96));
-            else if (ImGui::IsItemHovered())
-                drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 255));
-            else
-                drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 160));
-        }
-        else
-        {
-            ImGui::Dummy(ImVec2((float)saveIconWidth, (float)saveIconHeight));
-            drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 32));
-        }
-
-        ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-# if IMGUI_VERSION_NUM < 18967
-        ImGui::SetItemAllowOverlap();
-# else
-        ImGui::SetNextItemAllowOverlap();
-# endif
-        if (!node.SavedState.empty())
-        {
-            if (ImGui::InvisibleButton("restore", ImVec2((float)restoreIconWidth, (float)restoreIconHeight)))
-            {
-                node.State = node.SavedState;
-                ed::RestoreNodeState(node.ID);
-                node.SavedState.clear();
-            }
-
-            if (ImGui::IsItemActive())
-                drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 96));
-            else if (ImGui::IsItemHovered())
-                drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 255));
-            else
-                drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 160));
-        }
-        else
-        {
-            ImGui::Dummy(ImVec2((float)restoreIconWidth, (float)restoreIconHeight));
-            drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 32));
-        }
-
-        ImGui::SameLine(0, 0);
-# if IMGUI_VERSION_NUM < 18967
-        ImGui::SetItemAllowOverlap();
-# endif
-        ImGui::Dummy(ImVec2(0, (float)restoreIconHeight));
-
-        ImGui::PopID();
-    }
-    ImGui::Unindent();
-
-    static int changeCount = 0;
-
-    ImGui::GetWindowDrawList()->AddRectFilled(
-        ImGui::GetCursorScreenPos(),
-        ImGui::GetCursorScreenPos() + ImVec2(paneWidth, ImGui::GetTextLineHeight()),
-        ImColor(ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]), ImGui::GetTextLineHeight() * 0.25f);
-    ImGui::Spacing(); ImGui::SameLine();
-    ImGui::TextUnformatted("Selection");
-
-    ImGui::BeginHorizontal("Selection Stats", ImVec2(paneWidth, 0));
-    ImGui::Text("Changed %d time%s", changeCount, changeCount > 1 ? "s" : "");
-    ImGui::Spring();
-    if (ImGui::Button(ICON_FA_XMARK " Deselect"))
-        ed::ClearSelection();
-    ImGui::EndHorizontal();
-    ImGui::Indent();
-    for (int i = 0; i < nodeCount; ++i) ImGui::Text("Node (%p)", selectedNodes[i].AsPointer());
-    for (int i = 0; i < linkCount; ++i) ImGui::Text("Link (%p)", selectedLinks[i].AsPointer());
-    ImGui::Unindent();
-
-    if (ed::HasSelectionChanged())
-        ++changeCount;
-
-    ImGui::Separator();
-    ShowExecutionPanel(paneWidth);
-
-    ImGui::EndChild();
+    // intentionally empty – replaced by DrawNodeListPanel()
 }
 
 // ============================================================================
@@ -510,8 +324,9 @@ void BlueprintEditor::ShowLeftPane(float paneWidth)
 
 void BlueprintEditor::OnFrame(float deltaTime)
 {
-    // 仅使当前活跃文档的编辑器侧索引失效（懒重建：首次查找时自动重建）
-    // 非活跃文档无需每帧失效——只有当切换标签或执行修改时才需要重建
+    // 使当前活跃文档的编辑器侧索引标记为 dirty（懒重建：首次查找时自动重建）
+    // 目前所有 mutation 发生在同一帧的 ed::Begin/End 区间内，此处每帧标记 dirty 保证安全
+    // TODO: 后续可在每个 mutation 点单独调用 invalidateEditorIndices() 来完全消除此处调用
     if (ActiveDoc())
         ActiveDoc()->invalidateEditorIndices();
 
@@ -536,7 +351,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
     if (ActiveDoc())
         UpdateTouch();
 
-    // 动态更新 OS 窗口标题（反映 dirty 状态）
+    // 动态更新 OS 窗口标题（仅在 dirty 状态或文件变化时重建，避免每帧调用 OS API）
     if (ActiveDoc())
     {
         std::string baseName;
@@ -553,7 +368,14 @@ void BlueprintEditor::OnFrame(float deltaTime)
         std::string windowTitle = "Blueprint Editor - " + baseName;
         if (ActiveDoc()->isDirty)
             windowTitle += " *";
-        SetTitle(windowTitle.c_str());
+
+        // 只在标题变化时调用 SetTitle（避免每帧 OS 调用）
+        static std::string s_lastWindowTitle;
+        if (windowTitle != s_lastWindowTitle)
+        {
+            SetTitle(windowTitle.c_str());
+            s_lastWindowTitle = windowTitle;
+        }
     }
 
     auto& io = ImGui::GetIO();
@@ -759,15 +581,18 @@ void BlueprintEditor::OnFrame(float deltaTime)
     }
 
     // 键盘快捷键 - 文件操作
-    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_N))
+    // 当用户正在输入文本（搜索框/重命名框等）时，不触发快捷键
+    const bool canDoShortcut = !io.WantTextInput;
+
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_N))
         NewFile(RTBlueprintClass::Actor); // Ctrl+N 默认新建 Actor 蓝图
-    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_O))
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_O))
         OpenFile();
-    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_S))
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_S))
         SaveFile();
-    if (io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_S))
+    if (canDoShortcut && io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_S))
         SaveFileAs();
-    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_W))
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_W))
     {
         if (!m_Documents.empty())
         {
@@ -782,24 +607,24 @@ void BlueprintEditor::OnFrame(float deltaTime)
     }
 
     // 键盘快捷键 - 编辑操作
-    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_C))
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_C))
         CopySelectedNodes();
-    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_V))
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_V))
     {
         ImVec2 canvasPos = ed::ScreenToCanvas(ImGui::GetMousePos());
         PasteNodes(canvasPos);
     }
-    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_X))
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_X))
         CutSelectedNodes();
-    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_D))
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_D))
         DuplicateSelectedNodes();
-    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z))
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z))
         Undo();
-    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Y))
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Y))
         Redo();
-    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_F))
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_F))
         OpenSearchOverlay();
-    if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A))
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A))
     {
         if (ActiveDoc())
         {
@@ -809,7 +634,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
     }
 
     // F5: 执行蓝图
-    if (ImGui::IsKeyPressed(ImGuiKey_F5))
+    if (canDoShortcut && ImGui::IsKeyPressed(ImGuiKey_F5))
         ExecuteBlueprint();
 
     // 确保有活跃文档
@@ -2002,9 +1827,20 @@ void BlueprintEditor::DrawNodeListPanel()
                 if (ImGui::Button(ICON_FA_PLUS " Add Function"))
                 {
                     RTFunctionDefinition newFunc;
-                    static int funcCounter = 0;
-                    newFunc.id       = "func_" + std::to_string(++funcCounter);
-                    newFunc.name     = "NewFunction_" + std::to_string(funcCounter);
+                    // 从现有函数列表推算下一个不冲突的计数器值
+                    int maxIdx = 0;
+                    for (const auto& f : doc->functions)
+                    {
+                        // 解析 "func_N" 格式中的 N
+                        if (f.id.rfind("func_", 0) == 0)
+                        {
+                            int n = std::atoi(f.id.c_str() + 5);
+                            if (n > maxIdx) maxIdx = n;
+                        }
+                    }
+                    int nextIdx = maxIdx + 1;
+                    newFunc.id       = "func_" + std::to_string(nextIdx);
+                    newFunc.name     = "NewFunction_" + std::to_string(nextIdx);
                     newFunc.category = "Custom";
                     newFunc.isPublic = true;
                     doc->functions.push_back(std::move(newFunc));
@@ -2038,8 +1874,7 @@ void BlueprintEditor::DrawNodeListPanel()
                         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
                         {
                             renamingIdx = i;
-                            strncpy(renameBuf, func.name.c_str(), sizeof(renameBuf) - 1);
-                            renameBuf[sizeof(renameBuf) - 1] = '\0';
+                            snprintf(renameBuf, sizeof(renameBuf), "%s", func.name.c_str());
                             ImGui::SetKeyboardFocusHere(-1);
                         }
                         // Delete 键删除
@@ -3060,30 +2895,43 @@ void BlueprintEditor::DrawNodeLibraryPanel()
 
     const auto& allDefs = m_NodeRegistry.getAllNodeDefinitions();
 
-    // 构建分类 → 节点列表 映射（有序）
-    std::map<std::string, std::vector<const RTNodeDef*>> catMap;
-    for (const auto* d : allDefs)
+    // 缓存分类 → 节点列表映射（仅在 registry 大小或搜索词变化时重建）
+    static size_t s_libCachedDefCount = 0;
+    static std::string s_libCachedSearch;
+    static std::map<std::string, std::vector<const RTNodeDef*>> s_libCatMap;
+
+    bool needRebuild = (allDefs.size() != s_libCachedDefCount) || (searchLower != s_libCachedSearch);
+    if (needRebuild)
     {
-        if (d->isAbstract) continue;
-        // 搜索过滤
-        if (!searchLower.empty())
+        s_libCachedDefCount = allDefs.size();
+        s_libCachedSearch = searchLower;
+        s_libCatMap.clear();
+
+        for (const auto* d : allDefs)
         {
-            std::string nameLower = d->name;
-            for (auto& c : nameLower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-            std::string idLower = d->id;
-            for (auto& c : idLower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-            if (nameLower.find(searchLower) == std::string::npos &&
-                idLower.find(searchLower) == std::string::npos &&
-                d->category.find(searchStr) == std::string::npos)
-                continue;
+            if (d->isAbstract) continue;
+            // 搜索过滤
+            if (!searchLower.empty())
+            {
+                std::string nameLower = d->name;
+                for (auto& c : nameLower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                std::string idLower = d->id;
+                for (auto& c : idLower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                if (nameLower.find(searchLower) == std::string::npos &&
+                    idLower.find(searchLower) == std::string::npos &&
+                    d->category.find(searchStr) == std::string::npos)
+                    continue;
+            }
+            s_libCatMap[d->category.empty() ? "Misc" : d->category].push_back(d);
         }
-        catMap[d->category.empty() ? "Misc" : d->category].push_back(d);
     }
+
+    const auto& catMap = s_libCatMap;
 
     // 默认展开的分类（Flow/Math/String 默认展开，其余折叠）
     static std::unordered_map<std::string, bool> catOpenState;
 
-    for (auto& [cat, nodes] : catMap)
+    for (const auto& [cat, nodes] : catMap)
     {
         // 首次出现时设定默认展开状态
         if (catOpenState.find(cat) == catOpenState.end())

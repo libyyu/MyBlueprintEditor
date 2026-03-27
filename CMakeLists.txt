@@ -68,8 +68,8 @@ if(MSVC)
     add_compile_options(/utf-8)
 endif()
 
-# ImGui math operators (global, needed by Editor and Application)
-add_definitions(-DIMGUI_DEFINE_MATH_OPERATORS)
+# ImGui math operators — defined via target_compile_definitions(imgui PUBLIC ...) below.
+# The guard in BlueprintEditor.h provides a safety net for standalone compilation.
 
 # ---------------------------------------------------------------------------
 # Project root dir (referenced by Runtime/CMakeLists.txt for Utils sources)

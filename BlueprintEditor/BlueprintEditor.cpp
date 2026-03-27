@@ -649,6 +649,7 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
     }
 
     // ── 搜索框 ────────────────────────────────────────────────────────────
+    // 搜索框（static 可接受：右键菜单是瞬态 UI，不关联特定文档）
     static char searchBuf[128] = "";
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
     bool searchChanged = ImGui::InputTextWithHint(

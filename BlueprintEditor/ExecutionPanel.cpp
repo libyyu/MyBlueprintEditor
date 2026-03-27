@@ -167,7 +167,8 @@ void BlueprintEditor::ExecuteBlueprint()
         ActiveDoc()->flowLinks.push_back(link.ID);
     }
 
-    ActiveDoc()->isExecuting = false;
+    // isExecuting 仅在 runner 确实不再运行时才关闭（异步 Delay/Timer 可能仍在进行）
+    ActiveDoc()->isExecuting = ActiveDoc()->persistentRunner.IsRunning();
     ActiveDoc()->executionLogDirty = true;
 }
 
