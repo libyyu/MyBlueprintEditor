@@ -135,8 +135,10 @@ void BlueprintEditor::ExecuteBlueprint()
     if (result.success)
     {
         ActiveDoc()->executionLog.push_back("  Execution Completed Successfully!");
-        ActiveDoc()->lastExecutionStatus = "OK (" + std::to_string(result.nodesExecuted) + " nodes, " +
-            std::to_string(elapsed).substr(0, std::to_string(elapsed).find('.') + 3) + "ms)";
+        char statusBuf[128];
+        snprintf(statusBuf, sizeof(statusBuf), "OK (%d nodes, %.2fms)",
+                 result.nodesExecuted, elapsed);
+        ActiveDoc()->lastExecutionStatus = statusBuf;
     }
     else
     {
@@ -226,6 +228,10 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
         if (!ActiveDoc()->executionLog.empty())
         {
             std::string allText;
+            size_t totalLen = 0;
+            for (const auto& line : ActiveDoc()->executionLog)
+                totalLen += line.size() + 1;   // +1 for '\n'
+            allText.reserve(totalLen);
             for (const auto& line : ActiveDoc()->executionLog)
             { allText += line; allText += '\n'; }
             ImGui::SetClipboardText(allText.c_str());

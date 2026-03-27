@@ -86,8 +86,7 @@ void BlueprintEditor::CreateLinkWithFlowReconnect(
         }
     }
 
-    // 创建新链接
-    PushUndoState();
+    // 创建新链接（快照已在函数入口处保存，无需重复 PushUndoState）
     ActiveDoc()->links.emplace_back(Link(GetNextId(), startPinId, endPinId));
     ActiveDoc()->links.back().Color = GetIconColor(GetLinkColor(startPin, endPin));
     ActiveDoc()->isDirty = true;
@@ -475,10 +474,10 @@ void BlueprintEditor::ShowLeftPane(float paneWidth)
 
 void BlueprintEditor::OnFrame(float deltaTime)
 {
-    // 每帧使编辑器侧索引失效（懒重建：首次查找时自动重建）
-    // 这样无需在每个节点/链接增删处手动 invalidate
-    for (auto& doc : m_Documents)
-        doc->invalidateEditorIndices();
+    // 仅使当前活跃文档的编辑器侧索引失效（懒重建：首次查找时自动重建）
+    // 非活跃文档无需每帧失效——只有当切换标签或执行修改时才需要重建
+    if (ActiveDoc())
+        ActiveDoc()->invalidateEditorIndices();
 
     // 驱动所有文档的计时器
     for (auto& doc : m_Documents)

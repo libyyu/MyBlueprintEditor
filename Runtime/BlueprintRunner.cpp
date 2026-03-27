@@ -140,13 +140,6 @@ bool BlueprintRunner::buildTopologicalOrder(std::vector<NodeId>& order) const
     // 确保 BlueprintData 索引已建好
     m_blueprint.ensureIndices();
 
-    // 建立 nodeId -> index 映射（使用已有索引）
-    std::unordered_map<NodeId, size_t> idToIndex;
-    for (size_t i = 0; i < m_blueprint.nodes.size(); ++i)
-    {
-        idToIndex[m_blueprint.nodes[i].id] = i;
-    }
-
     size_t n = m_blueprint.nodes.size();
 
     // 邻接表和入度
