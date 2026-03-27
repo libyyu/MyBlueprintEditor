@@ -100,6 +100,20 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                             ImGui::PopStyleColor(3);
                         }
                         ImGui::Spring(0, 4.0f);
+                        // FontAwesome 图标（来自 customProperties["icon"]）
+                        if (!node.DefinitionId.empty())
+                        {
+                            auto* def = m_NodeRegistry.getNodeDefinition(node.DefinitionId);
+                            if (def)
+                            {
+                                auto iconIt = def->customProperties.find("icon");
+                                if (iconIt != def->customProperties.end() && !iconIt->second.empty())
+                                {
+                                    ImGui::TextUnformatted(iconIt->second.c_str());
+                                    ImGui::Spring(0, 4.0f);
+                                }
+                            }
+                        }
                         ImGui::TextUnformatted(node.Name.c_str());
                         ImGui::Spring(1);
                         ImGui::Dummy(ImVec2(0, 28));
@@ -545,15 +559,25 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                 }
             }
 
-            // ---- 执行可视化：绿色发光边框高亮已执行节点 ----
+            // ---- 执行可视化：绿色发光边框高亮已执行节点（脉冲动画）----
             {
                 uint64_t nid = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(node.ID.AsPointer()));
                 auto hlIt = ActiveDoc()->executedNodeHighlight.find(nid);
                 if (hlIt != ActiveDoc()->executedNodeHighlight.end() && hlIt->second > 0.0f)
                 {
-                    float alpha = hlIt->second / 3.0f;  // 淡出效果
-                    if (alpha > 1.0f) alpha = 1.0f;
-                    int a = static_cast<int>(alpha * 200);
+                    // 剩余时间 t: 3.0 → 0.0（由 Tick 逐帧递减）
+                    // 归一化到 0~1
+                    float t = hlIt->second / 3.0f;
+                    if (t > 1.0f) t = 1.0f;
+                    // elapsed = 已消耗比例 (0~1)
+                    float elapsed = 1.0f - t;
+                    // 脉冲：快速上升（0~0.3），然后缓慢淡出（0.3~1.0）
+                    float pulse;
+                    if (elapsed < 0.3f)
+                        pulse = elapsed / 0.3f;
+                    else
+                        pulse = 1.0f - (elapsed - 0.3f) / 0.7f;
+                    int a = static_cast<int>(pulse * 200);
 
                     // GetNodeBackgroundDrawList 使用画布坐标，不需要转换到屏幕坐标
                     auto drawList = ed::GetNodeBackgroundDrawList(node.ID);
