@@ -21,6 +21,9 @@
 #include "NodeDefinition.h"
 #include "FrameTimerManager.h"
 #include "FileSystem.h"
+#ifdef BLUEPRINT_HAS_LUA
+#include "LuaScriptEngine.h"
+#endif
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -43,6 +46,9 @@ namespace Runtime {
 // 前向声明
 // ============================================================================
 class BlueprintRunner;
+#ifdef BLUEPRINT_HAS_LUA
+class LuaScriptEngine;
+#endif
 
 // ============================================================================
 // NodeExecutionState —— 单次节点执行的纯数据上下文
@@ -441,6 +447,23 @@ public:
     const std::string& GetLastError() const { return m_lastError; }
 
     // ------------------------------------------------------------------
+    // Lua 脚本扩展（需要 BLUEPRINT_HAS_LUA 编译选项）
+    // ------------------------------------------------------------------
+#ifdef BLUEPRINT_HAS_LUA
+
+    // 加载 Lua 脚本文件并执行
+    // 脚本中调用 Blueprint.RegisterHandler() 会自动注册 handler 到本 runner
+    bool LoadLuaScript(const std::string& filePath);
+
+    // 加载 Lua 代码字符串并执行
+    bool LoadLuaString(const std::string& code, const std::string& name = "=string");
+
+    // 获取 Lua 引擎实例（高级用途：注册自定义 C 函数等）
+    LuaScriptEngine* GetLuaEngine();
+
+#endif // BLUEPRINT_HAS_LUA
+
+    // ------------------------------------------------------------------
     // 日志 / 输出配置
     // ------------------------------------------------------------------
 
@@ -659,6 +682,11 @@ private:
     // 递归深度保护
     int m_flowDepth = 0;
     static const int kMaxFlowDepth = 256;
+
+#ifdef BLUEPRINT_HAS_LUA
+    // Lua 脚本引擎（延迟创建：首次 LoadLuaScript 时初始化）
+    std::unique_ptr<LuaScriptEngine>                    m_luaEngine;
+#endif
 };
 
 } // namespace Runtime

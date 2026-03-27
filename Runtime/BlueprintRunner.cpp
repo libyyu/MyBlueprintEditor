@@ -1362,6 +1362,64 @@ bool ExecutionContext::EvaluateConditionPin(const std::string& pinName)
     return GetInputValue(pinName).asBool();
 }
 
+// ============================================================================
+// Lua 脚本扩展
+// ============================================================================
+#ifdef BLUEPRINT_HAS_LUA
+
+#include "LuaScriptEngine.h"
+
+bool BlueprintRunner::LoadLuaScript(const std::string& filePath)
+{
+    // 延迟创建 Lua 引擎
+    if (!m_luaEngine)
+    {
+        m_luaEngine = std::make_unique<LuaScriptEngine>();
+        if (!m_luaEngine->Initialize(this))
+        {
+            m_lastError = "Failed to initialize Lua: " + m_luaEngine->GetLastError();
+            m_luaEngine.reset();
+            return false;
+        }
+    }
+
+    if (!m_luaEngine->LoadFile(filePath))
+    {
+        m_lastError = "Lua load error: " + m_luaEngine->GetLastError();
+        return false;
+    }
+    return true;
+}
+
+bool BlueprintRunner::LoadLuaString(const std::string& code, const std::string& name)
+{
+    // 延迟创建 Lua 引擎
+    if (!m_luaEngine)
+    {
+        m_luaEngine = std::make_unique<LuaScriptEngine>();
+        if (!m_luaEngine->Initialize(this))
+        {
+            m_lastError = "Failed to initialize Lua: " + m_luaEngine->GetLastError();
+            m_luaEngine.reset();
+            return false;
+        }
+    }
+
+    if (!m_luaEngine->LoadString(code, name))
+    {
+        m_lastError = "Lua exec error: " + m_luaEngine->GetLastError();
+        return false;
+    }
+    return true;
+}
+
+LuaScriptEngine* BlueprintRunner::GetLuaEngine()
+{
+    return m_luaEngine.get();
+}
+
+#endif // BLUEPRINT_HAS_LUA
+
 
 } // namespace Runtime
 } // namespace NodeEditor

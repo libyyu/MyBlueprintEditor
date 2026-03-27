@@ -1,0 +1,485 @@
+// Runtime/LuaBindings.cpp -- Lua ↔ C++ 绑定实现
+//
+// 内容：
+//   · Variant userdata metatable（asBool/asInt/asFloat/asString + __gc）
+//   · ExecutionContext userdata metatable（GetInput/SetOutput/...）
+//   · Variant ↔ Lua 类型双向转换（pushVariant / toVariant）
+//   · Blueprint.RegisterHandler(definitionId, luaFunction)
+//   · wrapLuaHandler: Lua function → C++ NodeHandler
+
+#ifdef BLUEPRINT_HAS_LUA
+
+#include "LuaBindings.h"
+#include "BlueprintRunner.h"
+
+#include <lua.hpp>
+#include <new>       // placement new
+#include <string>
+#include <vector>
+#include <unordered_map>
+
+namespace NodeEditor {
+namespace Runtime {
+
+// =========================================================================
+// Metatable 名称常量
+// =========================================================================
+static const char* VARIANT_MT = "Blueprint.Variant";
+static const char* CTX_MT     = "Blueprint.ExecutionContext";
+
+// =========================================================================
+// Variant → Lua 压栈（原生 Lua 类型，非 userdata）
+// =========================================================================
+static void pushVariantRaw(lua_State* L, const Variant& v)
+{
+    switch (v.type) {
+    case PinDataType::Boolean: lua_pushboolean(L, v.asBool());                   break;
+    case PinDataType::Integer: lua_pushinteger(L, static_cast<lua_Integer>(v.asInt())); break;
+    case PinDataType::Float:   lua_pushnumber(L, v.asFloat());                   break;
+    case PinDataType::String:  lua_pushstring(L, v.asString().c_str());          break;
+    case PinDataType::Object:  lua_pushstring(L, v.asObjectId().c_str());        break;
+    case PinDataType::Array: {
+        lua_createtable(L, static_cast<int>(v.arraySize()), 0);
+        for (size_t i = 0; i < v.arraySize(); ++i) {
+            pushVariantRaw(L, v.arrayGet(i));
+            lua_rawseti(L, -2, static_cast<int>(i + 1));
+        }
+        break;
+    }
+    case PinDataType::Map: {
+        lua_createtable(L, 0, static_cast<int>(v.mapSize()));
+        for (const auto& kv : v.asMap()) {
+            lua_pushstring(L, kv.first.c_str());
+            pushVariantRaw(L, kv.second);
+            lua_rawset(L, -3);
+        }
+        break;
+    }
+    default: lua_pushnil(L); break;
+    }
+}
+
+// =========================================================================
+// Lua 栈值 → Variant
+// =========================================================================
+static Variant toVariant(lua_State* L, int idx)
+{
+    switch (lua_type(L, idx)) {
+    case LUA_TBOOLEAN:
+        return Variant(static_cast<bool>(lua_toboolean(L, idx)));
+    case LUA_TNUMBER:
+        if (lua_isinteger(L, idx))
+            return Variant(static_cast<int64_t>(lua_tointeger(L, idx)));
+        else
+            return Variant(lua_tonumber(L, idx));
+    case LUA_TSTRING:
+        return Variant(std::string(lua_tostring(L, idx)));
+    case LUA_TTABLE: {
+        // 启发式：若 key 1 存在则视为数组，否则视为 Map
+        int absIdx = lua_absindex(L, idx);
+        lua_rawgeti(L, absIdx, 1);
+        bool isArray = !lua_isnil(L, -1);
+        lua_pop(L, 1);
+
+        if (isArray) {
+            std::vector<Variant> arr;
+            int len = static_cast<int>(lua_rawlen(L, absIdx));
+            arr.reserve(static_cast<size_t>(len));
+            for (int i = 1; i <= len; ++i) {
+                lua_rawgeti(L, absIdx, i);
+                arr.push_back(toVariant(L, -1));
+                lua_pop(L, 1);
+            }
+            return Variant(std::move(arr));
+        } else {
+            std::unordered_map<std::string, Variant> map;
+            lua_pushnil(L);
+            while (lua_next(L, absIdx) != 0) {
+                if (lua_type(L, -2) == LUA_TSTRING) {
+                    map[lua_tostring(L, -2)] = toVariant(L, -1);
+                }
+                lua_pop(L, 1);
+            }
+            return Variant(std::move(map));
+        }
+    }
+    case LUA_TUSERDATA: {
+        // 如果是 Variant userdata，直接返回副本
+        auto* vp = static_cast<Variant*>(luaL_testudata(L, idx, VARIANT_MT));
+        if (vp) return *vp;
+        return Variant();
+    }
+    default:
+        return Variant();
+    }
+}
+
+// =========================================================================
+// Variant userdata 辅助
+// =========================================================================
+
+static Variant* pushNewVariant(lua_State* L, const Variant& v)
+{
+    void* mem = lua_newuserdata(L, sizeof(Variant));
+    auto* uv = new (mem) Variant(v);   // placement new
+    luaL_setmetatable(L, VARIANT_MT);
+    return uv;
+}
+
+static Variant* checkVariant(lua_State* L, int idx)
+{
+    return static_cast<Variant*>(luaL_checkudata(L, idx, VARIANT_MT));
+}
+
+// =========================================================================
+// Variant metatable 方法
+// =========================================================================
+
+static int variant_asBool(lua_State* L)
+{
+    lua_pushboolean(L, checkVariant(L, 1)->asBool());
+    return 1;
+}
+
+static int variant_asInt(lua_State* L)
+{
+    lua_pushinteger(L, static_cast<lua_Integer>(checkVariant(L, 1)->asInt()));
+    return 1;
+}
+
+static int variant_asFloat(lua_State* L)
+{
+    lua_pushnumber(L, checkVariant(L, 1)->asFloat());
+    return 1;
+}
+
+static int variant_asString(lua_State* L)
+{
+    lua_pushstring(L, checkVariant(L, 1)->asString().c_str());
+    return 1;
+}
+
+static int variant_tostring(lua_State* L)
+{
+    lua_pushstring(L, checkVariant(L, 1)->asString().c_str());
+    return 1;
+}
+
+static int variant_gc(lua_State* L)
+{
+    checkVariant(L, 1)->~Variant();
+    return 0;
+}
+
+static void registerVariantMetatable(lua_State* L)
+{
+    luaL_newmetatable(L, VARIANT_MT);
+
+    // mt.__index = mt
+    lua_pushvalue(L, -1);
+    lua_setfield(L, -2, "__index");
+
+    static const luaL_Reg methods[] = {
+        {"asBool",     variant_asBool},
+        {"asInt",      variant_asInt},
+        {"asFloat",    variant_asFloat},
+        {"asString",   variant_asString},
+        {"__tostring", variant_tostring},
+        {"__gc",       variant_gc},
+        {nullptr, nullptr}
+    };
+    luaL_setfuncs(L, methods, 0);
+    lua_pop(L, 1);
+}
+
+// =========================================================================
+// ExecutionContext userdata 方法
+// =========================================================================
+
+static ExecutionContext* checkCtx(lua_State* L, int idx)
+{
+    return *static_cast<ExecutionContext**>(luaL_checkudata(L, idx, CTX_MT));
+}
+
+static int ctx_getInput(lua_State* L)
+{
+    auto* ctx = checkCtx(L, 1);
+    const char* name = luaL_checkstring(L, 2);
+    pushNewVariant(L, ctx->GetInputValue(name));
+    return 1;
+}
+
+static int ctx_setOutput(lua_State* L)
+{
+    auto* ctx = checkCtx(L, 1);
+    const char* name = luaL_checkstring(L, 2);
+
+    // 支持 Variant userdata 或原生 Lua 类型
+    Variant val;
+    if (luaL_testudata(L, 3, VARIANT_MT))
+        val = *checkVariant(L, 3);
+    else
+        val = toVariant(L, 3);
+
+    ctx->SetOutputValue(name, val);
+    return 0;
+}
+
+static int ctx_getVariable(lua_State* L)
+{
+    auto* ctx = checkCtx(L, 1);
+    const char* name = luaL_checkstring(L, 2);
+    pushNewVariant(L, ctx->GetVariable(name));
+    return 1;
+}
+
+static int ctx_setVariable(lua_State* L)
+{
+    auto* ctx = checkCtx(L, 1);
+    const char* name = luaL_checkstring(L, 2);
+    ctx->SetVariable(name, toVariant(L, 3));
+    return 0;
+}
+
+static int ctx_activateOutputFlow(lua_State* L)
+{
+    auto* ctx = checkCtx(L, 1);
+    const char* pinName = luaL_checkstring(L, 2);
+    lua_pushboolean(L, ctx->ActivateOutputFlow(pinName));
+    return 1;
+}
+
+static int ctx_print(lua_State* L)
+{
+    auto* ctx = checkCtx(L, 1);
+    const char* msg = luaL_checkstring(L, 2);
+    ctx->Print(msg);
+    return 0;
+}
+
+static int ctx_log(lua_State* L)
+{
+    auto* ctx = checkCtx(L, 1);
+    const char* msg = luaL_checkstring(L, 2);
+    ctx->Log(msg);
+    return 0;
+}
+
+static int ctx_logWarning(lua_State* L)
+{
+    auto* ctx = checkCtx(L, 1);
+    const char* msg = luaL_checkstring(L, 2);
+    ctx->LogWarning(msg);
+    return 0;
+}
+
+static int ctx_logError(lua_State* L)
+{
+    auto* ctx = checkCtx(L, 1);
+    const char* msg = luaL_checkstring(L, 2);
+    ctx->LogError(msg);
+    return 0;
+}
+
+static int ctx_getCurrentNode(lua_State* L)
+{
+    auto* ctx = checkCtx(L, 1);
+    const auto* node = ctx->GetCurrentNode();
+    if (node) {
+        lua_createtable(L, 0, 3);
+        lua_pushinteger(L, static_cast<lua_Integer>(node->id));
+        lua_setfield(L, -2, "id");
+        lua_pushstring(L, node->definitionId.c_str());
+        lua_setfield(L, -2, "definitionId");
+        lua_pushstring(L, node->name.c_str());
+        lua_setfield(L, -2, "name");
+    } else {
+        lua_pushnil(L);
+    }
+    return 1;
+}
+
+static int ctx_getNodeData(lua_State* L)
+{
+    auto* ctx = checkCtx(L, 1);
+    const char* key = luaL_checkstring(L, 2);
+    pushNewVariant(L, ctx->GetNodeData(key));
+    return 1;
+}
+
+static int ctx_getPinId(lua_State* L)
+{
+    auto* ctx = checkCtx(L, 1);
+    const char* name = luaL_checkstring(L, 2);
+    lua_pushinteger(L, static_cast<lua_Integer>(ctx->GetPinId(name)));
+    return 1;
+}
+
+static int ctx_getActivatedInputPinName(lua_State* L)
+{
+    auto* ctx = checkCtx(L, 1);
+    lua_pushstring(L, ctx->GetActivatedInputPinName().c_str());
+    return 1;
+}
+
+static void registerCtxMetatable(lua_State* L)
+{
+    luaL_newmetatable(L, CTX_MT);
+
+    // mt.__index = mt
+    lua_pushvalue(L, -1);
+    lua_setfield(L, -2, "__index");
+
+    static const luaL_Reg methods[] = {
+        {"GetInput",                  ctx_getInput},
+        {"SetOutput",                 ctx_setOutput},
+        {"GetVariable",               ctx_getVariable},
+        {"SetVariable",               ctx_setVariable},
+        {"ActivateOutputFlow",        ctx_activateOutputFlow},
+        {"Print",                     ctx_print},
+        {"Log",                       ctx_log},
+        {"LogWarning",                ctx_logWarning},
+        {"LogError",                  ctx_logError},
+        {"GetCurrentNode",            ctx_getCurrentNode},
+        {"GetNodeData",               ctx_getNodeData},
+        {"GetPinId",                  ctx_getPinId},
+        {"GetActivatedInputPinName",  ctx_getActivatedInputPinName},
+        {nullptr, nullptr}
+    };
+    luaL_setfuncs(L, methods, 0);
+    lua_pop(L, 1);
+}
+
+// =========================================================================
+// wrapLuaHandler — 将 Lua 函数包装为 C++ NodeHandler
+// =========================================================================
+
+// 自定义错误处理函数：附加 traceback
+static int luaErrorHandler(lua_State* L)
+{
+    const char* msg = lua_tostring(L, 1);
+    luaL_traceback(L, L, msg, 1);
+    return 1;
+}
+
+static NodeHandler wrapLuaHandler(lua_State* L, int funcRef)
+{
+    // lambda 捕获 lua_State* 和 funcRef
+    // 生命周期安全：handler 存在 m_handlers 中，runner 析构时 handler 销毁，
+    //              此时 LuaScriptEngine 尚未析构（析构顺序：成员逆序声明顺序），
+    //              所以 lua_State* 仍然有效。
+    return [L, funcRef](ExecutionContext& ctx) -> bool {
+
+        // 压入错误处理函数
+        lua_pushcfunction(L, luaErrorHandler);
+        int errFuncIdx = lua_gettop(L);
+
+        // 压入 Lua 函数
+        lua_rawgeti(L, LUA_REGISTRYINDEX, funcRef);
+
+        // 创建 ExecutionContext userdata（指针-to-指针，不拥有）
+        auto** udata = static_cast<ExecutionContext**>(
+            lua_newuserdata(L, sizeof(ExecutionContext*)));
+        *udata = &ctx;
+        luaL_setmetatable(L, CTX_MT);
+
+        // 调用 Lua 函数（1 参数，1 返回值，错误函数在 errFuncIdx）
+        if (lua_pcall(L, 1, 1, errFuncIdx) != LUA_OK)
+        {
+            const char* err = lua_tostring(L, -1);
+            ctx.PrintError(std::string("[Lua Handler] ") + (err ? err : "unknown error"));
+            lua_pop(L, 2);  // pop error + errFunc
+            return false;
+        }
+
+        // 获取返回值（默认 true）
+        bool result = true;
+        if (lua_isboolean(L, -1))
+            result = lua_toboolean(L, -1) != 0;
+        lua_pop(L, 2);  // pop result + errFunc
+
+        return result;
+    };
+}
+
+// =========================================================================
+// Blueprint.RegisterHandler(definitionId, luaFunction)
+// =========================================================================
+
+static int l_registerHandler(lua_State* L)
+{
+    const char* defId = luaL_checkstring(L, 1);
+    luaL_checktype(L, 2, LUA_TFUNCTION);
+
+    // 将 Lua 函数存入 registry（获取引用）
+    lua_pushvalue(L, 2);
+    int funcRef = luaL_ref(L, LUA_REGISTRYINDEX);
+
+    // 获取 runner（存储在 registry["__blueprint_runner"]）
+    lua_getfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
+    auto* runner = static_cast<BlueprintRunner*>(lua_touserdata(L, -1));
+    lua_pop(L, 1);
+
+    if (!runner)
+        return luaL_error(L, "Blueprint.RegisterHandler: runner not available");
+
+    // 如果已有同名 handler，输出警告
+    if (runner->HasHandler(defId))
+    {
+        // 使用 Lua io 输出警告（此时没有 ExecutionContext）
+        lua_getglobal(L, "print");
+        lua_pushfstring(L, "[Lua] Warning: overriding existing handler '%s'", defId);
+        lua_pcall(L, 1, 0, 0);
+    }
+
+    // 包装并注册
+    runner->RegisterHandler(defId, wrapLuaHandler(L, funcRef));
+    return 0;
+}
+
+// =========================================================================
+// Blueprint.HasHandler(definitionId) → bool
+// =========================================================================
+
+static int l_hasHandler(lua_State* L)
+{
+    const char* defId = luaL_checkstring(L, 1);
+
+    lua_getfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
+    auto* runner = static_cast<BlueprintRunner*>(lua_touserdata(L, -1));
+    lua_pop(L, 1);
+
+    lua_pushboolean(L, runner && runner->HasHandler(defId));
+    return 1;
+}
+
+// =========================================================================
+// 入口：注册所有 Lua 绑定
+// =========================================================================
+
+void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner)
+{
+    // 注册 metatable
+    registerVariantMetatable(L);
+    registerCtxMetatable(L);
+
+    // 将 runner 指针存入 registry
+    lua_pushlightuserdata(L, runner);
+    lua_setfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
+
+    // 创建 Blueprint 全局表
+    lua_newtable(L);
+
+    lua_pushcfunction(L, l_registerHandler);
+    lua_setfield(L, -2, "RegisterHandler");
+
+    lua_pushcfunction(L, l_hasHandler);
+    lua_setfield(L, -2, "HasHandler");
+
+    lua_setglobal(L, "Blueprint");
+}
+
+} // namespace Runtime
+} // namespace NodeEditor
+
+#endif // BLUEPRINT_HAS_LUA

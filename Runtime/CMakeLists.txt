@@ -99,6 +99,73 @@ set(RUNTIME_PUBLIC_HEADERS
 )
 
 # ---------------------------------------------------------------------------
+# Optional: Lua scripting support
+# ---------------------------------------------------------------------------
+option(BLUEPRINT_LUA "Enable Lua scripting support (requires Lua 5.4)" OFF)
+
+if(BLUEPRINT_LUA)
+    # --- Locate Lua 5.4 ---
+    # Priority: find_package first (system / vcpkg / user-installed),
+    # fall back to FetchContent if not found.
+    find_package(Lua 5.4 QUIET)
+
+    if(NOT LUA_FOUND)
+        message(STATUS "[BlueprintRuntime] Lua not found via find_package, using FetchContent")
+        include(FetchContent)
+        FetchContent_Declare(lua54
+            URL      https://www.lua.org/ftp/lua-5.4.7.tar.gz
+            DOWNLOAD_EXTRACT_TIMESTAMP ON
+            # FetchContent_MakeAvailable would try to add_subdirectory,
+            # but Lua has no CMakeLists.txt, so we populate and build manually.
+            EXCLUDE_FROM_ALL
+        )
+        FetchContent_MakeAvailable(lua54)
+
+        # Build Lua as a static library from source
+        set(LUA54_SRC_DIR "${lua54_SOURCE_DIR}/src")
+
+        # Collect Lua core sources (exclude lua.c and luac.c which are standalone executables)
+        file(GLOB LUA54_SOURCES "${LUA54_SRC_DIR}/*.c")
+        list(REMOVE_ITEM LUA54_SOURCES "${LUA54_SRC_DIR}/lua.c" "${LUA54_SRC_DIR}/luac.c")
+
+        if(NOT TARGET lua54_static)
+            add_library(lua54_static STATIC ${LUA54_SOURCES})
+            target_include_directories(lua54_static PUBLIC "${LUA54_SRC_DIR}")
+
+            # Platform-specific defines
+            if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
+                target_compile_definitions(lua54_static PRIVATE LUA_USE_LINUX)
+            elseif(APPLE)
+                target_compile_definitions(lua54_static PRIVATE LUA_USE_MACOSX)
+            endif()
+
+            # Suppress warnings in third-party Lua code
+            if(MSVC)
+                target_compile_options(lua54_static PRIVATE /W0 /utf-8)
+            else()
+                target_compile_options(lua54_static PRIVATE -w)
+            endif()
+
+            set_property(TARGET lua54_static PROPERTY FOLDER "External")
+        endif()
+
+        # Provide variables compatible with FindLua
+        set(LUA_LIBRARIES lua54_static)
+        set(LUA_INCLUDE_DIR "${LUA54_SRC_DIR}")
+    endif()
+
+    # Append Lua binding sources
+    list(APPEND RUNTIME_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/LuaScriptEngine.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/LuaBindings.cpp
+    )
+    list(APPEND RUNTIME_PUBLIC_HEADERS
+        ${CMAKE_CURRENT_SOURCE_DIR}/LuaScriptEngine.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/LuaBindings.h
+    )
+endif()
+
+# ---------------------------------------------------------------------------
 # Target
 # ---------------------------------------------------------------------------
 add_library(BlueprintRuntime ${_RUNTIME_LIB_TYPE}
@@ -113,6 +180,14 @@ add_library(BlueprintRuntime::BlueprintRuntime ALIAS BlueprintRuntime)
 # Dependencies
 # ---------------------------------------------------------------------------
 target_link_libraries(BlueprintRuntime PUBLIC crude_json)
+
+# Lua scripting (conditional)
+if(BLUEPRINT_LUA)
+    target_link_libraries(BlueprintRuntime PRIVATE ${LUA_LIBRARIES})
+    target_include_directories(BlueprintRuntime PRIVATE ${LUA_INCLUDE_DIR})
+    target_compile_definitions(BlueprintRuntime PUBLIC BLUEPRINT_HAS_LUA)
+    message(STATUS "[BlueprintRuntime] Lua scripting enabled (include: ${LUA_INCLUDE_DIR})")
+endif()
 
 # ---------------------------------------------------------------------------
 # Include directories
