@@ -51,6 +51,7 @@ public:
     void Apply(const std::string& themeName);
     void ApplyImGuiStyle(const EditorTheme& theme);
     void ApplyNodeEditorStyle(const EditorTheme& theme);
+    void ApplyPendingNodeEditorStyle();   // 在 OnFrame 有 ed context 后调用
 
     const std::string& GetCurrentTheme() const { return m_currentTheme; }
     const std::vector<std::string>& GetThemeNames() const { return m_themeOrder; }
@@ -66,5 +67,6 @@ private:
 
     std::string m_currentTheme = "Dark";
     std::unordered_map<std::string, EditorTheme> m_themes;
+    bool m_nodeEditorStyleDirty = false;  // 等待 ed context 后补应用
     std::vector<std::string> m_themeOrder;
 };

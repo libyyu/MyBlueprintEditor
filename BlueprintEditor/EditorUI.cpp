@@ -784,7 +784,11 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
     // 提前设置编辑器上下文（左侧面板 DrawNodeListPanel 需要 ed:: 函数）
     if (ActiveDoc())
+    {
         ed::SetCurrentEditor(ActiveDoc()->editorContext);
+        // 延迟应用 NodeEditor style（OnStart 时 ed context 尚未激活）
+        ThemeManager::Get().ApplyPendingNodeEditorStyle();
+    }
 
     // ================================================================
     // VSCode 风格固定面板布局

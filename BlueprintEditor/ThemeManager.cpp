@@ -130,7 +130,18 @@ void ThemeManager::Apply(const std::string& themeName)
     if (it == m_themes.end()) return;
     m_currentTheme = themeName;
     ApplyImGuiStyle(it->second);
+    // NodeEditor style 需要 ed::SetCurrentEditor 后才能调用，
+    // 延迟到 OnFrame 里通过 ApplyPendingNodeEditorStyle() 应用
+    m_nodeEditorStyleDirty = true;
+}
+
+void ThemeManager::ApplyPendingNodeEditorStyle()
+{
+    if (!m_nodeEditorStyleDirty) return;
+    auto it = m_themes.find(m_currentTheme);
+    if (it == m_themes.end()) return;
     ApplyNodeEditorStyle(it->second);
+    m_nodeEditorStyleDirty = false;
 }
 
 void ThemeManager::ApplyImGuiStyle(const EditorTheme& t)
