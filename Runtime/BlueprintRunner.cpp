@@ -702,6 +702,12 @@ std::vector<NodeId> BlueprintRunner::GetDownstreamNodes(NodeId nodeId) const
 // 其他
 // ============================================================================
 
+void BlueprintRunner::Log(const std::string& message, LogLevel level) const
+{
+    if (m_logCallback && m_context.loggingEnabled)
+        m_logCallback(level, message);
+}
+
 void BlueprintRunner::SetLogCallback(std::function<void(LogLevel, const std::string&)> callback)
 {
     m_logCallback = std::move(callback);
@@ -1378,16 +1384,24 @@ bool BlueprintRunner::LoadLuaScript(const std::string& filePath)
         if (!m_luaEngine->Initialize(this))
         {
             m_lastError = "Failed to initialize Lua: " + m_luaEngine->GetLastError();
+            LogError("[Lua] " + m_lastError);
             m_luaEngine.reset();
             return false;
         }
+        Log("[Lua] Engine initialized", LogLevel::Verbose);
     }
+
+    Log("[Lua] Loading script: " + filePath + " (order: " +
+        std::to_string(m_luaEngine->GetLoadedCount() + 1) + ")", LogLevel::Verbose);
 
     if (!m_luaEngine->LoadFile(filePath))
     {
         m_lastError = "Lua load error: " + m_luaEngine->GetLastError();
+        LogError("[Lua] " + m_lastError);
         return false;
     }
+
+    Log("[Lua] Script loaded OK: " + filePath, LogLevel::Verbose);
     return true;
 }
 
@@ -1400,16 +1414,24 @@ bool BlueprintRunner::LoadLuaString(const std::string& code, const std::string& 
         if (!m_luaEngine->Initialize(this))
         {
             m_lastError = "Failed to initialize Lua: " + m_luaEngine->GetLastError();
+            LogError("[Lua] " + m_lastError);
             m_luaEngine.reset();
             return false;
         }
+        Log("[Lua] Engine initialized", LogLevel::Verbose);
     }
+
+    Log("[Lua] Loading string: " + name + " (order: " +
+        std::to_string(m_luaEngine->GetLoadedCount() + 1) + ")", LogLevel::Verbose);
 
     if (!m_luaEngine->LoadString(code, name))
     {
         m_lastError = "Lua exec error: " + m_luaEngine->GetLastError();
+        LogError("[Lua] " + m_lastError);
         return false;
     }
+
+    Log("[Lua] String loaded OK: " + name, LogLevel::Verbose);
     return true;
 }
 

@@ -362,13 +362,13 @@ static int luaErrorHandler(lua_State* L)
     return 1;
 }
 
-static NodeHandler wrapLuaHandler(lua_State* L, int funcRef)
+static NodeHandler wrapLuaHandler(lua_State* L, int funcRef, const std::string& defId)
 {
     // lambda 捕获 lua_State* 和 funcRef
     // 生命周期安全：handler 存在 m_handlers 中，runner 析构时 handler 销毁，
     //              此时 LuaScriptEngine 尚未析构（析构顺序：成员逆序声明顺序），
     //              所以 lua_State* 仍然有效。
-    return [L, funcRef](ExecutionContext& ctx) -> bool {
+    return [L, funcRef, defId](ExecutionContext& ctx) -> bool {
 
         // 压入错误处理函数
         lua_pushcfunction(L, luaErrorHandler);
@@ -387,7 +387,7 @@ static NodeHandler wrapLuaHandler(lua_State* L, int funcRef)
         if (lua_pcall(L, 1, 1, errFuncIdx) != LUA_OK)
         {
             const char* err = lua_tostring(L, -1);
-            ctx.PrintError(std::string("[Lua Handler] ") + (err ? err : "unknown error"));
+            ctx.PrintError(std::string("[Lua Handler '") + defId + "'] " + (err ? err : "unknown error"));
             lua_pop(L, 2);  // pop error + errFunc
             return false;
         }
@@ -423,17 +423,14 @@ static int l_registerHandler(lua_State* L)
     if (!runner)
         return luaL_error(L, "Blueprint.RegisterHandler: runner not available");
 
-    // 如果已有同名 handler，输出警告
+    // 如果已有同名 handler，通过 runner 日志通道输出警告
     if (runner->HasHandler(defId))
     {
-        // 使用 Lua io 输出警告（此时没有 ExecutionContext）
-        lua_getglobal(L, "print");
-        lua_pushfstring(L, "[Lua] Warning: overriding existing handler '%s'", defId);
-        lua_pcall(L, 1, 0, 0);
+        runner->LogWarning(std::string("[Lua] Overriding existing handler '") + defId + "'");
     }
 
-    // 包装并注册
-    runner->RegisterHandler(defId, wrapLuaHandler(L, funcRef));
+    // 包装并注册（传入 defId 用于错误信息上下文）
+    runner->RegisterHandler(defId, wrapLuaHandler(L, funcRef, defId));
     return 0;
 }
 

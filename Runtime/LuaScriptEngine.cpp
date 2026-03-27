@@ -82,6 +82,44 @@ void LuaScriptEngine::Shutdown()
         m_L = nullptr;
     }
     m_runner = nullptr;
+    m_loadedFiles.clear();
+    m_loadedCount = 0;
+}
+
+// ---------------------------------------------------------------------------
+// 内部：lua_pcall 的错误处理函数（追加 traceback 到错误消息）
+// ---------------------------------------------------------------------------
+static int luaTraceback(lua_State* L)
+{
+    const char* msg = lua_tostring(L, 1);
+    luaL_traceback(L, L, msg, 1);  // level 1 = 跳过本函数
+    return 1;
+}
+
+// ---------------------------------------------------------------------------
+// 内部：带 traceback 的 pcall（加载后执行）
+//   栈顶必须是待执行的 chunk，执行后栈已清理
+//   成功返回 true，失败写入 m_lastError 并返回 false
+// ---------------------------------------------------------------------------
+bool LuaScriptEngine::ExecuteChunk(const std::string& source)
+{
+    // 压入错误处理函数
+    lua_pushcfunction(m_L, luaTraceback);
+    int errFuncIdx = lua_gettop(m_L) - 1;  // chunk 在栈顶，errFunc 在其下方
+    // 调整顺序：errFunc 必须在 chunk 之前
+    lua_insert(m_L, errFuncIdx);            // 把 errFunc 移到 chunk 之前
+
+    // 执行 chunk（0 参数，0 返回值，errFuncIdx 指定错误处理函数）
+    if (lua_pcall(m_L, 0, 0, errFuncIdx) != LUA_OK)
+    {
+        const char* err = lua_tostring(m_L, -1);
+        m_lastError = std::string("[") + source + "] " + (err ? err : "unknown error");
+        lua_pop(m_L, 2);  // pop error msg + errFunc
+        return false;
+    }
+
+    lua_pop(m_L, 1);  // pop errFunc
+    return true;
 }
 
 bool LuaScriptEngine::LoadFile(const std::string& filePath)
@@ -92,23 +130,22 @@ bool LuaScriptEngine::LoadFile(const std::string& filePath)
         return false;
     }
 
-    // 加载文件
+    // 加载文件（编译为 chunk，压入栈顶）
     if (luaL_loadfile(m_L, filePath.c_str()) != LUA_OK)
     {
         const char* err = lua_tostring(m_L, -1);
-        m_lastError = std::string("Lua load error: ") + (err ? err : "unknown");
+        m_lastError = std::string("Lua load error [") + filePath + "]: " + (err ? err : "unknown");
         lua_pop(m_L, 1);
         return false;
     }
 
-    // 执行
-    if (lua_pcall(m_L, 0, 0, 0) != LUA_OK)
-    {
-        const char* err = lua_tostring(m_L, -1);
-        m_lastError = std::string("Lua exec error: ") + (err ? err : "unknown");
-        lua_pop(m_L, 1);
+    // 执行（带 traceback）
+    if (!ExecuteChunk(filePath))
         return false;
-    }
+
+    // 记录加载顺序
+    m_loadedFiles.push_back(filePath);
+    ++m_loadedCount;
 
     m_lastError.clear();
     return true;
@@ -122,23 +159,21 @@ bool LuaScriptEngine::LoadString(const std::string& code, const std::string& chu
         return false;
     }
 
-    // 加载字符串
+    // 加载字符串（编译为 chunk，压入栈顶）
     if (luaL_loadbuffer(m_L, code.c_str(), code.size(), chunkName.c_str()) != LUA_OK)
     {
         const char* err = lua_tostring(m_L, -1);
-        m_lastError = std::string("Lua load error: ") + (err ? err : "unknown");
+        m_lastError = std::string("Lua load error [") + chunkName + "]: " + (err ? err : "unknown");
         lua_pop(m_L, 1);
         return false;
     }
 
-    // 执行
-    if (lua_pcall(m_L, 0, 0, 0) != LUA_OK)
-    {
-        const char* err = lua_tostring(m_L, -1);
-        m_lastError = std::string("Lua exec error: ") + (err ? err : "unknown");
-        lua_pop(m_L, 1);
+    // 执行（带 traceback）
+    if (!ExecuteChunk(chunkName))
         return false;
-    }
+
+    // 记录加载计数（字符串不记入 m_loadedFiles，只计数）
+    ++m_loadedCount;
 
     m_lastError.clear();
     return true;

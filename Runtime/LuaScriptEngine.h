@@ -13,6 +13,7 @@
 
 #include "BlueprintExport.h"
 #include <string>
+#include <vector>
 
 // MSVC C4251: 'member': class 'std::...' needs to have dll-interface
 // Safe to suppress when DLL and consumer share the same CRT/compiler.
@@ -65,10 +66,21 @@ public:
     // 获取底层 lua_State（高级用途）
     lua_State* GetState() const { return m_L; }
 
+    // 获取已加载的脚本文件列表（按加载顺序）
+    const std::vector<std::string>& GetLoadedFiles() const { return m_loadedFiles; }
+
+    // 获取已加载的脚本数量（含字符串加载）
+    int GetLoadedCount() const { return m_loadedCount; }
+
 private:
-    lua_State*       m_L = nullptr;
-    BlueprintRunner* m_runner = nullptr;
-    std::string      m_lastError;
+    // 带 traceback 的 pcall 执行已编译 chunk（栈顶）
+    bool ExecuteChunk(const std::string& source);
+
+    lua_State*                 m_L = nullptr;
+    BlueprintRunner*           m_runner = nullptr;
+    std::string                m_lastError;
+    std::vector<std::string>   m_loadedFiles;   // 按顺序记录已加载的文件路径
+    int                        m_loadedCount = 0; // 总加载次数（文件 + 字符串）
 };
 
 } // namespace Runtime

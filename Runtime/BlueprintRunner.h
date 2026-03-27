@@ -467,6 +467,12 @@ public:
     // 日志 / 输出配置
     // ------------------------------------------------------------------
 
+    /// Log a message through the runner's log callback (if set and logging enabled).
+    /// Can be called outside of ExecutionContext (e.g., during Lua script loading).
+    void Log(const std::string& message, LogLevel level = LogLevel::Verbose) const;
+    void LogWarning(const std::string& message) const { Log(message, LogLevel::Warning); }
+    void LogError  (const std::string& message) const { Log(message, LogLevel::Error);   }
+
     /// Set callback for internal debug/diagnostic messages (LogLevel, message).
     /// Has no effect when logging is disabled (see EnableLogging).
     void SetLogCallback(std::function<void(LogLevel, const std::string&)> callback);
