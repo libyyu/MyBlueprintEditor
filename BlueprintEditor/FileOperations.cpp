@@ -104,15 +104,21 @@ void BlueprintEditor::ClearEditor()
 // 新建蓝图（创建新标签页）
 // ============================================================================
 
-void BlueprintEditor::NewFile()
+void BlueprintEditor::NewFile(RTBlueprintClass bpClass)
 {
     CreateNewDocument();
+
+    // 设置蓝图类型
+    ActiveDoc()->blueprintClass = bpClass;
 
     // 切换到新文档的编辑器上下文
     ed::SetCurrentEditor(ActiveDoc()->editorContext);
 
     // 更新窗口标题
-    SetTitle("Blueprint Editor - [New]");
+    std::string title = "Blueprint Editor - [New]";
+    if (bpClass == RTBlueprintClass::FunctionLibrary)
+        title += " [Library]";
+    SetTitle(title.c_str());
 }
 
 // ============================================================================
@@ -311,6 +317,8 @@ RTBlueprintData BlueprintEditor::BuildFullEditorData()
     else
         bp.metadata.name = "Untitled";
     bp.metadata.description = "Blueprint Editor file";
+    // 蓝图类型写入元数据
+    bp.metadata.blueprintClass = ActiveDoc()->blueprintClass;
     
     return bp;
 }
@@ -329,6 +337,9 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
             " is newer than current version " + std::to_string(::NodeEditor::Runtime::BLUEPRINT_CURRENT_SCHEMA_VERSION) +
             ". Some features may not load correctly.");
     }
+
+    // 恢复蓝图类型（旧文件缺失时默认 Actor，向后兼容）
+    ActiveDoc()->blueprintClass = data.metadata.blueprintClass;
 
     // 映射旧 ID -> 新 ID
     std::unordered_map<uint64_t, int> nodeIdMap;  // old nodeId -> new nodeId

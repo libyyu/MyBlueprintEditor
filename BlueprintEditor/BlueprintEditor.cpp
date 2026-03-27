@@ -620,6 +620,19 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
 {
     Node* result = nullptr;
 
+    // FunctionLibrary 蓝图过滤：禁止添加事件驱动节点
+    // （Event.* / OnBeginPlay / OnTick / CustomEvent 等）
+    bool isLibBP = ActiveDoc() && ActiveDoc()->blueprintClass == RTBlueprintClass::FunctionLibrary;
+    auto isEventCategory = [](const std::string& cat) -> bool {
+        // 分类前缀 "Event" 或就叫 "Events"
+        return cat == "Event" || cat == "Events" ||
+               cat.rfind("Event", 0) == 0;
+    };
+    auto isLibraryFilteredDef = [&](const RTNodeDef* d) -> bool {
+        if (!isLibBP) return false;
+        return isEventCategory(d->category);
+    };
+
     const auto& allDefsRef = m_NodeRegistry.getAllNodeDefinitions();
     size_t defCount = allDefsRef.size();
 
@@ -691,6 +704,7 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
         // ── 渲染搜索结果（直接遍历缓存，无 tolower） ──────────────────────
         for (const auto* d : m_CachedSearchResults)
         {
+            if (isLibraryFilteredDef(d)) continue;  // FunctionLibrary 过滤事件节点
             if (ImGui::MenuItem(d->name.c_str()))
             {
                 PushUndoState();
@@ -754,6 +768,10 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
         auto nameIt = m_CachedCatIdToName.find(rootId);
         const char* displayName = (nameIt != m_CachedCatIdToName.end()) ?
             nameIt->second.c_str() : rootId.c_str();
+
+        // FunctionLibrary 蓝图过滤：跳过 Event 分类顶级菜单
+        if (isLibBP && isEventCategory(rootId))
+            continue;
 
         if (ImGui::BeginMenu(displayName))
         {

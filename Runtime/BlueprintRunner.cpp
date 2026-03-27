@@ -357,6 +357,18 @@ ExecutionResult BlueprintRunner::Execute()
         m_runState.store(RunState::Running);
     }
 
+    // FunctionLibrary 蓝图禁止直接 Execute：它只应通过 Function.Call / Function.CallLibrary
+    // 节点来调用其内部函数，不能作为独立 Actor 执行。
+    if (m_blueprint.metadata.blueprintClass == BlueprintClass::FunctionLibrary)
+    {
+        result.errorMessage =
+            "Cannot Execute() a FunctionLibrary blueprint directly. "
+            "Use Function.Call / Function.CallLibrary nodes instead.";
+        if (m_logCallback)
+            m_logCallback(LogLevel::Warning, result.errorMessage);
+        return result;
+    }
+
     auto startTime = std::chrono::high_resolution_clock::now();
 
     // 拓扑排序（使用缓存）

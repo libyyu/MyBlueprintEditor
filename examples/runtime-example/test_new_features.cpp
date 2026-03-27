@@ -349,6 +349,9 @@ static void test_function_library_missing_dir()
 // ============================================================================
 // 测试入口（供 runtime-example main() 调用）
 // ============================================================================
+// 前向声明（Test H 定义在文件末尾）
+static void test_blueprint_class_serialization();
+
 int runNewFeatureTests()
 {
     g_pass_new = 0;
@@ -363,8 +366,85 @@ int runNewFeatureTests()
     test_function_serialization();
     test_function_call_node();
     test_function_library_missing_dir();
+    test_blueprint_class_serialization();
 
     std::cout << "\n========== 结果 ==========\n";
     std::cout << "PASS: " << g_pass_new << "  FAIL: " << g_fail_new << "\n";
     return (g_fail_new == 0) ? 0 : 1;
+}
+
+// ============================================================================
+// Test H: BlueprintClass 枚举序列化/反序列化
+// ============================================================================
+static void test_blueprint_class_serialization()
+{
+    std::cout << "\n[Test H] BlueprintClass 序列化/反序列化（枚举整数）\n";
+
+    using namespace NodeEditor::Runtime;
+
+    // ── Actor 蓝图序列化 ────────────────────────────────────────────────────
+    {
+        BlueprintData bp;
+        bp.metadata.name = "TestActor";
+        bp.metadata.blueprintClass = BlueprintClass::Actor;
+
+        JsonBlueprintExporter ex;
+        ExportOptions opts; opts.prettyPrint = false;
+        std::string json = ex.exportRuntimeToString(bp, opts);
+
+        // JSON 里应有 "blueprintClass":0
+        CHECK_NEW(json.find("\"blueprintClass\":0") != std::string::npos ||
+                  json.find("\"blueprintClass\": 0") != std::string::npos,
+                  "Actor 序列化为 blueprintClass=0");
+
+        // 反序列化
+        BlueprintRunner r;
+        CHECK_NEW(r.LoadFromJson(json), "Actor JSON 反序列化成功");
+        CHECK_NEW(r.GetBlueprintData().metadata.blueprintClass == BlueprintClass::Actor,
+                  "反序列化后 blueprintClass == Actor");
+    }
+
+    // ── FunctionLibrary 蓝图序列化 ─────────────────────────────────────────
+    {
+        BlueprintData bp;
+        bp.metadata.name = "TestLib";
+        bp.metadata.blueprintClass = BlueprintClass::FunctionLibrary;
+
+        JsonBlueprintExporter ex;
+        ExportOptions opts; opts.prettyPrint = false;
+        std::string json = ex.exportRuntimeToString(bp, opts);
+
+        CHECK_NEW(json.find("\"blueprintClass\":1") != std::string::npos ||
+                  json.find("\"blueprintClass\": 1") != std::string::npos,
+                  "FunctionLibrary 序列化为 blueprintClass=1");
+
+        BlueprintRunner r;
+        CHECK_NEW(r.LoadFromJson(json), "FunctionLibrary JSON 反序列化成功");
+        CHECK_NEW(r.GetBlueprintData().metadata.blueprintClass == BlueprintClass::FunctionLibrary,
+                  "反序列化后 blueprintClass == FunctionLibrary");
+    }
+
+    // ── 旧文件向后兼容（缺少 blueprintClass 字段）──────────────────────────
+    {
+        // 构造一个不含 blueprintClass 的旧格式 JSON
+        std::string oldJson = R"({"metadata":{"schemaVersion":2,"name":"OldFile","description":"","version":""},"nodes":[],"links":[],"variables":[],"functions":[],"comments":[]})";
+
+        BlueprintRunner r;
+        CHECK_NEW(r.LoadFromJson(oldJson), "旧格式 JSON 加载成功");
+        CHECK_NEW(r.GetBlueprintData().metadata.blueprintClass == BlueprintClass::Actor,
+                  "旧格式默认 blueprintClass == Actor（向后兼容）");
+    }
+
+    // ── FunctionLibrary 禁止直接 Execute ───────────────────────────────────
+    {
+        BlueprintData bp;
+        bp.metadata.blueprintClass = BlueprintClass::FunctionLibrary;
+
+        BlueprintRunner r;
+        r.Load(bp);
+        auto result = r.Execute();
+        CHECK_NEW(!result.success, "FunctionLibrary 直接 Execute 返回 failure");
+        CHECK_NEW(result.errorMessage.find("FunctionLibrary") != std::string::npos,
+                  "错误信息包含 'FunctionLibrary'");
+    }
 }

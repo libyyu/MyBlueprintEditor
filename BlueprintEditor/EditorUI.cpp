@@ -560,8 +560,10 @@ void BlueprintEditor::OnFrame(float deltaTime)
     {
         if (ImGui::BeginMenu(ICON_FA_FILE " File"))
         {
-            if (ImGui::MenuItem(ICON_FA_FILE " New", "Ctrl+N"))
-                NewFile();
+            if (ImGui::MenuItem(ICON_FA_FILE " New Actor Blueprint", "Ctrl+N"))
+                NewFile(RTBlueprintClass::Actor);
+            if (ImGui::MenuItem(ICON_FA_CUBE " New Function Library"))
+                NewFile(RTBlueprintClass::FunctionLibrary);
             if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Open...", "Ctrl+O"))
                 OpenFile();
             if (ImGui::BeginMenu(ICON_FA_CLOCK_ROTATE_LEFT " Recent Files"))
@@ -726,7 +728,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
     // 键盘快捷键 - 文件操作
     if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_N))
-        NewFile();
+        NewFile(RTBlueprintClass::Actor); // Ctrl+N 默认新建 Actor 蓝图
     if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_O))
         OpenFile();
     if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_S))
@@ -1832,8 +1834,9 @@ void BlueprintEditor::DrawNodeListPanel()
             ImGui::EndTabItem();
         }
 
-        // ── Variables Tab ───────────────────────────────────────────────────
-        if (ImGui::BeginTabItem(ICON_FA_LAYER_GROUP " Variables"))
+        // ── Variables Tab（FunctionLibrary 蓝图不显示，函数库无实例状态）──────
+        bool isLibrary = ActiveDoc() && ActiveDoc()->blueprintClass == RTBlueprintClass::FunctionLibrary;
+        if (!isLibrary && ImGui::BeginTabItem(ICON_FA_LAYER_GROUP " Variables"))
         {
             DrawVariablePanel();
             ImGui::EndTabItem();
@@ -1913,8 +1916,8 @@ void BlueprintEditor::DrawNodeListPanel()
             ImGui::EndTabItem();
         }
 
-        // ── Events Tab ──────────────────────────────────────────────────────
-        if (ImGui::BeginTabItem(ICON_FA_BOLT " Events"))
+        // ── Events Tab（FunctionLibrary 蓝图不显示，函数库无事件驱动）──────────
+        if (!isLibrary && ImGui::BeginTabItem(ICON_FA_BOLT " Events"))
         {
             auto events = RTEventBus::Get().GetRegisteredEvents();
             if (events.empty())
@@ -2647,9 +2650,18 @@ void BlueprintEditor::DrawExecutionPanel()
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.60f, 0.35f, 1.00f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.28f, 0.70f, 0.40f, 1.00f));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+    // FunctionLibrary 蓝图不能直接 Execute，禁用按钮
+    bool bpIsLibrary = ActiveDoc() && ActiveDoc()->blueprintClass == RTBlueprintClass::FunctionLibrary;
+    if (bpIsLibrary) ImGui::BeginDisabled();
     if (ImGui::Button(ICON_FA_PLAY " Execute", ImVec2(90, 0)))
     {
         ExecuteBlueprint();
+    }
+    if (bpIsLibrary)
+    {
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("FunctionLibrary 蓝图不可直接执行，\n请通过 Function.Call 节点调用其函数。");
     }
     ImGui::PopStyleVar();
     ImGui::PopStyleColor(3);

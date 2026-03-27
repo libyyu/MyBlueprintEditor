@@ -13,6 +13,36 @@
 #include <mutex>
 #include <shared_mutex>
 
+// ============================================================================
+// 蓝图类型
+// ============================================================================
+
+namespace NodeEditor {
+namespace Runtime {
+
+enum class BlueprintClass : int
+{
+    Actor           = 0,  // 默认：有实例，BeginPlay/Tick/事件驱动，有可变状态
+    FunctionLibrary = 1,  // 静态全局：纯函数库，无实例/无事件/无可变状态
+    // 保留扩展槽：
+    // MacroLibrary  = 2,
+    // DataAsset     = 3,
+};
+
+/// 将 BlueprintClass 转为人类可读名（仅用于调试/日志）
+inline const char* BlueprintClassName(BlueprintClass c)
+{
+    switch (c)
+    {
+        case BlueprintClass::Actor:           return "Actor";
+        case BlueprintClass::FunctionLibrary: return "FunctionLibrary";
+        default:                              return "Unknown";
+    }
+}
+
+} // namespace Runtime
+} // namespace NodeEditor
+
 namespace NodeEditor {
 namespace Runtime {
 
@@ -127,6 +157,7 @@ constexpr int BLUEPRINT_CURRENT_SCHEMA_VERSION = 2;
 struct BlueprintMetadata
 {
     int                         schemaVersion = BLUEPRINT_CURRENT_SCHEMA_VERSION; // 文件格式版本
+    BlueprintClass              blueprintClass = BlueprintClass::Actor;            // 蓝图类型（枚举整数）
     std::string                 name;           // 蓝图名称
     std::string                 description;    // 蓝图描述
     std::string                 author;         // 作者

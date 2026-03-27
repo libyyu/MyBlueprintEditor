@@ -156,6 +156,11 @@ std::string JsonBlueprintExporter::exportRuntimeToString(const BlueprintData& da
         writeIndent();
         oss << "\"schemaVersion\": " << data.metadata.schemaVersion << ",";
         writeNewline();
+
+        writeIndent();
+        // blueprintClass 以整数存储（0=Actor, 1=FunctionLibrary），节省空间，枚举扩展向后兼容
+        oss << "\"blueprintClass\": " << static_cast<int>(data.metadata.blueprintClass) << ",";
+        writeNewline();
         
         writeIndent();
         oss << "\"name\": \"" << escapeJson(data.metadata.name) << "\",";
@@ -966,6 +971,9 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
     {
         auto& meta = rootObj["metadata"];
         result.data.metadata.schemaVersion = static_cast<int>(getNumber(meta, "schemaVersion", 0));
+        // blueprintClass：整数枚举，默认 0（Actor），旧文件缺失时向后兼容
+        result.data.metadata.blueprintClass = static_cast<BlueprintClass>(
+            static_cast<int>(getNumber(meta, "blueprintClass", 0)));
         result.data.metadata.name        = getString(meta, "name");
         result.data.metadata.description  = getString(meta, "description");
         result.data.metadata.version      = getString(meta, "version");

@@ -48,6 +48,15 @@ int LoadFunctionLibrary(INodeRegistry& registry, const std::string& dirPath)
             continue;
         }
 
+        // 只加载 blueprintClass == FunctionLibrary 的文件
+        // blueprintClass == Actor 的蓝图不注册为全局节点
+        if (result.data.metadata.blueprintClass != BlueprintClass::FunctionLibrary)
+        {
+            // 旧格式文件（缺少 blueprintClass 字段）默认 Actor，跳过
+            // 若目录下混有 Actor 蓝图，也跳过，只处理函数库
+            continue;
+        }
+
         // 获取文件名（不含扩展名）
         std::string stem = p.stem().string();
         // 去掉 .bp 前缀（如果文件名是 xxx.bp.json，stem = xxx.bp）

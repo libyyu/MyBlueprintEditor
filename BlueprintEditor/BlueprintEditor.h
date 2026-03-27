@@ -46,6 +46,7 @@ typedef NodeEditor::Runtime::PinInfo            RTPinInfo;
 typedef NodeEditor::Runtime::PinDataType        RTPinDataType;
 typedef NodeEditor::Runtime::NodeDefinition     RTNodeDef;
 typedef NodeEditor::Runtime::ExecutionResult    RTExecutionResult;
+typedef NodeEditor::Runtime::BlueprintClass     RTBlueprintClass;
 typedef NodeEditor::Runtime::PinDefinition      RTPinDef;
 typedef NodeEditor::Runtime::VariableDefinition RTVariableDefinition;
 typedef NodeEditor::Runtime::FunctionDefinition RTFunctionDefinition;
@@ -187,6 +188,9 @@ struct BlueprintDocument
     int                  nextId = 1;
     std::deque<Node>     nodes;
     std::deque<Link>     links;
+
+    // 蓝图类型（对应 Runtime::BlueprintClass，决定编辑器 UI 限制与运行行为）
+    RTBlueprintClass     blueprintClass = RTBlueprintClass::Actor;
 
     // 触摸追踪
     std::map<ed::NodeId, float, NodeIdLess> nodeTouchTime;
@@ -331,10 +335,12 @@ struct BlueprintDocument
         return name;
     }
 
-    // 标签页标题（含修改标记）
+    // 标签页标题（含修改标记 + 蓝图类型徽章）
     std::string GetTabTitle() const
     {
         std::string title = GetTabName();
+        if (blueprintClass == RTBlueprintClass::FunctionLibrary)
+            title = "[Lib] " + title;
         if (isDirty)
             title += " *";
         return title;
@@ -591,7 +597,7 @@ struct BlueprintEditor : public Application
     // ------------------------------------------------------------------
     // 文件操作
     // ------------------------------------------------------------------
-    void    NewFile();                                  // 新建蓝图（新标签页）
+    void    NewFile(RTBlueprintClass bpClass = RTBlueprintClass::Actor); // 新建蓝图（新标签页）
     void    OpenFile();                                 // 打开蓝图文件（新标签页）
     void    SaveFile();                                 // 保存当前标签页
     void    SaveFileAs();                               // 另存为
