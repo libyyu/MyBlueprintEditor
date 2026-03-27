@@ -13,10 +13,8 @@
 #include <sstream>
 
 // ============================================================================
-// 平台文件对话框
+// 平台文件对话框（外部链接，供 EditorUI / ProjectOps 调用）
 // ============================================================================
-
-namespace {
 
 #ifdef _WIN32
 std::string OpenFileDialog(const char* filter, const char* title)
@@ -53,7 +51,17 @@ std::string SaveFileDialog(const char* filter, const char* title, const char* de
         return std::string(filename);
     return "";
 }
+#else
+// Linux/Mac：空实现（未来可集成 nfd/zenity）
+std::string OpenFileDialog(const char*, const char*) { return ""; }
+std::string SaveFileDialog(const char*, const char*, const char*) { return ""; }
 #endif
+
+// ============================================================================
+// 内部辅助（匿名 namespace）
+// ============================================================================
+
+namespace {
 
 // 从路径中提取文件名（不含扩展名）
 std::string GetFileBaseName(const std::string& path)
@@ -77,12 +85,6 @@ std::string GetEditorFilePath(const std::string& runtimePath)
 }
 
 } // anonymous namespace
-
-// ── 平台文件对话框（非 Windows：空实现，未来可集成 nfd/zenity）────────────
-#ifndef _WIN32
-std::string OpenFileDialog(const char*, const char*) { return ""; }
-std::string SaveFileDialog(const char*, const char*, const char*) { return ""; }
-#endif
 
 // ============================================================================
 // 清空编辑器（清空当前活跃文档）
