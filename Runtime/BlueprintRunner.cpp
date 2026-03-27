@@ -263,6 +263,37 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
     // 准备执行上下文
     prepareNodeContext(node);
 
+    // ── Function.Call 内置处理 ───────────────────────────────────────────────
+    if (node.definitionId == "Function.Call")
+    {
+        // 取 FunctionId 引脚值（先从 nodeData，再从 pinValues）
+        std::string funcId;
+        auto ndIt = node.nodeData.find("FunctionId");
+        if (ndIt != node.nodeData.end())
+            funcId = ndIt->second.asString();
+        else
+            funcId = m_context.GetInputValue("FunctionId").asString();
+
+        for (const auto& funcDef : m_blueprint.functions)
+        {
+            if (funcDef.id == funcId || funcDef.name == funcId)
+            {
+                BlueprintData funcBP;
+                funcBP.nodes = funcDef.nodes;
+                funcBP.links = funcDef.links;
+                BlueprintRunner subRunner;
+                subRunner.RegisterHandlers(m_handlers);
+                subRunner.SetParentTimerManager(m_timerManager);
+                if (subRunner.Load(funcBP))
+                    subRunner.Execute();
+                break;
+            }
+        }
+        m_context.ActivateOutputFlow(std::string(""));
+        propagatePinValues(node);
+        return true;
+    }
+
     // 查找处理器
     auto it = m_handlers.find(node.definitionId);
     NodeHandler handler;

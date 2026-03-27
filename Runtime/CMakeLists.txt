@@ -78,6 +78,7 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/FileSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintCAPI.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ScriptNodeLoader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/FunctionLibrary.cpp
 )
 
 set(RUNTIME_PUBLIC_HEADERS

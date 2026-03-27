@@ -427,6 +427,78 @@ std::string JsonBlueprintExporter::exportRuntimeToString(const BlueprintData& da
         oss << "]";
     }
     
+    // ── functions 数组 ───────────────────────────────────────────────────────
+    if (!data.functions.empty())
+    {
+        oss << ","; writeNewline();
+        writeIndent();
+        oss << "\"functions\": [";
+        writeNewline();
+        indentLevel++;
+
+        for (size_t fi = 0; fi < data.functions.size(); ++fi)
+        {
+            const auto& func = data.functions[fi];
+            writeIndent(); oss << "{"; writeNewline();
+            indentLevel++;
+
+            writeIndent(); oss << "\"id\": \""          << escapeJson(func.id)          << "\","; writeNewline();
+            writeIndent(); oss << "\"name\": \""         << escapeJson(func.name)         << "\","; writeNewline();
+            writeIndent(); oss << "\"category\": \""     << escapeJson(func.category)     << "\","; writeNewline();
+            writeIndent(); oss << "\"description\": \""  << escapeJson(func.description)  << "\","; writeNewline();
+            writeIndent(); oss << "\"isPublic\": "       << (func.isPublic ? "true" : "false") << ","; writeNewline();
+
+            // inputs
+            writeIndent(); oss << "\"inputs\": [";
+            for (size_t ii = 0; ii < func.inputs.size(); ++ii)
+            {
+                const auto& inp = func.inputs[ii];
+                oss << "{\"name\":\"" << escapeJson(inp.name) << "\",\"dataType\":" << static_cast<int>(inp.dataType) << "}";
+                if (ii + 1 < func.inputs.size()) oss << ",";
+            }
+            oss << "],"; writeNewline();
+
+            // outputs
+            writeIndent(); oss << "\"outputs\": [";
+            for (size_t oi = 0; oi < func.outputs.size(); ++oi)
+            {
+                const auto& out = func.outputs[oi];
+                oss << "{\"name\":\"" << escapeJson(out.name) << "\",\"dataType\":" << static_cast<int>(out.dataType) << "}";
+                if (oi + 1 < func.outputs.size()) oss << ",";
+            }
+            oss << "],"; writeNewline();
+
+            // nodes (sub-graph) - serialize node IDs and positions only
+            writeIndent(); oss << "\"nodes\": [";
+            for (size_t ni = 0; ni < func.nodes.size(); ++ni)
+            {
+                const auto& nd = func.nodes[ni];
+                oss << "{\"id\":" << nd.id << ",\"definitionId\":\"" << escapeJson(nd.definitionId) << "\",\"name\":\"" << escapeJson(nd.name) << "\"}";
+                if (ni + 1 < func.nodes.size()) oss << ",";
+            }
+            oss << "],"; writeNewline();
+
+            // links
+            writeIndent(); oss << "\"links\": [";
+            for (size_t li2 = 0; li2 < func.links.size(); ++li2)
+            {
+                const auto& lk = func.links[li2];
+                oss << "{\"id\":" << lk.id << ",\"startPinId\":" << lk.startPinId << ",\"endPinId\":" << lk.endPinId << "}";
+                if (li2 + 1 < func.links.size()) oss << ",";
+            }
+            oss << "]"; writeNewline();
+
+            indentLevel--;
+            writeIndent(); oss << "}";
+            if (fi + 1 < data.functions.size()) oss << ",";
+            writeNewline();
+        }
+
+        indentLevel--;
+        writeIndent();
+        oss << "]";
+    }
+
     // 结束根对象
     writeNewline();
     indentLevel--;
@@ -1080,6 +1152,75 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
             }
 
             result.data.variables.push_back(std::move(var));
+        }
+    }
+
+    // ---- 解析函数定义 ----
+    if (rootObj.contains("functions") && rootObj["functions"].type() == crude_json::type_t::array)
+    {
+        for (auto& funcJson : rootObj["functions"].get<crude_json::array>())
+        {
+            if (funcJson.type() != crude_json::type_t::object) continue;
+
+            FunctionDefinition func;
+            func.id          = getString(funcJson, "id");
+            func.name        = getString(funcJson, "name");
+            func.category    = getString(funcJson, "category");
+            func.description = getString(funcJson, "description");
+            func.isPublic    = getBool(funcJson, "isPublic", true);
+
+            // inputs
+            if (funcJson.contains("inputs") && funcJson["inputs"].type() == crude_json::type_t::array)
+            {
+                for (auto& inpJson : funcJson["inputs"].get<crude_json::array>())
+                {
+                    if (inpJson.type() != crude_json::type_t::object) continue;
+                    VariableDefinition vd;
+                    vd.name     = getString(inpJson, "name");
+                    vd.dataType = static_cast<PinDataType>(static_cast<int>(getNumber(inpJson, "dataType")));
+                    func.inputs.push_back(std::move(vd));
+                }
+            }
+            // outputs
+            if (funcJson.contains("outputs") && funcJson["outputs"].type() == crude_json::type_t::array)
+            {
+                for (auto& outJson : funcJson["outputs"].get<crude_json::array>())
+                {
+                    if (outJson.type() != crude_json::type_t::object) continue;
+                    VariableDefinition vd;
+                    vd.name     = getString(outJson, "name");
+                    vd.dataType = static_cast<PinDataType>(static_cast<int>(getNumber(outJson, "dataType")));
+                    func.outputs.push_back(std::move(vd));
+                }
+            }
+            // nodes (sub-graph)
+            if (funcJson.contains("nodes") && funcJson["nodes"].type() == crude_json::type_t::array)
+            {
+                for (auto& ndJson : funcJson["nodes"].get<crude_json::array>())
+                {
+                    if (ndJson.type() != crude_json::type_t::object) continue;
+                    NodeInstance nd;
+                    nd.id           = static_cast<NodeId>(getNumber(ndJson, "id"));
+                    nd.definitionId = getString(ndJson, "definitionId");
+                    nd.name         = getString(ndJson, "name");
+                    func.nodes.push_back(std::move(nd));
+                }
+            }
+            // links
+            if (funcJson.contains("links") && funcJson["links"].type() == crude_json::type_t::array)
+            {
+                for (auto& lkJson : funcJson["links"].get<crude_json::array>())
+                {
+                    if (lkJson.type() != crude_json::type_t::object) continue;
+                    LinkInstance lk;
+                    lk.id         = static_cast<LinkId>(getNumber(lkJson, "id"));
+                    lk.startPinId = static_cast<PinId>(getNumber(lkJson, "startPinId"));
+                    lk.endPinId   = static_cast<PinId>(getNumber(lkJson, "endPinId"));
+                    func.links.push_back(std::move(lk));
+                }
+            }
+
+            result.data.functions.push_back(std::move(func));
         }
     }
 

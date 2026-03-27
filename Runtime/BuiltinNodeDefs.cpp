@@ -1291,6 +1291,34 @@ static void RegisterNodeDefs_Event(INodeRegistry& registry)
     { auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("CustomEventNode")); if (d) d->customProperties["icon"] = u8"\uf0e7"; }
 }
 
+static void RegisterNodeDefs_Function(INodeRegistry& registry)
+{
+    auto reg = [&registry](const char* id, const char* name, const char* category,
+                  std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
+                  const char* color = "", const char* edType = "")
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
+
+    reg("Function.Entry", "Function Entry", "Function",
+        {},
+        { MakeFlowPin("") },
+        "60C060");
+
+    reg("Function.Return", "Function Return", "Function",
+        { MakeFlowPin("") },
+        {},
+        "60C060");
+
+    reg("Function.Call", "Call Function", "Function",
+        { MakeFlowPin(""), MakePin("FunctionId", PinDataType::String) },
+        { MakeFlowPin("") },
+        "40A0FF");
+
+    reg("Function.CallLibrary", "Call Library Function", "Function",
+        { MakeFlowPin(""), MakePin("LibraryPath", PinDataType::String), MakePin("FunctionId", PinDataType::String) },
+        { MakeFlowPin("") },
+        "40A0FF");
+}
+
 void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
 {
     // --- 注册分类 ---
@@ -1311,6 +1339,7 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     addCat("Misc",       "Misc");
     addCat("Conversion", "Conversion");
     addCat("Event",      "Events");
+    addCat("Function",   "Functions");
 
     // --- 注册各分类的节点定义 ---
     RegisterNodeDefs_Flow(registry);
@@ -1327,6 +1356,7 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     RegisterNodeDefs_Misc(registry);
     RegisterNodeDefs_Conversion(registry);
     RegisterNodeDefs_Event(registry);
+    RegisterNodeDefs_Function(registry);
 }
 
 } // namespace Runtime

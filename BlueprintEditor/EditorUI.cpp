@@ -1839,6 +1839,80 @@ void BlueprintEditor::DrawNodeListPanel()
             ImGui::EndTabItem();
         }
 
+        // ── Functions Tab ───────────────────────────────────────────────────
+        if (ImGui::BeginTabItem(ICON_FA_CODE_BRANCH " Functions"))
+        {
+            auto* doc = ActiveDoc();
+            if (doc)
+            {
+                if (ImGui::Button(ICON_FA_PLUS " Add Function"))
+                {
+                    RTFunctionDefinition newFunc;
+                    static int funcCounter = 0;
+                    newFunc.id       = "func_" + std::to_string(++funcCounter);
+                    newFunc.name     = "NewFunction_" + std::to_string(funcCounter);
+                    newFunc.category = "Custom";
+                    newFunc.isPublic = true;
+                    doc->functions.push_back(std::move(newFunc));
+                    doc->isDirty = true;
+                }
+                ImGui::Separator();
+
+                // 列表显示已有函数
+                static int renamingIdx = -1;
+                static char renameBuf[128] = {};
+                for (int i = 0; i < (int)doc->functions.size(); ++i)
+                {
+                    auto& func = doc->functions[i];
+                    ImGui::PushID(i);
+
+                    if (renamingIdx == i)
+                    {
+                        if (ImGui::InputText("##rename", renameBuf, sizeof(renameBuf),
+                                             ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
+                        {
+                            func.name = renameBuf;
+                            doc->isDirty = true;
+                            renamingIdx = -1;
+                        }
+                        if (!ImGui::IsItemActive() && ImGui::IsMouseClicked(0))
+                            renamingIdx = -1;
+                    }
+                    else
+                    {
+                        ImGui::Selectable(func.name.c_str(), false, ImGuiSelectableFlags_AllowDoubleClick);
+                        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+                        {
+                            renamingIdx = i;
+                            strncpy(renameBuf, func.name.c_str(), sizeof(renameBuf) - 1);
+                            renameBuf[sizeof(renameBuf) - 1] = '\0';
+                            ImGui::SetKeyboardFocusHere(-1);
+                        }
+                        // Delete 键删除
+                        if (ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Delete))
+                        {
+                            doc->functions.erase(doc->functions.begin() + i);
+                            doc->isDirty = true;
+                            ImGui::PopID();
+                            break;
+                        }
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Edit"))
+                    {
+                        // TODO: 后续支持切换子图（暂时 Log 占位）
+                        (void)func;
+                    }
+
+                    ImGui::PopID();
+                }
+
+                if (doc->functions.empty())
+                    ImGui::TextDisabled("Click '" ICON_FA_PLUS " Add Function' to create one.");
+            }
+            ImGui::EndTabItem();
+        }
+
         if (ImGui::BeginTabItem(ICON_FA_LIST " Library"))
         {
             DrawNodeLibraryPanel();

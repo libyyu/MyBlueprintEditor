@@ -850,6 +850,9 @@ RTBlueprintData BlueprintEditor::BuildRuntimeData()
     // 转换变量
     bp.variables = ActiveDoc()->variables;
 
+    // 转换函数定义
+    bp.functions = ActiveDoc()->functions;
+
     return bp;
 }
 
@@ -946,6 +949,9 @@ void BlueprintEditor::OnStart()
 
     // 加载外部自定义节点定义（文件不存在时静默跳过）
     ::NodeEditor::Runtime::LoadCustomNodesFromFile(m_NodeRegistry, "data/custom_nodes.json");
+
+    // 加载公共函数库（目录不存在时静默返回 0）
+    ::NodeEditor::Runtime::LoadFunctionLibrary(m_NodeRegistry, "data/function_library");
 
     // 加载主题（不存在时默认 Dark）
     if (!ThemeManager::Get().LoadFromFile("data/theme.json"))

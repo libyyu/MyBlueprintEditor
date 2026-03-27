@@ -86,6 +86,24 @@ struct CommentRegion
 };
 
 // ============================================================================
+// 函数定义（蓝图内定义的可复用函数）
+// ============================================================================
+
+struct FunctionDefinition
+{
+    std::string                         id;          // 函数 ID（蓝图内唯一）
+    std::string                         name;        // 函数显示名
+    std::string                         category;    // 分类
+    std::string                         description;
+    std::vector<VariableDefinition>     inputs;      // 函数输入参数
+    std::vector<VariableDefinition>     outputs;     // 函数输出值
+    // 函数体：独立的节点/链接子图
+    std::vector<NodeInstance>           nodes;
+    std::vector<LinkInstance>           links;
+    bool                                isPublic = true; // 是否导出为公共函数
+};
+
+// ============================================================================
 // Schema 版本常量
 // ============================================================================
 
@@ -133,6 +151,7 @@ struct BlueprintData
         , nodes(other.nodes)
         , links(other.links)
         , variables(other.variables)
+        , functions(other.functions)
         , comments(other.comments)
         , viewInfo(other.viewInfo)
         , m_indexDirty(true)   // 新对象重建索引，不拷贝缓存
@@ -143,6 +162,7 @@ struct BlueprintData
         , nodes(std::move(other.nodes))
         , links(std::move(other.links))
         , variables(std::move(other.variables))
+        , functions(std::move(other.functions))
         , comments(std::move(other.comments))
         , viewInfo(std::move(other.viewInfo))
         , m_indexDirty(true)   // 移动后重建索引
@@ -156,6 +176,7 @@ struct BlueprintData
             nodes     = other.nodes;
             links     = other.links;
             variables = other.variables;
+            functions = other.functions;
             comments  = other.comments;
             viewInfo  = other.viewInfo;
             // 不拷贝 m_indexMutex；不拷贝索引缓存，标记为 dirty 重建
@@ -178,6 +199,7 @@ struct BlueprintData
             nodes     = std::move(other.nodes);
             links     = std::move(other.links);
             variables = std::move(other.variables);
+            functions = std::move(other.functions);
             comments  = std::move(other.comments);
             viewInfo  = std::move(other.viewInfo);
             std::unique_lock<std::shared_mutex> wlock(m_indexMutex);
@@ -202,6 +224,9 @@ struct BlueprintData
     
     // 变量列表
     std::vector<VariableDefinition>     variables;
+
+    // 函数定义列表
+    std::vector<FunctionDefinition>     functions;
     
     // 注释/分组区域
     std::vector<CommentRegion>          comments;

@@ -17,6 +17,7 @@
 #include "BlueprintRunner.h"
 #include "BlueprintExporter.h"
 #include "NodeDefinition.h"
+#include "FunctionLibrary.h"
 
 #include <string>
 #include <vector>
@@ -46,6 +47,7 @@ typedef NodeEditor::Runtime::NodeDefinition     RTNodeDef;
 typedef NodeEditor::Runtime::ExecutionResult    RTExecutionResult;
 typedef NodeEditor::Runtime::PinDefinition      RTPinDef;
 typedef NodeEditor::Runtime::VariableDefinition RTVariableDefinition;
+typedef NodeEditor::Runtime::FunctionDefinition RTFunctionDefinition;
 typedef NodeEditor::Runtime::NodeCategory       RTNodeCategory;
 typedef NodeEditor::Runtime::DefaultNodeRegistry RTNodeRegistry;
 typedef NodeEditor::Runtime::NodeHandler        RTNodeHandler;
@@ -250,6 +252,9 @@ struct BlueprintDocument
 
     // 变量列表（蓝图级别的变量定义，可在 Get/Set Variable 节点中引用）
     std::vector<RTVariableDefinition> variables;
+
+    // 本蓝图定义的函数
+    std::vector<RTFunctionDefinition> functions;
 
     // ---- Undo / Redo ----
     std::deque<UndoState> undoStack;   // 最多 kMaxUndoSteps 步
