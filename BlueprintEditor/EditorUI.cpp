@@ -842,7 +842,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
         // 绘制左侧面板
         ImGui::BeginChild("##LeftPanel", ImVec2(m_LeftPanelWidth, totalHeight), true);
-        // 左侧 TabBar：Project + Nodes
+        // 左侧 TabBar：Project（始终显示）+ Nodes（仅有文档时显示）
         if (ImGui::BeginTabBar("##LeftTabs"))
         {
             if (ImGui::BeginTabItem(ICON_FA_DIAGRAM_PROJECT " Project"))
@@ -850,10 +850,13 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 DrawProjectPanel();
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem(ICON_FA_CUBES " Nodes"))
+            if (ActiveDoc())   // 无工程/无文档时隐藏 Nodes tab
             {
-                DrawNodeListPanel();
-                ImGui::EndTabItem();
+                if (ImGui::BeginTabItem(ICON_FA_CUBES " Nodes"))
+                {
+                    DrawNodeListPanel();
+                    ImGui::EndTabItem();
+                }
             }
             ImGui::EndTabBar();
         }
@@ -1677,6 +1680,13 @@ static void DrawNewProjectDialog(BlueprintEditor* editor, bool& show, char* name
 
 void BlueprintEditor::DrawNodeListPanel()
 {
+    // 无文档时不渲染（避免 ActiveDoc() 为 nullptr 崩溃）
+    if (!ActiveDoc())
+    {
+        ImGui::TextDisabled("No blueprint open.");
+        return;
+    }
+
     auto& io = ImGui::GetIO();
     float paneWidth = ImGui::GetContentRegionAvail().x;
 
@@ -2735,6 +2745,8 @@ void BlueprintEditor::DrawDetailsPanel()
 
 void BlueprintEditor::DrawExecutionPanel()
 {
+    if (!ActiveDoc()) return;   // 无文档时跳过
+
     float paneWidth = ImGui::GetContentRegionAvail().x;
 
     // 面板标题
