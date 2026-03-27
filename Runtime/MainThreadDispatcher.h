@@ -14,6 +14,12 @@
 #pragma once
 #include "BlueprintExport.h"
 
+// MSVC C4251: STL members in DLL-exported class
+#ifdef _MSC_VER
+#   pragma warning(push)
+#   pragma warning(disable: 4251)
+#endif
+
 #include <functional>
 #include <vector>
 
@@ -53,3 +59,7 @@ private:
 
 } // namespace Runtime
 } // namespace NodeEditor
+
+#ifdef _MSC_VER
+#   pragma warning(pop)
+#endif

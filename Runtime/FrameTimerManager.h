@@ -58,6 +58,11 @@ struct FrameTimerEntry
 // 主线程计时器管理器
 // ============================================================================
 
+#ifdef _MSC_VER
+#   pragma warning(push)
+#   pragma warning(disable: 4251)  // STL members in DLL-exported class
+#endif
+
 class BLUEPRINT_API FrameTimerManager
 {
 public:
@@ -152,6 +157,10 @@ private:
     bool                            m_globalPause = false;
     bool                            m_ticking     = false; // 防止 Tick 中嵌套修改
 };
+
+#ifdef _MSC_VER
+#   pragma warning(pop)
+#endif
 
 } // namespace Runtime
 } // namespace NodeEditor

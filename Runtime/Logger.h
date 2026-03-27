@@ -6,6 +6,12 @@
 #include <string>
 #include <functional>
 
+// MSVC C4251: STL members in DLL-exported class
+#ifdef _MSC_VER
+#   pragma warning(push)
+#   pragma warning(disable: 4251)
+#endif
+
 namespace NodeEditor {
 namespace Runtime {
 
@@ -39,6 +45,10 @@ private:
 
 } // namespace Runtime
 } // namespace NodeEditor
+
+#ifdef _MSC_VER
+#   pragma warning(pop)
+#endif
 
 // 便捷宏（tag 默认为当前文件名）
 #define BP_LOG_V(tag, msg) ::NodeEditor::Runtime::Logger::Get().Log(::NodeEditor::Runtime::LogLevel::Verbose, (tag), (msg))
