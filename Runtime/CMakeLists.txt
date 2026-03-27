@@ -80,6 +80,7 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/ScriptNodeLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FunctionLibrary.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/EventBus.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/StringPool.cpp
 )
 
 set(RUNTIME_PUBLIC_HEADERS

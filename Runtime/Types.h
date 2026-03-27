@@ -305,6 +305,10 @@ struct Variant
             values.push_back(kv.second);
         return values;
     }
+
+    // 驻留当前字符串值，返回稳定指针（适合频繁比较的场景）
+    // 实现在 StringPool.cpp（避免 Types.h 依赖 StringPool.h）
+    const char* internedString() const;
 };
 
 // ============================================================================
