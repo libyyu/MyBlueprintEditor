@@ -321,6 +321,15 @@ RTBlueprintData BlueprintEditor::BuildFullEditorData()
 
 void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
 {
+    // 检查 schemaVersion（版本高于当前版本时输出警告）
+    if (data.metadata.schemaVersion > ::NodeEditor::Runtime::BLUEPRINT_CURRENT_SCHEMA_VERSION)
+    {
+        ActiveDoc()->executionLog.push_back(
+            "[WARN] File schema version " + std::to_string(data.metadata.schemaVersion) +
+            " is newer than current version " + std::to_string(::NodeEditor::Runtime::BLUEPRINT_CURRENT_SCHEMA_VERSION) +
+            ". Some features may not load correctly.");
+    }
+
     // 映射旧 ID -> 新 ID
     std::unordered_map<uint64_t, int> nodeIdMap;  // old nodeId -> new nodeId
     std::unordered_map<uint64_t, int> pinIdMap;   // old pinId -> new pinId

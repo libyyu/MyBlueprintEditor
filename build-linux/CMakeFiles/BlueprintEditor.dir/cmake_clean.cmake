@@ -23,6 +23,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/BlueprintEditor.dir/BlueprintEditor/NodeRenderer.cpp.o.d"
   "CMakeFiles/BlueprintEditor.dir/BlueprintEditor/SearchOverlay.cpp.o"
   "CMakeFiles/BlueprintEditor.dir/BlueprintEditor/SearchOverlay.cpp.o.d"
+  "CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.o"
+  "CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.o.d"
   "CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ZoomBar.cpp.o"
   "CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ZoomBar.cpp.o.d"
   "CMakeFiles/BlueprintEditor.dir/BlueprintEditor/main.cpp.o"

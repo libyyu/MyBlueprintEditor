@@ -1,5 +1,6 @@
 // EditorUI.cpp -- 蓝图编辑器 UI 渲染
 #include "BlueprintEditor.h"
+#include "ThemeManager.h"
 
 // ============================================================================
 // 引脚图标颜色
@@ -207,6 +208,36 @@ void BlueprintEditor::ShowStyleEditor(bool* show)
     }
 
     auto paneWidth = ImGui::GetContentRegionAvail().x;
+
+    // ── 主题切换 ────────────────────────────────────────────────────────
+    ImGui::SeparatorText(ICON_FA_PALETTE " Theme");
+    {
+        auto& tm = ThemeManager::Get();
+        const auto& themes = tm.GetThemeNames();
+        const std::string& cur = tm.GetCurrentTheme();
+        ImGui::BeginHorizontal("##ThemeRow", ImVec2(paneWidth, 0));
+        ImGui::Text("Theme:");
+        ImGui::Spring(0, 8.0f);
+        ImGui::SetNextItemWidth(120.0f);
+        if (ImGui::BeginCombo("##ThemeCombo", cur.c_str()))
+        {
+            for (const auto& name : themes)
+            {
+                bool selected = (name == cur);
+                if (ImGui::Selectable(name.c_str(), selected))
+                    tm.Apply(name);
+                if (selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::Spring();
+        if (ImGui::Button(ICON_FA_FLOPPY_DISK " Save"))
+            tm.SaveToFile("data/theme.json");
+        ImGui::EndHorizontal();
+    }
+    ImGui::Spacing();
+    ImGui::SeparatorText(ICON_FA_SLIDERS " Node Editor Style");
 
     auto& editorStyle = ed::GetStyle();
     ImGui::BeginHorizontal("Style buttons", ImVec2(paneWidth, 0), 1.0f);
@@ -1120,6 +1151,25 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     doc->pendingVarDropPos = ImGui::GetMousePos();
                 }
             }
+            // 节点库拖拽：从 Library 面板拖节点定义到画布
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("BP_NODE_DEF"))
+            {
+                const char* defId = static_cast<const char*>(payload->Data);
+                if (defId && defId[0] != '\0')
+                {
+                    PushUndoState();
+                    Node* node = SpawnNodeByDef(std::string(defId));
+                    if (node)
+                    {
+                        FixupSpecialPinTypes(node, m_NodeRegistry.getNodeDefinition(defId));
+                        BuildNodes();
+                        // 在鼠标释放位置生成节点（转换到画布坐标）
+                        ImVec2 canvasPos = ed::ScreenToCanvas(ImGui::GetMousePos());
+                        ed::SetNodePosition(node->ID, canvasPos);
+                        ActiveDoc()->isDirty = true;
+                    }
+                }
+            }
             ImGui::EndDragDropTarget();
         }
     }
@@ -1786,6 +1836,12 @@ void BlueprintEditor::DrawNodeListPanel()
             ImGui::EndTabItem();
         }
 
+        if (ImGui::BeginTabItem(ICON_FA_LIST " Library"))
+        {
+            DrawNodeLibraryPanel();
+            ImGui::EndTabItem();
+        }
+
         ImGui::EndTabBar();
     }
 }
@@ -2279,4 +2335,163 @@ void BlueprintEditor::DrawTimerPanel()
     }
 
     ImGui::End();
+}
+
+// ============================================================================
+// 节点库面板（Library Tab）— 折叠分类 + 拖拽到画布
+// ============================================================================
+
+// 辅助：从分类名获取小彩色方块颜色
+static ImVec4 GetCategoryDotColor(const std::string& cat)
+{
+    if (cat.find("Flow")       == 0) return {0.20f, 0.39f, 0.86f, 1.f};
+    if (cat.find("Math")       == 0) return {0.24f, 0.71f, 0.31f, 1.f};
+    if (cat.find("String")     == 0) return {0.71f, 0.31f, 0.78f, 1.f};
+    if (cat.find("Debug")      == 0) return {0.78f, 0.24f, 0.24f, 1.f};
+    if (cat.find("Action")     == 0 ||
+        cat.find("Event")      == 0) return {0.86f, 0.39f, 0.16f, 1.f};
+    if (cat.find("Conversion") == 0) return {0.31f, 0.63f, 0.86f, 1.f};
+    if (cat.find("Array")      == 0) return {0.78f, 0.59f, 0.12f, 1.f};
+    if (cat.find("Misc/Map")   == 0 ||
+        cat.find("Map")        == 0) return {0.16f, 0.71f, 0.78f, 1.f};
+    if (cat.find("Custom")     == 0) return {0.24f, 0.71f, 0.51f, 1.f};
+    return {0.39f, 0.39f, 0.47f, 1.f};
+}
+
+void BlueprintEditor::DrawNodeLibraryPanel()
+{
+    float paneWidth = ImGui::GetContentRegionAvail().x;
+
+    // 搜索框
+    static char libSearchBuf[128] = "";
+    ImGui::SetNextItemWidth(paneWidth);
+    ImGui::InputTextWithHint("##LibSearch", ICON_FA_MAGNIFYING_GLASS " Search...", libSearchBuf, sizeof(libSearchBuf));
+
+    std::string searchStr(libSearchBuf);
+    std::string searchLower = searchStr;
+    for (auto& c : searchLower)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+    ImGui::Spacing();
+
+    const auto& allDefs = m_NodeRegistry.getAllNodeDefinitions();
+
+    // 构建分类 → 节点列表 映射（有序）
+    std::map<std::string, std::vector<const RTNodeDef*>> catMap;
+    for (const auto* d : allDefs)
+    {
+        if (d->isAbstract) continue;
+        // 搜索过滤
+        if (!searchLower.empty())
+        {
+            std::string nameLower = d->name;
+            for (auto& c : nameLower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            std::string idLower = d->id;
+            for (auto& c : idLower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            if (nameLower.find(searchLower) == std::string::npos &&
+                idLower.find(searchLower) == std::string::npos &&
+                d->category.find(searchStr) == std::string::npos)
+                continue;
+        }
+        catMap[d->category.empty() ? "Misc" : d->category].push_back(d);
+    }
+
+    // 默认展开的分类（Flow/Math/String 默认展开，其余折叠）
+    static std::unordered_map<std::string, bool> catOpenState;
+
+    for (auto& [cat, nodes] : catMap)
+    {
+        // 首次出现时设定默认展开状态
+        if (catOpenState.find(cat) == catOpenState.end())
+        {
+            catOpenState[cat] = (cat == "Flow" || cat == "Math" || cat == "String");
+        }
+
+        // 分类头部行：彩色方块 + CollapsingHeader
+        ImVec4 dotCol = GetCategoryDotColor(cat);
+        ImGui::PushStyleColor(ImGuiCol_Header,        ImVec4(dotCol.x*0.35f, dotCol.y*0.35f, dotCol.z*0.35f, 0.80f));
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(dotCol.x*0.50f, dotCol.y*0.50f, dotCol.z*0.50f, 0.90f));
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive,  ImVec4(dotCol.x*0.65f, dotCol.y*0.65f, dotCol.z*0.65f, 1.00f));
+
+        ImGui::SetNextItemOpen(catOpenState[cat], ImGuiCond_Once);
+        bool open = ImGui::CollapsingHeader(
+            (cat + " (" + std::to_string(nodes.size()) + ")").c_str(),
+            ImGuiTreeNodeFlags_None);
+        catOpenState[cat] = open;
+
+        ImGui::PopStyleColor(3);
+
+        if (!open) continue;
+
+        ImGui::Indent(8.0f);
+        for (const auto* d : nodes)
+        {
+            ImGui::PushID(d->id.c_str());
+
+            // 小彩色方块
+            ImVec2 squareMin = ImGui::GetCursorScreenPos();
+            squareMin.y += (ImGui::GetTextLineHeight() - 8.0f) * 0.5f;
+            ImGui::GetWindowDrawList()->AddRectFilled(
+                squareMin,
+                ImVec2(squareMin.x + 8.0f, squareMin.y + 8.0f),
+                ImGui::ColorConvertFloat4ToU32(dotCol), 2.0f);
+            ImGui::Dummy(ImVec2(10.0f, ImGui::GetTextLineHeight()));
+            ImGui::SameLine(0, 2.0f);
+
+            // 高亮搜索匹配文字
+            if (!searchLower.empty())
+            {
+                std::string nameLower = d->name;
+                for (auto& c : nameLower)
+                    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                size_t pos = nameLower.find(searchLower);
+                if (pos != std::string::npos)
+                {
+                    // 拆成三段：前、匹配、后
+                    ImGui::TextUnformatted(d->name.substr(0, pos).c_str());
+                    ImGui::SameLine(0, 0);
+                    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f),
+                        "%s", d->name.substr(pos, searchLower.size()).c_str());
+                    ImGui::SameLine(0, 0);
+                    ImGui::TextUnformatted(d->name.substr(pos + searchLower.size()).c_str());
+                }
+                else
+                {
+                    ImGui::TextUnformatted(d->name.c_str());
+                }
+            }
+            else
+            {
+                ImGui::TextUnformatted(d->name.c_str());
+            }
+
+            // Tooltip
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("ID: %s\nCategory: %s%s",
+                    d->id.c_str(), d->category.c_str(),
+                    d->description.empty() ? "" : ("\n" + d->description).c_str());
+            }
+
+            // DragDrop 拖拽源：拖拽到画布生成节点
+            if (ImGui::IsItemActive() || ImGui::IsItemHovered())
+            {
+                if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+                {
+                    // payload = defId 字符串
+                    ImGui::SetDragDropPayload("BP_NODE_DEF",
+                        d->id.c_str(),
+                        d->id.size() + 1);
+                    // 拖拽预览
+                    ImGui::TextColored(dotCol, "%s", d->name.c_str());
+                    ImGui::TextDisabled("Drop on canvas to create");
+                    ImGui::EndDragDropSource();
+                }
+            }
+
+            ImGui::PopID();
+        }
+        ImGui::Unindent(8.0f);
+        ImGui::Spacing();
+    }
 }

@@ -1,5 +1,6 @@
 // BlueprintEditor.cpp -- 蓝图编辑器核心逻辑
 #include "BlueprintEditor.h"
+#include "ThemeManager.h"
 #include <map>
 #include <functional>
 #include <algorithm>
@@ -946,6 +947,10 @@ void BlueprintEditor::OnStart()
     // 加载外部自定义节点定义（文件不存在时静默跳过）
     ::NodeEditor::Runtime::LoadCustomNodesFromFile(m_NodeRegistry, "data/custom_nodes.json");
 
+    // 加载主题（不存在时默认 Dark）
+    if (!ThemeManager::Get().LoadFromFile("data/theme.json"))
+        ThemeManager::Get().Apply("Dark");
+
     // 设置初始标题
     SetTitle("Blueprint Editor - [New]");
 }
@@ -964,6 +969,9 @@ void BlueprintEditor::OnStop()
     releaseTexture(m_RestoreIcon);
     releaseTexture(m_SaveIcon);
     releaseTexture(m_HeaderBackground);
+
+    // 保存主题设置
+    ThemeManager::Get().SaveToFile("data/theme.json");
 
     // 销毁所有文档的编辑器上下文
     for (auto& doc : m_Documents)

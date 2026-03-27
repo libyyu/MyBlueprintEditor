@@ -141,6 +141,15 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                     ImGui::Spring(0);
                                 }
                                 DrawPinIcon(output, IsPinLinked(output.ID), (int)(alpha * 255));
+                                // Debug-03: 引脚值悬浮 Tooltip
+                                if (ImGui::IsItemHovered())
+                                {
+                                    const auto& outVals = ActiveDoc()->lastExecutionResult.outputValues;
+                                    ::NodeEditor::Runtime::PinId pid = reinterpret_cast<uintptr_t>(output.ID.AsPointer());
+                                    auto valIt = outVals.find(pid);
+                                    if (valIt != outVals.end())
+                                        ImGui::SetTooltip("Value: %s", valIt->second.asString().c_str());
+                                }
                                 ImGui::Spring(0, ImGui::GetStyle().ItemSpacing.x / 2);
                                 ImGui::EndHorizontal();
                                 ImGui::PopStyleVar();

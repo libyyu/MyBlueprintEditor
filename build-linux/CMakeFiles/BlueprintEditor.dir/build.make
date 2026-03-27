@@ -237,10 +237,24 @@ CMakeFiles/BlueprintEditor.dir/BlueprintEditor/SearchOverlay.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/BlueprintEditor.dir/BlueprintEditor/SearchOverlay.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /root/.openclaw/workspace/MyBlueprintEditor/BlueprintEditor/SearchOverlay.cpp -o CMakeFiles/BlueprintEditor.dir/BlueprintEditor/SearchOverlay.cpp.s
 
+CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.o: CMakeFiles/BlueprintEditor.dir/flags.make
+CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.o: /root/.openclaw/workspace/MyBlueprintEditor/BlueprintEditor/ThemeManager.cpp
+CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.o: CMakeFiles/BlueprintEditor.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.o -MF CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.o.d -o CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.o -c /root/.openclaw/workspace/MyBlueprintEditor/BlueprintEditor/ThemeManager.cpp
+
+CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /root/.openclaw/workspace/MyBlueprintEditor/BlueprintEditor/ThemeManager.cpp > CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.i
+
+CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /root/.openclaw/workspace/MyBlueprintEditor/BlueprintEditor/ThemeManager.cpp -o CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.s
+
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ZoomBar.cpp.o: CMakeFiles/BlueprintEditor.dir/flags.make
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ZoomBar.cpp.o: /root/.openclaw/workspace/MyBlueprintEditor/BlueprintEditor/ZoomBar.cpp
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ZoomBar.cpp.o: CMakeFiles/BlueprintEditor.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ZoomBar.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Building CXX object CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ZoomBar.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ZoomBar.cpp.o -MF CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ZoomBar.cpp.o.d -o CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ZoomBar.cpp.o -c /root/.openclaw/workspace/MyBlueprintEditor/BlueprintEditor/ZoomBar.cpp
 
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ZoomBar.cpp.i: cmake_force
@@ -254,7 +268,7 @@ CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ZoomBar.cpp.s: cmake_force
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/main.cpp.o: CMakeFiles/BlueprintEditor.dir/flags.make
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/main.cpp.o: /root/.openclaw/workspace/MyBlueprintEditor/BlueprintEditor/main.cpp
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/main.cpp.o: CMakeFiles/BlueprintEditor.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Building CXX object CMakeFiles/BlueprintEditor.dir/BlueprintEditor/main.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Building CXX object CMakeFiles/BlueprintEditor.dir/BlueprintEditor/main.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/BlueprintEditor.dir/BlueprintEditor/main.cpp.o -MF CMakeFiles/BlueprintEditor.dir/BlueprintEditor/main.cpp.o.d -o CMakeFiles/BlueprintEditor.dir/BlueprintEditor/main.cpp.o -c /root/.openclaw/workspace/MyBlueprintEditor/BlueprintEditor/main.cpp
 
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/main.cpp.i: cmake_force
@@ -268,7 +282,7 @@ CMakeFiles/BlueprintEditor.dir/BlueprintEditor/main.cpp.s: cmake_force
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/builders.cpp.o: CMakeFiles/BlueprintEditor.dir/flags.make
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/builders.cpp.o: /root/.openclaw/workspace/MyBlueprintEditor/BlueprintEditor/utilities/builders.cpp
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/builders.cpp.o: CMakeFiles/BlueprintEditor.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Building CXX object CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/builders.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_16) "Building CXX object CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/builders.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/builders.cpp.o -MF CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/builders.cpp.o.d -o CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/builders.cpp.o -c /root/.openclaw/workspace/MyBlueprintEditor/BlueprintEditor/utilities/builders.cpp
 
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/builders.cpp.i: cmake_force
@@ -282,7 +296,7 @@ CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/builders.cpp.s: cmake_f
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/drawing.cpp.o: CMakeFiles/BlueprintEditor.dir/flags.make
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/drawing.cpp.o: /root/.openclaw/workspace/MyBlueprintEditor/BlueprintEditor/utilities/drawing.cpp
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/drawing.cpp.o: CMakeFiles/BlueprintEditor.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_16) "Building CXX object CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/drawing.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Building CXX object CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/drawing.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/drawing.cpp.o -MF CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/drawing.cpp.o.d -o CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/drawing.cpp.o -c /root/.openclaw/workspace/MyBlueprintEditor/BlueprintEditor/utilities/drawing.cpp
 
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/drawing.cpp.i: cmake_force
@@ -296,7 +310,7 @@ CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/drawing.cpp.s: cmake_fo
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/widgets.cpp.o: CMakeFiles/BlueprintEditor.dir/flags.make
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/widgets.cpp.o: /root/.openclaw/workspace/MyBlueprintEditor/BlueprintEditor/utilities/widgets.cpp
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/widgets.cpp.o: CMakeFiles/BlueprintEditor.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Building CXX object CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/widgets.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_18) "Building CXX object CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/widgets.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/widgets.cpp.o -MF CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/widgets.cpp.o.d -o CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/widgets.cpp.o -c /root/.openclaw/workspace/MyBlueprintEditor/BlueprintEditor/utilities/widgets.cpp
 
 CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/widgets.cpp.i: cmake_force
@@ -321,6 +335,7 @@ BlueprintEditor_OBJECTS = \
 "CMakeFiles/BlueprintEditor.dir/BlueprintEditor/Minimap.cpp.o" \
 "CMakeFiles/BlueprintEditor.dir/BlueprintEditor/NodeRenderer.cpp.o" \
 "CMakeFiles/BlueprintEditor.dir/BlueprintEditor/SearchOverlay.cpp.o" \
+"CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.o" \
 "CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ZoomBar.cpp.o" \
 "CMakeFiles/BlueprintEditor.dir/BlueprintEditor/main.cpp.o" \
 "CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/builders.cpp.o" \
@@ -342,6 +357,7 @@ bin/BlueprintEditor: CMakeFiles/BlueprintEditor.dir/BlueprintEditor/LinkRenderer
 bin/BlueprintEditor: CMakeFiles/BlueprintEditor.dir/BlueprintEditor/Minimap.cpp.o
 bin/BlueprintEditor: CMakeFiles/BlueprintEditor.dir/BlueprintEditor/NodeRenderer.cpp.o
 bin/BlueprintEditor: CMakeFiles/BlueprintEditor.dir/BlueprintEditor/SearchOverlay.cpp.o
+bin/BlueprintEditor: CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.o
 bin/BlueprintEditor: CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ZoomBar.cpp.o
 bin/BlueprintEditor: CMakeFiles/BlueprintEditor.dir/BlueprintEditor/main.cpp.o
 bin/BlueprintEditor: CMakeFiles/BlueprintEditor.dir/BlueprintEditor/utilities/builders.cpp.o
@@ -357,7 +373,7 @@ bin/BlueprintEditor: /usr/lib64/libglfw.so.3.3
 bin/BlueprintEditor: /usr/lib64/libGLX.so
 bin/BlueprintEditor: /usr/lib64/libOpenGL.so
 bin/BlueprintEditor: CMakeFiles/BlueprintEditor.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_18) "Linking CXX executable bin/BlueprintEditor"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_19) "Linking CXX executable bin/BlueprintEditor"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/BlueprintEditor.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

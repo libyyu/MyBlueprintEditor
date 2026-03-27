@@ -214,6 +214,30 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
 
     ImGui::Spring(0.0f);
 
+    // Step（单步：仅 Paused 时可用）
+    if (!isPaused) ImGui::BeginDisabled();
+    if (ImGui::Button(ICON_FA_ARROW_RIGHT " Step", ImVec2(60, 0)))
+    {
+        // 暂时 Resume 一帧让 runner Tick 推进一步，然后立即再 Pause
+        // 实现方式：调用 Tick(0) 让 timer 推进，然后立即 Pause
+        // 更精确的做法：通过 stepToken 让 runner 执行一个节点后自动暂停
+        runner.Resume();
+        runner.Tick(0.016f);   // 推进一帧（约 16ms）
+        runner.Pause();
+
+        // 高亮最后执行的节点
+        const auto& result = ActiveDoc()->lastExecutionResult;
+        if (!result.executedNodeIds.empty())
+        {
+            auto lastNodeId = result.executedNodeIds.back();
+            uint64_t nid = static_cast<uint64_t>(lastNodeId);
+            ActiveDoc()->executedNodeHighlight[nid] = 3.0f;
+        }
+    }
+    if (!isPaused) ImGui::EndDisabled();
+
+    ImGui::Spring(0.0f);
+
     // Stop（Running 或 Paused 时可点击）
     if (isIdle || isStopped) ImGui::BeginDisabled();
     if (ImGui::Button(ICON_FA_STOP " Stop", ImVec2(60, 0)))
@@ -251,6 +275,36 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
         else if (isStopped) { stateCol = ImVec4(1.0f, 0.3f, 0.3f, 1.0f);  stateText = ICON_FA_CIRCLE_STOP  " Stopped";    }
         else                { stateCol = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);  stateText = "Idle";       }
         ImGui::TextColored(stateCol, "%s", stateText);
+
+        // Paused 时：显示最后执行的节点名称，并高亮它
+        if (isPaused)
+        {
+            const auto& result = ActiveDoc()->lastExecutionResult;
+            if (!result.executedNodeIds.empty())
+            {
+                auto lastNodeId = result.executedNodeIds.back();
+                // 查找节点名
+                std::string lastName;
+                for (const auto& n : ActiveDoc()->nodes)
+                {
+                    uint64_t nid = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(n.ID.AsPointer()));
+                    if (nid == static_cast<uint64_t>(lastNodeId))
+                    {
+                        lastName = n.Name;
+                        break;
+                    }
+                }
+                if (!lastName.empty())
+                    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.3f, 1.0f),
+                        ICON_FA_ARROW_RIGHT " Last: %s", lastName.c_str());
+
+                // 持续高亮最后执行的节点（写入 2.0f 保持发光）
+                uint64_t nid = static_cast<uint64_t>(lastNodeId);
+                auto& hl = ActiveDoc()->executedNodeHighlight;
+                if (hl.find(nid) == hl.end() || hl[nid] < 1.5f)
+                    hl[nid] = 2.0f;
+            }
+        }
     }
 
     // ── 状态摘要 ─────────────────────────────────────────────────────────

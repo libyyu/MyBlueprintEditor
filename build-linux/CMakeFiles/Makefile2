@@ -151,7 +151,7 @@ CMakeFiles/runtime-example.dir/all: Utils/Json/CMakeFiles/crude_json.dir/all
 CMakeFiles/runtime-example.dir/all: Runtime/CMakeFiles/BlueprintRuntime.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/runtime-example.dir/build.make CMakeFiles/runtime-example.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/runtime-example.dir/build.make CMakeFiles/runtime-example.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=65,66 "Built target runtime-example"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=66,67 "Built target runtime-example"
 .PHONY : CMakeFiles/runtime-example.dir/all
 
 # Build rule for subdir invocation for target.
@@ -177,7 +177,7 @@ CMakeFiles/runtime-example.dir/clean:
 CMakeFiles/imgui.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/imgui.dir/build.make CMakeFiles/imgui.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/imgui.dir/build.make CMakeFiles/imgui.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=60,61,62,63,64 "Built target imgui"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=61,62,63,64,65 "Built target imgui"
 .PHONY : CMakeFiles/imgui.dir/all
 
 # Build rule for subdir invocation for target.
@@ -205,7 +205,7 @@ CMakeFiles/ImGuiNodeEditor.dir/all: Utils/Json/CMakeFiles/crude_json.dir/all
 CMakeFiles/ImGuiNodeEditor.dir/all: Runtime/CMakeFiles/BlueprintRuntime.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/ImGuiNodeEditor.dir/build.make CMakeFiles/ImGuiNodeEditor.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/ImGuiNodeEditor.dir/build.make CMakeFiles/ImGuiNodeEditor.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=48,49,50,51,52 "Built target ImGuiNodeEditor"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=49,50,51,52,53 "Built target ImGuiNodeEditor"
 .PHONY : CMakeFiles/ImGuiNodeEditor.dir/all
 
 # Build rule for subdir invocation for target.
@@ -265,12 +265,12 @@ CMakeFiles/BlueprintEditor.dir/all: Utils/Json/CMakeFiles/crude_json.dir/all
 CMakeFiles/BlueprintEditor.dir/all: Runtime/CMakeFiles/BlueprintRuntime.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/BlueprintEditor.dir/build.make CMakeFiles/BlueprintEditor.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/BlueprintEditor.dir/build.make CMakeFiles/BlueprintEditor.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25 "Built target BlueprintEditor"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26 "Built target BlueprintEditor"
 .PHONY : CMakeFiles/BlueprintEditor.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/BlueprintEditor.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles 60
+	$(CMAKE_COMMAND) -E cmake_progress_start /root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles 61
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/BlueprintEditor.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles 0
 .PHONY : CMakeFiles/BlueprintEditor.dir/rule
@@ -291,7 +291,7 @@ CMakeFiles/BlueprintEditor.dir/clean:
 CMakeFiles/copy_resources.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/copy_resources.dir/build.make CMakeFiles/copy_resources.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/copy_resources.dir/build.make CMakeFiles/copy_resources.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=57 "Built target copy_resources"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=58 "Built target copy_resources"
 .PHONY : CMakeFiles/copy_resources.dir/all
 
 # Build rule for subdir invocation for target.
@@ -317,7 +317,7 @@ CMakeFiles/copy_resources.dir/clean:
 Utils/Json/CMakeFiles/crude_json.dir/all:
 	$(MAKE) $(MAKESILENT) -f Utils/Json/CMakeFiles/crude_json.dir/build.make Utils/Json/CMakeFiles/crude_json.dir/depend
 	$(MAKE) $(MAKESILENT) -f Utils/Json/CMakeFiles/crude_json.dir/build.make Utils/Json/CMakeFiles/crude_json.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=58,59 "Built target crude_json"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=59,60 "Built target crude_json"
 .PHONY : Utils/Json/CMakeFiles/crude_json.dir/all
 
 # Build rule for subdir invocation for target.
@@ -343,7 +343,7 @@ Utils/Json/CMakeFiles/crude_json.dir/clean:
 Runtime/CMakeFiles/BlueprintRuntime.dir/all: Utils/Json/CMakeFiles/crude_json.dir/all
 	$(MAKE) $(MAKESILENT) -f Runtime/CMakeFiles/BlueprintRuntime.dir/build.make Runtime/CMakeFiles/BlueprintRuntime.dir/depend
 	$(MAKE) $(MAKESILENT) -f Runtime/CMakeFiles/BlueprintRuntime.dir/build.make Runtime/CMakeFiles/BlueprintRuntime.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47 "Built target BlueprintRuntime"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48 "Built target BlueprintRuntime"
 .PHONY : Runtime/CMakeFiles/BlueprintRuntime.dir/all
 
 # Build rule for subdir invocation for target.
@@ -374,7 +374,7 @@ examples/CMakeFiles/simple-example.dir/all: Utils/Json/CMakeFiles/crude_json.dir
 examples/CMakeFiles/simple-example.dir/all: Runtime/CMakeFiles/BlueprintRuntime.dir/all
 	$(MAKE) $(MAKESILENT) -f examples/CMakeFiles/simple-example.dir/build.make examples/CMakeFiles/simple-example.dir/depend
 	$(MAKE) $(MAKESILENT) -f examples/CMakeFiles/simple-example.dir/build.make examples/CMakeFiles/simple-example.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=67,68 "Built target simple-example"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=68,69 "Built target simple-example"
 .PHONY : examples/CMakeFiles/simple-example.dir/all
 
 # Build rule for subdir invocation for target.
@@ -405,7 +405,7 @@ examples/CMakeFiles/canvas-example.dir/all: Utils/Json/CMakeFiles/crude_json.dir
 examples/CMakeFiles/canvas-example.dir/all: Runtime/CMakeFiles/BlueprintRuntime.dir/all
 	$(MAKE) $(MAKESILENT) -f examples/CMakeFiles/canvas-example.dir/build.make examples/CMakeFiles/canvas-example.dir/depend
 	$(MAKE) $(MAKESILENT) -f examples/CMakeFiles/canvas-example.dir/build.make examples/CMakeFiles/canvas-example.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=55,56 "Built target canvas-example"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=56,57 "Built target canvas-example"
 .PHONY : examples/CMakeFiles/canvas-example.dir/all
 
 # Build rule for subdir invocation for target.
@@ -436,7 +436,7 @@ examples/CMakeFiles/widgets-example.dir/all: Utils/Json/CMakeFiles/crude_json.di
 examples/CMakeFiles/widgets-example.dir/all: Runtime/CMakeFiles/BlueprintRuntime.dir/all
 	$(MAKE) $(MAKESILENT) -f examples/CMakeFiles/widgets-example.dir/build.make examples/CMakeFiles/widgets-example.dir/depend
 	$(MAKE) $(MAKESILENT) -f examples/CMakeFiles/widgets-example.dir/build.make examples/CMakeFiles/widgets-example.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=69,70 "Built target widgets-example"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=70,71 "Built target widgets-example"
 .PHONY : examples/CMakeFiles/widgets-example.dir/all
 
 # Build rule for subdir invocation for target.
@@ -467,7 +467,7 @@ examples/CMakeFiles/basic-interaction-example.dir/all: Utils/Json/CMakeFiles/cru
 examples/CMakeFiles/basic-interaction-example.dir/all: Runtime/CMakeFiles/BlueprintRuntime.dir/all
 	$(MAKE) $(MAKESILENT) -f examples/CMakeFiles/basic-interaction-example.dir/build.make examples/CMakeFiles/basic-interaction-example.dir/depend
 	$(MAKE) $(MAKESILENT) -f examples/CMakeFiles/basic-interaction-example.dir/build.make examples/CMakeFiles/basic-interaction-example.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=53,54 "Built target basic-interaction-example"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/root/.openclaw/workspace/MyBlueprintEditor/build-linux/CMakeFiles --progress-num=54,55 "Built target basic-interaction-example"
 .PHONY : examples/CMakeFiles/basic-interaction-example.dir/all
 
 # Build rule for subdir invocation for target.

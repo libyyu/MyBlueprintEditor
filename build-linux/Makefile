@@ -749,6 +749,30 @@ BlueprintEditor/SearchOverlay.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/BlueprintEditor.dir/build.make CMakeFiles/BlueprintEditor.dir/BlueprintEditor/SearchOverlay.cpp.s
 .PHONY : BlueprintEditor/SearchOverlay.cpp.s
 
+BlueprintEditor/ThemeManager.o: BlueprintEditor/ThemeManager.cpp.o
+.PHONY : BlueprintEditor/ThemeManager.o
+
+# target to build an object file
+BlueprintEditor/ThemeManager.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/BlueprintEditor.dir/build.make CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.o
+.PHONY : BlueprintEditor/ThemeManager.cpp.o
+
+BlueprintEditor/ThemeManager.i: BlueprintEditor/ThemeManager.cpp.i
+.PHONY : BlueprintEditor/ThemeManager.i
+
+# target to preprocess a source file
+BlueprintEditor/ThemeManager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/BlueprintEditor.dir/build.make CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.i
+.PHONY : BlueprintEditor/ThemeManager.cpp.i
+
+BlueprintEditor/ThemeManager.s: BlueprintEditor/ThemeManager.cpp.s
+.PHONY : BlueprintEditor/ThemeManager.s
+
+# target to generate assembly for a file
+BlueprintEditor/ThemeManager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/BlueprintEditor.dir/build.make CMakeFiles/BlueprintEditor.dir/BlueprintEditor/ThemeManager.cpp.s
+.PHONY : BlueprintEditor/ThemeManager.cpp.s
+
 BlueprintEditor/ZoomBar.o: BlueprintEditor/ZoomBar.cpp.o
 .PHONY : BlueprintEditor/ZoomBar.o
 
@@ -1163,6 +1187,9 @@ help:
 	@echo "... BlueprintEditor/SearchOverlay.o"
 	@echo "... BlueprintEditor/SearchOverlay.i"
 	@echo "... BlueprintEditor/SearchOverlay.s"
+	@echo "... BlueprintEditor/ThemeManager.o"
+	@echo "... BlueprintEditor/ThemeManager.i"
+	@echo "... BlueprintEditor/ThemeManager.s"
 	@echo "... BlueprintEditor/ZoomBar.o"
 	@echo "... BlueprintEditor/ZoomBar.i"
 	@echo "... BlueprintEditor/ZoomBar.s"
