@@ -1,2 +1,0 @@
-/usr/bin/ar qc libApplication.a CMakeFiles/Application.dir/Application/source/application.cpp.o CMakeFiles/Application.dir/Application/source/entry_point.cpp.o CMakeFiles/Application.dir/Application/source/platform_glfw.cpp.o CMakeFiles/Application.dir/Application/source/renderer_ogl3.cpp.o CMakeFiles/Application.dir/Application/source/imgui_impl_glfw.cpp.o CMakeFiles/Application.dir/Application/source/imgui_impl_opengl3.cpp.o
-/usr/bin/ranlib libApplication.a

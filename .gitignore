@@ -37,3 +37,12 @@
 
 # debug information files
 *.dwo
+
+# Build output directories
+build-linux/
+build-windows/
+build-macos/
+build/
+build-*/
+*.user
+.vs/
