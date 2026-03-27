@@ -77,6 +77,7 @@ if(NOT TARGET runtime-example)
     project(runtime-example)
     add_executable(runtime-example
         ${CMAKE_CURRENT_SOURCE_DIR}/runtime-example/runtime-example.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/runtime-example/test_new_features.cpp
     )
     target_link_libraries(runtime-example PRIVATE BlueprintRuntime crude_json)
     target_include_directories(runtime-example PRIVATE

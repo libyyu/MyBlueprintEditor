@@ -284,6 +284,9 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
                 BlueprintRunner subRunner;
                 subRunner.RegisterHandlers(m_handlers);
                 subRunner.SetParentTimerManager(m_timerManager);
+                // 继承父 runner 的日志/打印回调，确保函数子图的输出能路由出来
+                if (m_logCallback)   subRunner.SetLogCallback(m_logCallback);
+                if (m_printCallback) subRunner.SetPrintCallback(m_printCallback);
                 if (subRunner.Load(funcBP))
                     subRunner.Execute();
                 break;

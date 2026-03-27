@@ -476,7 +476,13 @@ struct BlueprintData
     {
         const NodeInstance* node = findNode(nodeId);
         if (!node) return false;
-        
+
+        // Function.Entry / Function.Return 是函数子图的起终点，不是事件源
+        // 它们的子图在 Function.Call 里被显式执行，不应被 eventSubgraph 过滤跳过
+        const std::string& defId = node->definitionId;
+        if (defId == "Function.Entry" || defId == "Function.Return")
+            return false;
+
         bool hasExecInput = false;
         bool hasExecOutput = false;
         for (const auto& pin : node->pins)

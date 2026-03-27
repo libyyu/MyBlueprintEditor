@@ -93,6 +93,7 @@ add_subdirectory(Runtime)
 if(BUILD_EXAMPLES OR BUILD_RUNTIME_ONLY)
     set(_RE_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/runtime-example/runtime-example.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/runtime-example/test_new_features.cpp
     )
     add_executable(runtime-example ${_RE_SRC})
     target_link_libraries(runtime-example PRIVATE BlueprintRuntime crude_json)

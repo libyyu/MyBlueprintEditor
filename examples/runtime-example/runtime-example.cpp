@@ -558,6 +558,9 @@ static int runBlueprintFromFile(const std::string& filePath, float maxTimeSec, i
 // main
 // ============================================================================
 
+// 前向声明（实现在 test_new_features.cpp）
+int runNewFeatureTests();
+
 int main(int argc, char* argv[])
 {
     // --help
@@ -588,6 +591,13 @@ int main(int argc, char* argv[])
                 flowPath = argv[i+1];
             return runTests(flowPath);
         }
+    }
+
+    // --test-new: 新功能专项测试（Functions / Events / StringPool）
+    for (int i = 1; i < argc; ++i)
+    {
+        if (std::string(argv[i]) == "--test-new")
+            return runNewFeatureTests();
     }
 
     // 命令行模式: 传入蓝图文件

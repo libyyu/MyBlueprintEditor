@@ -181,6 +181,23 @@ void RegisterHandlers_Misc(std::unordered_map<std::string, NodeHandler>& handler
         }
         return true;
     };
+
+    // ── Function 系统节点 ──────────────────────────────────────────────────
+    // Function.Entry：函数子图的起点，直接激活下游 exec flow
+    handlers["Function.Entry"] = [](ExecutionContext& ctx) {
+        ctx.ActivateOutputFlow(std::string(""));
+        return true;
+    };
+
+    // Function.Return：函数子图的终点，无任何操作（子 runner Execute 自然结束）
+    handlers["Function.Return"] = [](ExecutionContext& ctx) {
+        (void)ctx;
+        return true;
+    };
+
+    // Function.Call 在 BlueprintRunner::executeNodeInternal 里内置处理，此处仅占位防止
+    // "handler not found" 警告（当 runner 以非 blueprint 方式执行时不会命中此分支）
+    // handlers["Function.Call"] — intentionally left to built-in path
 }
 
 // ============================================================================
