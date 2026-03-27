@@ -958,8 +958,7 @@ void BlueprintEditor::OnStart()
     RegisterBuiltinNodeDefinitions();
     RegisterBuiltinHandlers();
 
-    // 创建第一个空白文档
-    CreateNewDocument();
+    // 不自动创建空白文档——无工程时右侧画布留空，由 Project 面板引导用户
 
     // 加载纹理资源
     m_HeaderBackground = LoadTexture("data/BlueprintBackground.png");

@@ -863,9 +863,39 @@ void BlueprintEditor::OnFrame(float deltaTime)
     }
 
     // --- 右侧区域：标签栏 + 编辑器 + 执行输出 垂直布局 ---
-    ImVec2 editorMin(0, 0), editorMax(0, 0);  // 编辑器区域的屏幕坐标（供小地图等使用）
+    ImVec2 editorMin(0, 0), editorMax(0, 0);
     ImGui::BeginGroup();
     {
+        // ── 无文档时：欢迎占位页，引导用户打开/新建工程 ──────────────────
+        if (m_Documents.empty())
+        {
+            ImVec2 avail = ImGui::GetContentRegionAvail();
+            // 垂直居中
+            float offsetY = (avail.y - 120.0f) * 0.5f;
+            if (offsetY > 0) ImGui::SetCursorPosY(ImGui::GetCursorPosY() + offsetY);
+
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.50f, 0.60f, 1.0f));
+            float textW = ImGui::CalcTextSize(ICON_FA_DIAGRAM_PROJECT "  No Project Open").x;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - textW) * 0.5f);
+            ImGui::Text(ICON_FA_DIAGRAM_PROJECT "  No Project Open");
+            ImGui::Spacing();
+            float btnW = 200.0f;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - btnW) * 0.5f);
+            if (ImGui::Button(ICON_FA_DIAGRAM_PROJECT " New Project", ImVec2(btnW, 0)))
+                NewProject();
+            ImGui::Spacing();
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - btnW) * 0.5f);
+            if (ImGui::Button(ICON_FA_FOLDER_OPEN " Open Project...", ImVec2(btnW, 0)))
+                OpenProject();
+            ImGui::PopStyleColor();
+
+            ImGui::EndGroup();
+            // 弹框仍需每帧处理
+            ShowUnsavedChangesDialog();
+            DrawNewProjectDialog(this, m_ShowNewProjectDialog, m_NewProjNameBuf, sizeof(m_NewProjNameBuf));
+            return;
+        }
+
         // ================================================================
         // 标签栏（Tab Bar）—— 与中间编辑器视图对齐
         // ================================================================
