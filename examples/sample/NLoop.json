@@ -1,7 +1,7 @@
 {
     "fileType": "runtime",
     "metadata": {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "name": "NLoop",
         "description": "Blueprint Editor file",
         "version": ""
@@ -377,14 +377,14 @@
                     "defaultValue": ""
                 },
                 {
-                    "id": 74,
+                    "id": 55,
                     "kind": 0,
                     "dataType": 4,
                     "name": "C",
                     "defaultValue": ""
                 },
                 {
-                    "id": 55,
+                    "id": 56,
                     "kind": 1,
                     "dataType": 4,
                     "name": "Result"
@@ -392,20 +392,20 @@
             ]
         },
         {
-            "id": 56,
+            "id": 57,
             "definitionId": "BoolToString",
             "definitionVersion": 1,
             "name": "Bool to String",
             "pins": [
                 {
-                    "id": 57,
+                    "id": 58,
                     "kind": 0,
                     "dataType": 1,
                     "name": "Value",
                     "defaultValue": false
                 },
                 {
-                    "id": 58,
+                    "id": 59,
                     "kind": 1,
                     "dataType": 4,
                     "name": "Result"
@@ -415,99 +415,99 @@
     ],
     "links": [
         {
-            "id": 59,
+            "id": 60,
             "startPinId": 5,
             "endPinId": 9,
             "isEnabled": true
         },
         {
-            "id": 60,
+            "id": 61,
             "startPinId": 6,
             "endPinId": 17,
             "isEnabled": true
         },
         {
-            "id": 61,
+            "id": 62,
             "startPinId": 18,
             "endPinId": 14,
             "isEnabled": true
         },
         {
-            "id": 62,
+            "id": 63,
             "startPinId": 15,
             "endPinId": 10,
             "isEnabled": true
         },
         {
-            "id": 63,
+            "id": 64,
             "startPinId": 11,
             "endPinId": 20,
             "isEnabled": true
         },
         {
-            "id": 64,
+            "id": 65,
             "startPinId": 6,
             "endPinId": 25,
             "isEnabled": true
         },
         {
-            "id": 65,
+            "id": 66,
             "startPinId": 27,
             "endPinId": 21,
             "isEnabled": true
         },
         {
-            "id": 66,
+            "id": 67,
             "startPinId": 22,
             "endPinId": 29,
             "isEnabled": true
         },
         {
-            "id": 67,
+            "id": 68,
             "startPinId": 7,
             "endPinId": 33,
             "isEnabled": true
         },
         {
-            "id": 68,
+            "id": 69,
             "startPinId": 35,
             "endPinId": 37,
             "isEnabled": true
         },
         {
-            "id": 69,
+            "id": 70,
             "startPinId": 40,
             "endPinId": 45,
             "isEnabled": true
         },
         {
-            "id": 70,
+            "id": 71,
             "startPinId": 41,
             "endPinId": 49,
             "isEnabled": true
         },
         {
-            "id": 71,
+            "id": 72,
             "startPinId": 43,
             "endPinId": 50,
             "isEnabled": true
         },
         {
-            "id": 72,
+            "id": 73,
             "startPinId": 42,
-            "endPinId": 57,
+            "endPinId": 58,
             "isEnabled": true
         },
         {
-            "id": 73,
-            "startPinId": 58,
+            "id": 74,
+            "startPinId": 59,
             "endPinId": 54,
             "isEnabled": true
         },
         {
             "id": 75,
             "startPinId": 43,
-            "endPinId": 74,
+            "endPinId": 55,
             "isEnabled": true
         }
     ]

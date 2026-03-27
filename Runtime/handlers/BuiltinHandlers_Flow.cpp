@@ -124,14 +124,16 @@ void RegisterHandlers_Flow(
             subRunner.SetParentTimerManager(runner.GetTimerManagerPtr());
 
             // subLog 只收集用户可见的 Print 输出（用于填充 Output 引脚）
-            // verbose 节点执行日志仅转发给父蓝图显示，不放入 Output
+            // verbose 节点执行日志和 Print 输出都通过 ctx.Print() 转发给父蓝图显示
+            // 注意：必须用 Print() 而非 Log()，因为 Log() 受 loggingEnabled 门控，
+            // Release 模式下默认关闭，会导致子蓝图输出被静默丢弃
             std::vector<std::string> subLog;
             subRunner.SetLogCallback([&ctx](LogLevel lv, const std::string& msg) {
-                ctx.Log("    | " + msg, lv);
+                ctx.Print("    | " + msg, lv);
             });
             subRunner.SetPrintCallback([&subLog, &ctx](LogLevel lv, const std::string& msg) {
                 subLog.push_back(msg);
-                ctx.Log("    | " + msg, lv);
+                ctx.Print("    | " + msg, lv);
             });
 
             if (!subRunner.Load(importResult.data))
@@ -152,8 +154,8 @@ void RegisterHandlers_Flow(
 
             auto execResult = subRunner.Execute();
 
-            ctx.Log("  [ExecuteBlueprint] Sync result: " + std::string(execResult.success ? "SUCCESS" : "FAILED") +
-                    " (" + std::to_string(execResult.nodesExecuted) + " nodes executed)");
+            ctx.Print("  [ExecuteBlueprint] Sync result: " + std::string(execResult.success ? "SUCCESS" : "FAILED") +
+                    " (" + std::to_string(execResult.nodesExecuted) + " nodes executed)", LogLevel::Verbose);
 
             ctx.SetOutputValue("Success", Variant(execResult.success));
 
@@ -209,14 +211,24 @@ void RegisterHandlers_Flow(
             subRunner->SetParentTimerManager(runner.GetTimerManagerPtr());
 
             // subLog 只收集用户可见的 Print 输出（用于填充 Output 引脚）
-            // verbose 节点执行日志仅转发给父蓝图显示，不放入 Output
+            // verbose 节点执行日志和 Print 输出都通过 pCtx->Print() 转发给父蓝图显示
+            // 注意：必须用 Print() 而非 Log()，因为 Log() 受 loggingEnabled 门控，
+            // Release 模式下默认关闭，会导致子蓝图输出被静默丢弃
             auto subLog = std::make_shared<std::vector<std::string>>();
             subRunner->SetLogCallback([pCtx](LogLevel lv, const std::string& msg) {
-                pCtx->Log("    | " + msg, lv);
+                pCtx->Print("    | " + msg, lv);
             });
             subRunner->SetPrintCallback([subLog, pCtx](LogLevel lv, const std::string& msg) {
                 subLog->push_back(msg);
-                pCtx->Log("    | " + msg, lv);
+                pCtx->Print("    | " + msg, lv);
+                // 动态更新 Output 引脚值（子蓝图内异步 Delay/Timer 触发的 Print 也会被收集）
+                std::string outputText;
+                for (const auto& line : *subLog)
+                {
+                    if (!outputText.empty()) outputText += "\n";
+                    outputText += line;
+                }
+                pCtx->SetOutputValue("Output", Variant(outputText));
             });
 
             if (!subRunner->Load(*sharedData))
@@ -244,9 +256,9 @@ void RegisterHandlers_Flow(
                 outputText += line;
             }
 
-            pCtx->Log("  [ExecuteBlueprint] Async result: " +
+            pCtx->Print("  [ExecuteBlueprint] Async result: " +
                 std::string(execResult.success ? "SUCCESS" : "FAILED") +
-                " (" + std::to_string(execResult.nodesExecuted) + " nodes executed)");
+                " (" + std::to_string(execResult.nodesExecuted) + " nodes executed)", LogLevel::Verbose);
 
             pCtx->SetOutputValue("Success", Variant(execResult.success));
             pCtx->SetOutputValue("Output", Variant(outputText));

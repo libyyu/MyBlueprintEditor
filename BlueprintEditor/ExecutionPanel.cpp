@@ -98,6 +98,10 @@ void BlueprintEditor::ExecuteBlueprint()
         ActiveDoc()->executionLog.push_back(msg);
         ActiveDoc()->executionLogDirty = true;
     });
+    ActiveDoc()->persistentRunner.SetPrintCallback([this](::NodeEditor::Runtime::LogLevel /*level*/, const std::string& msg) {
+        ActiveDoc()->executionLog.push_back(msg);
+        ActiveDoc()->executionLogDirty = true;
+    });
 
     if (!ActiveDoc()->persistentRunner.Load(bp))
     {
