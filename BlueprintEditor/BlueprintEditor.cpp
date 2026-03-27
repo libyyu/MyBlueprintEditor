@@ -950,6 +950,10 @@ void BlueprintEditor::CloseDocument(int index)
 
 void BlueprintEditor::OnStart()
 {
+    // ── 日志系统（最先启动，后续所有模块都可用 BPLOG）─────────────────────
+    BpLogger::Get().Start("logs");
+    BPLOG("BlueprintEditor starting up");
+
     // Initialize node definition registry (全局共享)
     RegisterBuiltinNodeDefinitions();
     RegisterBuiltinHandlers();
@@ -969,6 +973,7 @@ void BlueprintEditor::OnStart()
     ::NodeEditor::Runtime::LoadCustomNodesFromFile(m_NodeRegistry, "data/custom_nodes.json");
 
     // 加载公共函数库（目录不存在时静默返回 0）
+    // 若工程系统启用后，此处可改为 SyncProjectLibrariesToRegistry()
     ::NodeEditor::Runtime::LoadFunctionLibrary(m_NodeRegistry, "data/function_library");
 
     // 加载主题（不存在时默认 Dark）
@@ -976,11 +981,13 @@ void BlueprintEditor::OnStart()
         ThemeManager::Get().Apply("Dark");
 
     // 设置初始标题
-    SetTitle("Blueprint Editor - [New]");
+    SetTitle("Blueprint Editor - [No Project]");
+    BPLOG("BlueprintEditor started");
 }
 
 void BlueprintEditor::OnStop()
 {
+    BPLOG("BlueprintEditor shutting down");
     auto releaseTexture = [this](ImTextureID& id)
     {
         if (id != ImTextureID_Invalid)
@@ -1007,6 +1014,9 @@ void BlueprintEditor::OnStop()
         }
     }
     m_Documents.clear();
+
+    // Logger 最后停止（确保所有日志写完）
+    BpLogger::Get().Stop();
 }
 
 ImGuiWindowFlags BlueprintEditor::GetWindowFlags() const

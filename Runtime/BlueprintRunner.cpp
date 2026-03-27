@@ -9,6 +9,9 @@
 #include <cassert>
 #include <unordered_set>
 #ifndef __EMSCRIPTEN__
+#  include <filesystem>
+#endif
+#ifndef __EMSCRIPTEN__
 #  include <thread>
 #endif
 
@@ -92,6 +95,61 @@ bool BlueprintRunner::LoadFromFile(const std::string& filePath)
         return false;
     }
     return Load(result.data);
+}
+
+bool BlueprintRunner::LoadFromFileWithDeps(const std::string& filePath)
+{
+#ifdef __EMSCRIPTEN__
+    // WebGL 环境无文件系统访问，退化到普通 LoadFromFile
+    return LoadFromFile(filePath);
+#else
+    // 1. 先加载蓝图本体
+    JsonBlueprintExporter exporter(m_fileSystem);
+    auto result = exporter.importRuntimeFromFile(filePath);
+    if (!result.success)
+    {
+        m_lastError = "File import failed: " + result.errorMessage;
+        return false;
+    }
+
+    // 2. 按 metadata.dependencies 顺序加载 Library，注册外部函数
+    const auto& deps = result.data.metadata.dependencies;
+    if (!deps.empty())
+    {
+        namespace fs = std::filesystem;
+        fs::path baseDir = fs::path(filePath).parent_path();
+
+        for (const auto& dep : deps)
+        {
+            std::string absDepPath = dep;
+            if (!fs::path(dep).is_absolute())
+                absDepPath = (baseDir / dep).lexically_normal().string();
+
+            if (!fs::exists(absDepPath))
+            {
+                m_lastError = "Dependency not found: " + absDepPath;
+                return false;
+            }
+
+            auto libResult = exporter.importRuntimeFromFile(absDepPath);
+            if (!libResult.success)
+            {
+                m_lastError = "Failed to load dependency '" + dep + "': " + libResult.errorMessage;
+                return false;
+            }
+            if (libResult.data.metadata.blueprintClass != BlueprintClass::FunctionLibrary)
+                continue;
+
+            for (const auto& funcDef : libResult.data.functions)
+            {
+                if (funcDef.isPublic)
+                    m_externalFunctions[funcDef.id] = funcDef;
+            }
+        }
+    }
+
+    return Load(result.data);
+#endif
 }
 
 // ============================================================================
@@ -289,7 +347,28 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
                 if (m_printCallback) subRunner.SetPrintCallback(m_printCallback);
                 if (subRunner.Load(funcBP))
                     subRunner.Execute();
-                break;
+                m_context.ActivateOutputFlow(std::string(""));
+                propagatePinValues(node);
+                return true;
+            }
+        }
+
+        // 也从依赖 Library 中注册的外部函数里查找
+        {
+            auto extIt = m_externalFunctions.find(funcId);
+            if (extIt != m_externalFunctions.end())
+            {
+                const auto& funcDef = extIt->second;
+                BlueprintData funcBP;
+                funcBP.nodes = funcDef.nodes;
+                funcBP.links = funcDef.links;
+                BlueprintRunner subRunner;
+                subRunner.RegisterHandlers(m_handlers);
+                subRunner.SetParentTimerManager(m_timerManager);
+                if (m_logCallback)   subRunner.SetLogCallback(m_logCallback);
+                if (m_printCallback) subRunner.SetPrintCallback(m_printCallback);
+                if (subRunner.Load(funcBP))
+                    subRunner.Execute();
             }
         }
         m_context.ActivateOutputFlow(std::string(""));

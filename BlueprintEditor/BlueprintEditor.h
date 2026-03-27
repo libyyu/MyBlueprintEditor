@@ -19,6 +19,8 @@
 #include "NodeDefinition.h"
 #include "FunctionLibrary.h"
 #include "EventBus.h"
+#include "BpProject.h"
+#include "BpLogger.h"
 
 #include <string>
 #include <vector>
@@ -490,6 +492,21 @@ struct BlueprintEditor : public Application
     // ------------------------------------------------------------------
     enum class AlignMode { Left, Right, Top, Bottom, CenterH, CenterV };
     void  AlignSelectedNodes(AlignMode mode);
+
+    // ------------------------------------------------------------------
+    // 工程系统（*.bp.proj）
+    // ------------------------------------------------------------------
+    BpProject   m_Project;                          // 当前工程（filePath 为空 = 无工程）
+    void        NewProject();                        // 新建工程（弹框输入名称）
+    void        OpenProject();                       // 打开工程（文件对话框）
+    void        SaveProject();                       // 保存工程
+    void        SaveProjectAs();                     // 另存为
+    void        CloseProject();                      // 关闭工程
+    void        AddCurrentDocToProject();            // 将当前文档加入工程列表
+    void        SyncProjectLibrariesToRegistry();    // 按工程 libraries 刷新节点定义注册表
+    void        DrawProjectPanel();                  // 工程面板（左侧栏）
+    bool        m_ShowNewProjectDialog = false;      // 新建工程弹框
+    char        m_NewProjNameBuf[128]  = "NewProject";
 
     BlueprintDocument* ActiveDoc()
     {

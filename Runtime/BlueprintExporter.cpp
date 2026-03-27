@@ -172,6 +172,21 @@ std::string JsonBlueprintExporter::exportRuntimeToString(const BlueprintData& da
         
         writeIndent();
         oss << "\"version\": \"" << escapeJson(data.metadata.version) << "\"";
+
+        // dependencies（可选，非空时写入）
+        if (!data.metadata.dependencies.empty())
+        {
+            oss << ",";
+            writeNewline();
+            writeIndent();
+            oss << "\"dependencies\": [";
+            for (size_t di = 0; di < data.metadata.dependencies.size(); ++di)
+            {
+                oss << "\"" << escapeJson(data.metadata.dependencies[di]) << "\"";
+                if (di + 1 < data.metadata.dependencies.size()) oss << ", ";
+            }
+            oss << "]";
+        }
         
         writeNewline();
         indentLevel--;
@@ -988,6 +1003,16 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
             {
                 if (tag.type() == crude_json::type_t::string)
                     result.data.metadata.tags.push_back(tag.get<std::string>());
+            }
+        }
+
+        // dependencies：加载时按序读取（Runtime 用来决定 Library 加载顺序）
+        if (meta.contains("dependencies") && meta["dependencies"].type() == crude_json::type_t::array)
+        {
+            for (auto& dep : meta["dependencies"].get<crude_json::array>())
+            {
+                if (dep.type() == crude_json::type_t::string)
+                    result.data.metadata.dependencies.push_back(dep.get<std::string>());
             }
         }
     }

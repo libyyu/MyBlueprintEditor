@@ -8,6 +8,7 @@
 #pragma once
 #include "BlueprintExport.h"
 #include "NodeDefinition.h"
+#include "BlueprintData.h"
 #include <string>
 
 #ifdef _MSC_VER
@@ -21,6 +22,12 @@ namespace Runtime {
 /// 加载函数库目录，返回成功注册的函数数量。
 /// 目录不存在或为空时静默返回 0。
 BLUEPRINT_API int LoadFunctionLibrary(INodeRegistry& registry, const std::string& dirPath);
+
+/// 将一个已解析的 Library BlueprintData 中的公开函数直接注册到 INodeRegistry（节点定义）。
+/// libFilePath 用于唯一前缀生成（可为空则用 data.metadata.name）。
+BLUEPRINT_API int RegisterLibraryFunctions(INodeRegistry& registry,
+                                            const BlueprintData& data,
+                                            const std::string& libFilePath = "");
 
 } // namespace Runtime
 } // namespace NodeEditor

@@ -1,5 +1,6 @@
 // FileOperations.cpp -- 蓝图文件操作（新建/打开/保存）
 #include "BlueprintEditor.h"
+// FileDialogs.h 中只是声明，本文件是实现，不需要 include
 
 #ifdef _WIN32
 #include <windows.h>
@@ -52,10 +53,6 @@ std::string SaveFileDialog(const char* filter, const char* title, const char* de
         return std::string(filename);
     return "";
 }
-#else
-// Linux/Mac 平台（简单实现）
-std::string OpenFileDialog(const char*, const char*) { return ""; }
-std::string SaveFileDialog(const char*, const char*, const char*) { return ""; }
 #endif
 
 // 从路径中提取文件名（不含扩展名）
@@ -80,6 +77,12 @@ std::string GetEditorFilePath(const std::string& runtimePath)
 }
 
 } // anonymous namespace
+
+// ── 平台文件对话框（非 Windows：空实现，未来可集成 nfd/zenity）────────────
+#ifndef _WIN32
+std::string OpenFileDialog(const char*, const char*) { return ""; }
+std::string SaveFileDialog(const char*, const char*, const char*) { return ""; }
+#endif
 
 // ============================================================================
 // 清空编辑器（清空当前活跃文档）

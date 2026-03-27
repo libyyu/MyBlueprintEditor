@@ -1,6 +1,11 @@
 // EditorUI.cpp -- 蓝图编辑器 UI 渲染
 #include "BlueprintEditor.h"
 #include "ThemeManager.h"
+#include "FileDialogs.h"
+#include <filesystem>
+
+// 前向声明（定义在本文件后段）
+static void DrawNewProjectDialog(BlueprintEditor* editor, bool& show, char* nameBuf, int nameBufSize);
 
 // ============================================================================
 // 引脚图标颜色
@@ -560,11 +565,22 @@ void BlueprintEditor::OnFrame(float deltaTime)
     {
         if (ImGui::BeginMenu(ICON_FA_FILE " File"))
         {
+            // ── 工程 ──────────────────────────────────────────────────────
+            if (ImGui::MenuItem(ICON_FA_DIAGRAM_PROJECT " New Project"))
+                NewProject();
+            if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Open Project..."))
+                OpenProject();
+            if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK " Save Project", nullptr, false, m_Project.IsOpen()))
+                SaveProject();
+            if (ImGui::MenuItem(ICON_FA_FILE_EXPORT " Save Project As...", nullptr, false, m_Project.IsOpen()))
+                SaveProjectAs();
+            ImGui::Separator();
+            // ── 蓝图 ──────────────────────────────────────────────────────
             if (ImGui::MenuItem(ICON_FA_FILE " New Actor Blueprint", "Ctrl+N"))
                 NewFile(RTBlueprintClass::Actor);
             if (ImGui::MenuItem(ICON_FA_CUBE " New Function Library"))
                 NewFile(RTBlueprintClass::FunctionLibrary);
-            if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Open...", "Ctrl+O"))
+            if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Open Blueprint...", "Ctrl+O"))
                 OpenFile();
             if (ImGui::BeginMenu(ICON_FA_CLOCK_ROTATE_LEFT " Recent Files"))
             {
@@ -826,7 +842,21 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
         // 绘制左侧面板
         ImGui::BeginChild("##LeftPanel", ImVec2(m_LeftPanelWidth, totalHeight), true);
-        DrawNodeListPanel();
+        // 左侧 TabBar：Project + Nodes
+        if (ImGui::BeginTabBar("##LeftTabs"))
+        {
+            if (ImGui::BeginTabItem(ICON_FA_DIAGRAM_PROJECT " Project"))
+            {
+                DrawProjectPanel();
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem(ICON_FA_CUBES " Nodes"))
+            {
+                DrawNodeListPanel();
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
+        }
         ImGui::EndChild();
 
         ImGui::SameLine();
@@ -1465,6 +1495,11 @@ void BlueprintEditor::OnFrame(float deltaTime)
     ShowUnsavedChangesDialog();
 
     // ================================================================
+    // 新建工程对话框
+    // ================================================================
+    DrawNewProjectDialog(this, m_ShowNewProjectDialog, m_NewProjNameBuf, sizeof(m_NewProjNameBuf));
+
+    // ================================================================
     // 样式编辑器浮动窗口
     // ================================================================
     if (m_ShowStyleEditorWindow)
@@ -1542,6 +1577,65 @@ void BlueprintEditor::ShowUnsavedChangesDialog()
             m_PendingQuitApp = false;
             ImGui::CloseCurrentPopup();
         }
+
+        ImGui::EndPopup();
+    }
+}
+
+// ============================================================================
+// 新建工程弹框（每帧调用）
+// ============================================================================
+
+static void DrawNewProjectDialog(BlueprintEditor* editor, bool& show, char* nameBuf, int nameBufSize)
+{
+    if (show)
+    {
+        ImGui::OpenPopup("New Project###NewProjDlg");
+        show = false;
+    }
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(360, 0), ImGuiCond_Appearing);
+
+    if (ImGui::BeginPopupModal("New Project###NewProjDlg", nullptr,
+        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+    {
+        ImGui::Text("Project Name:");
+        ImGui::SetNextItemWidth(-1);
+        bool confirmed = ImGui::InputText("##projname", nameBuf, nameBufSize,
+            ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+
+        ImGui::Spacing();
+
+        if (confirmed || ImGui::Button(ICON_FA_CHECK " Create", ImVec2(120, 0)))
+        {
+            std::string name(nameBuf);
+            if (name.empty()) name = "NewProject";
+
+            // 弹出保存路径
+            std::string path = SaveFileDialog(
+                "Blueprint Project (*.bp.proj)\0*.bp.proj\0",
+                "Save New Project",
+                (name + ".bp.proj").c_str()
+            );
+            if (!path.empty())
+            {
+                if (path.size() < 8 || path.substr(path.size() - 8) != ".bp.proj")
+                    path += ".bp.proj";
+                editor->CloseProject();
+                editor->m_Project = NewBpProject(name);
+                editor->m_Project.filePath   = std::filesystem::absolute(path).string();
+                editor->m_Project.projectDir = std::filesystem::path(editor->m_Project.filePath)
+                                               .parent_path().string();
+                SaveBpProject(editor->m_Project, editor->m_Project.filePath);
+                BPLOG("Created new project: " + name);
+                editor->SetTitle(("Blueprint Editor - [" + name + "]").c_str());
+            }
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(ICON_FA_XMARK " Cancel", ImVec2(80, 0)))
+            ImGui::CloseCurrentPopup();
 
         ImGui::EndPopup();
     }

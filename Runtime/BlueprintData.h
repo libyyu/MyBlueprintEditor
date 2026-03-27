@@ -165,6 +165,7 @@ struct BlueprintMetadata
     std::string                 createdAt;      // 创建时间
     std::string                 updatedAt;      // 更新时间
     std::vector<std::string>    tags;           // 标签
+    std::vector<std::string>    dependencies;   // 依赖的 Library 蓝图路径（相对或绝对），Runtime 加载时按序加载
     std::unordered_map<std::string, std::string> customProperties; // 自定义属性
 };
 

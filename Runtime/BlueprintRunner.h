@@ -357,6 +357,9 @@ public:
     // 从 JSON 文件加载
     bool LoadFromFile(const std::string& filePath);
 
+    // 从文件加载，并按 metadata.dependencies 自动加载依赖 Library（Runtime 无需工程文件）
+    bool LoadFromFileWithDeps(const std::string& filePath);
+
     // 获取已加载的蓝图数据
     const BlueprintData& GetBlueprintData() const { return m_blueprint; }
 
@@ -589,6 +592,10 @@ private:
     // 蓝图数据
     BlueprintData                                       m_blueprint;
     bool                                                m_loaded = false;
+
+    // 依赖 Library 中注册的外部函数（LoadFromFileWithDeps 时填充）
+    // key: funcDef.id, value: FunctionDefinition
+    std::unordered_map<std::string, FunctionDefinition> m_externalFunctions;
 
     // 节点处理器注册表
     std::unordered_map<std::string, NodeHandler>        m_handlers;

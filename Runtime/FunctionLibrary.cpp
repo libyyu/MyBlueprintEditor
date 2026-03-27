@@ -113,5 +113,71 @@ int LoadFunctionLibrary(INodeRegistry& registry, const std::string& dirPath)
 #endif
 }
 
+// ============================================================================
+// RegisterLibraryFunctions — 从内存 BlueprintData 注册（不需要文件系统扫描）
+// ============================================================================
+
+int RegisterLibraryFunctions(INodeRegistry& registry,
+                              const BlueprintData& data,
+                              const std::string& libFilePath)
+{
+    if (data.metadata.blueprintClass != BlueprintClass::FunctionLibrary)
+        return 0;
+
+    // 生成 stem（用于节点 id 前缀）
+    std::string stem = data.metadata.name;
+    if (!libFilePath.empty())
+    {
+#ifndef __EMSCRIPTEN__
+        std::string s = fs::path(libFilePath).stem().string();
+        // 去掉 .bp（如 MathLib.bp.json → stem = MathLib.bp → MathLib）
+        if (s.size() > 3 && s.substr(s.size() - 3) == ".bp")
+            s = s.substr(0, s.size() - 3);
+        if (!s.empty()) stem = s;
+#endif
+    }
+    if (stem.empty()) stem = "UnknownLib";
+
+    int count = 0;
+    for (const auto& funcDef : data.functions)
+    {
+        if (!funcDef.isPublic) continue;
+
+        NodeDefinition nodeDef;
+        nodeDef.id       = "FuncLib." + stem + "." + funcDef.id;
+        nodeDef.name     = funcDef.name;
+        nodeDef.category = "FunctionLibrary/" + funcDef.category;
+
+        {
+            PinDefinition flowIn;
+            flowIn.name = ""; flowIn.isExec = true;
+            flowIn.dataType = PinDataType::Unknown;
+            nodeDef.inputPins.push_back(flowIn);
+            for (const auto& inp : funcDef.inputs)
+            {
+                PinDefinition pin;
+                pin.name = inp.name; pin.dataType = inp.dataType;
+                nodeDef.inputPins.push_back(pin);
+            }
+        }
+        {
+            PinDefinition flowOut;
+            flowOut.name = ""; flowOut.isExec = true;
+            flowOut.dataType = PinDataType::Unknown;
+            nodeDef.outputPins.push_back(flowOut);
+            for (const auto& out : funcDef.outputs)
+            {
+                PinDefinition pin;
+                pin.name = out.name; pin.dataType = out.dataType;
+                nodeDef.outputPins.push_back(pin);
+            }
+        }
+
+        registry.registerNode(nodeDef);
+        ++count;
+    }
+    return count;
+}
+
 } // namespace Runtime
 } // namespace NodeEditor
