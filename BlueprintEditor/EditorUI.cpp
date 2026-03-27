@@ -749,10 +749,10 @@ void BlueprintEditor::OnFrame(float deltaTime)
             ImVec2 cursorBefore = ImGui::GetCursorPos();
             ImGui::PushItemWidth(rightWidth);
 
-            // 标签栏背景微调（比窗口背景略深，形成分层感）
-            ImGui::PushStyleColor(ImGuiCol_Tab,        ImVec4(0.130f, 0.136f, 0.168f, 1.00f));
-            ImGui::PushStyleColor(ImGuiCol_TabSelected, ImVec4(0.165f, 0.175f, 0.220f, 1.00f));
-            ImGui::PushStyleColor(ImGuiCol_TabHovered,  ImVec4(0.200f, 0.340f, 0.520f, 0.70f));
+            // 标签栏 VS 2022 风格颜色（非活跃略暗，活跃与编辑器背景融合）
+            ImGui::PushStyleColor(ImGuiCol_Tab,        ImVec4(0.120f, 0.120f, 0.148f, 1.00f));
+            ImGui::PushStyleColor(ImGuiCol_TabSelected, ImVec4(0.150f, 0.155f, 0.195f, 1.00f));
+            ImGui::PushStyleColor(ImGuiCol_TabHovered,  ImVec4(0.180f, 0.200f, 0.280f, 0.85f));
 
             if (ImGui::BeginTabBar("##BlueprintTabs", ImGuiTabBarFlags_Reorderable | ImGuiTabBarFlags_AutoSelectNewTabs | ImGuiTabBarFlags_FittingPolicyScroll))
             {
@@ -768,15 +768,15 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     {
                         m_ActiveDocIndex = i;
 
-                        // 绘制活跃标签的底部强调色指示线
+                        // VS 2022 风格：活跃标签顶部蓝色指示线
                         {
                             ImVec2 tabMin = ImGui::GetItemRectMin();
                             ImVec2 tabMax = ImGui::GetItemRectMax();
                             auto* dl = ImGui::GetWindowDrawList();
                             dl->AddRectFilled(
-                                ImVec2(tabMin.x + 2.0f, tabMax.y - 2.5f),
-                                ImVec2(tabMax.x - 2.0f, tabMax.y),
-                                IM_COL32(75, 140, 190, 240), 1.0f);
+                                ImVec2(tabMin.x + 1.0f, tabMin.y),
+                                ImVec2(tabMax.x - 1.0f, tabMin.y + 2.0f),
+                                IM_COL32(0, 122, 204, 255), 0.0f);  // VS 蓝 #007ACC
                         }
 
                         ImGui::EndTabItem();
@@ -807,13 +807,13 @@ void BlueprintEditor::OnFrame(float deltaTime)
             ImGui::PopItemWidth();
             tabBarHeight = ImGui::GetCursorPos().y - cursorBefore.y;
 
-            // Tab Bar 底部分隔线
+            // Tab Bar 底部分隔线（VS 风格：细而低调）
             {
                 ImVec2 lineStart = ImGui::GetCursorScreenPos();
                 lineStart.y -= 1.0f;
                 auto* dl = ImGui::GetWindowDrawList();
                 dl->AddLine(lineStart, ImVec2(lineStart.x + rightWidth, lineStart.y),
-                            IM_COL32(50, 55, 70, 160), 1.0f);
+                            IM_COL32(48, 50, 62, 200), 1.0f);
             }
         }
 
@@ -1303,12 +1303,10 @@ void BlueprintEditor::OnFrame(float deltaTime)
         ImVec2 barMin(editorMin.x, editorMax.y - barH);
         ImVec2 barMax(editorMax.x, editorMax.y);
 
-        // 渐变半透明背景
-        ImU32 barColTop    = IM_COL32(22, 24, 32, 210);
-        ImU32 barColBottom = IM_COL32(18, 20, 26, 230);
-        dl->AddRectFilledMultiColor(barMin, barMax, barColTop, barColTop, barColBottom, barColBottom);
-        // 顶部高光分割线
-        dl->AddLine(barMin, ImVec2(barMax.x, barMin.y), IM_COL32(60, 75, 100, 140));
+        // VS 2022 扁平状态栏
+        dl->AddRectFilled(barMin, barMax, IM_COL32(30, 30, 38, 230), 0.0f);
+        // 顶部 1px 分隔线
+        dl->AddLine(barMin, ImVec2(barMax.x, barMin.y), IM_COL32(0, 122, 204, 80));
 
         float textY = barMin.y + 4.0f;
         float x = barMin.x + 12.0f;
@@ -1556,30 +1554,28 @@ void BlueprintEditor::DrawNodeListPanel()
     auto& io = ImGui::GetIO();
     float paneWidth = ImGui::GetContentRegionAvail().x;
 
-    // 面板标题
+    // 面板标题（VS 2022 风格：扁平低调）
     {
         auto* drawList = ImGui::GetWindowDrawList();
         ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-        float headerH = ImGui::GetTextLineHeight() + 8.0f;
+        float headerH = ImGui::GetTextLineHeight() + 6.0f;
 
-        // 渐变标题栏
-        ImU32 colTop    = IM_COL32(38, 52, 75, 230);
-        ImU32 colBottom = IM_COL32(28, 38, 55, 200);
-        drawList->AddRectFilledMultiColor(
+        // VS 风格：扁平色带，与背景微差
+        drawList->AddRectFilled(
             cursorPos,
             ImVec2(cursorPos.x + paneWidth, cursorPos.y + headerH),
-            colTop, colTop, colBottom, colBottom);
-        // 底部高光线
+            IM_COL32(30, 30, 38, 230), 0.0f);
+        // 底部 1px 分隔线
         drawList->AddLine(
             ImVec2(cursorPos.x, cursorPos.y + headerH - 1.0f),
             ImVec2(cursorPos.x + paneWidth, cursorPos.y + headerH - 1.0f),
-            IM_COL32(75, 140, 190, 80));
+            IM_COL32(0, 122, 204, 100));
         drawList->AddText(
-            ImVec2(cursorPos.x + 10.0f, cursorPos.y + 4.0f),
-            IM_COL32(160, 195, 240, 240), ICON_FA_SITEMAP);
+            ImVec2(cursorPos.x + 8.0f, cursorPos.y + 3.0f),
+            IM_COL32(140, 170, 210, 240), ICON_FA_SITEMAP);
         drawList->AddText(
-            ImVec2(cursorPos.x + 28.0f, cursorPos.y + 4.0f),
-            IM_COL32(175, 200, 235, 240), "Inspector");
+            ImVec2(cursorPos.x + 26.0f, cursorPos.y + 3.0f),
+            IM_COL32(200, 210, 225, 240), "Inspector");
         ImGui::Dummy(ImVec2(paneWidth, headerH));
     }
 
@@ -1644,20 +1640,22 @@ void BlueprintEditor::DrawNodeListPanel()
             if (restoreIconWidth <= 0) restoreIconWidth = 24;
             if (restoreIconHeight <= 0) restoreIconHeight = 24;
 
-            // 节点列表
+            // 节点列表 — VS 2022 扁平色带
             {
                 auto* drawList = ImGui::GetWindowDrawList();
                 ImVec2 cursorPos = ImGui::GetCursorScreenPos();
                 float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-                ImU32 colL = IM_COL32(35, 48, 68, 210);
-                ImU32 colR = IM_COL32(28, 36, 52, 180);
-                drawList->AddRectFilledMultiColor(
+                drawList->AddRectFilled(
                     cursorPos,
                     ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-                    colL, colR, colR, colL);
+                    IM_COL32(30, 30, 38, 230), 0.0f);
+                drawList->AddLine(
+                    ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
+                    ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
+                    IM_COL32(0, 122, 204, 100));
                 drawList->AddText(
                     ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-                    IM_COL32(160, 195, 240, 230),
+                    IM_COL32(200, 200, 210, 230),
                     nodeFilter.empty() ? ICON_FA_CUBES " Nodes" : ICON_FA_CUBES " Nodes (filtered)");
                 ImGui::Dummy(ImVec2(paneWidth, sectionH));
             }
@@ -1796,21 +1794,23 @@ void BlueprintEditor::DrawNodeListPanel()
             }
             ImGui::Unindent();
 
-            // 选择信息
+            // 选择信息 — VS 2022 扁平色带
             static int changeCount = 0;
             {
                 auto* drawList = ImGui::GetWindowDrawList();
                 ImVec2 cursorPos = ImGui::GetCursorScreenPos();
                 float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-                ImU32 colL = IM_COL32(35, 48, 68, 210);
-                ImU32 colR = IM_COL32(28, 36, 52, 180);
-                drawList->AddRectFilledMultiColor(
+                drawList->AddRectFilled(
                     cursorPos,
                     ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-                    colL, colR, colR, colL);
+                    IM_COL32(30, 30, 38, 230), 0.0f);
+                drawList->AddLine(
+                    ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
+                    ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
+                    IM_COL32(0, 122, 204, 100));
                 drawList->AddText(
                     ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-                    IM_COL32(160, 195, 240, 230), ICON_FA_HAND_POINTER " Selection");
+                    IM_COL32(200, 200, 210, 230), ICON_FA_HAND_POINTER " Selection");
                 ImGui::Dummy(ImVec2(paneWidth, sectionH));
             }
             ImGui::BeginHorizontal("Selection Stats", ImVec2(paneWidth, 0));
@@ -2302,20 +2302,22 @@ void BlueprintEditor::DrawDetailsPanel()
         }
     };
 
-    // ── 节点基本信息 ─────────────────────────────────────────────────────
+    // ── 节点基本信息 — VS 2022 扁平色带 ────────────────────────────────
     {
         auto* drawList = ImGui::GetWindowDrawList();
         ImVec2 cursorPos = ImGui::GetCursorScreenPos();
         float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-        ImU32 colL = IM_COL32(35, 48, 68, 210);
-        ImU32 colR = IM_COL32(28, 36, 52, 180);
-        drawList->AddRectFilledMultiColor(
+        drawList->AddRectFilled(
             cursorPos,
             ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-            colL, colR, colR, colL);
+            IM_COL32(30, 30, 38, 230), 0.0f);
+        drawList->AddLine(
+            ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
+            IM_COL32(0, 122, 204, 100));
         drawList->AddText(
             ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-            IM_COL32(160, 195, 240, 230), ICON_FA_CUBE " Node Info");
+            IM_COL32(200, 200, 210, 230), ICON_FA_CUBE " Node Info");
         ImGui::Dummy(ImVec2(paneWidth, sectionH));
     }
 
@@ -2399,15 +2401,17 @@ void BlueprintEditor::DrawDetailsPanel()
             auto* drawList = ImGui::GetWindowDrawList();
             ImVec2 cursorPos = ImGui::GetCursorScreenPos();
             float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-            ImU32 colL = IM_COL32(40, 55, 35, 210);
-            ImU32 colR = IM_COL32(30, 42, 28, 180);
-            drawList->AddRectFilledMultiColor(
+            drawList->AddRectFilled(
                 cursorPos,
                 ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-                colL, colR, colR, colL);
+                IM_COL32(30, 30, 38, 230), 0.0f);
+            drawList->AddLine(
+                ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
+                ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
+                IM_COL32(0, 122, 204, 100));
             drawList->AddText(
                 ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-                IM_COL32(150, 210, 160, 230), ICON_FA_ARROW_RIGHT " Inputs");
+                IM_COL32(200, 200, 210, 230), ICON_FA_ARROW_RIGHT " Inputs");
             ImGui::Dummy(ImVec2(paneWidth, sectionH));
         }
 
@@ -2535,15 +2539,17 @@ void BlueprintEditor::DrawDetailsPanel()
             auto* drawList = ImGui::GetWindowDrawList();
             ImVec2 cursorPos = ImGui::GetCursorScreenPos();
             float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-            ImU32 colL = IM_COL32(55, 40, 35, 210);
-            ImU32 colR = IM_COL32(42, 30, 28, 180);
-            drawList->AddRectFilledMultiColor(
+            drawList->AddRectFilled(
                 cursorPos,
                 ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-                colL, colR, colR, colL);
+                IM_COL32(30, 30, 38, 230), 0.0f);
+            drawList->AddLine(
+                ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
+                ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
+                IM_COL32(0, 122, 204, 100));
             drawList->AddText(
                 ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-                IM_COL32(210, 160, 150, 230), ICON_FA_ARROW_LEFT " Outputs");
+                IM_COL32(200, 200, 210, 230), ICON_FA_ARROW_LEFT " Outputs");
             ImGui::Dummy(ImVec2(paneWidth, sectionH));
         }
 
@@ -2603,15 +2609,17 @@ void BlueprintEditor::DrawDetailsPanel()
             auto* drawList = ImGui::GetWindowDrawList();
             ImVec2 cursorPos = ImGui::GetCursorScreenPos();
             float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-            ImU32 colL = IM_COL32(45, 35, 55, 210);
-            ImU32 colR = IM_COL32(35, 28, 42, 180);
-            drawList->AddRectFilledMultiColor(
+            drawList->AddRectFilled(
                 cursorPos,
                 ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-                colL, colR, colR, colL);
+                IM_COL32(30, 30, 38, 230), 0.0f);
+            drawList->AddLine(
+                ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
+                ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
+                IM_COL32(0, 122, 204, 100));
             drawList->AddText(
                 ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-                IM_COL32(190, 170, 220, 230), ICON_FA_GEAR " Properties");
+                IM_COL32(200, 200, 210, 230), ICON_FA_GEAR " Properties");
             ImGui::Dummy(ImVec2(paneWidth, sectionH));
         }
 
@@ -2642,18 +2650,16 @@ void BlueprintEditor::DrawExecutionPanel()
         ImVec2 cursorPos = ImGui::GetCursorScreenPos();
         float headerH = ImGui::GetTextLineHeight() + 8.0f;
 
-        // 渐变标题栏
-        ImU32 colTop    = IM_COL32(32, 50, 78, 230);
-        ImU32 colBottom = IM_COL32(24, 36, 56, 200);
-        drawList->AddRectFilledMultiColor(
+        // VS 2022 扁平标题栏
+        drawList->AddRectFilled(
             cursorPos,
             ImVec2(cursorPos.x + paneWidth, cursorPos.y + headerH),
-            colTop, colTop, colBottom, colBottom);
-        // 底部 accent 高光线
+            IM_COL32(30, 30, 38, 230), 0.0f);
+        // 底部 1px VS blue accent 分隔线
         drawList->AddLine(
             ImVec2(cursorPos.x, cursorPos.y + headerH - 1.0f),
             ImVec2(cursorPos.x + paneWidth, cursorPos.y + headerH - 1.0f),
-            IM_COL32(75, 140, 190, 80));
+            IM_COL32(0, 122, 204, 100));
         drawList->AddText(
             ImVec2(cursorPos.x + 10.0f, cursorPos.y + 4.0f),
             IM_COL32(160, 195, 240, 240), ICON_FA_TERMINAL);

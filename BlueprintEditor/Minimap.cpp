@@ -72,10 +72,8 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
         );
     };
 
-    // 绘制背景（柔和的暗色渐变 + 精致边框）
-    ImU32 bgTop    = IM_COL32(16, 18, 26, 215);
-    ImU32 bgBottom = IM_COL32(12, 14, 20, 230);
-    drawList->AddRectFilledMultiColor(mapMin, mapMax, bgTop, bgTop, bgBottom, bgBottom);
+    // 绘制背景（VS 2022 扁平暗色 + 精致边框）
+    drawList->AddRectFilled(mapMin, mapMax, IM_COL32(14, 16, 22, 225), 6.0f);
     drawList->AddRect(mapMin, mapMax, IM_COL32(55, 70, 100, 140), 6.0f);
     // 内侧微光
     drawList->AddRect(
@@ -171,15 +169,17 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
     drawList->AddRectFilled(viewTL_map, viewBR_map, IM_COL32(75, 140, 190, 22));
     drawList->AddRect(viewTL_map, viewBR_map, IM_COL32(90, 155, 220, 150), 0.0f, 0, 1.5f);
 
-    // 小地图标题（渐变底色条）
+    // 小地图标题（VS 2022 扁平色带）
     float titleH = 16.0f;
-    ImU32 titleColL = IM_COL32(32, 48, 72, 200);
-    ImU32 titleColR = IM_COL32(24, 34, 52, 180);
-    drawList->AddRectFilledMultiColor(
+    drawList->AddRectFilled(
         mapMin, ImVec2(mapMax.x, mapMin.y + titleH),
-        titleColL, titleColR, titleColR, titleColL);
+        IM_COL32(30, 30, 38, 230), 6.0f);
+    drawList->AddLine(
+        ImVec2(mapMin.x, mapMin.y + titleH - 1.0f),
+        ImVec2(mapMax.x, mapMin.y + titleH - 1.0f),
+        IM_COL32(0, 122, 204, 80));
     drawList->AddText(ImVec2(mapMin.x + 6, mapMin.y + 1),
-                      IM_COL32(155, 190, 230, 220), "Minimap");
+                      IM_COL32(200, 200, 210, 220), "Minimap");
 
     // 点击/拖拽小地图导航到对应画布位置
     ImVec2 mousePos = ImGui::GetMousePos();

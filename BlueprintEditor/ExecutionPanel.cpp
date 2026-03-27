@@ -518,15 +518,17 @@ void BlueprintEditor::DrawWatchPanel(float paneWidth)
         auto* drawList = ImGui::GetWindowDrawList();
         ImVec2 cursorPos = ImGui::GetCursorScreenPos();
         float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-        ImU32 colL = IM_COL32(35, 52, 60, 210);
-        ImU32 colR = IM_COL32(28, 40, 48, 180);
-        drawList->AddRectFilledMultiColor(
+        drawList->AddRectFilled(
             cursorPos,
             ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-            colL, colR, colR, colL);
+            IM_COL32(30, 30, 38, 230), 0.0f);
+        drawList->AddLine(
+            ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
+            IM_COL32(0, 122, 204, 100));
         drawList->AddText(
             ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-            IM_COL32(140, 210, 220, 230), ICON_FA_LAYER_GROUP " Variables");
+            IM_COL32(200, 200, 210, 230), ICON_FA_LAYER_GROUP " Variables");
 
         // 变量数量标签
         char countBuf[32];
@@ -586,15 +588,17 @@ void BlueprintEditor::DrawWatchPanel(float paneWidth)
         auto* drawList = ImGui::GetWindowDrawList();
         ImVec2 cursorPos = ImGui::GetCursorScreenPos();
         float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-        ImU32 colL = IM_COL32(50, 42, 35, 210);
-        ImU32 colR = IM_COL32(38, 32, 28, 180);
-        drawList->AddRectFilledMultiColor(
+        drawList->AddRectFilled(
             cursorPos,
             ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-            colL, colR, colR, colL);
+            IM_COL32(30, 30, 38, 230), 0.0f);
+        drawList->AddLine(
+            ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
+            IM_COL32(0, 122, 204, 100));
         drawList->AddText(
             ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-            IM_COL32(220, 190, 140, 230), ICON_FA_CUBE " Selected Node Pins");
+            IM_COL32(200, 200, 210, 230), ICON_FA_CUBE " Selected Node Pins");
         ImGui::Dummy(ImVec2(paneWidth, sectionH));
     }
 
@@ -706,19 +710,21 @@ void BlueprintEditor::DrawWatchPanel(float paneWidth)
             auto* drawList = ImGui::GetWindowDrawList();
             ImVec2 cursorPos = ImGui::GetCursorScreenPos();
             float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-            ImU32 colL = IM_COL32(35, 42, 55, 210);
-            ImU32 colR = IM_COL32(28, 32, 42, 180);
-            drawList->AddRectFilledMultiColor(
+            drawList->AddRectFilled(
                 cursorPos,
                 ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-                colL, colR, colR, colL);
+                IM_COL32(30, 30, 38, 230), 0.0f);
+            drawList->AddLine(
+                ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
+                ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
+                IM_COL32(0, 122, 204, 100));
 
             char titleBuf[64];
             snprintf(titleBuf, sizeof(titleBuf), ICON_FA_CIRCLE_CHECK " All Output Values (%d)",
                 static_cast<int>(res.outputValues.size()));
             drawList->AddText(
                 ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-                IM_COL32(140, 170, 220, 230), titleBuf);
+                IM_COL32(200, 200, 210, 230), titleBuf);
             ImGui::Dummy(ImVec2(paneWidth, sectionH));
         }
 

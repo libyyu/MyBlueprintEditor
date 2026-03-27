@@ -24,35 +24,36 @@ ThemeManager::ThemeManager()
 
 void ThemeManager::RegisterBuiltinThemes()
 {
-    // ── Dark（默认暗色）──────────────────────────────────────────────────
+    // ── Dark（默认暗色 — VS 2022 风格）──────────────────────────────────
     {
         EditorTheme t;
         t.name           = "Dark";
-        t.windowBg       = {0.13f, 0.14f, 0.18f, 1.00f};
-        t.childBg        = {0.11f, 0.12f, 0.15f, 1.00f};
-        t.frameBg        = {0.20f, 0.22f, 0.28f, 1.00f};
-        t.frameHovered   = {0.28f, 0.32f, 0.42f, 1.00f};
-        t.frameActive    = {0.34f, 0.40f, 0.55f, 1.00f};
-        t.header         = {0.25f, 0.30f, 0.42f, 1.00f};
-        t.headerHovered  = {0.32f, 0.38f, 0.55f, 1.00f};
-        t.button         = {0.25f, 0.30f, 0.45f, 1.00f};
-        t.buttonHovered  = {0.34f, 0.42f, 0.60f, 1.00f};
-        t.text           = {0.85f, 0.87f, 0.92f, 1.00f};
-        t.textDisabled   = {0.40f, 0.44f, 0.52f, 1.00f};
-        t.scrollbarBg    = {0.08f, 0.09f, 0.12f, 0.80f};
-        t.scrollbarGrab  = {0.30f, 0.35f, 0.48f, 1.00f};
-        t.tabActive      = {0.32f, 0.42f, 0.65f, 1.00f};
-        t.tabHovered     = {0.28f, 0.36f, 0.55f, 1.00f};
-        t.tab            = {0.18f, 0.22f, 0.32f, 1.00f};
-        t.separator      = {0.25f, 0.30f, 0.42f, 1.00f};
-        t.popupBg        = {0.12f, 0.14f, 0.18f, 0.96f};
-        t.editorBg       = {0.13f, 0.14f, 0.18f, 1.00f};
-        t.editorGrid     = {0.20f, 0.22f, 0.28f, 0.60f};
-        t.editorGridLine = {0.28f, 0.30f, 0.38f, 0.30f};
-        t.nodeBackground = {0.17f, 0.19f, 0.25f, 0.96f};
-        t.nodeBorder     = {0.30f, 0.34f, 0.46f, 0.80f};
-        t.nodeSelection  = {0.26f, 0.59f, 0.98f, 0.80f};
-        t.linkFlow       = {0.90f, 0.92f, 1.00f, 0.80f};
+        // VS 2022 的基调：#1E1E1E（纯灰）带微蓝偏移
+        t.windowBg       = {0.118f, 0.118f, 0.145f, 1.00f};  // #1E1E25
+        t.childBg        = {0.110f, 0.110f, 0.135f, 1.00f};  // #1C1C22
+        t.frameBg        = {0.165f, 0.165f, 0.200f, 1.00f};  // #2A2A33
+        t.frameHovered   = {0.220f, 0.230f, 0.300f, 1.00f};  // #383A4D
+        t.frameActive    = {0.265f, 0.290f, 0.420f, 1.00f};  // #444A6B
+        t.header         = {0.180f, 0.200f, 0.280f, 1.00f};  // #2E3347
+        t.headerHovered  = {0.230f, 0.265f, 0.400f, 1.00f};  // #3B4466
+        t.button         = {0.200f, 0.220f, 0.320f, 1.00f};  // #333852
+        t.buttonHovered  = {0.260f, 0.300f, 0.460f, 1.00f};  // #424D75
+        t.text           = {0.870f, 0.880f, 0.920f, 1.00f};  // #DEE0EB
+        t.textDisabled   = {0.430f, 0.440f, 0.500f, 1.00f};  // #6E7080
+        t.scrollbarBg    = {0.080f, 0.080f, 0.100f, 0.85f};
+        t.scrollbarGrab  = {0.250f, 0.260f, 0.340f, 1.00f};
+        t.tabActive      = {0.180f, 0.200f, 0.280f, 1.00f};  // 与 header 同色（VS 风格）
+        t.tabHovered     = {0.230f, 0.265f, 0.400f, 1.00f};
+        t.tab            = {0.130f, 0.133f, 0.168f, 1.00f};  // 非活跃标签微暗
+        t.separator      = {0.200f, 0.210f, 0.270f, 1.00f};  // #333645
+        t.popupBg        = {0.128f, 0.128f, 0.160f, 0.97f};
+        t.editorBg       = {0.118f, 0.118f, 0.145f, 1.00f};
+        t.editorGrid     = {0.180f, 0.185f, 0.225f, 0.50f};
+        t.editorGridLine = {0.220f, 0.230f, 0.280f, 0.25f};
+        t.nodeBackground = {0.150f, 0.155f, 0.195f, 0.97f};
+        t.nodeBorder     = {0.240f, 0.260f, 0.360f, 0.70f};
+        t.nodeSelection  = {0.260f, 0.590f, 0.980f, 0.80f};  // VS 蓝色选中
+        t.linkFlow       = {0.880f, 0.900f, 1.000f, 0.80f};
         m_themes["Dark"] = t;
         m_themeOrder.push_back("Dark");
     }
@@ -147,6 +148,34 @@ void ThemeManager::ApplyPendingNodeEditorStyle()
 void ThemeManager::ApplyImGuiStyle(const EditorTheme& t)
 {
     auto& style = ImGui::GetStyle();
+
+    // ── VS 2022 风格几何参数 ─────────────────────────────────────────────
+    style.WindowPadding     = ImVec2(8.0f, 8.0f);
+    style.FramePadding      = ImVec2(6.0f, 4.0f);
+    style.CellPadding       = ImVec2(4.0f, 2.0f);
+    style.ItemSpacing       = ImVec2(8.0f, 4.0f);
+    style.ItemInnerSpacing  = ImVec2(4.0f, 4.0f);
+    style.IndentSpacing     = 18.0f;
+    style.ScrollbarSize     = 12.0f;
+    style.GrabMinSize       = 8.0f;
+
+    style.WindowBorderSize  = 1.0f;
+    style.ChildBorderSize   = 1.0f;
+    style.PopupBorderSize   = 1.0f;
+    style.FrameBorderSize   = 0.0f;   // VS 风格：输入框不加边框
+    style.TabBorderSize     = 0.0f;
+
+    style.WindowRounding    = 0.0f;   // VS 风格：窗口直角
+    style.ChildRounding     = 0.0f;
+    style.FrameRounding     = 2.0f;   // 微圆角输入框
+    style.PopupRounding     = 2.0f;
+    style.ScrollbarRounding = 2.0f;
+    style.GrabRounding      = 2.0f;
+    style.TabRounding       = 2.0f;   // VS 2022 标签页微圆角
+
+    style.WindowMenuButtonPosition = ImGuiDir_None;  // 不显示窗口菜单按钮
+
+    // ── 颜色 ─────────────────────────────────────────────────────────────
     style.Colors[ImGuiCol_WindowBg]             = t.windowBg;
     style.Colors[ImGuiCol_ChildBg]              = t.childBg;
     style.Colors[ImGuiCol_FrameBg]              = t.frameBg;
@@ -154,15 +183,15 @@ void ThemeManager::ApplyImGuiStyle(const EditorTheme& t)
     style.Colors[ImGuiCol_FrameBgActive]        = t.frameActive;
     style.Colors[ImGuiCol_Header]               = t.header;
     style.Colors[ImGuiCol_HeaderHovered]        = t.headerHovered;
-    style.Colors[ImGuiCol_HeaderActive]         = t.headerHovered;
+    style.Colors[ImGuiCol_HeaderActive]         = ImVec4(t.headerHovered.x * 0.95f, t.headerHovered.y * 0.95f, t.headerHovered.z * 0.95f, 1.0f);
     style.Colors[ImGuiCol_Button]               = t.button;
     style.Colors[ImGuiCol_ButtonHovered]        = t.buttonHovered;
-    style.Colors[ImGuiCol_ButtonActive]         = t.buttonHovered;
+    style.Colors[ImGuiCol_ButtonActive]         = ImVec4(t.buttonHovered.x * 0.85f, t.buttonHovered.y * 0.85f, t.buttonHovered.z * 0.85f, 1.0f);
     style.Colors[ImGuiCol_Text]                 = t.text;
     style.Colors[ImGuiCol_TextDisabled]         = t.textDisabled;
     style.Colors[ImGuiCol_ScrollbarBg]          = t.scrollbarBg;
     style.Colors[ImGuiCol_ScrollbarGrab]        = t.scrollbarGrab;
-    style.Colors[ImGuiCol_ScrollbarGrabHovered] = t.scrollbarGrab;
+    style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(t.scrollbarGrab.x + 0.08f, t.scrollbarGrab.y + 0.08f, t.scrollbarGrab.z + 0.08f, 1.0f);
     style.Colors[ImGuiCol_ScrollbarGrabActive]  = t.frameActive;
     style.Colors[ImGuiCol_Tab]                  = t.tab;
     style.Colors[ImGuiCol_TabHovered]           = t.tabHovered;
@@ -177,12 +206,22 @@ void ThemeManager::ApplyImGuiStyle(const EditorTheme& t)
     style.Colors[ImGuiCol_TitleBgActive]        = t.headerHovered;
     style.Colors[ImGuiCol_TitleBgCollapsed]     = t.windowBg;
     style.Colors[ImGuiCol_MenuBarBg]            = t.childBg;
-    style.Colors[ImGuiCol_CheckMark]            = t.text;
+    style.Colors[ImGuiCol_CheckMark]            = ImVec4(0.40f, 0.70f, 1.00f, 1.00f);  // VS 蓝色勾选
     style.Colors[ImGuiCol_SliderGrab]           = t.scrollbarGrab;
     style.Colors[ImGuiCol_SliderGrabActive]     = t.frameActive;
-    style.Colors[ImGuiCol_ResizeGrip]           = t.separator;
+    style.Colors[ImGuiCol_ResizeGrip]           = ImVec4(t.separator.x, t.separator.y, t.separator.z, 0.25f);
     style.Colors[ImGuiCol_ResizeGripHovered]    = t.headerHovered;
     style.Colors[ImGuiCol_ResizeGripActive]     = t.frameActive;
+    style.Colors[ImGuiCol_Border]               = t.separator;
+    style.Colors[ImGuiCol_BorderShadow]         = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+    style.Colors[ImGuiCol_NavHighlight]         = ImVec4(0.26f, 0.59f, 0.98f, 0.80f);
+    style.Colors[ImGuiCol_TableHeaderBg]        = t.header;
+    style.Colors[ImGuiCol_TableBorderStrong]    = t.separator;
+    style.Colors[ImGuiCol_TableBorderLight]     = ImVec4(t.separator.x, t.separator.y, t.separator.z, 0.50f);
+    style.Colors[ImGuiCol_TableRowBg]           = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+    style.Colors[ImGuiCol_TableRowBgAlt]        = ImVec4(1.0f, 1.0f, 1.0f, 0.03f);
+    style.Colors[ImGuiCol_DragDropTarget]       = ImVec4(0.26f, 0.59f, 0.98f, 0.70f);
+    style.Colors[ImGuiCol_ModalWindowDimBg]     = ImVec4(0.0f, 0.0f, 0.0f, 0.55f);
 }
 
 void ThemeManager::ApplyNodeEditorStyle(const EditorTheme& t)
