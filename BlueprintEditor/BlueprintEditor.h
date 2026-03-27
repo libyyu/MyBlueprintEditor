@@ -148,6 +148,7 @@ public:
 
     // 文件状态
     std::string          filePath;                         // 文件路径（空=未保存的新文件）
+    std::string          untitledName;                     // 未保存时显示的名称（Untitled-N）
     bool                 isDirty = false;                  // 是否有未保存的修改
     bool                 needSetNodePositions = false;     // 加载后需要设置节点位置
     int                  needNavigateToContent = 0;       // >0 时倒计帧数，到 0 时触发居中
@@ -277,7 +278,7 @@ public:
     std::string GetTabName() const
     {
         if (filePath.empty())
-            return "New";
+            return untitledName.empty() ? "New" : untitledName;
         size_t lastSlash = filePath.find_last_of("/\\");
         std::string name = (lastSlash != std::string::npos) ? filePath.substr(lastSlash + 1) : filePath;
         size_t lastDot = name.find_last_of('.');

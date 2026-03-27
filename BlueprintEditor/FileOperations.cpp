@@ -113,6 +113,11 @@ void BlueprintEditor::NewFile(RTBlueprintClass bpClass)
 {
     CreateNewDocument();
 
+    // 给新文档生成编号名（Untitled-1 / Untitled-2 ...）
+    static int s_untitledCounter = 0;
+    ++s_untitledCounter;
+    ActiveDoc()->untitledName = "Untitled-" + std::to_string(s_untitledCounter);
+
     // 设置蓝图类型
     ActiveDoc()->blueprintClass = bpClass;
 
@@ -120,10 +125,7 @@ void BlueprintEditor::NewFile(RTBlueprintClass bpClass)
     ed::SetCurrentEditor(ActiveDoc()->editorContext);
 
     // 更新窗口标题
-    std::string title = "Blueprint Editor - [New]";
-    if (bpClass == RTBlueprintClass::FunctionLibrary)
-        title += " [Library]";
-    SetTitle(title.c_str());
+    SetTitle("Blueprint Editor");
 }
 
 // ============================================================================

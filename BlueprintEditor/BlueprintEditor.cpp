@@ -651,7 +651,20 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
     // ── 搜索框 ────────────────────────────────────────────────────────────
     // 搜索框（static 可接受：右键菜单是瞬态 UI，不关联特定文档）
     static char searchBuf[128] = "";
+    // 菜单刚打开时自动清空并聚焦搜索框
+    static bool s_justOpened = false;
+    if (ImGui::IsWindowAppearing())
+    {
+        searchBuf[0] = '\0';
+        m_CachedSearchFilter.clear();
+        s_justOpened = true;
+    }
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    if (s_justOpened)
+    {
+        ImGui::SetKeyboardFocusHere();
+        s_justOpened = false;
+    }
     bool searchChanged = ImGui::InputTextWithHint(
         "##search", ICON_FA_MAGNIFYING_GLASS " Search nodes...", searchBuf, sizeof(searchBuf));
 
@@ -700,6 +713,24 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
             // 排序：名字字母序
             std::sort(m_CachedSearchResults.begin(), m_CachedSearchResults.end(),
                 [](const RTNodeDef* a, const RTNodeDef* b) { return a->name < b->name; });
+        }
+
+        // ── Enter 快捷：创建第一个搜索结果 ─────────────────────────────────
+        if ((ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter))
+            && !m_CachedSearchResults.empty())
+        {
+            for (const auto* d : m_CachedSearchResults)
+            {
+                if (isLibraryFilteredDef(d)) continue;
+                PushUndoState();
+                result = SpawnNodeByDef(d->id);
+                if (result)
+                    FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d->id));
+                searchBuf[0] = '\0';
+                m_CachedSearchFilter.clear();
+                ImGui::CloseCurrentPopup();
+                break;
+            }
         }
 
         // ── 渲染搜索结果（直接遍历缓存，无 tolower） ──────────────────────
@@ -940,9 +971,16 @@ void BlueprintEditor::CloseDocument(int index)
     if (m_ActiveDocIndex < 0)
         m_ActiveDocIndex = 0;
 
-    // 如果关闭了所有文档，自动创建一个新的
+    // 无文档时清空编辑器上下文，回到欢迎页
     if (m_Documents.empty())
-        CreateNewDocument();
+    {
+        m_ActiveDocIndex = -1;
+        ed::SetCurrentEditor(nullptr);
+    }
+    else
+    {
+        ed::SetCurrentEditor(ActiveDoc()->editorContext);
+    }
 }
 
 // ============================================================================

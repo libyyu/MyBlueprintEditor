@@ -1887,11 +1887,22 @@ void BlueprintEditor::DrawNodeListPanel()
                         }
                     }
                     ImGui::SameLine();
-                    if (ImGui::SmallButton("Edit"))
+                    if (ImGui::SmallButton(ICON_FA_MAGNIFYING_GLASS "##editfunc"))
                     {
-                        // TODO: 后续支持切换子图（暂时 Log 占位）
-                        (void)func;
+                        // 在当前画布中查找并跳转到对应的 Function.Entry 节点
+                        for (const auto& node : doc->nodes)
+                        {
+                            if (node.DefinitionId == "Function.Entry" && node.Name == func.name)
+                            {
+                                ed::ClearSelection();
+                                ed::SelectNode(node.ID, false);
+                                ed::NavigateToSelection();
+                                break;
+                            }
+                        }
                     }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Jump to Function.Entry node");
 
                     ImGui::PopID();
                 }
