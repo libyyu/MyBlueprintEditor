@@ -18,6 +18,7 @@
 #include "BlueprintExporter.h"
 #include "NodeDefinition.h"
 #include "FunctionLibrary.h"
+#include "EventBus.h"
 
 #include <string>
 #include <vector>
@@ -48,6 +49,7 @@ typedef NodeEditor::Runtime::ExecutionResult    RTExecutionResult;
 typedef NodeEditor::Runtime::PinDefinition      RTPinDef;
 typedef NodeEditor::Runtime::VariableDefinition RTVariableDefinition;
 typedef NodeEditor::Runtime::FunctionDefinition RTFunctionDefinition;
+typedef NodeEditor::Runtime::EventBus           RTEventBus;
 typedef NodeEditor::Runtime::NodeCategory       RTNodeCategory;
 typedef NodeEditor::Runtime::DefaultNodeRegistry RTNodeRegistry;
 typedef NodeEditor::Runtime::NodeHandler        RTNodeHandler;

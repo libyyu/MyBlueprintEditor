@@ -1319,6 +1319,34 @@ static void RegisterNodeDefs_Function(INodeRegistry& registry)
         "40A0FF");
 }
 
+static void RegisterNodeDefs_EventBus(INodeRegistry& registry)
+{
+    auto reg = [&registry](const char* id, const char* name, const char* category,
+                  std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
+                  const char* color = "", const char* edType = "")
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
+
+    reg("Event.Fire", "Fire Event", "Event",
+        { MakeFlowPin(""), MakePin("EventName", PinDataType::String), MakePin("Payload", PinDataType::Any) },
+        { MakeFlowPin("") },
+        "FF6040");
+
+    reg("Event.Subscribe", "Bind Event", "Event",
+        { MakeFlowPin(""), MakePin("EventName", PinDataType::String) },
+        { MakeFlowPin(""), MakePin("SubscriptionId", PinDataType::Integer) },
+        "FF6040");
+
+    reg("Event.Unsubscribe", "Unbind Event", "Event",
+        { MakeFlowPin(""), MakePin("SubscriptionId", PinDataType::Integer) },
+        { MakeFlowPin("") },
+        "FF6040");
+
+    reg("Event.OnEvent", "On Event", "Event",
+        {},
+        { MakeFlowPin(""), MakePin("EventName", PinDataType::String), MakePin("Payload", PinDataType::Any) },
+        "FF8060");
+}
+
 void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
 {
     // --- 注册分类 ---
@@ -1357,6 +1385,7 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     RegisterNodeDefs_Conversion(registry);
     RegisterNodeDefs_Event(registry);
     RegisterNodeDefs_Function(registry);
+    RegisterNodeDefs_EventBus(registry);
 }
 
 } // namespace Runtime

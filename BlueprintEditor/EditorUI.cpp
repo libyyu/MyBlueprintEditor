@@ -1913,6 +1913,61 @@ void BlueprintEditor::DrawNodeListPanel()
             ImGui::EndTabItem();
         }
 
+        // ── Events Tab ──────────────────────────────────────────────────────
+        if (ImGui::BeginTabItem(ICON_FA_BOLT " Events"))
+        {
+            auto events = RTEventBus::Get().GetRegisteredEvents();
+            if (events.empty())
+            {
+                ImGui::TextDisabled("No events registered.");
+            }
+            else
+            {
+                static char payloadBuf[256] = {};
+                static std::string fireEventTarget;
+
+                for (const auto& evtName : events)
+                {
+                    ImGui::PushID(evtName.c_str());
+                    ImGui::Text("%s", evtName.c_str());
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Fire"))
+                    {
+                        fireEventTarget = evtName;
+                        ImGui::OpenPopup("##fire_payload");
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Clear"))
+                    {
+                        RTEventBus::Get().ClearEvent(evtName);
+                    }
+                    ImGui::PopID();
+                }
+
+                // Fire payload popup
+                if (ImGui::BeginPopup("##fire_payload"))
+                {
+                    ImGui::Text("Payload for '%s':", fireEventTarget.c_str());
+                    ImGui::InputText("##payload", payloadBuf, sizeof(payloadBuf));
+                    if (ImGui::Button("Send"))
+                    {
+                        RTVariant pl;
+                        pl.type = RTPinDataType::String;
+                        pl.stringValue = std::string(payloadBuf);
+                        RTEventBus::Get().Fire(fireEventTarget, pl);
+                        payloadBuf[0] = '\0';
+                        ImGui::CloseCurrentPopup();
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Cancel"))
+                        ImGui::CloseCurrentPopup();
+                    ImGui::EndPopup();
+                }
+            }
+
+            ImGui::EndTabItem();
+        }
+
         if (ImGui::BeginTabItem(ICON_FA_LIST " Library"))
         {
             DrawNodeLibraryPanel();

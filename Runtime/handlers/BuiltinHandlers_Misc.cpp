@@ -1,5 +1,6 @@
 // Runtime/BuiltinHandlers_Misc.cpp -- Misc 节点处理器
 #include "BuiltinHandlers_Misc.h"
+#include "../EventBus.h"
 
 namespace NodeEditor {
 namespace Runtime {
@@ -124,6 +125,60 @@ void RegisterHandlers_Misc(std::unordered_map<std::string, NodeHandler>& handler
             ctx.SetVariable("__eventbus_payload_" + evtName, Variant());
         }
         ctx.ActivateOutputFlow("");
+        return true;
+    };
+
+    // ── 新版 EventBus 节点（使用全局 EventBus 单例）─────────────────────────
+
+    handlers["Event.Fire"] = [](ExecutionContext& ctx) {
+        std::string evtName = ctx.GetInputValue("EventName").asString();
+        Variant payload     = ctx.GetInputValue("Payload");
+        if (!evtName.empty())
+        {
+            ctx.Log("[EventBus] Fire: " + evtName);
+            EventBus::Get().Fire(evtName, payload);
+        }
+        ctx.ActivateOutputFlow("");
+        return true;
+    };
+
+    handlers["Event.Subscribe"] = [](ExecutionContext& ctx) {
+        std::string evtName = ctx.GetInputValue("EventName").asString();
+        if (!evtName.empty())
+        {
+            int subId = EventBus::Get().Subscribe(evtName, [](const std::string& /*name*/, const Variant& /*pl*/) {
+                // 订阅回调在节点执行中无法直接激活下游，记录为变量供 OnEvent 节点轮询
+            });
+            ctx.SetOutputValue("SubscriptionId", Variant(static_cast<int64_t>(subId)));
+            ctx.Log("[EventBus] Subscribe: " + evtName + " id=" + std::to_string(subId));
+        }
+        ctx.ActivateOutputFlow("");
+        return true;
+    };
+
+    handlers["Event.Unsubscribe"] = [](ExecutionContext& ctx) {
+        int64_t subId = ctx.GetInputValue("SubscriptionId").asInt();
+        EventBus::Get().Unsubscribe(static_cast<int>(subId));
+        ctx.Log("[EventBus] Unsubscribe id=" + std::to_string(subId));
+        ctx.ActivateOutputFlow("");
+        return true;
+    };
+
+    handlers["Event.OnEvent"] = [](ExecutionContext& ctx) {
+        // Event.OnEvent 是纯触发型：在 Execute() 前注册，事件触发时激活下游。
+        // 运行时简化实现：通过变量 "__onevent_pending_<evtname>" 检测事件是否触发。
+        const auto* node = ctx.GetCurrentNode();
+        std::string nodeKey = node ? ("__onevent_node_" + std::to_string(node->id)) : "__onevent_node_0";
+        std::string pendingEvt = ctx.GetVariable(nodeKey + "_evt").asString();
+        if (!pendingEvt.empty())
+        {
+            Variant payload = ctx.GetVariable(nodeKey + "_payload");
+            ctx.SetOutputValue("EventName", Variant(pendingEvt));
+            ctx.SetOutputValue("Payload", payload);
+            // 清除 pending 标志
+            ctx.SetVariable(nodeKey + "_evt", Variant(std::string("")));
+            ctx.ActivateOutputFlow("");
+        }
         return true;
     };
 }
