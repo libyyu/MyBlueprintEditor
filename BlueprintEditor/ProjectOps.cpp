@@ -44,7 +44,7 @@ void BlueprintEditor::OpenProject()
 
     // 按工程 libraries 重新注册节点定义
     SyncProjectLibrariesToRegistry();
-
+    AddRecentProject(m_Project.filePath);
     SetTitle(("Blueprint Editor - [" + m_Project.name + "]").c_str());
     BPLOG("Opened project: " + m_Project.name + " @ " + m_Project.filePath);
 }
@@ -79,6 +79,7 @@ void BlueprintEditor::SaveProjectAs()
     m_Project.filePath  = fs::absolute(path).string();
     m_Project.projectDir = fs::path(m_Project.filePath).parent_path().string();
     SaveBpProject(m_Project, m_Project.filePath);
+    AddRecentProject(m_Project.filePath);
     SetTitle(("Blueprint Editor - [" + m_Project.name + "]").c_str());
 }
 

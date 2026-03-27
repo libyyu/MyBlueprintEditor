@@ -573,41 +573,47 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 NewProject();
             if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Open Project..."))
                 OpenProject();
+            // 最近工程（始终显示，排除当前已打开的工程）
+            if (ImGui::BeginMenu(ICON_FA_CLOCK_ROTATE_LEFT " Recent Projects"))
+            {
+                DrawRecentProjectsMenu();
+                ImGui::EndMenu();
+            }
             if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK " Save Project", nullptr, false, hasProj))
                 SaveProject();
             if (ImGui::MenuItem(ICON_FA_FILE_EXPORT " Save Project As...", nullptr, false, hasProj))
                 SaveProjectAs();
-            ImGui::Separator();
-            // ── 蓝图（仅有工程时可用）─────────────────────────────────────
-            if (ImGui::MenuItem(ICON_FA_FILE " New Actor Blueprint", "Ctrl+N", false, hasProj))
-                NewFile(RTBlueprintClass::Actor);
-            if (ImGui::MenuItem(ICON_FA_CUBE " New Function Library", nullptr, false, hasProj))
-                NewFile(RTBlueprintClass::FunctionLibrary);
-            if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Open Blueprint...", "Ctrl+O", false, hasProj))
-                OpenFile();
+            // ── 蓝图（仅有工程时显示）─────────────────────────────────────
             if (hasProj)
             {
+                ImGui::Separator();
+                if (ImGui::MenuItem(ICON_FA_FILE " New Actor Blueprint", "Ctrl+N"))
+                    NewFile(RTBlueprintClass::Actor);
+                if (ImGui::MenuItem(ICON_FA_CUBE " New Function Library"))
+                    NewFile(RTBlueprintClass::FunctionLibrary);
+                if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Open Blueprint...", "Ctrl+O"))
+                    OpenFile();
                 if (ImGui::BeginMenu(ICON_FA_CLOCK_ROTATE_LEFT " Recent Files"))
                 {
                     DrawRecentFilesMenu();
                     ImGui::EndMenu();
                 }
-            }
-            ImGui::Separator();
-            if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK " Save", "Ctrl+S", false, hasDoc))
-                SaveFile();
-            if (ImGui::MenuItem(ICON_FA_FILE_EXPORT " Save As...", "Ctrl+Shift+S", false, hasDoc))
-                SaveFileAs();
-            ImGui::Separator();
-            if (ImGui::MenuItem(ICON_FA_XMARK " Close Tab", "Ctrl+W", false, hasDoc))
-            {
-                if (ActiveDoc()->isDirty)
+                ImGui::Separator();
+                if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK " Save", "Ctrl+S", false, hasDoc))
+                    SaveFile();
+                if (ImGui::MenuItem(ICON_FA_FILE_EXPORT " Save As...", "Ctrl+Shift+S", false, hasDoc))
+                    SaveFileAs();
+                ImGui::Separator();
+                if (ImGui::MenuItem(ICON_FA_XMARK " Close Tab", "Ctrl+W", false, hasDoc))
                 {
-                    m_PendingCloseTabIndex = m_ActiveDocIndex;
-                    m_ShowUnsavedDialog = true;
+                    if (ActiveDoc()->isDirty)
+                    {
+                        m_PendingCloseTabIndex = m_ActiveDocIndex;
+                        m_ShowUnsavedDialog = true;
+                    }
+                    else
+                        CloseDocument(m_ActiveDocIndex);
                 }
-                else
-                    CloseDocument(m_ActiveDocIndex);
             }
             ImGui::EndMenu();
         }
@@ -1671,6 +1677,7 @@ static void DrawNewProjectDialog(BlueprintEditor* editor, bool& show, char* name
                 editor->m_Project.projectDir = std::filesystem::path(editor->m_Project.filePath)
                                                .parent_path().string();
                 SaveBpProject(editor->m_Project, editor->m_Project.filePath);
+                editor->AddRecentProject(editor->m_Project.filePath);
                 BPLOG("Created new project: " + name);
                 editor->SetTitle(("Blueprint Editor - [" + name + "]").c_str());
             }

@@ -487,6 +487,14 @@ struct BlueprintEditor : public Application
     void  SaveRecentFiles();
     void  LoadRecentFiles();
 
+    // 最近打开的工程
+    static const int MaxRecentProjects = 8;
+    std::vector<std::string> m_RecentProjects;
+    void  AddRecentProject(const std::string& path);
+    void  DrawRecentProjectsMenu();
+    void  SaveRecentProjects();
+    void  LoadRecentProjects();
+
     // ------------------------------------------------------------------
     // 节点对齐（Align Selected Nodes）
     // ------------------------------------------------------------------

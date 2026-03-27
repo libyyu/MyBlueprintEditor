@@ -981,3 +981,109 @@ void BlueprintEditor::DrawRecentFilesMenu()
         SaveRecentFiles();  // 同步清空磁盘文件
     }
 }
+
+// ============================================================================
+// 最近工程列表
+// ============================================================================
+
+static const char* kRecentProjectsName = "Blueprint Editor.recent_projects.txt";
+
+void BlueprintEditor::AddRecentProject(const std::string& path)
+{
+    std::string normalized = NormalizePath(path);
+    m_RecentProjects.erase(
+        std::remove_if(m_RecentProjects.begin(), m_RecentProjects.end(),
+            [&normalized](const std::string& e) {
+                return NormalizePath(e) == normalized;
+            }),
+        m_RecentProjects.end());
+    m_RecentProjects.insert(m_RecentProjects.begin(), normalized);
+    while (static_cast<int>(m_RecentProjects.size()) > MaxRecentProjects)
+        m_RecentProjects.pop_back();
+    SaveRecentProjects();
+}
+
+void BlueprintEditor::SaveRecentProjects()
+{
+    std::string content;
+    for (const auto& p : m_RecentProjects)
+        content += p + "\n";
+    auto fs = ::NodeEditor::Runtime::GetDefaultFileSystem();
+    std::string err;
+    fs->WriteFile(kRecentProjectsName, content, err);
+}
+
+void BlueprintEditor::LoadRecentProjects()
+{
+    auto fs = ::NodeEditor::Runtime::GetDefaultFileSystem();
+    std::string fileContent, err;
+    if (!fs->ReadFile(kRecentProjectsName, fileContent, err)) return;
+
+    m_RecentProjects.clear();
+    std::istringstream iss(fileContent);
+    std::string line;
+    while (std::getline(iss, line))
+    {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.empty()) continue;
+        std::string normalized = NormalizePath(line);
+        bool dup = false;
+        for (const auto& e : m_RecentProjects)
+            if (NormalizePath(e) == normalized) { dup = true; break; }
+        if (!dup)
+            m_RecentProjects.push_back(normalized);
+    }
+    while (static_cast<int>(m_RecentProjects.size()) > MaxRecentProjects)
+        m_RecentProjects.pop_back();
+}
+
+void BlueprintEditor::DrawRecentProjectsMenu()
+{
+    // 过滤掉当前已打开的工程
+    std::string currentProjPath = NormalizePath(m_Project.filePath);
+
+    // 收集显示列表（排除当前工程）
+    std::vector<std::string> display;
+    for (const auto& p : m_RecentProjects)
+        if (NormalizePath(p) != currentProjPath)
+            display.push_back(p);
+
+    if (display.empty())
+    {
+        ImGui::MenuItem("(No Recent Projects)", nullptr, false, false);
+        return;
+    }
+
+    for (int i = 0; i < static_cast<int>(display.size()); ++i)
+    {
+        const auto& path = display[i];
+        size_t lastSlash = path.find_last_of("/\\");
+        std::string name = (lastSlash != std::string::npos) ? path.substr(lastSlash + 1) : path;
+        // 去掉 .bp.proj 后缀，显示更干净
+        if (name.size() > 8 && name.substr(name.size() - 8) == ".bp.proj")
+            name = name.substr(0, name.size() - 8);
+
+        std::string label = std::to_string(i + 1) + ". " + name;
+        if (ImGui::MenuItem(label.c_str()))
+        {
+            BpProject proj;
+            if (LoadBpProject(proj, path))
+            {
+                CloseProject();
+                m_Project = std::move(proj);
+                SyncProjectLibrariesToRegistry();
+                SetTitle(("Blueprint Editor - [" + m_Project.name + "]").c_str());
+                AddRecentProject(m_Project.filePath);
+            }
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", path.c_str());
+    }
+
+    ImGui::Separator();
+    if (ImGui::MenuItem("Clear Recent Projects"))
+    {
+        m_RecentProjects.clear();
+        SaveRecentProjects();
+    }
+}
