@@ -3,33 +3,34 @@
     "metadata": {
         "schemaVersion": 2,
         "blueprintClass": 1,
-        "name": "TestBP.Lib01",
+        "name": "TestBP.Lib.01",
         "description": "Blueprint Editor file",
         "version": ""
     },
     "nodes": [
         {
             "id": 1,
-            "definitionId": "PrintString",
+            "definitionId": "Function.Entry",
             "definitionVersion": 1,
-            "name": "Print String",
+            "name": "NewFunction_1",
             "pins": [
                 {
                     "id": 2,
-                    "kind": 0,
+                    "kind": 1,
                     "dataType": 0,
                     "isExec": true
-                },
-                {
-                    "id": 3,
-                    "kind": 0,
-                    "dataType": 4,
-                    "name": "In String",
-                    "defaultValue": ""
-                },
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "definitionId": "Function.Return",
+            "definitionVersion": 1,
+            "name": "NewFunction_1",
+            "pins": [
                 {
                     "id": 4,
-                    "kind": 1,
+                    "kind": 0,
                     "dataType": 0,
                     "isExec": true
                 }
@@ -37,6 +38,12 @@
         }
     ],
     "links": [
+        {
+            "id": 5,
+            "startPinId": 2,
+            "endPinId": 4,
+            "isEnabled": true
+        }
     ],
     "functions": [
         {
