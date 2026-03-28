@@ -404,11 +404,11 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
         ++s_funcLibDepth;
         struct FuncLibDepthGuard { ~FuncLibDepthGuard() { --s_funcLibDepth; } } _guard;
 
-        // 从 definitionId 提取 funcId（第三段：FuncLib.<stem>.<funcId>）
+        // 从 definitionId 提取 funcId（最后一段：FuncLib.<stem...>.<funcId>）
+        // 例：FuncLib.TestBp.Lib.01.func_1 → funcId = "func_1"
         std::string defId = node.definitionId;
-        size_t first = defId.find('.');          // pos of first '.'
-        size_t second = (first != std::string::npos) ? defId.find('.', first + 1) : std::string::npos;
-        std::string funcId = (second != std::string::npos) ? defId.substr(second + 1) : "";
+        size_t lastDot = defId.rfind('.');
+        std::string funcId = (lastDot != std::string::npos) ? defId.substr(lastDot + 1) : defId;
 
         // 先从当前蓝图自身的函数列表中找（内部函数库）
         bool found = false;

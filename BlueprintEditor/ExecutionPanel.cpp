@@ -121,13 +121,16 @@ void BlueprintEditor::ExecuteBlueprint()
     // 2. 使用持久 Runner（这样 Delay 等异步操作注册的 timer 不会随局部变量销毁）
     ActiveDoc()->persistentRunner.ResetState();
     ActiveDoc()->persistentRunner.m_withEditor = true;  // friend 权限：标记在编辑器环境下运行
-    ActiveDoc()->persistentRunner.SetLogCallback([this](::NodeEditor::Runtime::LogLevel /*level*/, const std::string& msg) {
-        ActiveDoc()->executionLog.push_back(msg);
-        ActiveDoc()->executionLogDirty = true;
+
+    // 捕获当前文档指针快照（而非每次调用 ActiveDoc()，防止标签页切换后回调写入错误文档）
+    BlueprintDocument* capturedDoc = ActiveDoc();
+    ActiveDoc()->persistentRunner.SetLogCallback([capturedDoc](::NodeEditor::Runtime::LogLevel /*level*/, const std::string& msg) {
+        capturedDoc->executionLog.push_back(msg);
+        capturedDoc->executionLogDirty = true;
     });
-    ActiveDoc()->persistentRunner.SetPrintCallback([this](::NodeEditor::Runtime::LogLevel /*level*/, const std::string& msg) {
-        ActiveDoc()->executionLog.push_back(msg);
-        ActiveDoc()->executionLogDirty = true;
+    ActiveDoc()->persistentRunner.SetPrintCallback([capturedDoc](::NodeEditor::Runtime::LogLevel /*level*/, const std::string& msg) {
+        capturedDoc->executionLog.push_back(msg);
+        capturedDoc->executionLogDirty = true;
     });
 
     if (!ActiveDoc()->persistentRunner.Load(bp))
@@ -199,10 +202,9 @@ void BlueprintEditor::ExecuteBlueprint()
     if (m_DefaultHandler)
         ActiveDoc()->persistentRunner.SetDefaultHandler(m_DefaultHandler);
 
-    // 注册断点回调
-    ActiveDoc()->persistentRunner.SetNodePreExecuteCallback([this](::NodeEditor::Runtime::NodeId nid) -> bool {
-        if (!ActiveDoc()) return false;
-        return ActiveDoc()->breakpoints.count(static_cast<uint64_t>(nid)) > 0;
+    // 注册断点回调（使用捕获的文档指针）
+    ActiveDoc()->persistentRunner.SetNodePreExecuteCallback([capturedDoc](::NodeEditor::Runtime::NodeId nid) -> bool {
+        return capturedDoc->breakpoints.count(static_cast<uint64_t>(nid)) > 0;
     });
 
     // 4. 执行
