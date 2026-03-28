@@ -3152,10 +3152,11 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
 
     ImGui::Indent(4.0f);
     bool inputsChanged = false;
+    int inputDeleteIdx = -1;
     for (int i = 0; i < (int)func.inputs.size(); ++i)
     {
         auto& param = func.inputs[i];
-        ImGui::PushID(("fi" + std::to_string(i)).c_str());
+        ImGui::PushID(i);
 
         // 类型下拉
         int typeIdx = dataTypeToIndex(param.dataType);
@@ -3168,15 +3169,34 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
             inputsChanged = true;
         }
 
-        // 名称编辑
+        // 名称编辑（每个参数独立 buffer，避免 static 共享导致卡死）
         ImGui::SameLine();
-        static char nameBuf[64] = {};
+        char nameBuf[64];
         snprintf(nameBuf, sizeof(nameBuf), "%s", param.name.c_str());
         ImGui::SetNextItemWidth(paneWidth - 130.0f);
         if (ImGui::InputText("##name", nameBuf, sizeof(nameBuf), ImGuiInputTextFlags_EnterReturnsTrue))
         {
+            // 检查重名：若与其他参数同名则加序号
+            std::string newName(nameBuf);
+            if (newName.empty()) newName = "Input_" + std::to_string(i);
+            // 检测重名（与 inputs 和 outputs 所有其他参数）
+            auto isNameTaken = [&](const std::string& n, int skipIdx) -> bool {
+                for (int k = 0; k < (int)func.inputs.size(); ++k)
+                    if (k != skipIdx && func.inputs[k].name == n) return true;
+                for (const auto& o : func.outputs)
+                    if (o.name == n) return true;
+                return false;
+            };
+            if (isNameTaken(newName, i))
+            {
+                int suffix = 2;
+                std::string candidate;
+                do { candidate = newName + "_" + std::to_string(suffix++); }
+                while (isNameTaken(candidate, i));
+                newName = candidate;
+            }
             PushUndoState();
-            param.name = nameBuf;
+            param.name = newName;
             doc->isDirty = true;
             inputsChanged = true;
         }
@@ -3184,25 +3204,36 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
         // 删除按钮
         ImGui::SameLine();
         if (ImGui::SmallButton(ICON_FA_TRASH "##del"))
-        {
-            PushUndoState();
-            func.inputs.erase(func.inputs.begin() + i);
-            doc->isDirty = true;
-            inputsChanged = true;
-            ImGui::PopID();
-            --i;
-            continue;
-        }
+            inputDeleteIdx = i;
 
         ImGui::PopID();
     }
+    // 延迟删除（避免在迭代中修改 vector）
+    if (inputDeleteIdx >= 0)
+    {
+        PushUndoState();
+        func.inputs.erase(func.inputs.begin() + inputDeleteIdx);
+        doc->isDirty = true;
+        inputsChanged = true;
+    }
 
-    // 添加输入参数按钮
+    // 添加输入参数按钮（自动生成唯一名称）
     if (ImGui::SmallButton(ICON_FA_PLUS " Add Input"))
     {
         PushUndoState();
         RTVariableDefinition newParam;
-        newParam.name = "NewInput";
+        // 生成唯一名称
+        std::string baseName = "NewInput";
+        std::string candidate = baseName;
+        int suffix = 1;
+        auto isNameUsed = [&](const std::string& n) -> bool {
+            for (const auto& p : func.inputs)  if (p.name == n) return true;
+            for (const auto& p : func.outputs) if (p.name == n) return true;
+            return false;
+        };
+        while (isNameUsed(candidate))
+            candidate = baseName + "_" + std::to_string(suffix++);
+        newParam.name = candidate;
         newParam.dataType = RTPinDataType::Float;
         func.inputs.push_back(std::move(newParam));
         doc->isDirty = true;
@@ -3233,10 +3264,11 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
 
     ImGui::Indent(4.0f);
     bool outputsChanged = false;
+    int outputDeleteIdx = -1;
     for (int i = 0; i < (int)func.outputs.size(); ++i)
     {
         auto& param = func.outputs[i];
-        ImGui::PushID(("fo" + std::to_string(i)).c_str());
+        ImGui::PushID(i + 1000);  // 偏移避免与 inputs PushID 冲突
 
         // 类型下拉
         int typeIdx = dataTypeToIndex(param.dataType);
@@ -3249,15 +3281,32 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
             outputsChanged = true;
         }
 
-        // 名称编辑
+        // 名称编辑（独立 buffer）
         ImGui::SameLine();
-        static char nameBuf[64] = {};
+        char nameBuf[64];
         snprintf(nameBuf, sizeof(nameBuf), "%s", param.name.c_str());
         ImGui::SetNextItemWidth(paneWidth - 130.0f);
         if (ImGui::InputText("##name", nameBuf, sizeof(nameBuf), ImGuiInputTextFlags_EnterReturnsTrue))
         {
+            std::string newName(nameBuf);
+            if (newName.empty()) newName = "Output_" + std::to_string(i);
+            auto isNameTaken = [&](const std::string& n, int skipIdx) -> bool {
+                for (int k = 0; k < (int)func.outputs.size(); ++k)
+                    if (k != skipIdx && func.outputs[k].name == n) return true;
+                for (const auto& inp : func.inputs)
+                    if (inp.name == n) return true;
+                return false;
+            };
+            if (isNameTaken(newName, i))
+            {
+                int suffix = 2;
+                std::string candidate;
+                do { candidate = newName + "_" + std::to_string(suffix++); }
+                while (isNameTaken(candidate, i));
+                newName = candidate;
+            }
             PushUndoState();
-            param.name = nameBuf;
+            param.name = newName;
             doc->isDirty = true;
             outputsChanged = true;
         }
@@ -3265,25 +3314,35 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
         // 删除按钮
         ImGui::SameLine();
         if (ImGui::SmallButton(ICON_FA_TRASH "##del"))
-        {
-            PushUndoState();
-            func.outputs.erase(func.outputs.begin() + i);
-            doc->isDirty = true;
-            outputsChanged = true;
-            ImGui::PopID();
-            --i;
-            continue;
-        }
+            outputDeleteIdx = i;
 
         ImGui::PopID();
     }
+    // 延迟删除
+    if (outputDeleteIdx >= 0)
+    {
+        PushUndoState();
+        func.outputs.erase(func.outputs.begin() + outputDeleteIdx);
+        doc->isDirty = true;
+        outputsChanged = true;
+    }
 
-    // 添加输出参数按钮
+    // 添加输出参数按钮（自动生成唯一名称）
     if (ImGui::SmallButton(ICON_FA_PLUS " Add Output"))
     {
         PushUndoState();
         RTVariableDefinition newParam;
-        newParam.name = "NewOutput";
+        std::string baseName = "NewOutput";
+        std::string candidate = baseName;
+        int suffix = 1;
+        auto isNameUsed = [&](const std::string& n) -> bool {
+            for (const auto& p : func.outputs) if (p.name == n) return true;
+            for (const auto& p : func.inputs)  if (p.name == n) return true;
+            return false;
+        };
+        while (isNameUsed(candidate))
+            candidate = baseName + "_" + std::to_string(suffix++);
+        newParam.name = candidate;
         newParam.dataType = RTPinDataType::Float;
         func.outputs.push_back(std::move(newParam));
         doc->isDirty = true;

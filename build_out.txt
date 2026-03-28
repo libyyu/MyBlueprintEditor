@@ -2,14 +2,14 @@
 
   Copying resources to output directory
   crude_json.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Utils\Json\Release\crude_json.lib
-  BlueprintRunner.cpp
-    正在创建库 C:/Users/maxweili/MyProjects/MyBlueprintEditor/build/Runtime/Release/BlueprintRuntime.lib 和对象 C:/Users/maxweili/MyProjects/MyBlueprintEditor/build/Runtime/Release/BlueprintRuntime.exp
   BlueprintRuntime.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\BlueprintRuntime.dll
   imgui.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\imgui.lib
   ImGuiNodeEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\ImGuiNodeEditor.lib
   dxerr.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\dxerr.lib
   Application.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\Application.lib
-  BlueprintEditor.cpp
+  EditorUI.cpp
+  main.cpp
+  正在生成代码...
   BlueprintEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\BlueprintEditor.exe
   basic-interaction-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\basic-interaction-example.exe
   canvas-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\canvas-example.exe
