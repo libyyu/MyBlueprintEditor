@@ -111,6 +111,13 @@ void BlueprintEditor::ClearEditor()
 
 void BlueprintEditor::NewFile(RTBlueprintClass bpClass)
 {
+    // 帧级防抖：同一帧内多次调用（如双击按钮）只生效一次
+    static int s_lastNewFileFrame = -1;
+    int curFrame = ImGui::GetFrameCount();
+    if (curFrame == s_lastNewFileFrame)
+        return;
+    s_lastNewFileFrame = curFrame;
+
     CreateNewDocument();
 
     // 给新文档生成编号名（Untitled-1 / Untitled-2 ...）
