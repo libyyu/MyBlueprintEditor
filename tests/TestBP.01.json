@@ -412,6 +412,33 @@
                     "name": "Output"
                 }
             ]
+        },
+        {
+            "id": 76,
+            "definitionId": "FuncLib.TestBp.Lib.01.func_1",
+            "definitionVersion": 1,
+            "name": "TestFunc1",
+            "pins": [
+                {
+                    "id": 77,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 78,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "NewInput",
+                    "defaultValue": "call lib"
+                },
+                {
+                    "id": 79,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
         }
     ],
     "links": [
@@ -509,6 +536,12 @@
             "id": 75,
             "startPinId": 59,
             "endPinId": 48,
+            "isEnabled": true
+        },
+        {
+            "id": 80,
+            "startPinId": 39,
+            "endPinId": 77,
             "isEnabled": true
         }
     ]

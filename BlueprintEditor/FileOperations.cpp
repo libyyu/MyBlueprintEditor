@@ -576,7 +576,12 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
         // ============================================================
         bool reconcileChanged = false;
         
-        if (def)
+        // Function.Entry / Function.Return 节点的引脚由 SyncFunctionPinsToNodes 动态管理，
+        // 不参与静态定义调和（否则自定义参数引脚会被误判为孤立引脚）
+        bool skipReconcile = (node.DefinitionId == "Function.Entry" ||
+                              node.DefinitionId == "Function.Return");
+
+        if (def && !skipReconcile)
         {
             // ---- 辅助 lambda：判断引脚名是否存在于 PinDef 列表中 ----
             auto pinExistsInDef = [](const std::string& pinName, PinType pinType,
@@ -813,7 +818,7 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
     }
     
     BuildNodes();
-    
+
     // 创建链接
     for (const auto& rtLink : data.links)
     {
@@ -834,6 +839,11 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
                 ActiveDoc()->links.back().Color = GetIconColor(GetLinkColor(startPin, endPin));
         }
     }
+
+    // 链接创建完成后，同步 Function.Entry/Return 节点引脚与函数定义一致
+    // （SyncFunctionPinsToNodes 会复用同名同类型的旧引脚，保持现有连线有效）
+    for (const auto& func : ActiveDoc()->functions)
+        SyncFunctionPinsToNodes(func);
     
     // 保存加载数据和 ID 映射，用于延迟设置节点位置
     ActiveDoc()->pendingLoadData = data;
