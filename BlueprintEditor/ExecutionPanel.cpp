@@ -306,12 +306,7 @@ void BlueprintEditor::ExecuteBlueprint()
 
 void BlueprintEditor::ShowExecutionPanel(float paneWidth)
 {
-    ImGui::GetWindowDrawList()->AddRectFilled(
-        ImGui::GetCursorScreenPos(),
-        ImGui::GetCursorScreenPos() + ImVec2(paneWidth, ImGui::GetTextLineHeight()),
-        ImColor(ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]), ImGui::GetTextLineHeight() * 0.25f);
-    ImGui::Spacing(); ImGui::SameLine();
-    ImGui::TextUnformatted("Execution");
+    if (!ActiveDoc()) return;   // 无文档时跳过
 
     // ── 工具栏 ──────────────────────────────────────────────────────────
     auto& runner = ActiveDoc()->persistentRunner;

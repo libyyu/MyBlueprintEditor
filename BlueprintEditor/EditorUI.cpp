@@ -1468,7 +1468,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         if (m_ShowExecutionWindow)
         {
             ImGui::BeginChild("##BottomPanel", ImVec2(rightWidth, bottomHeight), true);
-            DrawExecutionPanel();
+            ShowExecutionPanel(rightWidth);
             ImGui::EndChild();
         }
     }
