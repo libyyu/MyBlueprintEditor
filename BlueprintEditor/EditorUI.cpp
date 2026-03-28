@@ -710,117 +710,153 @@ void BlueprintEditor::OnFrame(float deltaTime)
     ImVec2 editorMin(0, 0), editorMax(0, 0);
     ImGui::BeginGroup();
     {
-        // ── 无文档时：根据工程状态显示优雅的占位提示 ──────────────────
+        // ── 无文档时：优雅的欢迎提示页 ──────────────────────────────
         if (m_Documents.empty())
         {
             ImVec2 avail = ImGui::GetContentRegionAvail();
             ImVec2 regionStart = ImGui::GetCursorScreenPos();
+            float baseX = ImGui::GetCursorPosX();
 
-            // 绘制微妙的渐变装饰背景
-            {
-                auto* dl = ImGui::GetWindowDrawList();
-                // 中央淡蓝辉光
-                ImVec2 center(regionStart.x + avail.x * 0.5f, regionStart.y + avail.y * 0.45f);
-                float radius = avail.x * 0.25f;
-                dl->AddCircleFilled(center, radius, IM_COL32(30, 80, 140, 12), 64);
-                dl->AddCircleFilled(center, radius * 0.6f, IM_COL32(40, 100, 180, 8), 48);
-            }
-
-            // 居中辅助 lambda
-            auto centerText = [&](const char* text) {
+            // 居中辅助
+            auto centerTextScaled = [&](const char* text, float scale = 1.0f) {
+                float oldScale = ImGui::GetFont()->Scale;
+                ImGui::GetFont()->Scale = scale;
+                ImGui::PushFont(ImGui::GetFont());
                 float w = ImGui::CalcTextSize(text).x;
-                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - w) * 0.5f);
+                ImGui::SetCursorPosX(baseX + (avail.x - w) * 0.5f);
+                ImGui::Text("%s", text);
+                ImGui::GetFont()->Scale = oldScale;
+                ImGui::PopFont();
             };
 
-            auto centerRichText = [&](const std::string& text) {
+            auto centerStringScaled = [&](const std::string& text, float scale = 1.0f) {
+                float oldScale = ImGui::GetFont()->Scale;
+                ImGui::GetFont()->Scale = scale;
+                ImGui::PushFont(ImGui::GetFont());
                 float w = ImGui::CalcTextSize(text.c_str()).x;
-                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - w) * 0.5f);
+                ImGui::SetCursorPosX(baseX + (avail.x - w) * 0.5f);
+                ImGui::Text("%s", text.c_str());
+                ImGui::GetFont()->Scale = oldScale;
+                ImGui::PopFont();
+            };
+
+            // 绘制快捷键行（左：快捷键，右：描述），整体居中
+            auto drawShortcutTable = [&](const std::vector<std::pair<std::string, std::string>>& items)
+            {
+                float keyColW = 180.0f;
+                float descColW = 260.0f;
+                float tableW = keyColW + descColW;
+                float tableStartX = baseX + (avail.x - tableW) * 0.5f;
+
+                for (auto& [key, desc] : items)
+                {
+                    ImGui::SetCursorPosX(tableStartX);
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.50f, 0.55f, 0.70f, 0.9f));
+                    ImGui::Text("%s", key.c_str());
+                    ImGui::PopStyleColor();
+
+                    ImGui::SameLine(tableStartX + keyColW - baseX);
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.40f, 0.44f, 0.55f, 0.7f));
+                    ImGui::Text("%s", desc.c_str());
+                    ImGui::PopStyleColor();
+
+                    ImGui::Spacing();
+                }
             };
 
             if (m_Project.IsOpen())
             {
                 // ── 工程已打开，但尚无蓝图文档 ──
-                float blockH = 140.0f;
-                float offsetY = (avail.y - blockH) * 0.42f;
+                float blockH = 200.0f;
+                float offsetY = (avail.y - blockH) * 0.40f;
                 if (offsetY > 0) ImGui::SetCursorPosY(ImGui::GetCursorPosY() + offsetY);
 
-                // 工程图标 + 名称（高亮）
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.35f, 0.75f, 0.95f, 1.0f));
-                std::string projTitle = ICON_FA_DIAGRAM_PROJECT "  " + m_Project.name;
-                centerRichText(projTitle);
-                ImGui::Text("%s", projTitle.c_str());
+                // 工程图标（大）
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.30f, 0.60f, 0.85f, 0.4f));
+                centerTextScaled(ICON_FA_DIAGRAM_PROJECT, 2.5f);
                 ImGui::PopStyleColor();
 
                 ImGui::Spacing();
 
-                // 副标题提示
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.40f, 0.44f, 0.52f, 1.0f));
-                const char* sub = "No blueprints open yet";
-                centerText(sub);
-                ImGui::Text("%s", sub);
-                ImGui::PopStyleColor();
-
-                ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
-
-                // 快捷操作提示
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.35f, 0.38f, 0.46f, 0.85f));
-                const char* h1 = ICON_FA_KEYBOARD "  Ctrl+N  New Blueprint";
-                centerText(h1); ImGui::Text("%s", h1);
-                ImGui::Spacing();
-                const char* h2 = ICON_FA_KEYBOARD "  Ctrl+O  Open Blueprint";
-                centerText(h2); ImGui::Text("%s", h2);
-                ImGui::Spacing();
-                const char* h3 = ICON_FA_CIRCLE_INFO "  Use the Project panel on the left to manage files";
-                centerText(h3); ImGui::Text("%s", h3);
-                ImGui::PopStyleColor();
-            }
-            else
-            {
-                // ── 无工程打开 ──
-                float blockH = 160.0f;
-                float offsetY = (avail.y - blockH) * 0.42f;
-                if (offsetY > 0) ImGui::SetCursorPosY(ImGui::GetCursorPosY() + offsetY);
-
-                // 大图标
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.30f, 0.35f, 0.45f, 0.6f));
-                const char* bigIcon = ICON_FA_DIAGRAM_PROJECT;
-                ImGui::PushFont(nullptr); // 使用默认字体大小
-                centerText(bigIcon);
-                ImGui::Text("%s", bigIcon);
-                ImGui::PopFont();
-                ImGui::PopStyleColor();
-
-                ImGui::Spacing();
-
-                // 标题
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.50f, 0.55f, 0.65f, 1.0f));
-                const char* title = "Blueprint Editor";
-                centerText(title);
-                ImGui::Text("%s", title);
+                // 工程名称
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.40f, 0.78f, 0.95f, 1.0f));
+                centerStringScaled(m_Project.name, 1.6f);
                 ImGui::PopStyleColor();
 
                 ImGui::Spacing();
 
                 // 副标题
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.38f, 0.42f, 0.50f, 0.8f));
-                const char* sub = "Create or open a project to get started";
-                centerText(sub);
-                ImGui::Text("%s", sub);
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.50f, 0.60f, 0.8f));
+                centerTextScaled("No blueprints open yet", 1.1f);
                 ImGui::PopStyleColor();
 
                 ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
+                ImGui::Spacing(); ImGui::Spacing();
 
-                // 快捷键 / 操作提示
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.35f, 0.38f, 0.46f, 0.75f));
-                const char* h1 = ICON_FA_KEYBOARD "  File > New Project       Create a new project";
-                centerText(h1); ImGui::Text("%s", h1);
-                ImGui::Spacing();
-                const char* h2 = ICON_FA_KEYBOARD "  File > Open Project      Open an existing project";
-                centerText(h2); ImGui::Text("%s", h2);
-                ImGui::Spacing();
-                const char* h3 = ICON_FA_KEYBOARD "  Ctrl+N                   Quick new blueprint";
-                centerText(h3); ImGui::Text("%s", h3);
+                // 分隔线（短居中线段）
+                {
+                    float lineW = 160.0f;
+                    float lineX = regionStart.x + (avail.x - lineW) * 0.5f;
+                    float lineY = ImGui::GetCursorScreenPos().y;
+                    ImGui::GetWindowDrawList()->AddLine(
+                        ImVec2(lineX, lineY), ImVec2(lineX + lineW, lineY),
+                        IM_COL32(80, 100, 140, 60), 1.0f);
+                    ImGui::Spacing(); ImGui::Spacing();
+                }
+
+                // 快捷操作提示
+                drawShortcutTable({
+                    { ICON_FA_KEYBOARD "  Ctrl+N",          "New Blueprint" },
+                    { ICON_FA_KEYBOARD "  Ctrl+O",          "Open Blueprint" },
+                    { ICON_FA_CIRCLE_INFO "  Project Panel",  "Manage files on the left" },
+                });
+            }
+            else
+            {
+                // ── 无工程打开 ──
+                float blockH = 240.0f;
+                float offsetY = (avail.y - blockH) * 0.38f;
+                if (offsetY > 0) ImGui::SetCursorPosY(ImGui::GetCursorPosY() + offsetY);
+
+                // 大图标
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.30f, 0.40f, 0.55f, 0.35f));
+                centerTextScaled(ICON_FA_DIAGRAM_PROJECT, 3.0f);
                 ImGui::PopStyleColor();
+
+                ImGui::Spacing(); ImGui::Spacing();
+
+                // 标题（大号）
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.60f, 0.72f, 1.0f));
+                centerTextScaled("Blueprint Editor", 1.8f);
+                ImGui::PopStyleColor();
+
+                ImGui::Spacing();
+
+                // 副标题
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.42f, 0.46f, 0.56f, 0.75f));
+                centerTextScaled("Create or open a project to get started", 1.1f);
+                ImGui::PopStyleColor();
+
+                ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
+                ImGui::Spacing(); ImGui::Spacing();
+
+                // 分隔线
+                {
+                    float lineW = 200.0f;
+                    float lineX = regionStart.x + (avail.x - lineW) * 0.5f;
+                    float lineY = ImGui::GetCursorScreenPos().y;
+                    ImGui::GetWindowDrawList()->AddLine(
+                        ImVec2(lineX, lineY), ImVec2(lineX + lineW, lineY),
+                        IM_COL32(80, 100, 140, 50), 1.0f);
+                    ImGui::Spacing(); ImGui::Spacing();
+                }
+
+                // 快捷键表格
+                drawShortcutTable({
+                    { ICON_FA_FILE "  File > New Project",   "Create a new project" },
+                    { ICON_FA_FOLDER_OPEN "  File > Open Project",  "Open an existing project" },
+                    { ICON_FA_KEYBOARD "  Ctrl+N",            "Quick new blueprint" },
+                });
             }
 
             ImGui::EndGroup();
