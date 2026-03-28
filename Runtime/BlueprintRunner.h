@@ -424,6 +424,16 @@ public:
     void RegisterExternalFunctions(const std::vector<FunctionDefinition>& funcs);
     void RegisterExternalFunction(const FunctionDefinition& func);
 
+    // 获取已注册的外部库函数表（供子 runner 继承，确保 FuncLib.* 节点在子蓝图中可用）
+    std::vector<FunctionDefinition> GetExternalFunctions() const;
+
+    // 注册完整函数库蓝图数据（含顶层节点图），供 FuncLib.* 节点执行时构建函数子图
+    void RegisterExternalLibrary(const BlueprintData& libData);
+
+    // 获取完整函数库数据表（供子 runner 继承）
+    const std::unordered_map<std::string, BlueprintData>& GetExternalLibraries() const
+    { return m_externalLibraries; }
+
     // ------------------------------------------------------------------
     // 引脚值操作（执行后读取输出）
     // ------------------------------------------------------------------
@@ -633,6 +643,11 @@ private:
     // 依赖 Library 中注册的外部函数（LoadFromFileWithDeps 时填充）
     // key: funcDef.id, value: FunctionDefinition
     std::unordered_map<std::string, FunctionDefinition> m_externalFunctions;
+
+    // 依赖 Library 的完整蓝图数据（LoadFromFileWithDeps 时填充）
+    // key: funcDef.id, value: 完整 BlueprintData（含顶层 nodes/links）
+    // 用于 FuncLib.* 节点执行时从完整节点图中构建函数子图（而非空索引）
+    std::unordered_map<std::string, BlueprintData>      m_externalLibraries;
 
     // 节点处理器注册表
     std::unordered_map<std::string, NodeHandler>        m_handlers;

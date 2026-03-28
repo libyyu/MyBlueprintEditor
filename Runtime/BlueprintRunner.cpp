@@ -145,6 +145,8 @@ bool BlueprintRunner::LoadFromFileWithDeps(const std::string& filePath)
                 if (funcDef.isPublic)
                     m_externalFunctions[funcDef.id] = funcDef;
             }
+            // 同时缓存完整 BlueprintData，供 FuncLib.* 节点执行时构建完整函数子图
+            RegisterExternalLibrary(libResult.data);
         }
     }
 
@@ -459,9 +461,97 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
             if (extIt != m_externalFunctions.end())
             {
                 const auto& funcDef = extIt->second;
+
+                // 优先从完整 Library BlueprintData 中构建函数子图（含完整 pins）
+                // funcDef.nodes/links 只是轻量索引（无 pins），不能直接执行。
+                // 需要从 m_externalLibraries 取完整顶层 nodes/links，
+                // 找到对应 Function.Entry 入口节点，再拓扑提取函数子图。
                 BlueprintData funcBP;
-                funcBP.nodes = funcDef.nodes;
-                funcBP.links = funcDef.links;
+
+                auto libIt = m_externalLibraries.find(funcId);
+                if (libIt != m_externalLibraries.end())
+                {
+                    const BlueprintData& libData = libIt->second;
+
+                    // 找到与 funcDef.name 匹配的 Function.Entry 入口节点
+                    NodeId entryNodeId = 0;
+                    for (const auto& n : libData.nodes)
+                    {
+                        if (n.definitionId == "Function.Entry" && n.name == funcDef.name)
+                        {
+                            entryNodeId = n.id;
+                            break;
+                        }
+                    }
+
+                    if (entryNodeId != 0)
+                    {
+                        // 从入口节点开始，收集所有可达节点和链接（BFS 拓扑提取）
+                        // 建立 pinId → nodeId 的反向索引
+                        std::unordered_map<PinId, NodeId> pinToNode;
+                        for (const auto& n : libData.nodes)
+                            for (const auto& p : n.pins)
+                                pinToNode[p.id] = n.id;
+
+                        // BFS
+                        std::unordered_set<NodeId> visited;
+                        std::queue<NodeId> queue;
+                        queue.push(entryNodeId);
+                        visited.insert(entryNodeId);
+
+                        while (!queue.empty())
+                        {
+                            NodeId curId = queue.front(); queue.pop();
+                            // 找到当前节点的所有输出引脚
+                            for (const auto& n : libData.nodes)
+                            {
+                                if (n.id != curId) continue;
+                                for (const auto& pin : n.pins)
+                                {
+                                    if (pin.kind != PinKind::Output) continue;
+                                    // 通过 links 找到连接的下游节点
+                                    for (const auto& lk : libData.links)
+                                    {
+                                        if (!lk.isEnabled) continue;
+                                        PinId downstream = 0;
+                                        if (lk.startPinId == pin.id)      downstream = lk.endPinId;
+                                        else if (lk.endPinId == pin.id)   downstream = lk.startPinId;
+                                        if (downstream == 0) continue;
+                                        auto nIt = pinToNode.find(downstream);
+                                        if (nIt == pinToNode.end()) continue;
+                                        if (visited.insert(nIt->second).second)
+                                            queue.push(nIt->second);
+                                    }
+                                }
+                                break;
+                            }
+                        }
+
+                        // 收集子图节点和链接
+                        for (const auto& n : libData.nodes)
+                            if (visited.count(n.id)) funcBP.nodes.push_back(n);
+                        for (const auto& lk : libData.links)
+                        {
+                            auto sIt = pinToNode.find(lk.startPinId);
+                            auto eIt = pinToNode.find(lk.endPinId);
+                            if (sIt != pinToNode.end() && visited.count(sIt->second) &&
+                                eIt != pinToNode.end() && visited.count(eIt->second))
+                                funcBP.links.push_back(lk);
+                        }
+                    }
+                    else if (m_logCallback)
+                    {
+                        m_logCallback(LogLevel::Warning,
+                            "FuncLib: Function.Entry not found for '" + funcDef.name + "'");
+                    }
+                }
+                else
+                {
+                    // 降级：直接用 funcDef.nodes/links（可能为空索引，不含 pins）
+                    funcBP.nodes = funcDef.nodes;
+                    funcBP.links = funcDef.links;
+                }
+
                 BlueprintRunner subRunner;
                 subRunner.RegisterHandlers(m_handlers);
                 subRunner.SetParentTimerManager(m_timerManager);
@@ -738,6 +828,25 @@ void BlueprintRunner::RegisterExternalFunctions(const std::vector<FunctionDefini
 {
     for (const auto& f : funcs)
         m_externalFunctions[f.id] = f;
+}
+
+std::vector<FunctionDefinition> BlueprintRunner::GetExternalFunctions() const
+{
+    std::vector<FunctionDefinition> result;
+    result.reserve(m_externalFunctions.size());
+    for (const auto& kv : m_externalFunctions)
+        result.push_back(kv.second);
+    return result;
+}
+
+void BlueprintRunner::RegisterExternalLibrary(const BlueprintData& libData)
+{
+    // 以每个 isPublic 函数的 id 为 key，存入完整 BlueprintData
+    for (const auto& funcDef : libData.functions)
+    {
+        if (funcDef.isPublic)
+            m_externalLibraries[funcDef.id] = libData;
+    }
 }
 
 Variant BlueprintRunner::GetVariable(const std::string& name) const

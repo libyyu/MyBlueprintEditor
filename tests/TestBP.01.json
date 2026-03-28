@@ -5,7 +5,8 @@
         "blueprintClass": 0,
         "name": "TestBP.01",
         "description": "Blueprint Editor file",
-        "version": ""
+        "version": "",
+        "dependencies": ["TestBP.Lib.01.json"]
     },
     "nodes": [
         {

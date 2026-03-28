@@ -484,7 +484,7 @@ static int runBlueprintFromFile(const std::string& filePath, float maxTimeSec, i
     }
     else
     {
-        if (!runner.LoadFromFile(filePath))
+        if (!runner.LoadFromFileWithDeps(filePath))
         {
             std::cerr << "ERROR: " << runner.GetLastError() << std::endl;
             return 1;

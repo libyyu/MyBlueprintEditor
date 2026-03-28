@@ -183,8 +183,23 @@ void RegisterHandlers_Misc(std::unordered_map<std::string, NodeHandler>& handler
     };
 
     // ── Function 系统节点 ──────────────────────────────────────────────────
-    // Function.Entry：函数子图的起点，直接激活下游 exec flow
+    // Function.Entry：函数子图的起点
+    // 将调用方通过 SetVariable 传入的参数值同步到对应输出引脚，再激活下游 exec flow
     handlers["Function.Entry"] = [](ExecutionContext& ctx) {
+        const auto* node = ctx.GetCurrentNode();
+        if (node)
+        {
+            for (const auto& pin : node->pins)
+            {
+                // Function.Entry 的 Output 数据引脚对应函数输入参数
+                if (pin.kind == PinKind::Output && pin.dataType != PinDataType::Unknown && !pin.name.empty())
+                {
+                    Variant val = ctx.GetVariable(pin.name);
+                    if (val.type != PinDataType::Unknown)
+                        ctx.SetOutputValue(pin.id, val);
+                }
+            }
+        }
         ctx.ActivateOutputFlow(std::string(""));
         return true;
     };
