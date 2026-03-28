@@ -710,28 +710,62 @@ void BlueprintEditor::OnFrame(float deltaTime)
     ImVec2 editorMin(0, 0), editorMax(0, 0);
     ImGui::BeginGroup();
     {
-        // ── 无文档时：欢迎占位页，引导用户打开/新建工程 ──────────────────
+        // ── 无文档时：根据工程状态显示不同占位页 ──────────────────
         if (m_Documents.empty())
         {
             ImVec2 avail = ImGui::GetContentRegionAvail();
-            // 垂直居中
-            float offsetY = (avail.y - 120.0f) * 0.5f;
-            if (offsetY > 0) ImGui::SetCursorPosY(ImGui::GetCursorPosY() + offsetY);
-
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.50f, 0.60f, 1.0f));
-            float textW = ImGui::CalcTextSize(ICON_FA_DIAGRAM_PROJECT "  No Project Open").x;
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - textW) * 0.5f);
-            ImGui::Text(ICON_FA_DIAGRAM_PROJECT "  No Project Open");
-            ImGui::Spacing();
             float btnW = 200.0f;
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - btnW) * 0.5f);
-            if (ImGui::Button(ICON_FA_DIAGRAM_PROJECT " New Project", ImVec2(btnW, 0)))
-                NewProject();
-            ImGui::Spacing();
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - btnW) * 0.5f);
-            if (ImGui::Button(ICON_FA_FOLDER_OPEN " Open Project...", ImVec2(btnW, 0)))
-                OpenProject();
-            ImGui::PopStyleColor();
+
+            if (m_Project.IsOpen())
+            {
+                // 工程已打开，但尚无蓝图文档 → 引导新建/打开蓝图
+                float offsetY = (avail.y - 160.0f) * 0.5f;
+                if (offsetY > 0) ImGui::SetCursorPosY(ImGui::GetCursorPosY() + offsetY);
+
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.8f, 1.0f, 1.0f));
+                std::string projTitle = ICON_FA_DIAGRAM_PROJECT "  " + m_Project.name;
+                float textW = ImGui::CalcTextSize(projTitle.c_str()).x;
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - textW) * 0.5f);
+                ImGui::Text("%s", projTitle.c_str());
+                ImGui::PopStyleColor();
+
+                ImGui::Spacing();
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.50f, 0.60f, 1.0f));
+                const char* hint = "Create or open a blueprint to get started.";
+                float hintW = ImGui::CalcTextSize(hint).x;
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - hintW) * 0.5f);
+                ImGui::Text("%s", hint);
+                ImGui::PopStyleColor();
+
+                ImGui::Spacing(); ImGui::Spacing();
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - btnW) * 0.5f);
+                if (ImGui::Button(ICON_FA_FILE " New Blueprint", ImVec2(btnW, 0)))
+                    NewFile(RTBlueprintClass::Actor);
+                ImGui::Spacing();
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - btnW) * 0.5f);
+                if (ImGui::Button(ICON_FA_FOLDER_OPEN " Open Blueprint...", ImVec2(btnW, 0)))
+                    OpenFile();
+            }
+            else
+            {
+                // 无工程 → 引导新建/打开工程
+                float offsetY = (avail.y - 120.0f) * 0.5f;
+                if (offsetY > 0) ImGui::SetCursorPosY(ImGui::GetCursorPosY() + offsetY);
+
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.50f, 0.60f, 1.0f));
+                float textW = ImGui::CalcTextSize(ICON_FA_DIAGRAM_PROJECT "  No Project Open").x;
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - textW) * 0.5f);
+                ImGui::Text(ICON_FA_DIAGRAM_PROJECT "  No Project Open");
+                ImGui::Spacing();
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - btnW) * 0.5f);
+                if (ImGui::Button(ICON_FA_DIAGRAM_PROJECT " New Project", ImVec2(btnW, 0)))
+                    NewProject();
+                ImGui::Spacing();
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - btnW) * 0.5f);
+                if (ImGui::Button(ICON_FA_FOLDER_OPEN " Open Project...", ImVec2(btnW, 0)))
+                    OpenProject();
+                ImGui::PopStyleColor();
+            }
 
             ImGui::EndGroup();
             // 弹框仍需每帧处理
@@ -1040,13 +1074,15 @@ void BlueprintEditor::OnFrame(float deltaTime)
     // ================================================================
     // 变量拖拽放置（在 ed::End 之前，画布仍在 Begin/End 块内）
     // ================================================================
-    // 用 InvisibleButton 覆盖整个编辑器区域，作为 DragDropTarget
+    // 仅当有 DragDrop payload 飞行时才创建 InvisibleButton 接收投放，
+    // 平时不创建，以免截获节点编辑器的拖拽/连线鼠标事件
+    if (ImGui::GetDragDropPayload() != nullptr)
     {
         ImVec2 editorMin = ImGui::GetItemRectMin();
         ImVec2 editorMax = ImGui::GetItemRectMax();
         ImGui::SetCursorScreenPos(editorMin);
         ImGui::InvisibleButton("##canvas_drop_target", editorMax - editorMin,
-                               ImGuiButtonFlags_None);
+                               ImGuiButtonFlags_AllowOverlap);
         if (ImGui::BeginDragDropTarget())
         {
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(VAR_DRAG_DROP_TYPE))

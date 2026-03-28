@@ -283,6 +283,9 @@ void BlueprintEditor::DoSaveFile(const std::string& path)
 
         // 添加到最近文件列表
         AddRecentFile(path);
+
+        // 自动将文档加入当前工程（去重由 AddCurrentDocToProject 处理）
+        AddCurrentDocToProject();
         
         ActiveDoc()->executionLog.push_back("[INFO] Saved: " + path + " (" + 
             std::to_string(result.runtimeBytes) + " + " + 
