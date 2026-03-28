@@ -1821,7 +1821,12 @@ std::string JsonBlueprintExporter::variantToJson(const Variant& value) const
     case PinDataType::Integer:
         return std::to_string(std::get<int64_t>(value.numericValue));
     case PinDataType::Float:
-        return std::to_string(std::get<double>(value.numericValue));
+    {
+        // %.17g: 最短精确往返表示，去除尾零；不用 std::to_string 的 %.6f
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "%.17g", std::get<double>(value.numericValue));
+        return std::string(buf);
+    }
     case PinDataType::String:
         return "\"" + escapeJson(value.stringValue) + "\"";
     case PinDataType::Object:

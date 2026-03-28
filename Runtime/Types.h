@@ -186,7 +186,13 @@ struct Variant
         case PinDataType::String:  return stringValue;
         case PinDataType::Boolean: return std::get<bool>(numericValue) ? "True" : "False";
         case PinDataType::Integer: return std::to_string(std::get<int64_t>(numericValue));
-        case PinDataType::Float:   return std::to_string(std::get<double>(numericValue));
+        case PinDataType::Float:
+        {
+            // 用 %.17g 保证往返精度，同时去除多余的尾零（比 std::to_string 的 %.6f 更准确）
+            char buf[64];
+            std::snprintf(buf, sizeof(buf), "%.17g", std::get<double>(numericValue));
+            return std::string(buf);
+        }
         case PinDataType::Object:  return stringValue.empty() ? "(none)" : stringValue;
         case PinDataType::Array:
         {
