@@ -8,6 +8,14 @@
 #include <algorithm>
 #include <cassert>
 #include <unordered_set>
+#include <queue>
+
+namespace NodeEditor { namespace Runtime {
+// 前向声明（定义在本文件后段）
+static bool BuildFuncSubGraph(const BlueprintData& libData,
+                              const std::string&   entryName,
+                              BlueprintData&       out);
+} }
 #ifndef __EMSCRIPTEN__
 #  include <filesystem>
 #endif
@@ -343,45 +351,73 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
         else
             funcId = m_context.GetInputValue("FunctionId").asString();
 
-        for (const auto& funcDef : m_blueprint.functions)
+        // ── 查找函数定义 + 完整子图 ────────────────────────────────────────
+        const FunctionDefinition* funcDefPtr = nullptr;
+        BlueprintData funcBP;
+        bool subGraphOk = false;
+
+        // 1. 先在当前蓝图自身函数列表里找
+        for (const auto& fd : m_blueprint.functions)
         {
-            if (funcDef.id == funcId || funcDef.name == funcId)
+            if (fd.id == funcId || fd.name == funcId)
             {
-                BlueprintData funcBP;
-                funcBP.nodes = funcDef.nodes;
-                funcBP.links = funcDef.links;
-                BlueprintRunner subRunner;
-                subRunner.RegisterHandlers(m_handlers);
-                subRunner.SetParentTimerManager(m_timerManager);
-                // 继承父 runner 的日志/打印回调，确保函数子图的输出能路由出来
-                if (m_logCallback)   subRunner.SetLogCallback(m_logCallback);
-                if (m_printCallback) subRunner.SetPrintCallback(m_printCallback);
-                if (subRunner.Load(funcBP))
-                    subRunner.Execute();
-                m_context.ActivateOutputFlow(std::string(""));
-                propagatePinValues(node);
-                return true;
+                funcDefPtr = &fd;
+                subGraphOk = BuildFuncSubGraph(m_blueprint, fd.name, funcBP);
+                break;
             }
         }
-
-        // 也从依赖 Library 中注册的外部函数里查找
+        // 2. 再从外部依赖库找
+        if (!funcDefPtr)
         {
             auto extIt = m_externalFunctions.find(funcId);
             if (extIt != m_externalFunctions.end())
             {
-                const auto& funcDef = extIt->second;
-                BlueprintData funcBP;
-                funcBP.nodes = funcDef.nodes;
-                funcBP.links = funcDef.links;
-                BlueprintRunner subRunner;
-                subRunner.RegisterHandlers(m_handlers);
-                subRunner.SetParentTimerManager(m_timerManager);
-                if (m_logCallback)   subRunner.SetLogCallback(m_logCallback);
-                if (m_printCallback) subRunner.SetPrintCallback(m_printCallback);
-                if (subRunner.Load(funcBP))
-                    subRunner.Execute();
+                funcDefPtr = &extIt->second;
+                auto libIt = m_externalLibraries.find(funcId);
+                if (libIt != m_externalLibraries.end())
+                    subGraphOk = BuildFuncSubGraph(*libIt->second, extIt->second.name, funcBP);
             }
         }
+
+        if (funcDefPtr && subGraphOk)
+        {
+            BlueprintRunner subRunner;
+            subRunner.RegisterHandlers(m_handlers);
+            subRunner.SetParentTimerManager(m_timerManager);
+            if (m_logCallback)   subRunner.SetLogCallback(m_logCallback);
+            if (m_printCallback) subRunner.SetPrintCallback(m_printCallback);
+            subRunner.RegisterExternalFunctions(GetExternalFunctions());
+            subRunner.InheritExternalLibraries(m_externalLibraries);
+            // 传递输入引脚值
+            for (const auto& pin : node.pins)
+            {
+                if (pin.kind == PinKind::Input && pin.dataType != PinDataType::Unknown && !pin.name.empty())
+                    subRunner.SetVariable(pin.name, m_context.GetInputValue(pin.name));
+            }
+            if (subRunner.Load(funcBP))
+            {
+                subRunner.Execute();
+                // 回传输出引脚值
+                for (const auto& pin : node.pins)
+                {
+                    if (pin.kind == PinKind::Output && pin.dataType != PinDataType::Unknown && !pin.name.empty())
+                    {
+                        auto val = subRunner.GetVariable(pin.name);
+                        if (val.type != PinDataType::Unknown)
+                            m_context.SetOutputValue(pin.name, val);
+                    }
+                }
+            }
+        }
+        else if (!funcDefPtr && m_logCallback)
+        {
+            m_logCallback(LogLevel::Warning, "Function.Call: function '" + funcId + "' not found");
+        }
+        else if (!subGraphOk && m_logCallback)
+        {
+            m_logCallback(LogLevel::Warning, "Function.Call: Function.Entry not found for '" + funcId + "'");
+        }
+
         m_context.ActivateOutputFlow(std::string(""));
         propagatePinValues(node);
         return true;
@@ -412,178 +448,76 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
         size_t lastDot = defId.rfind('.');
         std::string funcId = (lastDot != std::string::npos) ? defId.substr(lastDot + 1) : defId;
 
-        // 先从当前蓝图自身的函数列表中找（内部函数库）
-        bool found = false;
-        for (const auto& funcDef : m_blueprint.functions)
+        // ── 查找函数定义 + 构建完整子图 ──────────────────────────────────────
+        const FunctionDefinition* funcDefPtr = nullptr;
+        BlueprintData funcBP;
+        bool subGraphOk = false;
+
+        // 1. 先从当前蓝图自身函数列表找（内部函数）
+        for (const auto& fd : m_blueprint.functions)
         {
-            if (funcDef.id == funcId)
+            if (fd.id == funcId)
             {
-                BlueprintData funcBP;
-                funcBP.nodes = funcDef.nodes;
-                funcBP.links = funcDef.links;
-                BlueprintRunner subRunner;
-                subRunner.RegisterHandlers(m_handlers);
-                subRunner.SetParentTimerManager(m_timerManager);
-                if (m_logCallback)   subRunner.SetLogCallback(m_logCallback);
-                if (m_printCallback) subRunner.SetPrintCallback(m_printCallback);
-                // 传递输入引脚值到子 runner 变量
-                for (const auto& pin : node.pins)
-                {
-                    if (pin.kind == PinKind::Input && pin.dataType != PinDataType::Unknown && !pin.name.empty())
-                    {
-                        auto val = m_context.GetInputValue(pin.name);
-                        subRunner.SetVariable(pin.name, val);
-                    }
-                }
-                if (subRunner.Load(funcBP))
-                {
-                    auto subResult = subRunner.Execute();
-                    // 回传输出引脚值
-                    for (const auto& pin : node.pins)
-                    {
-                        if (pin.kind == PinKind::Output && pin.dataType != PinDataType::Unknown && !pin.name.empty())
-                        {
-                            auto val = subRunner.GetVariable(pin.name);
-                            if (val.type != PinDataType::Unknown)
-                                m_context.SetOutputValue(pin.name, val);
-                        }
-                    }
-                }
-                found = true;
+                funcDefPtr = &fd;
+                subGraphOk = BuildFuncSubGraph(m_blueprint, fd.name, funcBP);
                 break;
             }
         }
-
-        // 再从外部依赖库函数中找
-        if (!found)
+        // 2. 再从外部依赖库找
+        if (!funcDefPtr)
         {
             auto extIt = m_externalFunctions.find(funcId);
             if (extIt != m_externalFunctions.end())
             {
-                const auto& funcDef = extIt->second;
-
-                // 优先从完整 Library BlueprintData 中构建函数子图（含完整 pins）
-                // funcDef.nodes/links 只是轻量索引（无 pins），不能直接执行。
-                // 需要从 m_externalLibraries 取完整顶层 nodes/links，
-                // 找到对应 Function.Entry 入口节点，再拓扑提取函数子图。
-                BlueprintData funcBP;
-
+                funcDefPtr = &extIt->second;
                 auto libIt = m_externalLibraries.find(funcId);
                 if (libIt != m_externalLibraries.end())
-                {
-                    const BlueprintData& libData = libIt->second;
-
-                    // 找到与 funcDef.name 匹配的 Function.Entry 入口节点
-                    NodeId entryNodeId = 0;
-                    for (const auto& n : libData.nodes)
-                    {
-                        if (n.definitionId == "Function.Entry" && n.name == funcDef.name)
-                        {
-                            entryNodeId = n.id;
-                            break;
-                        }
-                    }
-
-                    if (entryNodeId != 0)
-                    {
-                        // 从入口节点开始，收集所有可达节点和链接（BFS 拓扑提取）
-                        // 建立 pinId → nodeId 的反向索引
-                        std::unordered_map<PinId, NodeId> pinToNode;
-                        for (const auto& n : libData.nodes)
-                            for (const auto& p : n.pins)
-                                pinToNode[p.id] = n.id;
-
-                        // BFS
-                        std::unordered_set<NodeId> visited;
-                        std::queue<NodeId> queue;
-                        queue.push(entryNodeId);
-                        visited.insert(entryNodeId);
-
-                        while (!queue.empty())
-                        {
-                            NodeId curId = queue.front(); queue.pop();
-                            // 找到当前节点的所有输出引脚
-                            for (const auto& n : libData.nodes)
-                            {
-                                if (n.id != curId) continue;
-                                for (const auto& pin : n.pins)
-                                {
-                                    if (pin.kind != PinKind::Output) continue;
-                                    // 通过 links 找到连接的下游节点
-                                    for (const auto& lk : libData.links)
-                                    {
-                                        if (!lk.isEnabled) continue;
-                                        PinId downstream = 0;
-                                        if (lk.startPinId == pin.id)      downstream = lk.endPinId;
-                                        else if (lk.endPinId == pin.id)   downstream = lk.startPinId;
-                                        if (downstream == 0) continue;
-                                        auto nIt = pinToNode.find(downstream);
-                                        if (nIt == pinToNode.end()) continue;
-                                        if (visited.insert(nIt->second).second)
-                                            queue.push(nIt->second);
-                                    }
-                                }
-                                break;
-                            }
-                        }
-
-                        // 收集子图节点和链接
-                        for (const auto& n : libData.nodes)
-                            if (visited.count(n.id)) funcBP.nodes.push_back(n);
-                        for (const auto& lk : libData.links)
-                        {
-                            auto sIt = pinToNode.find(lk.startPinId);
-                            auto eIt = pinToNode.find(lk.endPinId);
-                            if (sIt != pinToNode.end() && visited.count(sIt->second) &&
-                                eIt != pinToNode.end() && visited.count(eIt->second))
-                                funcBP.links.push_back(lk);
-                        }
-                    }
-                    else if (m_logCallback)
-                    {
-                        m_logCallback(LogLevel::Warning,
-                            "FuncLib: Function.Entry not found for '" + funcDef.name + "'");
-                    }
-                }
-                else
-                {
-                    // 降级：直接用 funcDef.nodes/links（可能为空索引，不含 pins）
-                    funcBP.nodes = funcDef.nodes;
-                    funcBP.links = funcDef.links;
-                }
-
-                BlueprintRunner subRunner;
-                subRunner.RegisterHandlers(m_handlers);
-                subRunner.SetParentTimerManager(m_timerManager);
-                if (m_logCallback)   subRunner.SetLogCallback(m_logCallback);
-                if (m_printCallback) subRunner.SetPrintCallback(m_printCallback);
-                for (const auto& pin : node.pins)
-                {
-                    if (pin.kind == PinKind::Input && pin.dataType != PinDataType::Unknown && !pin.name.empty())
-                    {
-                        auto val = m_context.GetInputValue(pin.name);
-                        subRunner.SetVariable(pin.name, val);
-                    }
-                }
-                if (subRunner.Load(funcBP))
-                {
-                    subRunner.Execute();
-                    for (const auto& pin : node.pins)
-                    {
-                        if (pin.kind == PinKind::Output && pin.dataType != PinDataType::Unknown && !pin.name.empty())
-                        {
-                            auto val = subRunner.GetVariable(pin.name);
-                            if (val.type != PinDataType::Unknown)
-                                m_context.SetOutputValue(pin.name, val);
-                        }
-                    }
-                }
-                found = true;
+                    subGraphOk = BuildFuncSubGraph(*libIt->second, extIt->second.name, funcBP);
             }
         }
 
-        if (!found && m_logCallback)
-            m_logCallback(LogLevel::Warning, "FuncLib: function '" + funcId + "' not found in library");
+        if (!funcDefPtr)
+        {
+            if (m_logCallback)
+                m_logCallback(LogLevel::Warning, "FuncLib: function '" + funcId + "' not found in library");
+        }
+        else if (!subGraphOk)
+        {
+            if (m_logCallback)
+                m_logCallback(LogLevel::Warning,
+                    "FuncLib: Function.Entry not found for '" + funcDefPtr->name + "'");
+        }
+        else
+        {
+            // ── 构造子 runner ───────────────────────────────────────────────
+            BlueprintRunner subRunner;
+            subRunner.RegisterHandlers(m_handlers);
+            subRunner.SetParentTimerManager(m_timerManager);
+            if (m_logCallback)   subRunner.SetLogCallback(m_logCallback);
+            if (m_printCallback) subRunner.SetPrintCallback(m_printCallback);
+            subRunner.RegisterExternalFunctions(GetExternalFunctions());
+            subRunner.InheritExternalLibraries(m_externalLibraries);
+            // 传递输入引脚值
+            for (const auto& pin : node.pins)
+            {
+                if (pin.kind == PinKind::Input && pin.dataType != PinDataType::Unknown && !pin.name.empty())
+                    subRunner.SetVariable(pin.name, m_context.GetInputValue(pin.name));
+            }
+            if (subRunner.Load(funcBP))
+            {
+                subRunner.Execute();
+                // 回传输出引脚值
+                for (const auto& pin : node.pins)
+                {
+                    if (pin.kind == PinKind::Output && pin.dataType != PinDataType::Unknown && !pin.name.empty())
+                    {
+                        auto val = subRunner.GetVariable(pin.name);
+                        if (val.type != PinDataType::Unknown)
+                            m_context.SetOutputValue(pin.name, val);
+                    }
+                }
+            }
+        }
 
         m_context.ActivateOutputFlow(std::string(""));
         propagatePinValues(node);
@@ -841,12 +775,102 @@ std::vector<FunctionDefinition> BlueprintRunner::GetExternalFunctions() const
 
 void BlueprintRunner::RegisterExternalLibrary(const BlueprintData& libData)
 {
-    // 以每个 isPublic 函数的 id 为 key，存入完整 BlueprintData
+    // 所有来自同一个库文件的函数共享同一个 shared_ptr<BlueprintData>，避免冗余拷贝
+    auto shared = std::make_shared<BlueprintData>(libData);
     for (const auto& funcDef : libData.functions)
     {
         if (funcDef.isPublic)
-            m_externalLibraries[funcDef.id] = libData;
+            m_externalLibraries[funcDef.id] = shared;
     }
+}
+
+// ============================================================================
+// BuildFuncSubGraph — 从 BlueprintData 中提取以 entryName 为入口的函数子图
+//
+// 算法：
+//   1. 预建 nodeId→NodeInstance* 和 pinId→nodeId 两个 O(1) 索引
+//   2. 从 Function.Entry（name==entryName）开始 BFS，遍历所有可达节点
+//   3. 收集节点和两端均在子图内的链接，填入 out
+//
+// 返回值：true = 找到入口并构建成功；false = 未找到 Function.Entry
+// ============================================================================
+static bool BuildFuncSubGraph(
+    const BlueprintData& libData,
+    const std::string&   entryName,
+    BlueprintData&       out)
+{
+    // ── 预建索引 ────────────────────────────────────────────────────────────
+    std::unordered_map<NodeId, const NodeInstance*> nodeById;
+    nodeById.reserve(libData.nodes.size());
+    for (const auto& n : libData.nodes)
+        nodeById[n.id] = &n;
+
+    std::unordered_map<PinId, NodeId> pinToNode;
+    for (const auto& n : libData.nodes)
+        for (const auto& p : n.pins)
+            pinToNode[p.id] = n.id;
+
+    // ── 找 Function.Entry 入口 ───────────────────────────────────────────────
+    NodeId entryId = 0;
+    for (const auto& n : libData.nodes)
+    {
+        if (n.definitionId == "Function.Entry" && n.name == entryName)
+        {
+            entryId = n.id;
+            break;
+        }
+    }
+    if (entryId == 0)
+        return false;
+
+    // ── BFS ─────────────────────────────────────────────────────────────────
+    std::unordered_set<NodeId> visited;
+    std::queue<NodeId> bfsQueue;
+    bfsQueue.push(entryId);
+    visited.insert(entryId);
+
+    while (!bfsQueue.empty())
+    {
+        NodeId curId = bfsQueue.front();
+        bfsQueue.pop();
+
+        auto nIt = nodeById.find(curId);
+        if (nIt == nodeById.end()) continue;
+
+        for (const auto& pin : nIt->second->pins)
+        {
+            if (pin.kind != PinKind::Output) continue;
+            for (const auto& lk : libData.links)
+            {
+                if (!lk.isEnabled) continue;
+                PinId downstream = 0;
+                if      (lk.startPinId == pin.id) downstream = lk.endPinId;
+                else if (lk.endPinId   == pin.id) downstream = lk.startPinId;
+                if (downstream == 0) continue;
+
+                auto pIt = pinToNode.find(downstream);
+                if (pIt == pinToNode.end()) continue;
+                if (visited.insert(pIt->second).second)
+                    bfsQueue.push(pIt->second);
+            }
+        }
+    }
+
+    // ── 收集子图 ─────────────────────────────────────────────────────────────
+    out.nodes.reserve(visited.size());
+    for (const auto& n : libData.nodes)
+        if (visited.count(n.id))
+            out.nodes.push_back(n);
+
+    for (const auto& lk : libData.links)
+    {
+        auto sIt = pinToNode.find(lk.startPinId);
+        auto eIt = pinToNode.find(lk.endPinId);
+        if (sIt != pinToNode.end() && visited.count(sIt->second) &&
+            eIt != pinToNode.end() && visited.count(eIt->second))
+            out.links.push_back(lk);
+    }
+    return true;
 }
 
 Variant BlueprintRunner::GetVariable(const std::string& name) const

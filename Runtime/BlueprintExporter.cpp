@@ -488,12 +488,35 @@ std::string JsonBlueprintExporter::exportRuntimeToString(const BlueprintData& da
             }
             oss << "],"; writeNewline();
 
-            // nodes (sub-graph) - serialize node IDs and positions only
+            // nodes (sub-graph) — serialize with full pin data so the runtime
+            // can execute func.nodes directly when top-level nodes are unavailable
             writeIndent(); oss << "\"nodes\": [";
             for (size_t ni = 0; ni < func.nodes.size(); ++ni)
             {
                 const auto& nd = func.nodes[ni];
-                oss << "{\"id\":" << nd.id << ",\"definitionId\":\"" << escapeJson(nd.definitionId) << "\",\"name\":\"" << escapeJson(nd.name) << "\"}";
+                oss << "{\"id\":" << nd.id
+                    << ",\"definitionId\":\"" << escapeJson(nd.definitionId) << "\""
+                    << ",\"name\":\"" << escapeJson(nd.name) << "\"";
+                if (!nd.pins.empty())
+                {
+                    oss << ",\"pins\":[";
+                    for (size_t pi = 0; pi < nd.pins.size(); ++pi)
+                    {
+                        const auto& p = nd.pins[pi];
+                        oss << "{\"id\":" << p.id
+                            << ",\"kind\":" << static_cast<int>(p.kind)
+                            << ",\"dataType\":" << static_cast<int>(p.dataType)
+                            << ",\"isExec\":" << (p.isExec ? "true" : "false");
+                        if (!p.name.empty())
+                            oss << ",\"name\":\"" << escapeJson(p.name) << "\"";
+                        if (p.defaultValue.type != PinDataType::Unknown)
+                            oss << ",\"defaultValue\":" << variantToJson(p.defaultValue);
+                        oss << "}";
+                        if (pi + 1 < nd.pins.size()) oss << ",";
+                    }
+                    oss << "]";
+                }
+                oss << "}";
                 if (ni + 1 < func.nodes.size()) oss << ",";
             }
             oss << "],"; writeNewline();
@@ -1236,6 +1259,24 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
                     nd.id           = static_cast<NodeId>(getNumber(ndJson, "id"));
                     nd.definitionId = getString(ndJson, "definitionId");
                     nd.name         = getString(ndJson, "name");
+                    // 反序列化完整 pin 数据（新格式；旧格式无 pins 字段，跳过兼容）
+                    if (ndJson.contains("pins") && ndJson["pins"].type() == crude_json::type_t::array)
+                    {
+                        for (auto& pinJson : ndJson["pins"].get<crude_json::array>())
+                        {
+                            if (pinJson.type() != crude_json::type_t::object) continue;
+                            PinInfo pin;
+                            pin.id        = static_cast<PinId>(getNumber(pinJson, "id"));
+                            pin.kind      = static_cast<PinKind>(static_cast<int>(getNumber(pinJson, "kind")));
+                            pin.dataType  = static_cast<PinDataType>(static_cast<int>(getNumber(pinJson, "dataType")));
+                            pin.isExec    = pinJson.contains("isExec") && pinJson["isExec"].type() == crude_json::type_t::boolean
+                                            ? pinJson["isExec"].get<bool>() : false;
+                            pin.name      = getString(pinJson, "name");
+                            if (pinJson.contains("defaultValue"))
+                                pin.defaultValue = jsonToVariant(pinJson["defaultValue"].dump(), pin.dataType);
+                            nd.pins.push_back(std::move(pin));
+                        }
+                    }
                     func.nodes.push_back(std::move(nd));
                 }
             }

@@ -428,11 +428,19 @@ public:
     std::vector<FunctionDefinition> GetExternalFunctions() const;
 
     // 注册完整函数库蓝图数据（含顶层节点图），供 FuncLib.* 节点执行时构建函数子图
+    // 同一个库的多个函数共享同一个 shared_ptr<BlueprintData>，避免冗余拷贝
     void RegisterExternalLibrary(const BlueprintData& libData);
 
     // 获取完整函数库数据表（供子 runner 继承）
-    const std::unordered_map<std::string, BlueprintData>& GetExternalLibraries() const
+    const std::unordered_map<std::string, std::shared_ptr<BlueprintData>>& GetExternalLibraries() const
     { return m_externalLibraries; }
+
+    // 将父 runner 的 externalLibraries 共享给子 runner（shared_ptr 共享，零拷贝）
+    void InheritExternalLibraries(const std::unordered_map<std::string, std::shared_ptr<BlueprintData>>& libs)
+    {
+        for (const auto& kv : libs)
+            m_externalLibraries[kv.first] = kv.second;
+    }
 
     // ------------------------------------------------------------------
     // 引脚值操作（执行后读取输出）
@@ -626,10 +634,6 @@ private:
     friend class ExecutionContext;
     friend struct ::BlueprintEditor;  // 仅编辑器可设置 m_withEditor
 
-    // 存活标志：shared_ptr<atomic<bool>>，供异步回调检查 runner 是否已析构
-    // 构造时为 true，析构时设为 false；异步回调持有 shared_ptr 副本，可安全判断
-    std::shared_ptr<std::atomic<bool>>                  m_alive;
-
     // 是否在编辑器环境下运行
     bool                                                m_withEditor = false;
 
@@ -645,9 +649,9 @@ private:
     std::unordered_map<std::string, FunctionDefinition> m_externalFunctions;
 
     // 依赖 Library 的完整蓝图数据（LoadFromFileWithDeps 时填充）
-    // key: funcDef.id, value: 完整 BlueprintData（含顶层 nodes/links）
-    // 用于 FuncLib.* 节点执行时从完整节点图中构建函数子图（而非空索引）
-    std::unordered_map<std::string, BlueprintData>      m_externalLibraries;
+    // key: funcDef.id, value: shared_ptr<BlueprintData>（同一个库的多个函数共享一份数据）
+    // 用于 FuncLib.* / Function.Call 节点执行时从完整节点图中构建函数子图（而非空索引）
+    std::unordered_map<std::string, std::shared_ptr<BlueprintData>> m_externalLibraries;
 
     // 节点处理器注册表
     std::unordered_map<std::string, NodeHandler>        m_handlers;
@@ -673,6 +677,10 @@ private:
 
     // 父级 timer manager（weak_ptr：借用，不拥有；父析构后自动失效）
     std::weak_ptr<FrameTimerManager>                    m_parentTimerManager;
+
+    // 存活标志：shared_ptr<atomic<bool>>，供异步回调检查 runner 是否已析构
+    // 构造时为 true，析构时设为 false；异步回调持有 shared_ptr 副本，可安全判断
+    std::shared_ptr<std::atomic<bool>>                  m_alive;
 
     // 保持子蓝图 runner 存活的容器
     std::vector<std::shared_ptr<BlueprintRunner>>       m_keepAliveRunners;

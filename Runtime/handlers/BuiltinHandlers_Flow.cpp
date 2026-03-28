@@ -206,9 +206,8 @@ void RegisterHandlers_Flow(
             // 将父 runner 的外部函数库（m_externalFunctions）透传给子 runner，
             // 确保子蓝图中引用的 FuncLib.* 节点能找到对应的函数定义。
             subRunner->RegisterExternalFunctions(runner.GetExternalFunctions());
-            // 同时透传完整 Library 数据（含顶层节点图），供 FuncLib.* 节点正确执行
-            for (const auto& kv : runner.GetExternalLibraries())
-                subRunner->RegisterExternalLibrary(kv.second);
+            // 同时透传完整 Library 数据（shared_ptr 共享，零拷贝），供 FuncLib.* 节点正确执行
+            subRunner->InheritExternalLibraries(runner.GetExternalLibraries());
 
             auto execResult = subRunner->Execute();
 
