@@ -1,0 +1,216 @@
+{
+    "fileType": "editor",
+    "metadata": {
+        "author": "",
+        "createdAt": "",
+        "updatedAt": ""
+    },
+    "nodes": [
+        {
+            "id": 1,
+            "position": {
+                "x": 952,
+                "y": 364
+            },
+            "size": {
+                "width": 344,
+                "height": 128
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 11,
+            "position": {
+                "x": 497,
+                "y": 366
+            },
+            "size": {
+                "width": 263,
+                "height": 103
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 16,
+            "position": {
+                "x": 1640,
+                "y": 350
+            },
+            "size": {
+                "width": 263,
+                "height": 103
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 21,
+            "position": {
+                "x": 1656,
+                "y": 510
+            },
+            "size": {
+                "width": 263,
+                "height": 103
+            },
+            "isCollapsed": false
+        }
+    ],
+    "viewInfo": {
+        "viewPosition": { "x": 0, "y": 0 },
+        "viewScale": 1
+    },
+    "runtime": {
+    "fileType": "runtime",
+    "metadata": {
+        "schemaVersion": 2,
+        "blueprintClass": 0,
+        "name": "TestBP.02",
+        "description": "Blueprint Editor file",
+        "version": ""
+    },
+    "nodes": [
+        {
+            "id": 1,
+            "definitionId": "Delay",
+            "definitionVersion": 1,
+            "name": "Delay",
+            "pins": [
+                {
+                    "id": 2,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 3,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Duration",
+                    "defaultValue": 2.000000
+                },
+                {
+                    "id": 4,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "Exec",
+                    "isExec": true
+                },
+                {
+                    "id": 5,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "Completed",
+                    "isExec": true
+                },
+                {
+                    "id": 6,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "TimerHandle"
+                }
+            ]
+        },
+        {
+            "id": 11,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print String",
+            "pins": [
+                {
+                    "id": 12,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 13,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": "Delay Start"
+                },
+                {
+                    "id": 14,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 16,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print String",
+            "pins": [
+                {
+                    "id": 17,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 18,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": "Delay 111"
+                },
+                {
+                    "id": 19,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 21,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print String",
+            "pins": [
+                {
+                    "id": 22,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 23,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": "Delay 222 Completed"
+                },
+                {
+                    "id": 24,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        }
+    ],
+    "links": [
+        {
+            "id": 15,
+            "startPinId": 14,
+            "endPinId": 2,
+            "isEnabled": true
+        },
+        {
+            "id": 20,
+            "startPinId": 4,
+            "endPinId": 17,
+            "isEnabled": true
+        },
+        {
+            "id": 25,
+            "startPinId": 5,
+            "endPinId": 22,
+            "isEnabled": true
+        }
+    ]
+}
+}
