@@ -729,6 +729,17 @@ void BlueprintRunner::SetVariable(const std::string& name, const Variant& value)
     m_state.variables[name] = value;
 }
 
+void BlueprintRunner::RegisterExternalFunction(const FunctionDefinition& func)
+{
+    m_externalFunctions[func.id] = func;
+}
+
+void BlueprintRunner::RegisterExternalFunctions(const std::vector<FunctionDefinition>& funcs)
+{
+    for (const auto& f : funcs)
+        m_externalFunctions[f.id] = f;
+}
+
 Variant BlueprintRunner::GetVariable(const std::string& name) const
 {
     auto it = m_state.variables.find(name);

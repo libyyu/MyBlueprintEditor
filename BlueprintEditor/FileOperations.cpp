@@ -249,6 +249,25 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
             ActiveDoc()->executionLog.push_back("[WARN] " + w);
     }
     ActiveDoc()->executionLogDirty = true;
+
+    // 如果没有打开工程，自动扫描蓝图同目录下的 FunctionLibrary 文件并注册节点
+    // （有工程时由 SyncProjectLibrariesToRegistry 负责）
+    if (!m_Project.IsOpen())
+    {
+        std::string dir;
+        const std::string& fp = ActiveDoc()->filePath;
+        auto slash = fp.find_last_of("/\\");
+        dir = (slash != std::string::npos) ? fp.substr(0, slash) : ".";
+
+        int libCount = ::NodeEditor::Runtime::LoadFunctionLibrary(m_NodeRegistry, dir);
+        if (libCount > 0)
+        {
+            ActiveDoc()->executionLog.push_back(
+                "[INFO] Auto-registered " + std::to_string(libCount) +
+                " library function(s) from: " + dir);
+            m_CachedDefCount = 0;  // 强制重建菜单缓存
+        }
+    }
 }
 
 // ============================================================================

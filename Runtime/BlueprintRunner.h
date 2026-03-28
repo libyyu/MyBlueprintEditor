@@ -420,6 +420,10 @@ public:
     // 获取所有变量
     const std::unordered_map<std::string, Variant>& GetAllVariables() const;
 
+    // 注册外部库函数（供编辑器在 Load 后注入工程库函数，用于 FuncLib.* 节点执行）
+    void RegisterExternalFunctions(const std::vector<FunctionDefinition>& funcs);
+    void RegisterExternalFunction(const FunctionDefinition& func);
+
     // ------------------------------------------------------------------
     // 引脚值操作（执行后读取输出）
     // ------------------------------------------------------------------

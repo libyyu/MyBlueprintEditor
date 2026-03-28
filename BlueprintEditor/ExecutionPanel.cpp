@@ -4,6 +4,9 @@
 #include <ctime>
 #include <chrono>
 #include <unordered_set>
+#ifndef __EMSCRIPTEN__
+#include <filesystem>
+#endif
 
 // 返回 "HH:MM:SS.mmm" 格式的时间戳字符串
 static std::string NowTimestamp()
@@ -133,6 +136,51 @@ void BlueprintEditor::ExecuteBlueprint()
         ActiveDoc()->lastExecutionStatus = "Load Failed";
         ActiveDoc()->isExecuting = false;
         return;
+    }
+
+    // 注入工程库函数到 runner（用于 FuncLib.* 节点执行）
+    // 扫描工程 libraries 或蓝图同目录下的库文件
+    {
+        ::NodeEditor::Runtime::JsonBlueprintExporter exporter;
+        auto tryRegisterLibDir = [&](const std::string& dirPath) {
+#ifndef __EMSCRIPTEN__
+            std::error_code ec;
+            if (!std::filesystem::is_directory(dirPath, ec)) return;
+            for (const auto& entry : std::filesystem::directory_iterator(dirPath, ec))
+            {
+                if (ec) break;
+                if (!entry.is_regular_file()) continue;
+                auto p = entry.path();
+                if (p.extension() != ".json") continue;
+                auto r = exporter.importRuntimeFromFile(p.string());
+                if (!r.success) continue;
+                if (r.data.metadata.blueprintClass != ::NodeEditor::Runtime::BlueprintClass::FunctionLibrary) continue;
+                ActiveDoc()->persistentRunner.RegisterExternalFunctions(r.data.functions);
+            }
+#endif
+        };
+
+        if (m_Project.IsOpen())
+        {
+            // 有工程：从工程 libraries 列表注入
+            for (const auto& libEntry : m_Project.libraries)
+            {
+                std::string absPath = m_Project.AbsPath(libEntry.relativePath);
+                if (absPath.empty()) continue;
+                auto r = exporter.importRuntimeFromFile(absPath);
+                if (!r.success) continue;
+                if (r.data.metadata.blueprintClass != ::NodeEditor::Runtime::BlueprintClass::FunctionLibrary) continue;
+                ActiveDoc()->persistentRunner.RegisterExternalFunctions(r.data.functions);
+            }
+        }
+        else
+        {
+            // 无工程：扫描蓝图同目录下的库文件
+            const std::string& fp = ActiveDoc()->filePath;
+            auto pos = fp.find_last_of("/\\");
+            std::string dir = (pos != std::string::npos) ? fp.substr(0, pos) : ".";
+            tryRegisterLibDir(dir);
+        }
     }
 
     // 3. 用当前文件所在目录重新注册 handlers（确保 ExecuteBlueprint 节点能解析子蓝图的相对路径）

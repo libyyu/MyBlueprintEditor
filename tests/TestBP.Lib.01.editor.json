@@ -7,50 +7,38 @@
     },
     "nodes": [
         {
-            "id": 1,
+            "id": 19,
             "position": {
-                "x": 344,
-                "y": 78
+                "x": 38,
+                "y": 188
+            },
+            "size": {
+                "width": 162,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 21,
+            "position": {
+                "x": 616,
+                "y": 188
+            },
+            "size": {
+                "width": 162,
+                "height": 72
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 26,
+            "position": {
+                "x": 304,
+                "y": 188
             },
             "size": {
                 "width": 168,
                 "height": 100
-            },
-            "isCollapsed": false
-        },
-        {
-            "id": 5,
-            "position": {
-                "x": 360,
-                "y": 257
-            },
-            "size": {
-                "width": 415,
-                "height": 155
-            },
-            "isCollapsed": false
-        },
-        {
-            "id": 27,
-            "position": {
-                "x": -113,
-                "y": 272
-            },
-            "size": {
-                "width": 153,
-                "height": 100
-            },
-            "isCollapsed": false
-        },
-        {
-            "id": 29,
-            "position": {
-                "x": 500,
-                "y": 492
-            },
-            "size": {
-                "width": 153,
-                "height": 72
             },
             "isCollapsed": false
         }
@@ -70,106 +58,61 @@
     },
     "nodes": [
         {
-            "id": 1,
-            "definitionId": "PrintString",
-            "definitionVersion": 1,
-            "name": "Print String",
-            "pins": [
-                {
-                    "id": 2,
-                    "kind": 0,
-                    "dataType": 0,
-                    "isExec": true
-                },
-                {
-                    "id": 3,
-                    "kind": 0,
-                    "dataType": 4,
-                    "name": "In String",
-                    "defaultValue": "lib print called"
-                },
-                {
-                    "id": 4,
-                    "kind": 1,
-                    "dataType": 0,
-                    "isExec": true
-                }
-            ]
-        },
-        {
-            "id": 5,
-            "definitionId": "FormatString",
-            "definitionVersion": 1,
-            "name": "Format String",
-            "pins": [
-                {
-                    "id": 6,
-                    "kind": 0,
-                    "dataType": 4,
-                    "name": "Format",
-                    "defaultValue": "lib print called:{0}{1}{2}{3}"
-                },
-                {
-                    "id": 7,
-                    "kind": 0,
-                    "dataType": 8,
-                    "name": "Arg 0"
-                },
-                {
-                    "id": 8,
-                    "kind": 0,
-                    "dataType": 8,
-                    "name": "Arg 1"
-                },
-                {
-                    "id": 9,
-                    "kind": 0,
-                    "dataType": 8,
-                    "name": "Arg 0"
-                },
-                {
-                    "id": 10,
-                    "kind": 0,
-                    "dataType": 8,
-                    "name": "Arg 1"
-                },
-                {
-                    "id": 11,
-                    "kind": 1,
-                    "dataType": 4,
-                    "name": "Result"
-                }
-            ]
-        },
-        {
-            "id": 27,
+            "id": 19,
             "definitionId": "Function.Entry",
             "definitionVersion": 1,
-            "name": "TestPrint",
+            "name": "TestFunc1",
             "pins": [
                 {
-                    "id": 28,
+                    "id": 20,
                     "kind": 1,
                     "dataType": 0,
                     "isExec": true
                 },
                 {
-                    "id": 32,
+                    "id": 25,
                     "kind": 1,
-                    "dataType": 3,
+                    "dataType": 4,
                     "name": "NewInput"
                 }
             ]
         },
         {
-            "id": 29,
+            "id": 21,
             "definitionId": "Function.Return",
             "definitionVersion": 1,
-            "name": "TestPrint",
+            "name": "TestFunc1",
             "pins": [
                 {
-                    "id": 30,
+                    "id": 22,
                     "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 26,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print String",
+            "pins": [
+                {
+                    "id": 27,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 28,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 29,
+                    "kind": 1,
                     "dataType": 0,
                     "isExec": true
                 }
@@ -178,26 +121,32 @@
     ],
     "links": [
         {
-            "id": 20,
-            "startPinId": 11,
-            "endPinId": 3,
+            "id": 30,
+            "startPinId": 25,
+            "endPinId": 28,
             "isEnabled": true
         },
         {
             "id": 31,
-            "startPinId": 28,
-            "endPinId": 30,
+            "startPinId": 20,
+            "endPinId": 27,
+            "isEnabled": true
+        },
+        {
+            "id": 32,
+            "startPinId": 29,
+            "endPinId": 22,
             "isEnabled": true
         }
     ],
     "functions": [
         {
             "id": "func_1",
-            "name": "TestPrint",
+            "name": "TestFunc1",
             "category": "Custom",
             "description": "",
             "isPublic": true,
-            "inputs": [{"name":"NewInput","dataType":3}],
+            "inputs": [{"name":"NewInput","dataType":4}],
             "outputs": [],
             "nodes": [],
             "links": []

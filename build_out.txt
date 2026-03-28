@@ -2,17 +2,52 @@
 
   Copying resources to output directory
   crude_json.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Utils\Json\Release\crude_json.lib
+  BlueprintCAPI.cpp
+  BlueprintRunner.cpp
+  BuiltinHandlers.cpp
+  BuiltinHandlers_Action.cpp
+  BuiltinHandlers_Array.cpp
+  BuiltinHandlers_Data.cpp
+  BuiltinHandlers_Debug.cpp
+  BuiltinHandlers_Flow.cpp
+  BuiltinHandlers_Houdini.cpp
+  BuiltinHandlers_Map.cpp
+  BuiltinHandlers_Math.cpp
+  BuiltinHandlers_Misc.cpp
+  BuiltinHandlers_String.cpp
+  BuiltinHandlers_Time.cpp
+  BuiltinHandlers_Tree.cpp
+  正在生成代码...
+    正在创建库 C:/Users/maxweili/MyProjects/MyBlueprintEditor/build/Runtime/Release/BlueprintRuntime.lib 和对象 C:/Users/maxweili/MyProjects/MyBlueprintEditor/build/Runtime/Release/BlueprintRuntime.exp
   BlueprintRuntime.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\BlueprintRuntime.dll
   imgui.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\imgui.lib
   ImGuiNodeEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\ImGuiNodeEditor.lib
   dxerr.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\dxerr.lib
   Application.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\Application.lib
   BlueprintEditor.cpp
+  BuiltinHandlers.cpp
+  BuiltinNodeDefs.cpp
+  ClipboardOps.cpp
+  ContextMenus.cpp
   EditorUI.cpp
+  EditorUtils.cpp
+  ExecutionPanel.cpp
+  FileOperations.cpp
+  LinkRenderer.cpp
+  Minimap.cpp
+  NodeRenderer.cpp
+  ProjectOps.cpp
+  SearchOverlay.cpp
+  ThemeManager.cpp
+  ZoomBar.cpp
+  main.cpp
   正在生成代码...
   BlueprintEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\BlueprintEditor.exe
   basic-interaction-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\basic-interaction-example.exe
   canvas-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\canvas-example.exe
+  runtime-example.cpp
+  test_new_features.cpp
+  正在生成代码...
   runtime-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\runtime-example.exe
   simple-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\simple-example.exe
   widgets-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\widgets-example.exe

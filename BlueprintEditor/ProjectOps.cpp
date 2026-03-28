@@ -158,8 +158,18 @@ void BlueprintEditor::SyncProjectLibrariesToRegistry()
 {
     if (!m_Project.IsOpen()) return;
 
-    // 清理已有 FunctionLibrary 前缀的节点定义（避免重复注册）
-    // 注：DefaultNodeRegistry 目前没有 unregister，这里只做 re-register（重复 id 会覆盖）
+    // 先清除所有旧的 FuncLib.* 节点定义，防止残留过时的函数显示在菜单里
+    {
+        std::vector<std::string> toRemove;
+        for (const auto* def : m_NodeRegistry.getAllNodeDefinitions())
+        {
+            if (def->id.rfind("FuncLib.", 0) == 0)
+                toRemove.push_back(def->id);
+        }
+        for (const auto& id : toRemove)
+            m_NodeRegistry.unregisterNode(id);
+    }
+
     ::NodeEditor::Runtime::JsonBlueprintExporter exporter;
     int total = 0;
     for (const auto& libEntry : m_Project.libraries)
@@ -177,7 +187,7 @@ void BlueprintEditor::SyncProjectLibrariesToRegistry()
     BPLOG("SyncProjectLibraries: registered " + std::to_string(total) + " functions");
 
     // 节点定义变更，强制重建缓存
-    m_CachedDefCount = SIZE_MAX;
+    m_CachedDefCount = 0;
 }
 
 // ============================================================================
