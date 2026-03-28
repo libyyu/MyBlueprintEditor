@@ -1492,62 +1492,160 @@ void BlueprintEditor::OnFrame(float deltaTime)
     if (ActiveDoc() && editorMax.x > editorMin.x)
         DrawZoomBar(editorMin, editorMax);
 
+
     // ================================================================
-    // 调试状态 Pill（编辑器顶部中央浮动，仅在 Running/Paused/Stopped 时显示）
-    // 操作按钮统一在底部 Execution Panel 中。
+    // 调试工具条（浮动，画布顶部中央）
+    // 包含完整操作：Run / Pause / Resume / Step / Stop / Copy / Clear + 状态
     // ================================================================
     if (ActiveDoc() && editorMax.x > editorMin.x)
     {
-        auto& runner = ActiveDoc()->persistentRunner;
+        auto& runner   = ActiveDoc()->persistentRunner;
         bool isRunning = runner.IsRunning();
         bool isPaused  = runner.IsPaused();
         bool isStopped = runner.IsStopped();
         bool isIdle    = runner.IsIdle();
+        bool bpIsLibrary = ActiveDoc()->blueprintClass == RTBlueprintClass::FunctionLibrary;
 
-        // Idle 时不显示
-        if (!isIdle)
+        float tbH   = 36.0f;
+        float btnH  = tbH - 10.0f;
+        float btnW  = 54.0f;
+        float iconW = btnH + 2.0f;
+        // 估算工具条宽度
+        float totalW = btnW + 4 + iconW + 4 + iconW + 4 + iconW + 14 + iconW + 4 + iconW + 24;
+        float centerX = (editorMin.x + editorMax.x) * 0.5f;
+        ImVec2 tbPos(centerX - totalW * 0.5f, editorMin.y + 6.0f);
+
+        ImGui::SetNextWindowPos(tbPos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(totalW, tbH));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,  ImVec2(8.0f, 4.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,    ImVec2(4.0f, 4.0f));
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(18, 20, 26, 235));
+        ImGui::PushStyleColor(ImGuiCol_Border,
+            isPaused  ? IM_COL32(180, 130, 20, 160) :
+            isRunning ? IM_COL32(30, 160, 60, 160)  :
+                        IM_COL32(0, 100, 180, 100));
+        bool tbOpen = ImGui::Begin("##DebugToolbar", nullptr,
+            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoMove     | ImGuiWindowFlags_NoScrollbar |
+            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking);
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(3);
+
+        if (tbOpen)
         {
-            // 状态文字 + 颜色
-            ImVec4 stateCol;
-            const char* stateText;
-            ImU32 bgCol;
+            // Run
+            bool canRun = isIdle || isStopped;
+            ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(30, 100, 50, 255));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(45, 135, 70, 255));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(55, 160, 85, 255));
+            if (!canRun || bpIsLibrary) ImGui::BeginDisabled();
+            if (ImGui::Button(ICON_FA_PLAY " Run", ImVec2(btnW, btnH)))
+            {
+                if (isStopped) runner.ResetState();
+                ExecuteBlueprint();
+            }
+            if (!canRun || bpIsLibrary) ImGui::EndDisabled();
+            if (bpIsLibrary && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("FunctionLibrary cannot execute directly.");
+            ImGui::PopStyleColor(3);
+
+            ImGui::SameLine(0, 4);
+
+            // Pause / Resume
+            if (!isRunning && !isPaused) ImGui::BeginDisabled();
+            if (isPaused)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(30, 100, 50, 255));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(45, 135, 70, 255));
+                if (ImGui::Button(ICON_FA_PLAY "##resume", ImVec2(iconW, btnH)))
+                    runner.Resume();
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Resume");
+                ImGui::PopStyleColor(2);
+            }
+            else
+            {
+                if (ImGui::Button(ICON_FA_PAUSE "##pause", ImVec2(iconW, btnH)))
+                    runner.Pause();
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Pause");
+            }
+            if (!isRunning && !isPaused) ImGui::EndDisabled();
+
+            ImGui::SameLine(0, 4);
+
+            // Step
+            if (!isPaused) ImGui::BeginDisabled();
+            if (ImGui::Button(ICON_FA_ARROW_RIGHT "##step", ImVec2(iconW, btnH)))
+            {
+                bool hasMore = runner.StepNextNode();
+                if (hasMore)
+                {
+                    const auto& topo = runner.GetTopoCache();
+                    size_t stepIdx   = runner.GetStepTopoIndex();
+                    if (stepIdx > 0 && stepIdx - 1 < topo.size())
+                    {
+                        uint64_t nid = static_cast<uint64_t>(topo[stepIdx - 1]);
+                        ActiveDoc()->executedNodeHighlight[nid] = 3.0f;
+                    }
+                }
+            }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Step (next node)");
+            if (!isPaused) ImGui::EndDisabled();
+
+            ImGui::SameLine(0, 4);
+
+            // Stop
+            ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(120, 30, 30, 255));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(160, 40, 40, 255));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(190, 50, 50, 255));
+            if (isIdle || isStopped) ImGui::BeginDisabled();
+            if (ImGui::Button(ICON_FA_STOP "##stop", ImVec2(iconW, btnH)))
+                runner.Stop();
+            if (isIdle || isStopped) ImGui::EndDisabled();
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Stop");
+            ImGui::PopStyleColor(3);
+
+            // 分隔线
+            ImGui::SameLine(0, 8);
+            ImVec2 sepP = ImGui::GetCursorScreenPos();
+            ImGui::GetWindowDrawList()->AddLine(
+                ImVec2(sepP.x, sepP.y + 2.0f),
+                ImVec2(sepP.x, sepP.y + btnH - 2.0f),
+                IM_COL32(80, 85, 100, 160), 1.0f);
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 5.0f);
+
+            // Copy log
+            if (ImGui::Button(ICON_FA_COPY "##copy", ImVec2(iconW, btnH)))
+            {
+                std::string allText;
+                for (const auto& line : ActiveDoc()->executionLog)
+                { allText += line; allText += '\n'; }
+                ImGui::SetClipboardText(allText.c_str());
+            }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Copy Log");
+
+            ImGui::SameLine(0, 4);
+
+            // Clear log
+            if (ImGui::Button(ICON_FA_ERASER "##clear", ImVec2(iconW, btnH)))
+            {
+                ActiveDoc()->executionLog.clear();
+                ActiveDoc()->executionLogDirty = false;
+                ActiveDoc()->lastExecutionStatus.clear();
+                ActiveDoc()->lastExecutionResult = RTExecutionResult{};
+            }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Clear Log");
+
+            // 状态指示
+            ImGui::SameLine(0, 8);
             if (isRunning)
-            {
-                stateCol = ImVec4(0.25f, 0.95f, 0.35f, 1.0f);
-                stateText = ICON_FA_CIRCLE_PLAY "  Running...";
-                bgCol = IM_COL32(20, 55, 30, 220);
-            }
+                ImGui::TextColored(ImVec4(0.25f, 0.95f, 0.35f, 1.0f), ICON_FA_CIRCLE_PLAY);
             else if (isPaused)
-            {
-                stateCol = ImVec4(1.0f, 0.75f, 0.1f, 1.0f);
-                stateText = ICON_FA_PAUSE "  Paused";
-                bgCol = IM_COL32(55, 42, 10, 220);
-            }
-            else  // stopped
-            {
-                stateCol = ImVec4(1.0f, 0.35f, 0.30f, 1.0f);
-                stateText = ICON_FA_CIRCLE_STOP "  Stopped";
-                bgCol = IM_COL32(55, 15, 15, 220);
-            }
-
-            float pillH = 24.0f;
-            float paddingX = 14.0f;
-            float textW = ImGui::CalcTextSize(stateText).x;
-            float pillW = textW + paddingX * 2.0f;
-            float centerX = (editorMin.x + editorMax.x) * 0.5f;
-            ImVec2 pillMin(centerX - pillW * 0.5f, editorMin.y + 6.0f);
-            ImVec2 pillMax(pillMin.x + pillW, pillMin.y + pillH);
-
-            auto* dl = ImGui::GetWindowDrawList();
-            dl->AddRectFilled(pillMin, pillMax, bgCol, pillH * 0.5f);
-            dl->AddRect(pillMin, pillMax,
-                        isRunning  ? IM_COL32(40, 190, 70, 160) :
-                        isPaused   ? IM_COL32(200, 140, 30, 160) :
-                                     IM_COL32(200, 50, 50, 160),
-                        pillH * 0.5f, 0, 1.2f);
-            dl->AddText(ImVec2(pillMin.x + paddingX, pillMin.y + (pillH - ImGui::GetTextLineHeight()) * 0.5f),
-                        ImGui::ColorConvertFloat4ToU32(stateCol), stateText);
+                ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.1f, 1.0f),   ICON_FA_PAUSE);
+            else if (isStopped)
+                ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.30f, 1.0f),  ICON_FA_CIRCLE_STOP);
         }
+        ImGui::End();
     }
 
     // ================================================================
