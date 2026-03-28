@@ -205,9 +205,21 @@ void BlueprintEditor::DrawProjectPanel()
 
                 if (ImGui::Selectable((std::string(icon) + " " + label).c_str(), isActive))
                 {
-                    // 点击打开对应文件
+                    // 点击打开对应文件（先检查是否已在某个标签页中打开）
                     std::string absPath = m_Project.AbsPath(e.relativePath);
-                    if (fs::exists(absPath))
+                    bool alreadyOpen = false;
+                    for (int j = 0; j < (int)m_Documents.size(); ++j)
+                    {
+                        if (m_Documents[j]->filePath == absPath)
+                        {
+                            m_ActiveDocIndex = j;
+                            ed::SetCurrentEditor(ActiveDoc()->editorContext);
+                            ActiveDoc()->needNavigateToContent = 1;
+                            alreadyOpen = true;
+                            break;
+                        }
+                    }
+                    if (!alreadyOpen && fs::exists(absPath))
                         DoOpenFile(absPath);
                 }
                 if (ImGui::IsItemHovered())
