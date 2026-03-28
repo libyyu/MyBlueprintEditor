@@ -822,8 +822,10 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
 RTBlueprintData BlueprintEditor::BuildRuntimeData()
 {
     RTBlueprintData bp;
-    bp.metadata.name = "EditorBlueprint";
+    bp.metadata.name = ActiveDoc()->untitledName.empty() ? "EditorBlueprint" : ActiveDoc()->untitledName;
     bp.metadata.description = "Built from editor state";
+    // 同步蓝图类型（确保 FunctionLibrary 保护条件正确触发）
+    bp.metadata.blueprintClass = ActiveDoc()->blueprintClass;
 
     // 转换节点
     for (const auto& node : ActiveDoc()->nodes)

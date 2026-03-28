@@ -386,43 +386,49 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
         // ── Tab: Log ────────────────────────────────────────────────────
         if (ImGui::BeginTabItem(ICON_FA_TERMINAL " Log"))
         {
-            // 过滤框
-            ImGui::SetNextItemWidth(paneWidth - 16.0f);
-            ImGui::InputTextWithHint("##LogFilter", ICON_FA_MAGNIFYING_GLASS " Filter...",
+            // 过滤框 + "Select All" 弹出按钮
+            float filterW = paneWidth - 80.0f;
+            if (filterW < 80.0f) filterW = 80.0f;
+            ImGui::SetNextItemWidth(filterW);
+            bool filterChanged = ImGui::InputTextWithHint("##LogFilter",
+                ICON_FA_MAGNIFYING_GLASS " Filter...",
                 ActiveDoc()->execLogFilter, sizeof(ActiveDoc()->execLogFilter));
 
-            float logH = ImGui::GetContentRegionAvail().y - 4.0f;
-            if (logH < 40.0f) logH = 40.0f;
-
-            // 将日志行合并为文本（用于可选文本显示）
-            if (ActiveDoc()->executionLogDirty || ActiveDoc()->executionLogText.empty())
+            ImGui::SameLine(0, 4);
+            if (ImGui::Button("Copy##logcopy", ImVec2(-1, 0)))
             {
+                std::string allText;
                 std::string filter(ActiveDoc()->execLogFilter);
-                ActiveDoc()->executionLogText.clear();
                 for (const auto& line : ActiveDoc()->executionLog)
                 {
                     if (!filter.empty() && line.find(filter) == std::string::npos)
                         continue;
-                    ActiveDoc()->executionLogText += line;
-                    ActiveDoc()->executionLogText += '\n';
+                    allText += line;
+                    allText += '\n';
                 }
+                ImGui::SetClipboardText(allText.c_str());
             }
 
-            // 只读可选文本框（支持 Ctrl+A/Ctrl+C）
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.08f, 0.08f, 0.10f, 1.0f));
-            ImGui::InputTextMultiline("##ExecLog",
-                const_cast<char*>(ActiveDoc()->executionLogText.c_str()),
-                ActiveDoc()->executionLogText.size() + 1,
-                ImVec2(paneWidth, logH),
-                ImGuiInputTextFlags_ReadOnly);
-            ImGui::PopStyleColor();
+            float logH = ImGui::GetContentRegionAvail().y - 4.0f;
+            if (logH < 40.0f) logH = 40.0f;
+
+            ImGui::BeginChild("##ExecLog", ImVec2(paneWidth, logH), true,
+                ImGuiWindowFlags_HorizontalScrollbar);
+
+            std::string filter(ActiveDoc()->execLogFilter);
+            for (const auto& line : ActiveDoc()->executionLog)
+            {
+                if (!filter.empty() && line.find(filter) == std::string::npos)
+                    continue;
+                DrawColoredLogLine(line);
+            }
 
             if (ActiveDoc()->executionLogDirty)
             {
-                // 滚动到底部：通过键盘下键模拟或直接设置滚动
                 ImGui::SetScrollHereY(1.0f);
                 ActiveDoc()->executionLogDirty = false;
             }
+            ImGui::EndChild();
             ImGui::EndTabItem();
         }
 

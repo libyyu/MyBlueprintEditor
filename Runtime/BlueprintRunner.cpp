@@ -389,6 +389,21 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
     // FuncLib.<libStem>.<funcId>  →  在 m_externalFunctions 中查 funcId
     if (node.definitionId.rfind("FuncLib.", 0) == 0)
     {
+        // 递归深度保护（防止自递归无限循环导致栈溢出）
+        static thread_local int s_funcLibDepth = 0;
+        static constexpr int kMaxFuncLibDepth = 16;
+        if (s_funcLibDepth >= kMaxFuncLibDepth)
+        {
+            if (m_logCallback)
+                m_logCallback(LogLevel::Error,
+                    "[FuncLib] Max call depth (" + std::to_string(kMaxFuncLibDepth) +
+                    ") exceeded at '" + node.definitionId + "'. Possible infinite recursion.");
+            m_context.ActivateOutputFlow(std::string(""));
+            return true;
+        }
+        ++s_funcLibDepth;
+        struct FuncLibDepthGuard { ~FuncLibDepthGuard() { --s_funcLibDepth; } } _guard;
+
         // 从 definitionId 提取 funcId（第三段：FuncLib.<stem>.<funcId>）
         std::string defId = node.definitionId;
         size_t first = defId.find('.');          // pos of first '.'
