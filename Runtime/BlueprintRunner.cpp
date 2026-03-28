@@ -340,10 +340,12 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
     // ── 断点检测 ────────────────────────────────────────────────────────────
     if (m_nodePreExecuteCb && m_nodePreExecuteCb(node.id))
     {
-        // 命中断点：暂停 runner（下次 Tick 前不再继续执行）
+        // 命中断点：先暂停 runner，然后跳过本节点执行（下一次 StepNextNode 才执行）
+        // 注意：m_stepTopoIndex 已在 Execute() 主循环设置为 i，不需要重复调整
         Pause();
         if (m_logCallback)
-            m_logCallback(LogLevel::Verbose, "[Breakpoint] Paused at node '" + node.name + "'");
+            m_logCallback(LogLevel::Verbose, "[Breakpoint] Hit at node '" + node.name + "' — execution paused before this node");
+        return true;  // 跳过本节点，暂停在此处
     }
 
     // 准备执行上下文
@@ -769,10 +771,12 @@ ExecutionResult BlueprintRunner::Execute()
         result.nodesExecuted++;
         result.executedNodeIds.push_back(node->id);
 
-        // 断点命中后 Pause：记录当前 topo 进度，下次 StepNextNode 从这里继续
+        // 断点命中后 Pause：记录当前 topo 进度
+        // executeNodeInternal 里命中断点会 return true（跳过该节点执行）
+        // m_stepTopoIndex 指向该节点本身（i），StepNextNode 下次从它开始执行
         if (m_runState.load() == RunState::Paused)
         {
-            m_stepTopoIndex = i + 1;
+            m_stepTopoIndex = i;  // 指向断点节点，StepNextNode 将执行它
             auto endTime = std::chrono::high_resolution_clock::now();
             result.elapsedMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
             result.success = false;
