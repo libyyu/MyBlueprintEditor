@@ -1877,11 +1877,13 @@ void BlueprintEditor::DrawNodeListPanel()
             if (restoreIconWidth <= 0) restoreIconWidth = 24;
             if (restoreIconHeight <= 0) restoreIconHeight = 24;
 
-            // 节点列表 — VS 2022 扁平色带
+            // 节点列表 — Header bar（显示节点数 + 过滤状态）
             {
-                auto* drawList = ImGui::GetWindowDrawList();
+                int totalNodes   = static_cast<int>(ActiveDoc()->nodes.size());
+                int selCount     = static_cast<int>(selectedNodes.size());
+                auto* drawList   = ImGui::GetWindowDrawList();
                 ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-                float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+                float sectionH   = ImGui::GetTextLineHeight() + 4.0f;
                 drawList->AddRectFilled(
                     cursorPos,
                     ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
@@ -1890,10 +1892,22 @@ void BlueprintEditor::DrawNodeListPanel()
                     ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
                     ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
                     IM_COL32(0, 122, 204, 100));
+                // 左：图标 + 标题
                 drawList->AddText(
                     ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
                     IM_COL32(200, 200, 210, 230),
                     nodeFilter.empty() ? ICON_FA_CUBES " Nodes" : ICON_FA_CUBES " Nodes (filtered)");
+                // 右：节点数 badge（选中/总数）
+                char badge[32];
+                if (selCount > 0)
+                    std::snprintf(badge, sizeof(badge), "%d / %d", selCount, totalNodes);
+                else
+                    std::snprintf(badge, sizeof(badge), "%d", totalNodes);
+                ImVec2 badgeSize = ImGui::CalcTextSize(badge);
+                drawList->AddText(
+                    ImVec2(cursorPos.x + paneWidth - badgeSize.x - 6.0f, cursorPos.y + 2.0f),
+                    selCount > 0 ? IM_COL32(100, 200, 255, 220) : IM_COL32(130, 140, 155, 160),
+                    badge);
                 ImGui::Dummy(ImVec2(paneWidth, sectionH));
             }
             // 节点过滤缓存：只在 filter 或节点列表变化时重建 tolower 映射
