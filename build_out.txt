@@ -8,8 +8,6 @@
   dxerr.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\dxerr.lib
   Application.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\Application.lib
   EditorUI.cpp
-  main.cpp
-  正在生成代码...
   BlueprintEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\BlueprintEditor.exe
   basic-interaction-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\basic-interaction-example.exe
   canvas-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\canvas-example.exe

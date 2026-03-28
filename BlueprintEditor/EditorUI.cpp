@@ -3493,6 +3493,7 @@ void BlueprintEditor::SyncFunctionPinsToNodes(const RTFunctionDefinition& func)
     }
 
     doc->invalidateEditorIndices();
+    doc->rebuildEditorIndices();  // 立即重建（防止本帧内旧Pin*被访问导致崩溃）
 }
 
 // ============================================================================
