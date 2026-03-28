@@ -313,7 +313,11 @@ void Application::Frame()
     auto& io = ImGui::GetIO();
 
     if (m_Platform->HasWindowScaleChanged())
+    {
+        // 窗口移到新 DPI 屏幕（或系统缩放改变），需要重建字体 atlas
+        RecreateFontAtlas();
         m_Platform->AcknowledgeWindowScaleChanged();
+    }
 
     if (m_Platform->HasFramebufferScaleChanged())
     {
