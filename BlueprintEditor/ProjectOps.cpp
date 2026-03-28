@@ -210,70 +210,66 @@ void BlueprintEditor::DrawProjectPanel()
         return;
     }
 
+    // 固定样式：只在这个函数内部压入，确保不泄漏到外部
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,  ImVec2(2.0f, 2.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,   ImVec2(4.0f, 2.0f));
+
     float panelW = ImGui::GetContentRegionAvail().x;
+    float lineH  = ImGui::GetTextLineHeight();
+    auto* dl     = ImGui::GetWindowDrawList();
 
-    // ── 工程 Header（VSCode Explorer 风格）────────────────────────────────
-    //   [ ▸ PROJECT NAME ]          [+BP] [+Lib] [↻] [⋯]
+    // ────────────────────────────────────────────────────────────────────
+    // 工程 Header：深色背景条，左侧项目名，右侧 4 个小图标按钮
+    // ────────────────────────────────────────────────────────────────────
     {
-        auto* dl = ImGui::GetWindowDrawList();
+        float hdrH   = lineH + 8.0f;
         ImVec2 hdrMin = ImGui::GetCursorScreenPos();
-        float hdrH = ImGui::GetTextLineHeight() + 6.0f;
-
-        // 背景条
         dl->AddRectFilled(hdrMin, ImVec2(hdrMin.x + panelW, hdrMin.y + hdrH),
                           IM_COL32(35, 37, 43, 255));
 
-        // 工程名（左侧）
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 3.0f);
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 6.0f);
-        ImGui::TextColored(ImVec4(0.85f, 0.87f, 0.92f, 1.0f),
-                           ICON_FA_DIAGRAM_PROJECT "  %s",
-                           m_Project.name.empty() ? "(untitled)" : m_Project.name.c_str());
+        // 左侧项目名（垂直居中）
+        ImVec2 textPos(hdrMin.x + 8.0f, hdrMin.y + (hdrH - lineH) * 0.5f);
+        dl->AddText(textPos, IM_COL32(200, 210, 220, 255),
+                    (std::string(ICON_FA_DIAGRAM_PROJECT "  ") +
+                     (m_Project.name.empty() ? "(untitled)" : m_Project.name)).c_str());
 
-        // 右侧操作按钮（小图标按钮，对齐右边）
-        const float btnSz  = hdrH - 2.0f;
-        const float btnPad = 2.0f;
-        // 4个按钮：New BP, New Lib, Refresh, Add Current
-        float btnAreaW = (btnSz + btnPad) * 4.0f;
-        ImGui::SameLine(panelW - btnAreaW - 4.0f);
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 3.0f);  // 对齐垂直
+        // 右侧 4 个按钮（New BP, New Lib, Refresh, Add Current）
+        const float btnSz  = hdrH - 6.0f;
+        const float btnGap = 2.0f;
+        float btnX = hdrMin.x + panelW - (btnSz + btnGap) * 4.0f - 4.0f;
+        float btnY = hdrMin.y + (hdrH - btnSz) * 0.5f;
+        ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
 
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2.0f, 2.0f));
         ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(0,0,0,0));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(0, 122, 204, 60));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(0, 122, 204, 120));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(0, 122, 204, 70));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(0, 122, 204, 130));
 
         if (ImGui::Button(ICON_FA_FILE "##newBP", ImVec2(btnSz, btnSz)))
             NewFile(RTBlueprintClass::Actor);
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("New Blueprint");
 
-        ImGui::SameLine(0, btnPad);
+        ImGui::SameLine(0, btnGap);
         if (ImGui::Button(ICON_FA_CUBE "##newLib", ImVec2(btnSz, btnSz)))
             NewFile(RTBlueprintClass::FunctionLibrary);
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("New Library");
 
-        ImGui::SameLine(0, btnPad);
+        ImGui::SameLine(0, btnGap);
         if (ImGui::Button(ICON_FA_ARROWS_ROTATE "##refresh", ImVec2(btnSz, btnSz)))
         {
-            // 刷新：重新扫描工程目录并同步缺失文件
             if (!m_Project.projectDir.empty())
             {
                 for (auto it = m_Project.blueprints.begin(); it != m_Project.blueprints.end();)
-                {
                     if (!fs::exists(m_Project.AbsPath(it->relativePath))) it = m_Project.blueprints.erase(it);
                     else ++it;
-                }
                 for (auto it = m_Project.libraries.begin(); it != m_Project.libraries.end();)
-                {
                     if (!fs::exists(m_Project.AbsPath(it->relativePath))) it = m_Project.libraries.erase(it);
                     else ++it;
-                }
                 SaveProject();
             }
         }
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Refresh (remove missing files)");
 
-        ImGui::SameLine(0, btnPad);
+        ImGui::SameLine(0, btnGap);
         bool canAdd = ActiveDoc() && !ActiveDoc()->filePath.empty();
         if (!canAdd) ImGui::BeginDisabled();
         if (ImGui::Button(ICON_FA_PLUS "##addCurrent", ImVec2(btnSz, btnSz)))
@@ -283,61 +279,76 @@ void BlueprintEditor::DrawProjectPanel()
             ImGui::SetTooltip(canAdd ? "Add Current File to Project" : "Save the file first");
 
         ImGui::PopStyleColor(3);
-        ImGui::PopStyleVar();
 
-        // 占位：让 Dummy 撑满这一行（防止 TreeNode 抢走光标位置）
-        ImGui::Dummy(ImVec2(panelW, 0.0f));
-        ImGui::Spacing();
+        // 推进光标到 header 下方
+        ImGui::SetCursorScreenPos(ImVec2(hdrMin.x, hdrMin.y + hdrH + 2.0f));
     }
 
-    // ── Section：Blueprints ───────────────────────────────────────────────
+    // ────────────────────────────────────────────────────────────────────
+    // Section 绘制 lambda（手绘 header，无 TreeNodeFlags_Framed）
+    // ────────────────────────────────────────────────────────────────────
     auto drawSection = [&](std::vector<BpProjectEntry>& entries,
-                           const char* sectionId,
+                           const char* openStateKey,
                            const char* sectionLabel,
                            const char* entryIcon,
                            RTBlueprintClass bpClass)
     {
-        // Section header 行：[▶/▼ BLUEPRINTS]  [+ new]
-        float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-        auto* dl       = ImGui::GetWindowDrawList();
-        ImVec2 secMin  = ImGui::GetCursorScreenPos();
-        dl->AddRectFilled(secMin, ImVec2(secMin.x + panelW, secMin.y + sectionH),
-                          IM_COL32(28, 30, 36, 200));
-        dl->AddLine(ImVec2(secMin.x, secMin.y + sectionH - 1),
-                    ImVec2(secMin.x + panelW, secMin.y + sectionH - 1),
-                    IM_COL32(60, 64, 72, 180));
+        // 用 ImGui Storage 维护折叠状态（比 static 更安全，跨帧稳定）
+        ImGuiID stateId = ImGui::GetID(openStateKey);
+        bool* pOpen = ImGui::GetStateStorage()->GetBoolRef(stateId, true);
 
-        // 折叠状态用 TreeNode（渲染成单行 header）
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.0f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_Header,        IM_COL32(0,0,0,0));
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(0,0,0,0));
-        ImGui::PushStyleColor(ImGuiCol_HeaderActive,  IM_COL32(0,0,0,0));
+        float secH   = lineH + 6.0f;
+        ImVec2 secMin = ImGui::GetCursorScreenPos();
 
-        bool open = ImGui::TreeNodeEx(sectionId,
-            ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanFullWidth |
-            ImGuiTreeNodeFlags_Framed,
-            "%s  %s  (%d)", sectionLabel, entryIcon, (int)entries.size());
+        // Section header 背景
+        dl->AddRectFilled(secMin, ImVec2(secMin.x + panelW, secMin.y + secH),
+                          IM_COL32(28, 30, 36, 220));
+        dl->AddLine(ImVec2(secMin.x, secMin.y + secH - 1),
+                    ImVec2(secMin.x + panelW, secMin.y + secH - 1),
+                    IM_COL32(55, 60, 70, 200));
 
-        // 右侧 new 按钮（浮在 header 右侧）
-        float newBtnW = ImGui::CalcTextSize(ICON_FA_PLUS).x + 10.0f;
-        ImGui::SameLine(panelW - newBtnW - 4.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(0,0,0,0));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(0, 122, 204, 80));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(0, 122, 204, 150));
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2.0f, 1.0f));
-        std::string newBtnId = std::string("##new_") + sectionId;
-        if (ImGui::Button((ICON_FA_PLUS + newBtnId).c_str()))
+        // 折叠箭头 + 标签（手绘，完全不影响 ItemSpacing/FramePadding）
+        const char* arrow = *pOpen ? ICON_FA_CARET_DOWN : ICON_FA_CARET_RIGHT;
+        char headerText[64];
+        std::snprintf(headerText, sizeof(headerText), "%s  %s  (%d)",
+                      arrow, sectionLabel, (int)entries.size());
+        ImVec2 textPos(secMin.x + 6.0f, secMin.y + (secH - lineH) * 0.5f);
+        dl->AddText(textPos, IM_COL32(190, 195, 205, 230), headerText);
+
+        // [+] 新建按钮（右侧，手绘）
+        float plusW = ImGui::CalcTextSize(ICON_FA_PLUS).x + 8.0f;
+        float plusX = secMin.x + panelW - plusW - 4.0f;
+        float plusY = secMin.y + (secH - lineH) * 0.5f;
+        ImVec2 plusMin(plusX - 2.0f, secMin.y + 1.0f);
+        ImVec2 plusMax(plusX + plusW, secMin.y + secH - 1.0f);
+        bool plusHovered = ImGui::IsMouseHoveringRect(plusMin, plusMax);
+        bool plusClicked = plusHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+        if (plusHovered)
+            dl->AddRectFilled(plusMin, plusMax, IM_COL32(0, 122, 204, 80), 3.0f);
+        dl->AddText(ImVec2(plusX + 2.0f, plusY), IM_COL32(160, 180, 220, 220), ICON_FA_PLUS);
+        if (plusClicked)
             NewFile(bpClass);
-        ImGui::PopStyleVar();
-        ImGui::PopStyleColor(3);
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(bpClass == RTBlueprintClass::Actor ? "New Blueprint" : "New Library");
+        if (plusHovered && ImGui::BeginTooltip())
+        {
+            ImGui::TextUnformatted(bpClass == RTBlueprintClass::Actor ? "New Blueprint" : "New Library");
+            ImGui::EndTooltip();
+        }
 
-        ImGui::PopStyleColor(3);
-        ImGui::PopStyleVar();
+        // Header 点击切换折叠（排除按钮区域）
+        ImRect headerRect(secMin, ImVec2(plusMin.x - 2.0f, secMin.y + secH));
+        if (ImGui::IsMouseHoveringRect(headerRect.Min, headerRect.Max))
+        {
+            dl->AddRectFilled(secMin, ImVec2(plusMin.x - 2.0f, secMin.y + secH),
+                              IM_COL32(255, 255, 255, 8));
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+                *pOpen = !*pOpen;
+        }
 
-        if (open)
+        // 推进光标
+        ImGui::SetCursorScreenPos(ImVec2(secMin.x, secMin.y + secH));
+        ImGui::Dummy(ImVec2(panelW, 0.0f));
+
+        if (*pOpen)
         {
             int removeIdx = -1;
             for (int i = 0; i < (int)entries.size(); ++i)
@@ -348,61 +359,66 @@ void BlueprintEditor::DrawProjectPanel()
                 std::string label = e.displayName.empty()
                     ? fs::path(e.relativePath).stem().string()
                     : e.displayName;
-
                 bool isActive = ActiveDoc() && !ActiveDoc()->filePath.empty() &&
                                 m_Project.RelPath(ActiveDoc()->filePath) == e.relativePath;
 
-                // 行背景高亮（当前活跃 / hover）
+                float rowH = lineH + 4.0f;
                 ImVec2 rowMin = ImGui::GetCursorScreenPos();
-                float  rowH   = ImGui::GetTextLineHeightWithSpacing();
 
+                // 行背景（active / hover）
+                bool rowHov = ImGui::IsMouseHoveringRect(rowMin, ImVec2(rowMin.x + panelW, rowMin.y + rowH));
                 if (isActive)
-                    ImGui::GetWindowDrawList()->AddRectFilled(
-                        rowMin, ImVec2(rowMin.x + panelW, rowMin.y + rowH),
-                        IM_COL32(0, 122, 204, 35));
+                    dl->AddRectFilled(rowMin, ImVec2(rowMin.x + panelW, rowMin.y + rowH), IM_COL32(0, 122, 204, 40));
+                else if (rowHov)
+                    dl->AddRectFilled(rowMin, ImVec2(rowMin.x + panelW, rowMin.y + rowH), IM_COL32(255, 255, 255, 12));
 
-                if (isActive)
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.3f, 1.0f, 0.5f, 1.0f));
+                // 图标 + 文字
+                ImU32 textColor = isActive ? IM_COL32(80, 220, 120, 255) : IM_COL32(200, 205, 215, 230);
+                std::string rowText = std::string("  ") + entryIcon + "  " + label;
+                dl->AddText(ImVec2(rowMin.x + 4.0f, rowMin.y + 2.0f), textColor, rowText.c_str());
 
-                std::string selLabel = std::string("  ") + entryIcon + "  " + label;
-                if (ImGui::Selectable(selLabel.c_str(), isActive,
-                                      ImGuiSelectableFlags_SpanAllColumns, ImVec2(0, 0)))
+                // 点击打开
+                if (rowHov && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
                 {
                     std::string absPath = m_Project.AbsPath(e.relativePath);
                     std::string normAbs = fs::path(absPath).lexically_normal().string();
-                    bool alreadyOpen = false;
+                    bool found = false;
                     for (int j = 0; j < (int)m_Documents.size(); ++j)
                     {
-                        std::string normDoc = fs::path(m_Documents[j]->filePath).lexically_normal().string();
-                        if (normDoc == normAbs)
-                        {
-                            m_PendingSwitchTabIndex = j;
-                            alreadyOpen = true;
-                            break;
-                        }
+                        if (fs::path(m_Documents[j]->filePath).lexically_normal().string() == normAbs)
+                        { m_PendingSwitchTabIndex = j; found = true; break; }
                     }
-                    if (!alreadyOpen && fs::exists(absPath))
+                    if (!found && fs::exists(absPath))
                         DoOpenFile(absPath);
                 }
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("%s", e.relativePath.c_str());
+                if (rowHov && ImGui::BeginTooltip())
+                {
+                    ImGui::TextUnformatted(e.relativePath.c_str());
+                    ImGui::EndTooltip();
+                }
 
-                if (isActive)
-                    ImGui::PopStyleColor();
-
-                // 右键菜单
+                // 右键菜单（用 Selectable 触发 context item，宽度为0高度为rowH）
+                ImGui::SetCursorScreenPos(rowMin);
+                ImGui::InvisibleButton(("##row" + std::to_string(i)).c_str(), ImVec2(panelW, rowH));
                 if (ImGui::BeginPopupContextItem("##projEntryCtx"))
                 {
                     if (ImGui::MenuItem(ICON_FA_XMARK " Remove from Project"))
                         removeIdx = i;
                     ImGui::EndPopup();
                 }
+
+                // 推进光标
+                ImGui::SetCursorScreenPos(ImVec2(rowMin.x, rowMin.y + rowH));
+
                 ImGui::PopID();
             }
 
             if (entries.empty())
             {
-                ImGui::TextDisabled("   (empty)");
+                ImVec2 emptyPos = ImGui::GetCursorScreenPos();
+                dl->AddText(ImVec2(emptyPos.x + 12.0f, emptyPos.y + 2.0f),
+                            IM_COL32(100, 105, 115, 160), "(empty)");
+                ImGui::Dummy(ImVec2(panelW, lineH + 4.0f));
             }
 
             if (removeIdx >= 0)
@@ -410,17 +426,13 @@ void BlueprintEditor::DrawProjectPanel()
                 entries.erase(entries.begin() + removeIdx);
                 SaveProject();
             }
-
-            ImGui::TreePop();
         }
+
         ImGui::Spacing();
     };
 
-    drawSection(m_Project.blueprints,
-                "##sec_bp",   "BLUEPRINTS", ICON_FA_FILE,
-                RTBlueprintClass::Actor);
+    drawSection(m_Project.blueprints, "##sec_bp",  "BLUEPRINTS", ICON_FA_FILE, RTBlueprintClass::Actor);
+    drawSection(m_Project.libraries,  "##sec_lib", "LIBRARIES",  ICON_FA_CUBE, RTBlueprintClass::FunctionLibrary);
 
-    drawSection(m_Project.libraries,
-                "##sec_lib",  "LIBRARIES",  ICON_FA_CUBE,
-                RTBlueprintClass::FunctionLibrary);
+    ImGui::PopStyleVar(2);  // FramePadding + ItemSpacing
 }
