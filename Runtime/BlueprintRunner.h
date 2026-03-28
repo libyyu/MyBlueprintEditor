@@ -690,6 +690,7 @@ private:
     // 存活标志：shared_ptr<atomic<bool>>，供异步回调检查 runner 是否已析构
     // 构造时为 true，析构时设为 false；异步回调持有 shared_ptr 副本，可安全判断
     std::shared_ptr<std::atomic<bool>>                  m_alive;
+    std::string                                         m_loadedFileDir;  // LoadFromFile/WithDeps 记录的文件目录，供 Function.CallLibrary 解析相对路径
 
     // 保持子蓝图 runner 存活的容器
     std::vector<std::shared_ptr<BlueprintRunner>>       m_keepAliveRunners;

@@ -102,6 +102,9 @@ bool BlueprintRunner::LoadFromFile(const std::string& filePath)
         m_lastError = "File import failed: " + result.errorMessage;
         return false;
     }
+    // 记录蓝图文件所在目录，供 Function.CallLibrary 相对路径解析
+    size_t sl = filePath.find_last_of("/\\");
+    m_loadedFileDir = (sl != std::string::npos) ? filePath.substr(0, sl) : "";
     return Load(result.data);
 }
 
@@ -111,6 +114,12 @@ bool BlueprintRunner::LoadFromFileWithDeps(const std::string& filePath)
     // WebGL 环境无文件系统访问，退化到普通 LoadFromFile
     return LoadFromFile(filePath);
 #else
+    // 记录蓝图文件所在目录
+    {
+        size_t sl = filePath.find_last_of("/\\");
+        m_loadedFileDir = (sl != std::string::npos) ? filePath.substr(0, sl) : "";
+    }
+
     // 1. 先加载蓝图本体
     JsonBlueprintExporter exporter(m_fileSystem);
     auto result = exporter.importRuntimeFromFile(filePath);
@@ -416,6 +425,115 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
         else if (!subGraphOk && m_logCallback)
         {
             m_logCallback(LogLevel::Warning, "Function.Call: Function.Entry not found for '" + funcId + "'");
+        }
+
+        m_context.ActivateOutputFlow(std::string(""));
+        propagatePinValues(node);
+        return true;
+    }
+
+    // ── Function.CallLibrary ─────────────────────────────────────────────────
+    // 通过 LibraryPath（蓝图文件路径）+ FunctionId 动态调用外部库函数
+    if (node.definitionId == "Function.CallLibrary")
+    {
+        std::string libPath, funcId;
+        auto ndLibIt = node.nodeData.find("LibraryPath");
+        if (ndLibIt != node.nodeData.end()) libPath = ndLibIt->second.asString();
+        else libPath = m_context.GetInputValue("LibraryPath").asString();
+
+        auto ndFnIt = node.nodeData.find("FunctionId");
+        if (ndFnIt != node.nodeData.end()) funcId = ndFnIt->second.asString();
+        else funcId = m_context.GetInputValue("FunctionId").asString();
+
+        if (libPath.empty() || funcId.empty())
+        {
+            if (m_logCallback)
+                m_logCallback(LogLevel::Warning,
+                    "Function.CallLibrary: LibraryPath or FunctionId is empty");
+            m_context.ActivateOutputFlow(std::string(""));
+            return true;
+        }
+
+        // 先看是否已加载过该库（m_externalLibraries key 为 funcId）
+        const FunctionDefinition* funcDefPtr = nullptr;
+        BlueprintData funcBP;
+        bool subGraphOk = false;
+
+        // 在已注册的外部库中按 funcId 查找
+        auto extIt = m_externalFunctions.find(funcId);
+        if (extIt != m_externalFunctions.end())
+        {
+            funcDefPtr = &extIt->second;
+            auto libIt = m_externalLibraries.find(funcId);
+            if (libIt != m_externalLibraries.end())
+                subGraphOk = BuildFuncSubGraph(*libIt->second, extIt->second.name, funcBP);
+        }
+
+        // 如果没找到，尝试按路径加载库文件
+        if (!funcDefPtr)
+        {
+            JsonBlueprintExporter exporter(m_fileSystem);
+            // 解析相对路径
+            std::string resolvedPath = libPath;
+            if (!m_loadedFileDir.empty() && libPath.find(':') == std::string::npos
+                && libPath[0] != '/' && libPath[0] != '\\')
+            {
+                resolvedPath = m_loadedFileDir + '/' + libPath;
+            }
+            auto ir = exporter.importRuntimeFromFile(resolvedPath);
+            if (ir.success)
+            {
+                RegisterExternalLibrary(ir.data);
+                // 再次查找
+                auto extIt2 = m_externalFunctions.find(funcId);
+                if (extIt2 != m_externalFunctions.end())
+                {
+                    funcDefPtr = &extIt2->second;
+                    auto libIt2 = m_externalLibraries.find(funcId);
+                    if (libIt2 != m_externalLibraries.end())
+                        subGraphOk = BuildFuncSubGraph(*libIt2->second, extIt2->second.name, funcBP);
+                }
+            }
+            else if (m_logCallback)
+            {
+                m_logCallback(LogLevel::Warning,
+                    "Function.CallLibrary: failed to load '" + resolvedPath + "': " + ir.errorMessage);
+            }
+        }
+
+        if (funcDefPtr && subGraphOk)
+        {
+            BlueprintRunner subRunner;
+            subRunner.RegisterHandlers(m_handlers);
+            subRunner.SetParentTimerManager(m_timerManager);
+            if (m_logCallback)   subRunner.SetLogCallback(m_logCallback);
+            if (m_printCallback) subRunner.SetPrintCallback(m_printCallback);
+            subRunner.RegisterExternalFunctions(GetExternalFunctions());
+            subRunner.InheritExternalLibraries(m_externalLibraries);
+            for (const auto& pin : node.pins)
+            {
+                if (pin.kind == PinKind::Input && pin.dataType != PinDataType::Unknown && !pin.name.empty()
+                    && pin.name != "LibraryPath" && pin.name != "FunctionId")
+                    subRunner.SetVariable(pin.name, m_context.GetInputValue(pin.name));
+            }
+            if (subRunner.Load(funcBP))
+            {
+                subRunner.Execute();
+                for (const auto& pin : node.pins)
+                {
+                    if (pin.kind == PinKind::Output && pin.dataType != PinDataType::Unknown && !pin.name.empty())
+                    {
+                        auto val = subRunner.GetVariable(pin.name);
+                        if (val.type != PinDataType::Unknown)
+                            m_context.SetOutputValue(pin.name, val);
+                    }
+                }
+            }
+        }
+        else if (!funcDefPtr && m_logCallback)
+        {
+            m_logCallback(LogLevel::Warning,
+                "Function.CallLibrary: function '" + funcId + "' not found in '" + libPath + "'");
         }
 
         m_context.ActivateOutputFlow(std::string(""));
