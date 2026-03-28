@@ -167,6 +167,20 @@ void BlueprintEditor::DrawContextMenus(
             }
         }
 
+        // 断点控制
+        ImGui::Separator();
+        if (node)
+        {
+            uint64_t nid = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(node->ID.AsPointer()));
+            bool hasBp = ActiveDoc()->breakpoints.count(nid) > 0;
+            const char* bpLabel = hasBp ? (ICON_FA_CIRCLE_STOP " Remove Breakpoint") : (ICON_FA_CIRCLE_STOP " Add Breakpoint");
+            if (ImGui::MenuItem(bpLabel))
+            {
+                if (hasBp) ActiveDoc()->breakpoints.erase(nid);
+                else       ActiveDoc()->breakpoints.insert(nid);
+            }
+        }
+
         ImGui::Separator();
         if (ImGui::MenuItem(ICON_FA_TRASH_CAN " Delete"))
         {

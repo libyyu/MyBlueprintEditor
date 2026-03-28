@@ -147,6 +147,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 // Output pin tooltip
                                 if (ImGui::IsItemHovered() && output.Type != PinType::Flow)
                                 {
+                                    ed::Suspend();
                                     const auto& outVals = ActiveDoc()->lastExecutionResult.outputValues;
                                     ::NodeEditor::Runtime::PinId pid = reinterpret_cast<uintptr_t>(output.ID.AsPointer());
                                     auto valIt = outVals.find(pid);
@@ -160,6 +161,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                     else
                                         ImGui::TextDisabled("(no runtime value)");
                                     ImGui::EndTooltip();
+                                    ed::Resume();
                                 }
                                 ImGui::Spring(0, ImGui::GetStyle().ItemSpacing.x / 2);
                                 ImGui::EndHorizontal();
@@ -213,6 +215,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                     // Input pin tooltip：悬浮在图标上时显示引脚类型 + 当前值
                     if (ImGui::IsItemHovered() && input.Type != PinType::Flow)
                     {
+                        ed::Suspend();
                         ImGui::BeginTooltip();
                         // 类型标签
                         const char* typeName = "Unknown";
@@ -256,6 +259,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                             ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Runtime: %s", valIt->second.asString().c_str());
                         }
                         ImGui::EndTooltip();
+                        ed::Resume();
                     }
                     ImGui::Spring(0);
                     if (!input.Name.empty())
@@ -663,6 +667,18 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                         rectMin - ImVec2(6, 6),
                         rectMax + ImVec2(6, 6),
                         IM_COL32(50, 255, 100, a / 3), 10.0f, 0, 2.0f);
+                }
+
+                // ---- 断点标记：红色圆圈显示在节点左上角 ----
+                if (ActiveDoc()->breakpoints.count(nid) > 0)
+                {
+                    auto drawList = ed::GetNodeBackgroundDrawList(node.ID);
+                    auto nodePos  = ed::GetNodePosition(node.ID);
+                    ImVec2 bpCenter(nodePos.x - 2.0f, nodePos.y + 10.0f);
+                    drawList->AddCircleFilled(bpCenter, 7.0f, IM_COL32(220, 30, 30, 230));
+                    drawList->AddCircle      (bpCenter, 7.0f, IM_COL32(255, 120, 120, 200), 0, 1.5f);
+                    // 内部白点
+                    drawList->AddCircleFilled(bpCenter, 3.0f, IM_COL32(255, 200, 200, 200));
                 }
             }
         }

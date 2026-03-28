@@ -1498,9 +1498,12 @@ void BlueprintEditor::OnFrame(float deltaTime)
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 4));
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.12f, 0.12f, 0.15f, 0.92f));
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.48f, 0.80f, 0.40f));
-        if (ImGui::Begin("##DebugToolbar", nullptr,
+        bool tbOpen = ImGui::Begin("##DebugToolbar", nullptr,
             ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking))
+            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking);
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(2);
+        if (tbOpen)
         {
             float btnH = toolbarH - 10.0f;
             float btnW = 52.0f;
@@ -1585,8 +1588,6 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 ImGui::TextColored(stateCol, "%s", stateText);
         }
         ImGui::End();
-        ImGui::PopStyleColor(2);
-        ImGui::PopStyleVar(2);
     }
 
     // ================================================================
@@ -2171,8 +2172,15 @@ void BlueprintEditor::DrawNodeListPanel()
 
                     bool isSelected = (doc->selectedFuncIdx == i);
 
+                    // 先渲染右侧小按钮，再渲染 Selectable（避免 Selectable 覆盖按钮）
+                    float btnSize = ImGui::GetFrameHeight() * 0.75f;
+                    float availW  = ImGui::GetContentRegionAvail().x;
+                    float selectW = availW - btnSize * 2 - ImGui::GetStyle().ItemSpacing.x * 2;
+                    if (selectW < 20.0f) selectW = 20.0f;
+
                     if (renamingIdx == i)
                     {
+                        ImGui::SetNextItemWidth(selectW);
                         if (ImGui::InputText("##rename", renameBuf, sizeof(renameBuf),
                                              ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
                         {
@@ -2192,7 +2200,12 @@ void BlueprintEditor::DrawNodeListPanel()
                     }
                     else
                     {
-                        if (ImGui::Selectable(func.name.c_str(), isSelected, ImGuiSelectableFlags_AllowDoubleClick))
+#if IMGUI_VERSION_NUM >= 18967
+                        ImGui::SetNextItemAllowOverlap();
+#endif
+                        if (ImGui::Selectable(func.name.c_str(), isSelected,
+                                              ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_AllowOverlap,
+                                              ImVec2(selectW, 0)))
                         {
                             doc->selectedFuncIdx = i;
                         }
@@ -2226,9 +2239,7 @@ void BlueprintEditor::DrawNodeListPanel()
                             }
                             ImGui::Separator();
                             if (ImGui::MenuItem(ICON_FA_TRASH " Delete"))
-                            {
                                 deleteIdx = i;
-                            }
                             ImGui::EndPopup();
                         }
 
@@ -2237,16 +2248,19 @@ void BlueprintEditor::DrawNodeListPanel()
                             deleteIdx = i;
                     }
 
-                    // 删除按钮（🗑）
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton(ICON_FA_TRASH "##delfunc"))
+                    // 删除按钮
+                    ImGui::SameLine(0, ImGui::GetStyle().ItemSpacing.x);
+                    ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.55f, 0.15f, 0.15f, 0.7f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.80f, 0.20f, 0.20f, 1.0f));
+                    if (ImGui::Button("X##delfunc", ImVec2(btnSize, btnSize)))
                         deleteIdx = i;
+                    ImGui::PopStyleColor(2);
                     if (ImGui::IsItemHovered())
                         ImGui::SetTooltip("Delete function");
 
                     // 跳转按钮
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton(ICON_FA_MAGNIFYING_GLASS "##gotofunc"))
+                    ImGui::SameLine(0, 2.0f);
+                    if (ImGui::Button("->##gotofunc", ImVec2(btnSize, btnSize)))
                     {
                         for (const auto& node : doc->nodes)
                         {
@@ -2260,7 +2274,7 @@ void BlueprintEditor::DrawNodeListPanel()
                         }
                     }
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Jump to Function.Entry node");
+                        ImGui::SetTooltip("Jump to Entry node");
 
                     ImGui::PopID();
                 }
@@ -2269,12 +2283,13 @@ void BlueprintEditor::DrawNodeListPanel()
                 if (deleteIdx >= 0 && deleteIdx < (int)doc->functions.size())
                 {
                     PushUndoState();
-                    const auto& funcName = doc->functions[deleteIdx].name;
+                    const std::string funcName = doc->functions[deleteIdx].name;
                     for (auto nit = doc->nodes.begin(); nit != doc->nodes.end(); )
                     {
                         if ((nit->DefinitionId == "Function.Entry" || nit->DefinitionId == "Function.Return")
                             && nit->Name == funcName)
                         {
+                            // 先断开所有连线
                             doc->links.erase(std::remove_if(doc->links.begin(), doc->links.end(),
                                 [&](const Link& lnk) {
                                     for (auto& p : nit->Inputs)
@@ -2283,6 +2298,8 @@ void BlueprintEditor::DrawNodeListPanel()
                                         if (lnk.StartPinID == p.ID || lnk.EndPinID == p.ID) return true;
                                     return false;
                                 }), doc->links.end());
+                            // 通知节点编辑器删除该节点（同步内部状态）
+                            ed::DeleteNode(nit->ID);
                             nit = doc->nodes.erase(nit);
                         }
                         else
@@ -2292,6 +2309,8 @@ void BlueprintEditor::DrawNodeListPanel()
                     if (doc->selectedFuncIdx >= (int)doc->functions.size())
                         doc->selectedFuncIdx = (int)doc->functions.size() - 1;
                     doc->isDirty = true;
+                    // 强制重建创建节点菜单缓存（以防 Function 节点注册在 registry 中）
+                    m_CachedDefCount = 0;
                     BuildNodes();
                 }
 

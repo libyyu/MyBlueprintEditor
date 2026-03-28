@@ -487,6 +487,10 @@ public:
     /// should override.  Independent of EnableLogging.
     void SetPrintCallback(std::function<void(LogLevel, const std::string&)> callback);
 
+    /// Set callback called BEFORE each node executes. If callback returns true, execution pauses at that node.
+    /// nodeId is the runtime NodeId (same value as editor node's ID.AsPointer()).
+    void SetNodePreExecuteCallback(std::function<bool(NodeId)> callback);
+
     // 重置执行状态（保留蓝图数据和处理器注册）
     void ResetState();
 
@@ -642,6 +646,8 @@ private:
     // 调试日志回调 / 逻辑输出回调
     std::function<void(LogLevel, const std::string&)>   m_logCallback;
     std::function<void(LogLevel, const std::string&)>   m_printCallback;
+    // 节点预执行回调（用于断点检测）：返回 true 则在此节点处暂停
+    std::function<bool(NodeId)>                         m_nodePreExecuteCb;
 
     // 主线程计时器管理器（shared_ptr，可共享给子 runner）
     std::shared_ptr<FrameTimerManager>                  m_timerManager;

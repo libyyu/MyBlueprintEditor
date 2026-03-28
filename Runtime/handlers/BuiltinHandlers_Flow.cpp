@@ -75,14 +75,17 @@ void RegisterHandlers_Flow(
             return true;
         }
 
-        // 自动补全扩展名：如果没有 .bp.json 后缀则自动添加
+        // 自动补全扩展名：如果没有已知扩展名则尝试 .bp.json，若文件不存在再尝试 .json
         {
             auto hasExt = [](const std::string& s, const std::string& ext) {
                 if (s.size() < ext.size()) return false;
                 return s.compare(s.size() - ext.size(), ext.size(), ext) == 0;
             };
             if (!hasExt(filePath, ".bp.json") && !hasExt(filePath, ".json"))
+            {
+                // 先补 .bp.json；路径解析后若不存在再换 .json
                 filePath += ".bp.json";
+            }
         }
 
         // 如果路径是相对路径，基于 basePath（目录路径）解析
@@ -100,9 +103,24 @@ void RegisterHandlers_Flow(
 
         ctx.Log("  [ExecuteBlueprint] Resolved: \"" + resolvedPath + "\"");
 
-        // 加载子蓝图
+        // 加载子蓝图（若 .bp.json 不存在则尝试 .json）
         JsonBlueprintExporter exporter(runner.GetFileSystem());
         auto importResult = exporter.importRuntimeFromFile(resolvedPath);
+
+        if (!importResult.success)
+        {
+            // .bp.json 不存在时尝试 fallback 到 .json
+            static const std::string bpJsonExt = ".bp.json";
+            if (resolvedPath.size() > bpJsonExt.size() &&
+                resolvedPath.compare(resolvedPath.size() - bpJsonExt.size(), bpJsonExt.size(), bpJsonExt) == 0)
+            {
+                std::string fallback = resolvedPath.substr(0, resolvedPath.size() - bpJsonExt.size()) + ".json";
+                ctx.Log("  [ExecuteBlueprint] .bp.json not found, trying: \"" + fallback + "\"");
+                importResult = exporter.importRuntimeFromFile(fallback);
+                if (importResult.success)
+                    resolvedPath = fallback;
+            }
+        }
 
         if (!importResult.success)
         {

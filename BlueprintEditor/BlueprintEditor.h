@@ -27,6 +27,7 @@
 #include <deque>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <array>
 #include <algorithm>
 #include <utility>
@@ -168,6 +169,9 @@ public:
 
     // 执行可视化（高亮已执行的节点）
     std::unordered_map<uint64_t, float> executedNodeHighlight;  // nodeId -> 剩余高亮时间(秒)
+
+    // 断点集合（nodeId set）
+    std::unordered_set<uint64_t> breakpoints;
 
     // 上次执行结果（用于面板展示）
     RTExecutionResult           lastExecutionResult;

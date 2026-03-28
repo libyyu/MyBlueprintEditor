@@ -318,6 +318,15 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
 {
     if (!node.isEnabled) return true; // 跳过禁用的节点
 
+    // ── 断点检测 ────────────────────────────────────────────────────────────
+    if (m_nodePreExecuteCb && m_nodePreExecuteCb(node.id))
+    {
+        // 命中断点：暂停 runner（下次 Tick 前不再继续执行）
+        Pause();
+        if (m_logCallback)
+            m_logCallback(LogLevel::Verbose, "[Breakpoint] Paused at node '" + node.name + "'");
+    }
+
     // 准备执行上下文
     prepareNodeContext(node);
 
@@ -371,6 +380,106 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
                     subRunner.Execute();
             }
         }
+        m_context.ActivateOutputFlow(std::string(""));
+        propagatePinValues(node);
+        return true;
+    }
+
+    // ── FuncLib.* 内置处理（通过函数库直接调用的节点）───────────────────────
+    // FuncLib.<libStem>.<funcId>  →  在 m_externalFunctions 中查 funcId
+    if (node.definitionId.rfind("FuncLib.", 0) == 0)
+    {
+        // 从 definitionId 提取 funcId（第三段：FuncLib.<stem>.<funcId>）
+        std::string defId = node.definitionId;
+        size_t first = defId.find('.');          // pos of first '.'
+        size_t second = (first != std::string::npos) ? defId.find('.', first + 1) : std::string::npos;
+        std::string funcId = (second != std::string::npos) ? defId.substr(second + 1) : "";
+
+        // 先从当前蓝图自身的函数列表中找（内部函数库）
+        bool found = false;
+        for (const auto& funcDef : m_blueprint.functions)
+        {
+            if (funcDef.id == funcId)
+            {
+                BlueprintData funcBP;
+                funcBP.nodes = funcDef.nodes;
+                funcBP.links = funcDef.links;
+                BlueprintRunner subRunner;
+                subRunner.RegisterHandlers(m_handlers);
+                subRunner.SetParentTimerManager(m_timerManager);
+                if (m_logCallback)   subRunner.SetLogCallback(m_logCallback);
+                if (m_printCallback) subRunner.SetPrintCallback(m_printCallback);
+                // 传递输入引脚值到子 runner 变量
+                for (const auto& pin : node.pins)
+                {
+                    if (pin.kind == PinKind::Input && pin.dataType != PinDataType::Unknown && !pin.name.empty())
+                    {
+                        auto val = m_context.GetInputValue(pin.name);
+                        subRunner.SetVariable(pin.name, val);
+                    }
+                }
+                if (subRunner.Load(funcBP))
+                {
+                    auto subResult = subRunner.Execute();
+                    // 回传输出引脚值
+                    for (const auto& pin : node.pins)
+                    {
+                        if (pin.kind == PinKind::Output && pin.dataType != PinDataType::Unknown && !pin.name.empty())
+                        {
+                            auto val = subRunner.GetVariable(pin.name);
+                            if (val.type != PinDataType::Unknown)
+                                m_context.SetOutputValue(pin.name, val);
+                        }
+                    }
+                }
+                found = true;
+                break;
+            }
+        }
+
+        // 再从外部依赖库函数中找
+        if (!found)
+        {
+            auto extIt = m_externalFunctions.find(funcId);
+            if (extIt != m_externalFunctions.end())
+            {
+                const auto& funcDef = extIt->second;
+                BlueprintData funcBP;
+                funcBP.nodes = funcDef.nodes;
+                funcBP.links = funcDef.links;
+                BlueprintRunner subRunner;
+                subRunner.RegisterHandlers(m_handlers);
+                subRunner.SetParentTimerManager(m_timerManager);
+                if (m_logCallback)   subRunner.SetLogCallback(m_logCallback);
+                if (m_printCallback) subRunner.SetPrintCallback(m_printCallback);
+                for (const auto& pin : node.pins)
+                {
+                    if (pin.kind == PinKind::Input && pin.dataType != PinDataType::Unknown && !pin.name.empty())
+                    {
+                        auto val = m_context.GetInputValue(pin.name);
+                        subRunner.SetVariable(pin.name, val);
+                    }
+                }
+                if (subRunner.Load(funcBP))
+                {
+                    subRunner.Execute();
+                    for (const auto& pin : node.pins)
+                    {
+                        if (pin.kind == PinKind::Output && pin.dataType != PinDataType::Unknown && !pin.name.empty())
+                        {
+                            auto val = subRunner.GetVariable(pin.name);
+                            if (val.type != PinDataType::Unknown)
+                                m_context.SetOutputValue(pin.name, val);
+                        }
+                    }
+                }
+                found = true;
+            }
+        }
+
+        if (!found && m_logCallback)
+            m_logCallback(LogLevel::Warning, "FuncLib: function '" + funcId + "' not found in library");
+
         m_context.ActivateOutputFlow(std::string(""));
         propagatePinValues(node);
         return true;
@@ -718,6 +827,11 @@ void BlueprintRunner::SetPrintCallback(std::function<void(LogLevel, const std::s
 {
     m_printCallback = std::move(callback);
     m_context.OnPrint = m_printCallback;
+}
+
+void BlueprintRunner::SetNodePreExecuteCallback(std::function<bool(NodeId)> callback)
+{
+    m_nodePreExecuteCb = std::move(callback);
 }
 
 void BlueprintRunner::ResetState()

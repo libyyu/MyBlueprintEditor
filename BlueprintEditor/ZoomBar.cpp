@@ -89,7 +89,7 @@ void BlueprintEditor::DrawZoomBar(ImVec2 editorMin, ImVec2 editorMax)
     ImGui::InvisibleButton("##zoom_pct", pctMax - pctMin);
     if (ImGui::IsItemHovered())
     {
-        ImGui::SetTooltip("双击复位到 100%%\n当前: %.0f%%", curZoom * 100.0f);
+        ImGui::SetTooltip("Double-click to reset to 100%%\nCurrent: %.0f%%", curZoom * 100.0f);
         dl->AddRectFilled(pctMin, pctMax, IM_COL32(60, 80, 120, 80), 3.0f);
     }
     if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
@@ -169,7 +169,7 @@ void BlueprintEditor::DrawZoomBar(ImVec2 editorMin, ImVec2 editorMax)
     if (trackHov || trackAct)
     {
         thumbCol = IM_COL32(180, 210, 255, 255);
-        ImGui::SetTooltip("拖动调整缩放\n%.0f%%  (%.2fx)", curZoom * 100.0f, curZoom);
+        ImGui::SetTooltip("Drag to adjust zoom\n%.0f%%  (%.2fx)", curZoom * 100.0f, curZoom);
     }
 
     if (trackAct && ImGui::IsMouseDown(0))

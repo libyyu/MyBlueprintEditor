@@ -151,6 +151,12 @@ void BlueprintEditor::ExecuteBlueprint()
     if (m_DefaultHandler)
         ActiveDoc()->persistentRunner.SetDefaultHandler(m_DefaultHandler);
 
+    // 注册断点回调
+    ActiveDoc()->persistentRunner.SetNodePreExecuteCallback([this](::NodeEditor::Runtime::NodeId nid) -> bool {
+        if (!ActiveDoc()) return false;
+        return ActiveDoc()->breakpoints.count(static_cast<uint64_t>(nid)) > 0;
+    });
+
     // 4. 执行
     auto startTime = std::chrono::high_resolution_clock::now();
     auto result = ActiveDoc()->persistentRunner.Execute();
@@ -387,23 +393,36 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
 
             float logH = ImGui::GetContentRegionAvail().y - 4.0f;
             if (logH < 40.0f) logH = 40.0f;
-            ImGui::BeginChild("##ExecLog", ImVec2(paneWidth, logH), true,
-                ImGuiWindowFlags_HorizontalScrollbar);
 
-            std::string filter(ActiveDoc()->execLogFilter);
-            for (const auto& line : ActiveDoc()->executionLog)
+            // 将日志行合并为文本（用于可选文本显示）
+            if (ActiveDoc()->executionLogDirty || ActiveDoc()->executionLogText.empty())
             {
-                if (!filter.empty() && line.find(filter) == std::string::npos)
-                    continue;
-                DrawColoredLogLine(line);
+                std::string filter(ActiveDoc()->execLogFilter);
+                ActiveDoc()->executionLogText.clear();
+                for (const auto& line : ActiveDoc()->executionLog)
+                {
+                    if (!filter.empty() && line.find(filter) == std::string::npos)
+                        continue;
+                    ActiveDoc()->executionLogText += line;
+                    ActiveDoc()->executionLogText += '\n';
+                }
             }
+
+            // 只读可选文本框（支持 Ctrl+A/Ctrl+C）
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.08f, 0.08f, 0.10f, 1.0f));
+            ImGui::InputTextMultiline("##ExecLog",
+                const_cast<char*>(ActiveDoc()->executionLogText.c_str()),
+                ActiveDoc()->executionLogText.size() + 1,
+                ImVec2(paneWidth, logH),
+                ImGuiInputTextFlags_ReadOnly);
+            ImGui::PopStyleColor();
 
             if (ActiveDoc()->executionLogDirty)
             {
+                // 滚动到底部：通过键盘下键模拟或直接设置滚动
                 ImGui::SetScrollHereY(1.0f);
                 ActiveDoc()->executionLogDirty = false;
             }
-            ImGui::EndChild();
             ImGui::EndTabItem();
         }
 
