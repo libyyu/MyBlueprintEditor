@@ -743,19 +743,23 @@ void BlueprintEditor::OnFrame(float deltaTime)
             // 绘制快捷键行（左：快捷键，右：描述），整体居中
             auto drawShortcutTable = [&](const std::vector<std::pair<std::string, std::string>>& items)
             {
-                float keyColW = 180.0f;
+                float keyColW = 200.0f;
                 float descColW = 260.0f;
                 float tableW = keyColW + descColW;
                 float tableStartX = baseX + (avail.x - tableW) * 0.5f;
+                float descStartX = tableStartX + keyColW;
 
                 for (auto& [key, desc] : items)
                 {
+                    float curY = ImGui::GetCursorPosY();
+
                     ImGui::SetCursorPosX(tableStartX);
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.50f, 0.55f, 0.70f, 0.9f));
                     ImGui::Text("%s", key.c_str());
                     ImGui::PopStyleColor();
 
-                    ImGui::SameLine(tableStartX + keyColW - baseX);
+                    ImGui::SetCursorPosY(curY);
+                    ImGui::SetCursorPosX(descStartX);
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.40f, 0.44f, 0.55f, 0.7f));
                     ImGui::Text("%s", desc.c_str());
                     ImGui::PopStyleColor();
