@@ -117,7 +117,23 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 }
                             }
                         }
-                        ImGui::TextUnformatted(node.Name.c_str());
+                        // 节点标题：Function.Entry/Return 节点显示前缀避免与函数名歧义
+                        if (node.DefinitionId == "Function.Entry")
+                        {
+                            ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 0.8f), ICON_FA_ARROW_RIGHT);
+                            ImGui::Spring(0, 4.0f);
+                            ImGui::TextUnformatted(node.Name.c_str());
+                        }
+                        else if (node.DefinitionId == "Function.Return")
+                        {
+                            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 0.8f), ICON_FA_ARROW_LEFT);
+                            ImGui::Spring(0, 4.0f);
+                            ImGui::TextUnformatted(node.Name.c_str());
+                        }
+                        else
+                        {
+                            ImGui::TextUnformatted(node.Name.c_str());
+                        }
                         ImGui::Spring(1);
                         ImGui::Dummy(ImVec2(0, 28));
                         if (hasOutputDelegates && !node.isCollapsed)
@@ -440,7 +456,10 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                         [](const Pin& p) { return p.StringValue == "\x01REMOVE"; }),
                         node.Inputs.end());
                     if (node.Inputs.size() != oldSize)
-                        ActiveDoc()->invalidateEditorIndices();  // 引脚被删除，需要重建索引
+                    {
+                        ActiveDoc()->invalidateEditorIndices();
+                        ActiveDoc()->rebuildEditorIndices();  // 立即重建，防止同帧内悬空 Pin* 访问
+                    }
                     BuildNode(&node);
                 }
 
@@ -493,7 +512,8 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
                             }
                             BuildNode(&node);
-                            ActiveDoc()->invalidateEditorIndices();  // 引脚指针可能失效，需要重建索引
+                            ActiveDoc()->invalidateEditorIndices();
+                            ActiveDoc()->rebuildEditorIndices();  // 立即重建防悬空
                             ActiveDoc()->isDirty = true;
                         }
                         ImGui::PopStyleColor(3);
@@ -546,7 +566,8 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                             node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
                         }
                         BuildNode(&node);
-                        ActiveDoc()->invalidateEditorIndices();  // 引脚指针可能失效，需要重建索引
+                        ActiveDoc()->invalidateEditorIndices();
+                        ActiveDoc()->rebuildEditorIndices();  // 立即重建防悬空
                         ActiveDoc()->isDirty = true;
                     }
                     ImGui::PopStyleColor(3);
