@@ -25,6 +25,7 @@ void BlueprintEditor::DrawContextMenus(
     {
         ImGui::OpenPopup("Create New Node");
         newNodeLinkPin = nullptr;
+        ActiveDoc()->newNodeLinkPinId = 0;
     }
     ed::Resume();
 

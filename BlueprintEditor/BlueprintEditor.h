@@ -185,9 +185,11 @@ public:
     ed::LinkId contextLinkId      = 0;
     ed::PinId  contextPinId       = 0;
     bool       createNewNode      = false;
-    Pin*       newNodeLinkPin     = nullptr;
-    Pin*       newLinkPin         = nullptr;
-    ed::PinId  newLinkPinId       = 0;   // newLinkPin 对应的 PinId，用于每帧刷新指针防悬空
+    ed::PinId  newNodeLinkPinId   = 0;   // 右键创建节点时的起始引脚 PinId
+    ed::PinId  newLinkPinId       = 0;   // 当前拖拽连线的起始引脚 PinId
+    // 每帧通过 FindPin(id) 刷新，不直接存储 Pin*（会在 SyncFunctionPinsToNodes 后失效）
+    Pin*       newNodeLinkPin     = nullptr;  // 由 newNodeLinkPinId 驱动，勿直接赋值
+    Pin*       newLinkPin         = nullptr;  // 由 newLinkPinId 驱动，勿直接赋值
 
     // 变量拖拽到画布的待处理状态
     bool           pendingVarDrop     = false;  // 有待处理的拖拽放置

@@ -216,7 +216,9 @@ void BlueprintEditor::Redo()
 
 bool BlueprintEditor::CanCreateLink(Pin* a, Pin* b)
 {
-    if (!a || !b || a == b || a->Kind == b->Kind || a->Node == b->Node)
+    if (!a || !b || a == b) return false;
+    if (!a->Node || !b->Node) return false;  // 防止悬空 Node 指针
+    if (a->Kind == b->Kind || a->Node == b->Node)
         return false;
 
     // Any 类型可以与任何非 Flow 的数据类型连接

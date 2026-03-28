@@ -1,14 +1,18 @@
 // LinkRenderer.cpp -- 链接渲染 + BeginCreate/BeginDelete 连线交互
 #include "BlueprintEditor.h"
 
+// 辅助宏：通过 PinId 设置 newLinkPin / newNodeLinkPin（通过 ID 确保持久有效性）
+#define SET_NEW_LINK_PIN(doc, pin)     do { (doc)->newLinkPinId     = (pin) ? (pin)->ID : ed::PinId(0); (doc)->newLinkPin     = (pin); } while(0)
+#define SET_NEW_NODE_PIN(doc, pin)     do { (doc)->newNodeLinkPinId = (pin) ? (pin)->ID : ed::PinId(0); (doc)->newNodeLinkPin = (pin); } while(0)
+#define CLEAR_NEW_LINK_PIN(doc)        do { (doc)->newLinkPinId     = 0; (doc)->newLinkPin     = nullptr; } while(0)
+#define CLEAR_NEW_NODE_PIN(doc)        do { (doc)->newNodeLinkPinId = 0; (doc)->newNodeLinkPin = nullptr; } while(0)
+
 void BlueprintEditor::DrawLinks()
 {
     auto* _doc = ActiveDoc();
     if (!_doc) return;
 
     auto& createNewNode  = _doc->createNewNode;
-    auto& newNodeLinkPin = _doc->newNodeLinkPin;
-    auto& newLinkPin     = _doc->newLinkPin;
 
         // 链接
         // ================================================================
@@ -61,8 +65,8 @@ void BlueprintEditor::DrawLinks()
                     auto startPin = FindPin(startPinId);
                     auto endPin   = FindPin(endPinId);
 
-                    newLinkPin = startPin ? startPin : endPin;
-                    _doc->newLinkPinId = newLinkPin ? newLinkPin->ID : ed::PinId(0);
+                    // 通过宏同时保存 PinId，防止后续帧 Pin* 悬空
+                    SET_NEW_LINK_PIN(_doc, startPin ? startPin : endPin);
 
                     if (startPin && startPin->Kind == PinKind::Input)
                     {
@@ -126,15 +130,16 @@ void BlueprintEditor::DrawLinks()
                 ed::PinId pinId = 0;
                 if (ed::QueryNewNode(&pinId))
                 {
-                    newLinkPin = FindPin(pinId);
-                    if (newLinkPin)
+                    Pin* linkPin = FindPin(pinId);
+                    SET_NEW_LINK_PIN(_doc, linkPin);
+                    if (linkPin)
                         showLabel("+ Create Node", ImColor(32, 45, 32, 180));
 
                     if (ed::AcceptNewItem())
                     {
-                        createNewNode  = true;
-                        newNodeLinkPin = FindPin(pinId);
-                        newLinkPin = nullptr;
+                        createNewNode = true;
+                        SET_NEW_NODE_PIN(_doc, FindPin(pinId));
+                        CLEAR_NEW_LINK_PIN(_doc);
                         ed::Suspend();
                         ImGui::OpenPopup("Create New Node");
                         ed::Resume();
@@ -143,8 +148,7 @@ void BlueprintEditor::DrawLinks()
             }
             else
             {
-                newLinkPin = nullptr;
-                _doc->newLinkPinId = 0;
+                CLEAR_NEW_LINK_PIN(_doc);
             }
 
             ed::EndCreate();

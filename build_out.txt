@@ -8,22 +8,7 @@
   dxerr.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\dxerr.lib
   Application.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\Application.lib
   BlueprintEditor.cpp
-  BuiltinHandlers.cpp
-  BuiltinNodeDefs.cpp
-  ClipboardOps.cpp
-  ContextMenus.cpp
   EditorUI.cpp
-  EditorUtils.cpp
-  ExecutionPanel.cpp
-  FileOperations.cpp
-  LinkRenderer.cpp
-  Minimap.cpp
-  NodeRenderer.cpp
-  ProjectOps.cpp
-  SearchOverlay.cpp
-  ThemeManager.cpp
-  ZoomBar.cpp
-  main.cpp
   正在生成代码...
   BlueprintEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\BlueprintEditor.exe
   basic-interaction-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\basic-interaction-example.exe

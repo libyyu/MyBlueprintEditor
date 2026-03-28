@@ -9,26 +9,26 @@
     },
     "nodes": [
         {
-            "id": 10,
+            "id": 1,
             "definitionId": "PrintString",
             "definitionVersion": 1,
             "name": "Print String",
             "pins": [
                 {
-                    "id": 11,
+                    "id": 2,
                     "kind": 0,
                     "dataType": 0,
                     "isExec": true
                 },
                 {
-                    "id": 12,
+                    "id": 3,
                     "kind": 0,
                     "dataType": 4,
                     "name": "In String",
                     "defaultValue": "lib print called"
                 },
                 {
-                    "id": 13,
+                    "id": 4,
                     "kind": 1,
                     "dataType": 0,
                     "isExec": true
@@ -36,44 +36,44 @@
             ]
         },
         {
-            "id": 14,
+            "id": 5,
             "definitionId": "FormatString",
             "definitionVersion": 1,
             "name": "Format String",
             "pins": [
                 {
-                    "id": 15,
+                    "id": 6,
                     "kind": 0,
                     "dataType": 4,
                     "name": "Format",
                     "defaultValue": "lib print called:{0}{1}{2}{3}"
                 },
                 {
-                    "id": 16,
+                    "id": 7,
                     "kind": 0,
                     "dataType": 8,
                     "name": "Arg 0"
                 },
                 {
-                    "id": 17,
+                    "id": 8,
                     "kind": 0,
                     "dataType": 8,
                     "name": "Arg 1"
                 },
                 {
-                    "id": 18,
+                    "id": 9,
                     "kind": 0,
                     "dataType": 8,
                     "name": "Arg 0"
                 },
                 {
-                    "id": 19,
+                    "id": 10,
                     "kind": 0,
                     "dataType": 8,
                     "name": "Arg 1"
                 },
                 {
-                    "id": 20,
+                    "id": 11,
                     "kind": 1,
                     "dataType": 4,
                     "name": "Result"
@@ -81,88 +81,63 @@
             ]
         },
         {
-            "id": 29,
+            "id": 27,
             "definitionId": "Function.Entry",
             "definitionVersion": 1,
-            "name": "LibTestPrint",
+            "name": "TestPrint",
             "pins": [
                 {
-                    "id": 30,
+                    "id": 28,
                     "kind": 1,
                     "dataType": 0,
                     "isExec": true
                 },
                 {
-                    "id": 34,
+                    "id": 32,
                     "kind": 1,
                     "dataType": 3,
                     "name": "NewInput"
-                },
-                {
-                    "id": 36,
-                    "kind": 1,
-                    "dataType": 1,
-                    "name": "NewInput_1"
-                },
-                {
-                    "id": 38,
-                    "kind": 1,
-                    "dataType": 2,
-                    "name": "NewInput_2"
-                },
-                {
-                    "id": 40,
-                    "kind": 1,
-                    "dataType": 4,
-                    "name": "NewInput_3"
                 }
             ]
         },
         {
-            "id": 31,
+            "id": 29,
             "definitionId": "Function.Return",
             "definitionVersion": 1,
-            "name": "LibTestPrint",
+            "name": "TestPrint",
             "pins": [
                 {
-                    "id": 32,
+                    "id": 30,
                     "kind": 0,
                     "dataType": 0,
                     "isExec": true
-                },
-                {
-                    "id": 42,
-                    "kind": 0,
-                    "dataType": 4,
-                    "name": "NewOutput",
-                    "defaultValue": ""
                 }
             ]
         }
     ],
     "links": [
         {
-            "id": 28,
-            "startPinId": 20,
-            "endPinId": 12,
+            "id": 20,
+            "startPinId": 11,
+            "endPinId": 3,
             "isEnabled": true
         },
         {
-            "id": 33,
-            "startPinId": 30,
-            "endPinId": 32,
+            "id": 31,
+            "startPinId": 28,
+            "endPinId": 30,
             "isEnabled": true
         }
     ],
     "functions": [
         {
             "id": "func_1",
-            "name": "LibTestPrint",
+            "name": "TestPrint",
             "category": "Custom",
             "description": "",
             "isPublic": true,
-            "inputs": [{"name":"NewInput","dataType":3},{"name":"NewInput_1","dataType":1},{"name":"NewInput_2","dataType":2},{"name":"NewInput_3","dataType":4}],
-            "outputs": [{"name":"NewOutput","dataType":4}],
+            "inputs": [{"name":"NewInput","dataType":3}],
+            "outputs": [],
             "nodes": [],
             "links": []
         }
