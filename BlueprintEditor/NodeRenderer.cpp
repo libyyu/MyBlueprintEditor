@@ -169,19 +169,23 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 if (ImGui::IsItemHovered() && output.Type != PinType::Flow)
                                 {
                                     ed::Suspend();
-                                    const auto& outVals = ActiveDoc()->lastExecutionResult.outputValues;
-                                    ::NodeEditor::Runtime::PinId pid = reinterpret_cast<uintptr_t>(output.ID.AsPointer());
-                                    auto valIt = outVals.find(pid);
-                                    ImGui::BeginTooltip();
-                                    ImGui::TextColored(ImVec4(0.5f, 0.75f, 1.0f, 1.0f), "%s", output.Name.empty() ? "(output)" : output.Name.c_str());
-                                    if (valIt != outVals.end())
+                                    if (ImGui::BeginTooltip())
                                     {
-                                        ImGui::Separator();
-                                        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Runtime: %s", valIt->second.asString().c_str());
+                                        const auto& outVals = ActiveDoc()->lastExecutionResult.outputValues;
+                                        ::NodeEditor::Runtime::PinId pid = reinterpret_cast<uintptr_t>(output.ID.AsPointer());
+                                        auto valIt = outVals.find(pid);
+                                        ImGui::TextColored(ImVec4(0.5f, 0.75f, 1.0f, 1.0f), "%s",
+                                            output.Name.empty() ? "(output)" : output.Name.c_str());
+                                        if (valIt != outVals.end())
+                                        {
+                                            ImGui::Separator();
+                                            ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Runtime: %s",
+                                                valIt->second.asString().c_str());
+                                        }
+                                        else
+                                            ImGui::TextDisabled("(no runtime value)");
+                                        ImGui::EndTooltip();
                                     }
-                                    else
-                                        ImGui::TextDisabled("(no runtime value)");
-                                    ImGui::EndTooltip();
                                     ed::Resume();
                                 }
                                 ImGui::Spring(0, ImGui::GetStyle().ItemSpacing.x / 2);
@@ -237,49 +241,52 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                     if (ImGui::IsItemHovered() && input.Type != PinType::Flow)
                     {
                         ed::Suspend();
-                        ImGui::BeginTooltip();
-                        // 类型标签
-                        const char* typeName = "Unknown";
-                        switch (input.Type) {
-                            case PinType::Bool:     typeName = "Bool";     break;
-                            case PinType::Int:      typeName = "Int";      break;
-                            case PinType::Float:    typeName = "Float";    break;
-                            case PinType::String:   typeName = "String";   break;
-                            case PinType::Object:   typeName = "Object";   break;
-                            case PinType::Function: typeName = "Function"; break;
-                            case PinType::Array:    typeName = "Array";    break;
-                            case PinType::Map:      typeName = "Map";      break;
-                            case PinType::Delegate: typeName = "Delegate"; break;
-                            default: break;
-                        }
-                        ImGui::TextColored(ImVec4(0.5f, 0.75f, 1.0f, 1.0f), "%s", input.Name.c_str());
-                        ImGui::SameLine();
-                        ImGui::TextDisabled("(%s)", typeName);
-                        // 当前默认值
-                        if (!IsPinLinked(input.ID))
+                        if (ImGui::BeginTooltip())
                         {
-                            ImGui::Separator();
-                            ImGui::TextDisabled("Default: ");
-                            ImGui::SameLine();
+                            // 类型标签
+                            const char* typeName = "Unknown";
                             switch (input.Type) {
-                                case PinType::Bool:   ImGui::Text("%s", input.BoolValue ? "true" : "false"); break;
-                                case PinType::Int:    ImGui::Text("%" PRId64, input.IntValue); break;
-                                case PinType::Float:  ImGui::Text("%.4g", input.FloatValue); break;
-                                case PinType::String: ImGui::Text("\"%s\"", input.StringValue.c_str()); break;
-                                case PinType::Object: ImGui::Text("%s", input.ObjectValue.empty() ? "(empty)" : input.ObjectValue.c_str()); break;
-                                default:              ImGui::TextDisabled("(no value)"); break;
+                                case PinType::Bool:     typeName = "Bool";     break;
+                                case PinType::Int:      typeName = "Int";      break;
+                                case PinType::Float:    typeName = "Float";    break;
+                                case PinType::String:   typeName = "String";   break;
+                                case PinType::Object:   typeName = "Object";   break;
+                                case PinType::Function: typeName = "Function"; break;
+                                case PinType::Array:    typeName = "Array";    break;
+                                case PinType::Map:      typeName = "Map";      break;
+                                case PinType::Delegate: typeName = "Delegate"; break;
+                                default: break;
                             }
+                            ImGui::TextColored(ImVec4(0.5f, 0.75f, 1.0f, 1.0f), "%s", input.Name.c_str());
+                            ImGui::SameLine();
+                            ImGui::TextDisabled("(%s)", typeName);
+                            // 当前默认值
+                            if (!IsPinLinked(input.ID))
+                            {
+                                ImGui::Separator();
+                                ImGui::TextDisabled("Default: ");
+                                ImGui::SameLine();
+                                switch (input.Type) {
+                                    case PinType::Bool:   ImGui::Text("%s", input.BoolValue ? "true" : "false"); break;
+                                    case PinType::Int:    ImGui::Text("%" PRId64, input.IntValue); break;
+                                    case PinType::Float:  ImGui::Text("%.4g", input.FloatValue); break;
+                                    case PinType::String: ImGui::Text("\"%s\"", input.StringValue.c_str()); break;
+                                    case PinType::Object: ImGui::Text("%s", input.ObjectValue.empty() ? "(empty)" : input.ObjectValue.c_str()); break;
+                                    default:              ImGui::TextDisabled("(no value)"); break;
+                                }
+                            }
+                            // 运行时最后执行值
+                            const auto& outVals = ActiveDoc()->lastExecutionResult.outputValues;
+                            ::NodeEditor::Runtime::PinId pid = reinterpret_cast<uintptr_t>(input.ID.AsPointer());
+                            auto valIt = outVals.find(pid);
+                            if (valIt != outVals.end())
+                            {
+                                ImGui::Separator();
+                                ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Runtime: %s",
+                                    valIt->second.asString().c_str());
+                            }
+                            ImGui::EndTooltip();
                         }
-                        // 运行时最后执行值
-                        const auto& outVals = ActiveDoc()->lastExecutionResult.outputValues;
-                        ::NodeEditor::Runtime::PinId pid = reinterpret_cast<uintptr_t>(input.ID.AsPointer());
-                        auto valIt = outVals.find(pid);
-                        if (valIt != outVals.end())
-                        {
-                            ImGui::Separator();
-                            ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Runtime: %s", valIt->second.asString().c_str());
-                        }
-                        ImGui::EndTooltip();
                         ed::Resume();
                     }
                     ImGui::Spring(0);
