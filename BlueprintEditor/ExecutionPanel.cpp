@@ -383,34 +383,49 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
         else                { stateCol = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);  stateText = "Idle";       }
         ImGui::TextColored(stateCol, "%s", stateText);
 
-        // Paused 时：显示最后执行的节点名称，并高亮它
+        // Paused 时：显示"即将执行的节点"（断点节点），并持续高亮它
         if (isPaused)
         {
-            const auto& result = ActiveDoc()->lastExecutionResult;
-            if (!result.executedNodeIds.empty())
+            // 优先用 StepNextNode 的 topo 进度找"断点节点"
+            const auto& topo = runner.GetTopoCache();
+            size_t stepIdx   = runner.GetStepTopoIndex();
+            std::string pausedAtName;
+            uint64_t    pausedAtNid = 0;
+
+            if (stepIdx < topo.size())
             {
-                auto lastNodeId = result.executedNodeIds.back();
-                // 查找节点名
-                std::string lastName;
+                uint64_t nid = static_cast<uint64_t>(topo[stepIdx]);
                 for (const auto& n : ActiveDoc()->nodes)
                 {
-                    uint64_t nid = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(n.ID.AsPointer()));
-                    if (nid == static_cast<uint64_t>(lastNodeId))
+                    uint64_t uid = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(n.ID.AsPointer()));
+                    if (uid == nid) { pausedAtName = n.Name; pausedAtNid = nid; break; }
+                }
+            }
+            // fallback：用最后执行的节点
+            if (pausedAtName.empty())
+            {
+                const auto& res = ActiveDoc()->lastExecutionResult;
+                if (!res.executedNodeIds.empty())
+                {
+                    uint64_t nid = static_cast<uint64_t>(res.executedNodeIds.back());
+                    for (const auto& n : ActiveDoc()->nodes)
                     {
-                        lastName = n.Name;
-                        break;
+                        uint64_t uid = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(n.ID.AsPointer()));
+                        if (uid == nid) { pausedAtName = n.Name; pausedAtNid = nid; break; }
                     }
                 }
-                if (!lastName.empty())
-                    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.3f, 1.0f),
-                        ICON_FA_ARROW_RIGHT " Last: %s", lastName.c_str());
-
-                // 持续高亮最后执行的节点（写入 2.0f 保持发光）
-                uint64_t nid = static_cast<uint64_t>(lastNodeId);
-                auto& hl = ActiveDoc()->executedNodeHighlight;
-                if (hl.find(nid) == hl.end() || hl[nid] < 1.5f)
-                    hl[nid] = 2.0f;
             }
+            if (!pausedAtName.empty())
+            {
+                ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.3f, 1.0f),
+                    ICON_FA_ARROW_RIGHT " Break: %s", pausedAtName.c_str());
+                // 断点节点持续发光（橙色，区别于执行后的绿色）
+                auto& hl = ActiveDoc()->executedNodeHighlight;
+                hl[pausedAtNid] = 2.0f;
+            }
+
+            // 显示 Step 快捷提示
+            ImGui::TextDisabled("  Press [Step] to advance one node");
         }
     }
 
