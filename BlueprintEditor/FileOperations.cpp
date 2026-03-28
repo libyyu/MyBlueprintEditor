@@ -11,6 +11,7 @@
 #endif
 
 #include <sstream>
+#include <chrono>
 
 // ============================================================================
 // 平台文件对话框（外部链接，供 EditorUI / ProjectOps 调用）
@@ -111,12 +112,13 @@ void BlueprintEditor::ClearEditor()
 
 void BlueprintEditor::NewFile(RTBlueprintClass bpClass)
 {
-    // 帧级防抖：同一帧内多次调用（如双击按钮）只生效一次
-    static int s_lastNewFileFrame = -1;
-    int curFrame = ImGui::GetFrameCount();
-    if (curFrame == s_lastNewFileFrame)
+    // 时间防抖：300ms 内多次调用（如双击按钮）只生效一次
+    using Clock = std::chrono::steady_clock;
+    static Clock::time_point s_lastNewFileTime{};
+    auto now = Clock::now();
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - s_lastNewFileTime).count() < 300)
         return;
-    s_lastNewFileFrame = curFrame;
+    s_lastNewFileTime = now;
 
     CreateNewDocument();
 

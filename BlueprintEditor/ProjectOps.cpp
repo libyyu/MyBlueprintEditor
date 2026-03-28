@@ -207,10 +207,13 @@ void BlueprintEditor::DrawProjectPanel()
                 {
                     // 点击打开对应文件（先检查是否已在某个标签页中打开）
                     std::string absPath = m_Project.AbsPath(e.relativePath);
+                    // 标准化路径用于比较（Windows 上斜杠方向可能不同）
+                    std::string normAbs = fs::path(absPath).lexically_normal().string();
                     bool alreadyOpen = false;
                     for (int j = 0; j < (int)m_Documents.size(); ++j)
                     {
-                        if (m_Documents[j]->filePath == absPath)
+                        std::string normDoc = fs::path(m_Documents[j]->filePath).lexically_normal().string();
+                        if (normDoc == normAbs)
                         {
                             m_ActiveDocIndex = j;
                             ed::SetCurrentEditor(ActiveDoc()->editorContext);
