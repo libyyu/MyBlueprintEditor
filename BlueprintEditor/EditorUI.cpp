@@ -1605,39 +1605,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Stop");
             ImGui::PopStyleColor(3);
 
-            // 分隔线
-            ImGui::SameLine(0, 8);
-            ImVec2 sepP = ImGui::GetCursorScreenPos();
-            ImGui::GetWindowDrawList()->AddLine(
-                ImVec2(sepP.x, sepP.y + 2.0f),
-                ImVec2(sepP.x, sepP.y + btnH - 2.0f),
-                IM_COL32(80, 85, 100, 160), 1.0f);
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 5.0f);
-
-            // Copy log
-            if (ImGui::Button(ICON_FA_COPY "##copy", ImVec2(iconW, btnH)))
-            {
-                std::string allText;
-                for (const auto& line : ActiveDoc()->executionLog)
-                { allText += line; allText += '\n'; }
-                ImGui::SetClipboardText(allText.c_str());
-            }
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Copy Log");
-
-            ImGui::SameLine(0, 4);
-
-            // Clear log
-            if (ImGui::Button(ICON_FA_ERASER "##clear", ImVec2(iconW, btnH)))
-            {
-                ActiveDoc()->executionLog.clear();
-                ActiveDoc()->executionLogDirty = false;
-                ActiveDoc()->lastExecutionStatus.clear();
-                ActiveDoc()->lastExecutionResult = RTExecutionResult{};
-            }
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Clear Log");
-
             // 状态指示
-            ImGui::SameLine(0, 8);
+            ImGui::SameLine(0, 10);
             if (isRunning)
                 ImGui::TextColored(ImVec4(0.25f, 0.95f, 0.35f, 1.0f), ICON_FA_CIRCLE_PLAY);
             else if (isPaused)

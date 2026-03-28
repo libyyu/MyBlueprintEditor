@@ -322,16 +322,19 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
         // ── Tab: Log ────────────────────────────────────────────────────
         if (ImGui::BeginTabItem(ICON_FA_TERMINAL " Log"))
         {
-            // 过滤框 + "Select All" 弹出按钮
-            float filterW = paneWidth - 80.0f;
+            // 过滤框 + Copy + Clear 按钮（同行）
+            float copyW  = ImGui::CalcTextSize(ICON_FA_COPY  " Copy").x  + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f;
+            float clearW = ImGui::CalcTextSize(ICON_FA_ERASER " Clear").x + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f;
+            float filterW = paneWidth - copyW - clearW - ImGui::GetStyle().ItemSpacing.x * 2.0f - 4.0f;
             if (filterW < 80.0f) filterW = 80.0f;
+
             ImGui::SetNextItemWidth(filterW);
-            bool filterChanged = ImGui::InputTextWithHint("##LogFilter",
+            ImGui::InputTextWithHint("##LogFilter",
                 ICON_FA_MAGNIFYING_GLASS " Filter...",
                 ActiveDoc()->execLogFilter, sizeof(ActiveDoc()->execLogFilter));
 
             ImGui::SameLine(0, 4);
-            if (ImGui::Button("Copy##logcopy", ImVec2(-1, 0)))
+            if (ImGui::Button(ICON_FA_COPY " Copy##logcopy"))
             {
                 std::string allText;
                 std::string filter(ActiveDoc()->execLogFilter);
@@ -343,6 +346,15 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
                     allText += '\n';
                 }
                 ImGui::SetClipboardText(allText.c_str());
+            }
+
+            ImGui::SameLine(0, 4);
+            if (ImGui::Button(ICON_FA_ERASER " Clear##logclear"))
+            {
+                ActiveDoc()->executionLog.clear();
+                ActiveDoc()->executionLogDirty = false;
+                ActiveDoc()->lastExecutionStatus.clear();
+                ActiveDoc()->lastExecutionResult = RTExecutionResult{};
             }
 
             float logH = ImGui::GetContentRegionAvail().y - 4.0f;
