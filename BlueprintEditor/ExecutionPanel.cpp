@@ -159,6 +159,7 @@ void BlueprintEditor::ExecuteBlueprint()
                 if (!r.success) continue;
                 if (r.data.metadata.blueprintClass != ::NodeEditor::Runtime::BlueprintClass::FunctionLibrary) continue;
                 ActiveDoc()->persistentRunner.RegisterExternalFunctions(r.data.functions);
+                ActiveDoc()->persistentRunner.RegisterExternalLibrary(r.data);  // 注册完整节点图供 FuncLib.* 执行
             }
 #endif
         };
@@ -174,6 +175,7 @@ void BlueprintEditor::ExecuteBlueprint()
                 if (!r.success) continue;
                 if (r.data.metadata.blueprintClass != ::NodeEditor::Runtime::BlueprintClass::FunctionLibrary) continue;
                 ActiveDoc()->persistentRunner.RegisterExternalFunctions(r.data.functions);
+                ActiveDoc()->persistentRunner.RegisterExternalLibrary(r.data);  // 注册完整节点图供 FuncLib.* 执行
             }
         }
         else
