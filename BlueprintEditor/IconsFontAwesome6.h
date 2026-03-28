@@ -93,6 +93,7 @@
 #define ICON_FA_CIRCLE_MINUS       "\xef\x81\x96"  // U+f056
 #define ICON_FA_GEAR               "\xef\x80\x93"  // U+f013  (settings)
 #define ICON_FA_GEARS              "\xef\x82\x85"  // U+f085
+#define ICON_FA_PUZZLE_PIECE       "\xef\x84\xae"  // U+f12e  (plugin/library)
 #define ICON_FA_SLIDERS            "\xef\x87\x9e"  // U+f1de
 #define ICON_FA_WAND_MAGIC_SPARKLES "\xee\x8b\x8b" // U+e2cb
 #define ICON_FA_ARROW_RIGHT        "\xef\x81\xa1"  // U+f061
