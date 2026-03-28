@@ -581,6 +581,14 @@ void ax::NodeEditor::NavigateToRect(const ImVec2& boundsMin, const ImVec2& bound
     s_Editor->NavigateTo(ImRect(boundsMin, boundsMax), zoomIn, duration);
 }
 
+void ax::NodeEditor::NavigateToRectExact(const ImVec2& boundsMin, const ImVec2& boundsMax, float duration)
+{
+    if (duration < 0.0f)
+        duration = s_Editor->GetStyle().ScrollDuration;
+    s_Editor->GetNavigateAction().NavigateTo(ImRect(boundsMin, boundsMax),
+        Detail::NavigateAction::ZoomMode::Exact, duration);
+}
+
 bool ax::NodeEditor::ShowNodeContextMenu(NodeId* nodeId)
 {
     return s_Editor->GetContextMenu().ShowNodeContextMenu(nodeId);

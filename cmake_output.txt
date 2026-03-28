@@ -1,0 +1,11 @@
+-- [BlueprintRuntime] Building as SHARED
+-- [BlueprintRuntime] Lua library type: SHARED
+-- [BlueprintRuntime] Lua not found via find_package, using FetchContent
+-- [BlueprintRuntime] Lua scripting enabled (SHARED, include: C:/Users/maxweili/MyProjects/MyBlueprintEditor/build-windows/_deps/lua54-src/src)
+-- [runtime-example] target added (BUILD_RUNTIME_ONLY=OFF)
+-- Found ImGui headers at: C:/Users/maxweili/MyProjects/MyBlueprintEditor/external/imgui
+-- Building examples...
+-- Examples will be built in: C:/Users/maxweili/MyProjects/MyBlueprintEditor/build-windows/bin
+-- Configuring done (1.6s)
+-- Generating done (0.2s)
+-- Build files have been written to: C:/Users/maxweili/MyProjects/MyBlueprintEditor/build-windows

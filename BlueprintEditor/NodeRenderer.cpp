@@ -946,8 +946,8 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
         // 支持：双击标题进入编辑、Enter/Esc 确认/取消、颜色存储于 node.Color
         // ================================================================
         {
-            // 处理双击进入编辑状态
-            ed::NodeId dblNode = ed::GetDoubleClickedNode();
+            // 处理双击进入编辑状态（使用 EditorUI.cpp 中预读的值）
+            ed::NodeId dblNode = ActiveDoc()->lastDoubleClickedNode;
             if (dblNode)
             {
                 Node* n = FindNode(dblNode);

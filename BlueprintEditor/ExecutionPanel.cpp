@@ -3,6 +3,7 @@
 #include "BuiltinHandlers.h"
 #include <ctime>
 #include <chrono>
+#include <unordered_set>
 
 // 返回 "HH:MM:SS.mmm" 格式的时间戳字符串
 static std::string NowTimestamp()
@@ -181,16 +182,27 @@ void BlueprintEditor::ExecuteBlueprint()
 
     // 5. 执行可视化 —— 精确高亮已执行的节点 & 触发 Flow 动画
     ActiveDoc()->executedNodeHighlight.clear();
+    std::unordered_set<uint64_t> executedNodeSet;
     for (const auto& runtimeId : result.executedNodeIds)
     {
         // runtime NodeId → editor NodeId 映射：通过 definitionId 比对
         // runtime node id = reinterpret_cast<uintptr_t>(editorNode.ID.AsPointer())
         ActiveDoc()->executedNodeHighlight[runtimeId] = 3.0f;  // 3 秒高亮
+        executedNodeSet.insert(runtimeId);
     }
 
+    // 只对连接已执行节点的链接触发 Flow 动画
     for (const auto& link : ActiveDoc()->links)
     {
-        ActiveDoc()->flowLinks.push_back(link.ID);
+        auto* startPin = FindPin(link.StartPinID);
+        auto* endPin   = FindPin(link.EndPinID);
+        if (startPin && endPin && startPin->Node && endPin->Node)
+        {
+            uint64_t startNid = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(startPin->Node->ID.AsPointer()));
+            uint64_t endNid   = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(endPin->Node->ID.AsPointer()));
+            if (executedNodeSet.count(startNid) && executedNodeSet.count(endNid))
+                ActiveDoc()->flowLinks.push_back(link.ID);
+        }
     }
 
     // isExecuting 仅在 runner 确实不再运行时才关闭（异步 Delay/Timer 可能仍在进行）

@@ -743,11 +743,20 @@ void BlueprintEditor::OnFrame(float deltaTime)
             // 绘制快捷键行（左：快捷键，右：描述），整体居中
             auto drawShortcutTable = [&](const std::vector<std::pair<std::string, std::string>>& items)
             {
-                float keyColW = 200.0f;
-                float descColW = 260.0f;
-                float tableW = keyColW + descColW;
+                // 自动计算列宽
+                float keyColW  = 0.0f;
+                float descColW = 0.0f;
+                float gap      = 24.0f;
+                for (const auto& [key, desc] : items)
+                {
+                    float kw = ImGui::CalcTextSize(key.c_str()).x;
+                    float dw = ImGui::CalcTextSize(desc.c_str()).x;
+                    if (kw > keyColW)  keyColW  = kw;
+                    if (dw > descColW) descColW = dw;
+                }
+                float tableW = keyColW + gap + descColW;
                 float tableStartX = baseX + (avail.x - tableW) * 0.5f;
-                float descStartX = tableStartX + keyColW;
+                float descStartX  = tableStartX + keyColW + gap;
 
                 for (auto& [key, desc] : items)
                 {
@@ -1070,6 +1079,10 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
         auto cursorTopLeft = ImGui::GetCursorScreenPos();
 
+        // 读取双击节点事件（一次性消费 API），保存到文档供后续使用
+        // 必须在 DrawNodes 之前读取，否则会被 Comment 编辑逻辑消费
+        ActiveDoc()->lastDoubleClickedNode = ed::GetDoubleClickedNode();
+
         util::BlueprintNodeBuilder builder(m_HeaderBackground,
             GetTextureWidth(m_HeaderBackground), GetTextureHeight(m_HeaderBackground));
         DrawNodes(builder);  // → NodeRenderer.cpp
@@ -1091,7 +1104,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
     //       这里只记录要打开的路径，在 ed::End() 之后再执行。
     // ================================================================
     {
-        auto doubleClickedNodeId = ed::GetDoubleClickedNode();
+        auto doubleClickedNodeId = ActiveDoc()->lastDoubleClickedNode;
         if (doubleClickedNodeId)
         {
             auto* node = FindNode(doubleClickedNodeId);
@@ -1984,6 +1997,8 @@ void BlueprintEditor::DrawNodeListPanel()
             {
                 if (ImGui::Button(ICON_FA_PLUS " Add Function"))
                 {
+                    PushUndoState();
+
                     RTFunctionDefinition newFunc;
                     // 从现有函数列表推算下一个不冲突的计数器值
                     int maxIdx = 0;
@@ -2002,6 +2017,45 @@ void BlueprintEditor::DrawNodeListPanel()
                     newFunc.category = "Custom";
                     newFunc.isPublic = true;
                     doc->functions.push_back(std::move(newFunc));
+
+                    // 在画布中创建对应的 Function.Entry 和 Function.Return 节点
+                    const auto& funcName = doc->functions.back().name;
+
+                    // 找到一个不与现有节点重叠的空闲位置
+                    float spawnY = 0.0f;
+                    for (const auto& n : doc->nodes)
+                    {
+                        auto pos = ed::GetNodePosition(n.ID);
+                        auto sz  = ed::GetNodeSize(n.ID);
+                        float bottom = pos.y + sz.y;
+                        if (bottom > spawnY) spawnY = bottom;
+                    }
+                    spawnY += 80.0f;  // 在所有节点下方留间距
+
+                    Node* entryNode = SpawnNodeByDef("Function.Entry");
+                    if (entryNode)
+                    {
+                        entryNode->Name = funcName;
+                        FixupSpecialPinTypes(entryNode, m_NodeRegistry.getNodeDefinition("Function.Entry"));
+                        ed::SetNodePosition(entryNode->ID, ImVec2(100.0f, spawnY));
+                    }
+
+                    Node* returnNode = SpawnNodeByDef("Function.Return");
+                    if (returnNode)
+                    {
+                        returnNode->Name = funcName;
+                        FixupSpecialPinTypes(returnNode, m_NodeRegistry.getNodeDefinition("Function.Return"));
+                        ed::SetNodePosition(returnNode->ID, ImVec2(500.0f, spawnY));
+                    }
+
+                    // 如果都创建成功，用 flow link 连接 Entry → Return
+                    if (entryNode && returnNode && !entryNode->Outputs.empty() && !returnNode->Inputs.empty())
+                    {
+                        doc->links.emplace_back(Link(GetNextId(), entryNode->Outputs[0].ID, returnNode->Inputs[0].ID));
+                        doc->links.back().Color = ImColor(255, 255, 255);
+                    }
+
+                    BuildNodes();
                     doc->isDirty = true;
                 }
                 ImGui::Separator();

@@ -1437,6 +1437,8 @@ struct EditorContext
         m_NavigateAction.NavigateTo(bounds, zoomMode, duration);
     }
 
+    NavigateAction& GetNavigateAction() { return m_NavigateAction; }
+
     void RegisterAnimation(Animation* animation);
     void UnregisterAnimation(Animation* animation);
 

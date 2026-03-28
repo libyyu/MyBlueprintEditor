@@ -196,6 +196,9 @@ public:
     ed::NodeId     editingCommentId   = 0;         // 当前正在编辑标题的 Comment 节点 ID
     char           commentEditBuf[256] = {};        // 编辑缓冲区
 
+    // 每帧缓存的双击节点 ID（GetDoubleClickedNode 是一次性消费 API，需提前读取共享）
+    ed::NodeId     lastDoubleClickedNode = 0;
+
     // 内联编辑控件字符串缓冲区（按 PinId 索引，文档切换时自然隔离）
     std::unordered_map<uintptr_t, std::array<char, 128>> pinStringBuffers;
     std::unordered_map<uintptr_t, std::array<char, 128>> pinObjectBuffers;

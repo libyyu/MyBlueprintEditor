@@ -53,7 +53,7 @@ static void ApplyZoom(float newZoom, ImVec2 editorMin, ImVec2 editorMax)
     ImVec2 rMin = canvasCtr - halfCanvas;
     ImVec2 rMax = canvasCtr + halfCanvas;
 
-    ed::NavigateToRect(rMin, rMax, false, 0.0f);
+    ed::NavigateToRectExact(rMin, rMax, 0.0f);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

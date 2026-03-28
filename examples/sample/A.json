@@ -1,0 +1,15 @@
+{
+    "fileType": "runtime",
+    "metadata": {
+        "schemaVersion": 2,
+        "blueprintClass": 0,
+        "name": "A",
+        "description": "Blueprint Editor file",
+        "version": ""
+    },
+    "nodes": [
+
+    ],
+    "links": [
+    ]
+}
