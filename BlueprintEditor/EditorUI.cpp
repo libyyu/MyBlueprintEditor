@@ -2095,7 +2095,7 @@ void BlueprintEditor::DrawNodeListPanel()
                 else
                 {
                     ImGui::Dummy(ImVec2((float)restoreIconWidth, (float)restoreIconHeight));
-                    drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,32));
+                    drawList2->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,32));
                 }
 
                 ImGui::SameLine(0, 0);
