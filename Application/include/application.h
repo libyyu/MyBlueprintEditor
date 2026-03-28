@@ -54,6 +54,7 @@ private:
     ImFont*                     m_DefaultFont = nullptr;
     ImFont*                     m_HeaderFont = nullptr;
     ImFont*                     m_IconFont = nullptr;
+    float                       m_LastDpiScale = 0.0f;  // 上次 RecreateFontAtlas 时的 DPI 缩放值（用于 Style 增量缩放）
 };
 
 int Main(int argc, char** argv);

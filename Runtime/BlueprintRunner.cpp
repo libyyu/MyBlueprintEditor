@@ -608,13 +608,16 @@ ExecutionResult BlueprintRunner::Execute()
 
     // 按拓扑顺序执行
     m_flowExecutedNodes.clear(); // 清空控制流已执行记录
+    m_stepTopoIndex = 0;         // 重置单步索引
 
     // 收集所有事件源节点及其 exec 下游子图（如 CustomEvent → Print String）
     // 这些节点不在主循环中执行，只在被外部触发（如 Timer 回调）时执行
     auto eventSubgraph = m_blueprint.collectEventSubgraphs();
 
-    for (NodeId nodeId : order)
+    for (size_t i = 0; i < order.size(); ++i)
     {
+        NodeId nodeId = order[i];
+
         // 跳过已被控制流（ActivateOutputFlow）递归执行过的节点
         if (m_flowExecutedNodes.count(nodeId))
             continue;
@@ -647,6 +650,17 @@ ExecutionResult BlueprintRunner::Execute()
 
         result.nodesExecuted++;
         result.executedNodeIds.push_back(node->id);
+
+        // 断点命中后 Pause：记录当前 topo 进度，下次 StepNextNode 从这里继续
+        if (m_runState.load() == RunState::Paused)
+        {
+            m_stepTopoIndex = i + 1;
+            auto endTime = std::chrono::high_resolution_clock::now();
+            result.elapsedMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
+            result.success = false;
+            result.errorMessage = "Paused at breakpoint";
+            return result;
+        }
     }
 
     // 收集所有输出引脚的最终值
@@ -1067,6 +1081,49 @@ void ExecutionContext::PauseRunner()
 {
     if (m_runner)
         m_runner->Pause();
+}
+
+bool BlueprintRunner::StepNextNode()
+{
+    if (!IsPaused() || !m_loaded)
+        return false;
+
+    // 确保拓扑缓存有效
+    if (!ensureTopologicalOrder())
+        return false;
+    const auto& order = m_topoCache;
+
+    auto eventSubgraph = m_blueprint.collectEventSubgraphs();
+
+    // 从 m_stepTopoIndex 开始找下一个需要执行的节点
+    while (m_stepTopoIndex < order.size())
+    {
+        NodeId nodeId = order[m_stepTopoIndex];
+        ++m_stepTopoIndex;
+
+        if (m_flowExecutedNodes.count(nodeId)) continue;
+        if (eventSubgraph.count(nodeId))       continue;
+
+        const NodeInstance* node = m_blueprint.findNode(nodeId);
+        if (!node) continue;
+
+        if (m_logCallback)
+            m_logCallback(LogLevel::Verbose, "[Step] Node '" + node->name +
+                "' (id=" + std::to_string(node->id) + ", def=" + node->definitionId + ")");
+
+        executeNodeInternal(*node);
+
+        // 执行完一个节点后保持 Paused
+        if (m_runState.load() != RunState::Paused)
+            m_runState.store(RunState::Paused);
+
+        return true;
+    }
+
+    // 已无更多节点，恢复 Idle
+    m_runState.store(RunState::Idle);
+    m_stepTopoIndex = 0;
+    return false;
 }
 
 // ============================================================================

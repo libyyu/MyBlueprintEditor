@@ -1945,10 +1945,71 @@ void BlueprintEditor::DrawNodeListPanel()
                 }
 
                 bool isSelected = std::find(selectedNodes.begin(), selectedNodes.end(), node.ID) != selectedNodes.end();
+                bool hasBreakpoint = ActiveDoc()->breakpoints.count(static_cast<uint64_t>(node.ID.Get())) > 0;
+
+                // ── 每行行高 ────────────────────────────────────────────────
+                float rowH     = ImGui::GetTextLineHeight() + ImGui::GetStyle().ItemSpacing.y;
+                float rowY     = ImGui::GetCursorScreenPos().y;
+                float rowX     = ImGui::GetCursorScreenPos().x;
+                float rowRight = rowX + paneWidth - ImGui::GetStyle().ScrollbarSize - 4.0f;
+
+                // ── 选中 / hover 背景 ───────────────────────────────────────
+                ImVec2 rowMin(rowX - ImGui::GetStyle().IndentSpacing, rowY);
+                ImVec2 rowMax(rowRight, rowY + ImGui::GetTextLineHeight() + 2.0f);
+                auto* dl = ImGui::GetWindowDrawList();
+
+                if (isSelected)
+                    dl->AddRectFilled(rowMin, rowMax, IM_COL32(0, 122, 204, 60), 3.0f);
+
+                // ── 左侧色条（按 DefinitionId 前缀分类着色）────────────────
+                ImU32 accentCol = IM_COL32(120, 120, 120, 200);
+                const std::string& defId = node.DefinitionId;
+                if (defId.rfind("FuncLib.", 0) == 0)           accentCol = IM_COL32(180, 100, 255, 220);
+                else if (defId == "ForLoop")                    accentCol = IM_COL32( 80, 160, 255, 220);
+                else if (defId == "Branch")                     accentCol = IM_COL32(255, 180,  60, 220);
+                else if (defId.rfind("Print", 0) == 0)         accentCol = IM_COL32( 80, 210,  80, 220);
+                else if (defId == "Delay")                      accentCol = IM_COL32(255, 120, 120, 220);
+                else if (defId == "ExecuteBlueprint")           accentCol = IM_COL32( 60, 200, 200, 220);
+                else if (defId.rfind("Math", 0) == 0 ||
+                         defId == "Add" || defId == "Sub" ||
+                         defId == "Mul" || defId == "Div")      accentCol = IM_COL32(255, 210,  80, 220);
+                else if (defId.rfind("Function.", 0) == 0)      accentCol = IM_COL32(220,  80, 180, 220);
+
+                dl->AddRectFilled(
+                    ImVec2(rowMin.x, rowMin.y + 2.0f),
+                    ImVec2(rowMin.x + 3.0f, rowMax.y - 2.0f),
+                    accentCol, 1.5f);
+
+                // ── 断点圆点 ────────────────────────────────────────────────
+                if (hasBreakpoint)
+                {
+                    float cx = rowMin.x + 10.0f;
+                    float cy = rowMin.y + rowH * 0.5f - 1.0f;
+                    dl->AddCircleFilled(ImVec2(cx, cy), 5.0f, IM_COL32(220, 50, 50, 255));
+                    dl->AddCircle(ImVec2(cx, cy), 5.0f, IM_COL32(255, 120, 120, 200), 0, 1.5f);
+                }
+
+                // ── 节点图标（按分类）──────────────────────────────────────
+                const char* nodeIcon = ICON_FA_CIRCLE_NODES;
+                if      (defId.rfind("FuncLib.", 0) == 0)  nodeIcon = ICON_FA_PUZZLE_PIECE;
+                else if (defId == "ForLoop")                nodeIcon = ICON_FA_ROTATE;
+                else if (defId == "Branch")                 nodeIcon = ICON_FA_CODE_BRANCH;
+                else if (defId.rfind("Print", 0) == 0)     nodeIcon = ICON_FA_TERMINAL;
+                else if (defId == "Delay")                  nodeIcon = ICON_FA_CLOCK;
+                else if (defId == "ExecuteBlueprint")       nodeIcon = ICON_FA_DIAGRAM_PROJECT;
+                else if (defId.rfind("Function.", 0) == 0) nodeIcon = ICON_FA_BOLT;
+
+                // ── Selectable（透明背景，自定义绘制）────────────────────
+                ImGui::PushStyleColor(ImGuiCol_Header,        IM_COL32(0, 122, 204, 40));
+                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(0, 122, 204, 30));
+                ImGui::PushStyleColor(ImGuiCol_HeaderActive,  IM_COL32(0, 122, 204, 70));
 #if IMGUI_VERSION_NUM >= 18967
                 ImGui::SetNextItemAllowOverlap();
 #endif
-                if (ImGui::Selectable((node.Name + "##" + std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer()))).c_str(), &isSelected))
+                std::string selectableLabel = std::string("##node_") +
+                    std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer()));
+                if (ImGui::Selectable(selectableLabel.c_str(), isSelected,
+                    ImGuiSelectableFlags_SpanAllColumns, ImVec2(0, ImGui::GetTextLineHeight() + 2.0f)))
                 {
                     if (io.KeyCtrl)
                     {
@@ -1959,20 +2020,44 @@ void BlueprintEditor::DrawNodeListPanel()
                         ed::SelectNode(node.ID, false);
                     ed::NavigateToSelection();
                 }
-                if (ImGui::IsItemHovered() && !node.State.empty())
-                    ImGui::SetTooltip("State: %s", node.State.c_str());
+                ImGui::PopStyleColor(3);
 
-                auto id = std::string("(") + std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer())) + ")";
-                auto textSize = ImGui::CalcTextSize(id.c_str(), nullptr);
-                auto iconPanelPos = start + ImVec2(
-                    paneWidth - ImGui::GetStyle().FramePadding.x - ImGui::GetStyle().IndentSpacing - saveIconWidth - restoreIconWidth - ImGui::GetStyle().ItemInnerSpacing.x,
-                    (ImGui::GetTextLineHeight() - saveIconHeight) / 2);
-                ImGui::GetWindowDrawList()->AddText(
-                    ImVec2(iconPanelPos.x - textSize.x - ImGui::GetStyle().ItemInnerSpacing.x, start.y),
-                    IM_COL32(255, 255, 255, 255), id.c_str(), nullptr);
+                if (ImGui::IsItemHovered())
+                {
+                    // hover 高亮条
+                    dl->AddRectFilled(rowMin, rowMax, IM_COL32(255, 255, 255, 10), 3.0f);
+                    if (!node.State.empty())
+                        ImGui::SetTooltip("State: %s\nDef: %s", node.State.c_str(), defId.c_str());
+                    else
+                        ImGui::SetTooltip("Def: %s", defId.c_str());
+                }
 
-                auto drawList = ImGui::GetWindowDrawList();
-                ImGui::SetCursorScreenPos(iconPanelPos);
+                // ── 图标 + 节点名（覆盖在 Selectable 上方）────────────────
+                ImGui::SameLine(0, 0);
+                ImGui::SetCursorScreenPos(ImVec2(rowMin.x + 16.0f, rowY));
+                ImGui::PushStyleColor(ImGuiCol_Text, accentCol);
+                ImGui::TextUnformatted(nodeIcon);
+                ImGui::PopStyleColor();
+                ImGui::SameLine(0, 5.0f);
+                ImGui::TextUnformatted(node.Name.c_str());
+
+                // ── 右侧节点 ID（淡色）─────────────────────────────────────
+                {
+                    std::string idStr = "#" + std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer()) & 0xFFFF);
+                    ImVec2 idSize = ImGui::CalcTextSize(idStr.c_str());
+                    dl->AddText(
+                        ImVec2(rowRight - idSize.x - 4.0f, rowY + 1.0f),
+                        IM_COL32(120, 130, 145, 140),
+                        idStr.c_str());
+                }
+
+                // ── Save / Restore 按钮（保留原功能，紧凑显示）────────────
+                auto drawList2 = ImGui::GetWindowDrawList();
+                float btnSize  = (float)std::min(saveIconWidth, 16);
+                float btnY     = rowY + (ImGui::GetTextLineHeight() - btnSize) * 0.5f;
+                float btnX     = rowRight - btnSize * 2.0f - ImGui::GetStyle().ItemInnerSpacing.x * 2.0f - 20.0f;
+
+                ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
 #if IMGUI_VERSION_NUM < 18967
                 ImGui::SetItemAllowOverlap();
 #else
@@ -1980,21 +2065,16 @@ void BlueprintEditor::DrawNodeListPanel()
 #endif
                 if (node.SavedState.empty())
                 {
-                    if (ImGui::InvisibleButton("save", ImVec2((float)saveIconWidth, (float)saveIconHeight)))
+                    if (ImGui::InvisibleButton("save", ImVec2(btnSize, btnSize)))
                         node.SavedState = node.State;
-                    if (ImGui::IsItemActive())
-                        drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,96));
-                    else if (ImGui::IsItemHovered())
-                        drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,255));
-                    else
-                        drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,160));
+                    ImU32 c = ImGui::IsItemHovered() ? IM_COL32(255,255,255,200) : IM_COL32(255,255,255,100);
+                    drawList2->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), c);
                 }
                 else
                 {
-                    ImGui::Dummy(ImVec2((float)saveIconWidth, (float)saveIconHeight));
-                    drawList->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,32));
+                    ImGui::Dummy(ImVec2(btnSize, btnSize));
+                    drawList2->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,30));
                 }
-
                 ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
 #if IMGUI_VERSION_NUM < 18967
                 ImGui::SetItemAllowOverlap();
@@ -2003,18 +2083,14 @@ void BlueprintEditor::DrawNodeListPanel()
 #endif
                 if (!node.SavedState.empty())
                 {
-                    if (ImGui::InvisibleButton("restore", ImVec2((float)restoreIconWidth, (float)restoreIconHeight)))
+                    if (ImGui::InvisibleButton("restore", ImVec2(btnSize, btnSize)))
                     {
                         node.State = node.SavedState;
                         ed::RestoreNodeState(node.ID);
                         node.SavedState.clear();
                     }
-                    if (ImGui::IsItemActive())
-                        drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,96));
-                    else if (ImGui::IsItemHovered())
-                        drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,255));
-                    else
-                        drawList->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,160));
+                    ImU32 c = ImGui::IsItemHovered() ? IM_COL32(255,255,255,200) : IM_COL32(255,255,255,120);
+                    drawList2->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), c);
                 }
                 else
                 {

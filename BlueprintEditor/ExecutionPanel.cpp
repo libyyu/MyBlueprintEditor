@@ -321,20 +321,20 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
     if (!isPaused) ImGui::BeginDisabled();
     if (ImGui::Button(ICON_FA_ARROW_RIGHT " Step", ImVec2(60, 0)))
     {
-        // 暂时 Resume 一帧让 runner Tick 推进一步，然后立即再 Pause
-        // 实现方式：调用 Tick(0) 让 timer 推进，然后立即 Pause
-        // 更精确的做法：通过 stepToken 让 runner 执行一个节点后自动暂停
-        runner.Resume();
-        runner.Tick(0.016f);   // 推进一帧（约 16ms）
-        runner.Pause();
+        // 单步执行：在 Paused 状态下执行下一个拓扑节点，然后继续 Paused
+        bool hasMore = runner.StepNextNode();
 
-        // 高亮最后执行的节点
-        const auto& result = ActiveDoc()->lastExecutionResult;
-        if (!result.executedNodeIds.empty())
+        // 高亮刚执行的节点（取 log 中最新节点 id，或从 topo 反推）
+        if (hasMore)
         {
-            auto lastNodeId = result.executedNodeIds.back();
-            uint64_t nid = static_cast<uint64_t>(lastNodeId);
-            ActiveDoc()->executedNodeHighlight[nid] = 3.0f;
+            const auto& topo  = runner.GetTopoCache();
+            size_t stepIdx    = runner.GetStepTopoIndex();
+            // stepIdx 指向下一个待执行节点，上一个就是 stepIdx-1
+            if (stepIdx > 0 && stepIdx - 1 < topo.size())
+            {
+                uint64_t nid = static_cast<uint64_t>(topo[stepIdx - 1]);
+                ActiveDoc()->executedNodeHighlight[nid] = 3.0f;
+            }
         }
     }
     if (!isPaused) ImGui::EndDisabled();

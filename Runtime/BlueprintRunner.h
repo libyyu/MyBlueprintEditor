@@ -536,6 +536,15 @@ public:
     bool IsStopped() const { return m_runState.load() == RunState::Stopped; }
     bool IsIdle()    const { return m_runState.load() == RunState::Idle;    }
 
+    // ── 断点单步调试 ─────────────────────────────────────────────────────────
+    // 在 Paused 状态下执行下一个拓扑节点，然后再次 Pause。
+    // 返回 true = 成功执行了一个节点；false = 无更多节点（执行完毕）。
+    bool StepNextNode();
+
+    // 获取拓扑排序缓存（供编辑器在 Step 后高亮节点使用）
+    const std::vector<NodeId>& GetTopoCache() const { return m_topoCache; }
+    size_t GetStepTopoIndex() const { return m_stepTopoIndex; }
+
     // ------------------------------------------------------------------
     // 主线程计时器（由外部每帧调用 Tick 驱动）
     // ------------------------------------------------------------------
@@ -693,6 +702,9 @@ private:
     // 运行时控制状态
     enum class RunState { Idle, Running, Paused, Stopped };
     std::atomic<RunState>                               m_runState { RunState::Idle };
+
+    // 断点单步调试：记录当前已执行到拓扑序的第几个节点（Paused 时有效）
+    size_t                                              m_stepTopoIndex = 0;
 
     // 缓存：拓扑排序结果
     mutable std::vector<NodeId>                         m_topoCache;
