@@ -2,6 +2,7 @@
 # include "setup.h"
 # include "platform.h"
 # include "renderer.h"
+#include <cmath>   // std::round, std::floor — Windows MSVC requires explicit include
 
 #ifdef _WIN32
 #define NOMINMAX

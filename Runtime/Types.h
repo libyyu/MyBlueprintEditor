@@ -6,6 +6,7 @@
 #include "BlueprintExport.h"
 #include <cstdint>
 #include <cstdlib>
+#include <cstdio>    // std::snprintf — explicit for MSVC
 #include <string>
 #include <vector>
 #include <unordered_map>

@@ -9,6 +9,7 @@
 #include <sstream>
 #include <iomanip>
 #include <ctime>
+#include <cstdio>   // std::snprintf — explicit for MSVC
 #include <iostream>
 #include <algorithm>
 #include <unordered_map>
