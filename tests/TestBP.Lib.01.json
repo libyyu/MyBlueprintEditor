@@ -8,30 +8,197 @@
         "version": ""
     },
     "nodes": [
-
+        {
+            "id": 1,
+            "definitionId": "Function.Entry",
+            "definitionVersion": 1,
+            "name": "LibPrintFunc",
+            "pins": [
+                {
+                    "id": 2,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 7,
+                    "kind": 1,
+                    "dataType": 3,
+                    "name": "fInArg"
+                },
+                {
+                    "id": 10,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "iInArg"
+                },
+                {
+                    "id": 13,
+                    "kind": 1,
+                    "dataType": 1,
+                    "name": "bInArg"
+                },
+                {
+                    "id": 16,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "sInArg"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "definitionId": "Function.Return",
+            "definitionVersion": 1,
+            "name": "LibPrintFunc",
+            "pins": [
+                {
+                    "id": 4,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 19,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "sOutArg",
+                    "defaultValue": ""
+                }
+            ]
+        },
+        {
+            "id": 20,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print String",
+            "pins": [
+                {
+                    "id": 21,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 22,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": "lib print called"
+                },
+                {
+                    "id": 23,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 31,
+            "definitionId": "FormatString",
+            "definitionVersion": 1,
+            "name": "Format String",
+            "pins": [
+                {
+                    "id": 32,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Format",
+                    "defaultValue": "lib print called:{0}{1}{2}{3}"
+                },
+                {
+                    "id": 33,
+                    "kind": 0,
+                    "dataType": 8,
+                    "name": "Arg 0"
+                },
+                {
+                    "id": 34,
+                    "kind": 0,
+                    "dataType": 8,
+                    "name": "Arg 1"
+                },
+                {
+                    "id": 37,
+                    "kind": 0,
+                    "dataType": 8,
+                    "name": "Arg 0"
+                },
+                {
+                    "id": 40,
+                    "kind": 0,
+                    "dataType": 8,
+                    "name": "Arg 1"
+                },
+                {
+                    "id": 35,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Result"
+                }
+            ]
+        }
     ],
     "links": [
+        {
+            "id": 24,
+            "startPinId": 2,
+            "endPinId": 21,
+            "isEnabled": true
+        },
+        {
+            "id": 25,
+            "startPinId": 23,
+            "endPinId": 4,
+            "isEnabled": true
+        },
+        {
+            "id": 26,
+            "startPinId": 16,
+            "endPinId": 19,
+            "isEnabled": true
+        },
+        {
+            "id": 36,
+            "startPinId": 7,
+            "endPinId": 33,
+            "isEnabled": true
+        },
+        {
+            "id": 38,
+            "startPinId": 10,
+            "endPinId": 34,
+            "isEnabled": true
+        },
+        {
+            "id": 39,
+            "startPinId": 13,
+            "endPinId": 37,
+            "isEnabled": true
+        },
+        {
+            "id": 41,
+            "startPinId": 16,
+            "endPinId": 40,
+            "isEnabled": true
+        },
+        {
+            "id": 42,
+            "startPinId": 35,
+            "endPinId": 22,
+            "isEnabled": true
+        }
     ],
     "functions": [
         {
-            "id": "func_1",
-            "name": "LibFun01",
-            "category": "Custom",
-            "description": "",
-            "isPublic": true,
-            "inputs": [{"name":"fArgs","dataType":3},{"name":"bArgs","dataType":1},{"name":"iArgs","dataType":2},{"name":"sArgs","dataType":4}],
-            "outputs": [{"name":"oString","dataType":4}],
-            "nodes": [],
-            "links": []
-        },
-        {
             "id": "func_2",
-            "name": "NewFunction_2",
+            "name": "LibPrintFunc",
             "category": "Custom",
             "description": "",
             "isPublic": true,
-            "inputs": [],
-            "outputs": [],
+            "inputs": [{"name":"fInArg","dataType":3},{"name":"iInArg","dataType":2},{"name":"bInArg","dataType":1},{"name":"sInArg","dataType":4}],
+            "outputs": [{"name":"sOutArg","dataType":4}],
             "nodes": [],
             "links": []
         }

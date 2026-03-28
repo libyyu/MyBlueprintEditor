@@ -250,60 +250,6 @@
             ]
         },
         {
-            "id": 36,
-            "definitionId": "ExecuteBlueprint",
-            "definitionVersion": 1,
-            "name": "Execute Blueprint",
-            "pins": [
-                {
-                    "id": 37,
-                    "kind": 0,
-                    "dataType": 0,
-                    "isExec": true
-                },
-                {
-                    "id": 38,
-                    "kind": 0,
-                    "dataType": 4,
-                    "name": "File",
-                    "defaultValue": "TestBP.02.json"
-                },
-                {
-                    "id": 39,
-                    "kind": 0,
-                    "dataType": 1,
-                    "name": "Sync",
-                    "defaultValue": false
-                },
-                {
-                    "id": 40,
-                    "kind": 1,
-                    "dataType": 0,
-                    "name": "Done",
-                    "isExec": true
-                },
-                {
-                    "id": 41,
-                    "kind": 1,
-                    "dataType": 0,
-                    "name": "Completed",
-                    "isExec": true
-                },
-                {
-                    "id": 42,
-                    "kind": 1,
-                    "dataType": 1,
-                    "name": "Success"
-                },
-                {
-                    "id": 43,
-                    "kind": 1,
-                    "dataType": 4,
-                    "name": "Output"
-                }
-            ]
-        },
-        {
             "id": 44,
             "definitionId": "PrintString",
             "definitionVersion": 1,
@@ -382,7 +328,7 @@
                     "kind": 0,
                     "dataType": 4,
                     "name": "C",
-                    "defaultValue": "sub message:"
+                    "defaultValue": ",sub message:"
                 },
                 {
                     "id": 56,
@@ -417,6 +363,107 @@
                     "kind": 1,
                     "dataType": 4,
                     "name": "Result"
+                }
+            ]
+        },
+        {
+            "id": 77,
+            "definitionId": "ExecuteBlueprint",
+            "definitionVersion": 1,
+            "name": "Execute Blueprint",
+            "pins": [
+                {
+                    "id": 78,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 79,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "File",
+                    "defaultValue": "TestBP.02"
+                },
+                {
+                    "id": 80,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "Done",
+                    "isExec": true
+                },
+                {
+                    "id": 81,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "Completed",
+                    "isExec": true
+                },
+                {
+                    "id": 82,
+                    "kind": 1,
+                    "dataType": 1,
+                    "name": "Success"
+                },
+                {
+                    "id": 83,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Output"
+                }
+            ]
+        },
+        {
+            "id": 89,
+            "definitionId": "FuncLib.TestBp.Lib.01.func_1",
+            "definitionVersion": 1,
+            "name": "LibFun01",
+            "pins": [
+                {
+                    "id": 90,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 91,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "fArgs",
+                    "defaultValue": 1.200000
+                },
+                {
+                    "id": 92,
+                    "kind": 0,
+                    "dataType": 1,
+                    "name": "bArgs",
+                    "defaultValue": true
+                },
+                {
+                    "id": 93,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "iArgs",
+                    "defaultValue": 8
+                },
+                {
+                    "id": 94,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "sArgs",
+                    "defaultValue": "test lib"
+                },
+                {
+                    "id": 95,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 96,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "oString"
                 }
             ]
         }
@@ -477,45 +524,51 @@
             "isEnabled": true
         },
         {
-            "id": 70,
-            "startPinId": 22,
-            "endPinId": 37,
-            "isEnabled": true
-        },
-        {
-            "id": 71,
-            "startPinId": 40,
-            "endPinId": 45,
-            "isEnabled": true
-        },
-        {
-            "id": 72,
-            "startPinId": 41,
-            "endPinId": 49,
-            "isEnabled": true
-        },
-        {
-            "id": 73,
-            "startPinId": 42,
-            "endPinId": 59,
-            "isEnabled": true
-        },
-        {
             "id": 74,
             "startPinId": 60,
             "endPinId": 54,
             "isEnabled": true
         },
         {
-            "id": 75,
-            "startPinId": 43,
+            "id": 76,
+            "startPinId": 57,
+            "endPinId": 50,
+            "isEnabled": true
+        },
+        {
+            "id": 84,
+            "startPinId": 22,
+            "endPinId": 78,
+            "isEnabled": true
+        },
+        {
+            "id": 85,
+            "startPinId": 80,
+            "endPinId": 45,
+            "isEnabled": true
+        },
+        {
+            "id": 86,
+            "startPinId": 81,
+            "endPinId": 49,
+            "isEnabled": true
+        },
+        {
+            "id": 87,
+            "startPinId": 82,
+            "endPinId": 59,
+            "isEnabled": true
+        },
+        {
+            "id": 88,
+            "startPinId": 83,
             "endPinId": 56,
             "isEnabled": true
         },
         {
-            "id": 76,
-            "startPinId": 57,
-            "endPinId": 50,
+            "id": 97,
+            "startPinId": 47,
+            "endPinId": 90,
             "isEnabled": true
         }
     ]
