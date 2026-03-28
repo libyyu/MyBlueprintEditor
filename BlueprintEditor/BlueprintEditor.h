@@ -217,6 +217,9 @@ public:
     // 本蓝图定义的函数
     std::vector<RTFunctionDefinition> functions;
 
+    // Functions 面板状态
+    int  selectedFuncIdx = -1;           // 当前选中的函数索引（-1 = 无选中）
+
     // ---- Undo / Redo ----
     std::deque<UndoState> undoStack;   // 最多 kMaxUndoSteps 步
     std::deque<UndoState> redoStack;
@@ -555,6 +558,8 @@ struct BlueprintEditor : public Application
     void    DrawVariablePanel();                       // 变量面板（在 DrawNodeListPanel TabBar 内调用）
     void    DrawNodeLibraryPanel();                    // 节点库面板（可折叠分类 + 拖拽）
     void    DrawDetailsPanel();                        // Details 面板（选中节点的属性检查器）
+    void    DrawFunctionDetailsPanel(RTFunctionDefinition& func);  // 函数参数编辑面板
+    void    SyncFunctionPinsToNodes(const RTFunctionDefinition& func);  // 同步函数参数到画布节点引脚
     void    DrawExecutionPanel();                      // 底部执行输出面板（嵌入式）
     void    DrawWatchPanel(float paneWidth);           // Watch 面板（运行时变量/引脚值监控）
     void    DrawTimerPanel();                          // 计时器监控浮动面板

@@ -1995,16 +1995,15 @@ void BlueprintEditor::DrawNodeListPanel()
             auto* doc = ActiveDoc();
             if (doc)
             {
+                // --- Add Function 按钮 ---
                 if (ImGui::Button(ICON_FA_PLUS " Add Function"))
                 {
                     PushUndoState();
 
                     RTFunctionDefinition newFunc;
-                    // 从现有函数列表推算下一个不冲突的计数器值
                     int maxIdx = 0;
                     for (const auto& f : doc->functions)
                     {
-                        // 解析 "func_N" 格式中的 N
                         if (f.id.rfind("func_", 0) == 0)
                         {
                             int n = std::atoi(f.id.c_str() + 5);
@@ -2017,50 +2016,12 @@ void BlueprintEditor::DrawNodeListPanel()
                     newFunc.category = "Custom";
                     newFunc.isPublic = true;
                     doc->functions.push_back(std::move(newFunc));
-
-                    // 在画布中创建对应的 Function.Entry 和 Function.Return 节点
-                    const auto& funcName = doc->functions.back().name;
-
-                    // 找到一个不与现有节点重叠的空闲位置
-                    float spawnY = 0.0f;
-                    for (const auto& n : doc->nodes)
-                    {
-                        auto pos = ed::GetNodePosition(n.ID);
-                        auto sz  = ed::GetNodeSize(n.ID);
-                        float bottom = pos.y + sz.y;
-                        if (bottom > spawnY) spawnY = bottom;
-                    }
-                    spawnY += 80.0f;  // 在所有节点下方留间距
-
-                    Node* entryNode = SpawnNodeByDef("Function.Entry");
-                    if (entryNode)
-                    {
-                        entryNode->Name = funcName;
-                        FixupSpecialPinTypes(entryNode, m_NodeRegistry.getNodeDefinition("Function.Entry"));
-                        ed::SetNodePosition(entryNode->ID, ImVec2(100.0f, spawnY));
-                    }
-
-                    Node* returnNode = SpawnNodeByDef("Function.Return");
-                    if (returnNode)
-                    {
-                        returnNode->Name = funcName;
-                        FixupSpecialPinTypes(returnNode, m_NodeRegistry.getNodeDefinition("Function.Return"));
-                        ed::SetNodePosition(returnNode->ID, ImVec2(500.0f, spawnY));
-                    }
-
-                    // 如果都创建成功，用 flow link 连接 Entry → Return
-                    if (entryNode && returnNode && !entryNode->Outputs.empty() && !returnNode->Inputs.empty())
-                    {
-                        doc->links.emplace_back(Link(GetNextId(), entryNode->Outputs[0].ID, returnNode->Inputs[0].ID));
-                        doc->links.back().Color = ImColor(255, 255, 255);
-                    }
-
-                    BuildNodes();
+                    doc->selectedFuncIdx = static_cast<int>(doc->functions.size()) - 1;
                     doc->isDirty = true;
                 }
                 ImGui::Separator();
 
-                // 列表显示已有函数
+                // --- 函数列表 ---
                 static int renamingIdx = -1;
                 static char renameBuf[128] = {};
                 for (int i = 0; i < (int)doc->functions.size(); ++i)
@@ -2068,12 +2029,22 @@ void BlueprintEditor::DrawNodeListPanel()
                     auto& func = doc->functions[i];
                     ImGui::PushID(i);
 
+                    bool isSelected = (doc->selectedFuncIdx == i);
+
                     if (renamingIdx == i)
                     {
                         if (ImGui::InputText("##rename", renameBuf, sizeof(renameBuf),
                                              ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
                         {
+                            // 重命名时同步更新画布上对应的 Entry/Return 节点名
+                            std::string oldName = func.name;
                             func.name = renameBuf;
+                            for (auto& node : doc->nodes)
+                            {
+                                if ((node.DefinitionId == "Function.Entry" || node.DefinitionId == "Function.Return")
+                                    && node.Name == oldName)
+                                    node.Name = func.name;
+                            }
                             doc->isDirty = true;
                             renamingIdx = -1;
                         }
@@ -2082,7 +2053,10 @@ void BlueprintEditor::DrawNodeListPanel()
                     }
                     else
                     {
-                        ImGui::Selectable(func.name.c_str(), false, ImGuiSelectableFlags_AllowDoubleClick);
+                        if (ImGui::Selectable(func.name.c_str(), isSelected, ImGuiSelectableFlags_AllowDoubleClick))
+                        {
+                            doc->selectedFuncIdx = i;
+                        }
                         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
                         {
                             renamingIdx = i;
@@ -2092,16 +2066,42 @@ void BlueprintEditor::DrawNodeListPanel()
                         // Delete 键删除
                         if (ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Delete))
                         {
+                            PushUndoState();
+                            // 删除画布上对应的 Entry/Return 节点和相关链接
+                            for (auto nit = doc->nodes.begin(); nit != doc->nodes.end(); )
+                            {
+                                if ((nit->DefinitionId == "Function.Entry" || nit->DefinitionId == "Function.Return")
+                                    && nit->Name == func.name)
+                                {
+                                    // 删除连接到此节点的所有链接
+                                    auto nodeId = nit->ID;
+                                    doc->links.erase(std::remove_if(doc->links.begin(), doc->links.end(),
+                                        [&](const Link& lnk) {
+                                            for (auto& p : nit->Inputs)
+                                                if (lnk.StartPinID == p.ID || lnk.EndPinID == p.ID) return true;
+                                            for (auto& p : nit->Outputs)
+                                                if (lnk.StartPinID == p.ID || lnk.EndPinID == p.ID) return true;
+                                            return false;
+                                        }), doc->links.end());
+                                    nit = doc->nodes.erase(nit);
+                                }
+                                else
+                                    ++nit;
+                            }
                             doc->functions.erase(doc->functions.begin() + i);
+                            if (doc->selectedFuncIdx >= (int)doc->functions.size())
+                                doc->selectedFuncIdx = (int)doc->functions.size() - 1;
                             doc->isDirty = true;
+                            BuildNodes();
                             ImGui::PopID();
                             break;
                         }
                     }
+
+                    // 跳转按钮
                     ImGui::SameLine();
-                    if (ImGui::SmallButton(ICON_FA_MAGNIFYING_GLASS "##editfunc"))
+                    if (ImGui::SmallButton(ICON_FA_MAGNIFYING_GLASS "##gotofunc"))
                     {
-                        // 在当前画布中查找并跳转到对应的 Function.Entry 节点
                         for (const auto& node : doc->nodes)
                         {
                             if (node.DefinitionId == "Function.Entry" && node.Name == func.name)
@@ -2120,7 +2120,19 @@ void BlueprintEditor::DrawNodeListPanel()
                 }
 
                 if (doc->functions.empty())
+                {
                     ImGui::TextDisabled("Click '" ICON_FA_PLUS " Add Function' to create one.");
+                    doc->selectedFuncIdx = -1;
+                }
+
+                // --- 选中函数的参数编辑面板 ---
+                if (doc->selectedFuncIdx >= 0 && doc->selectedFuncIdx < (int)doc->functions.size())
+                {
+                    ImGui::Spacing();
+                    ImGui::Separator();
+                    ImGui::Spacing();
+                    DrawFunctionDetailsPanel(doc->functions[doc->selectedFuncIdx]);
+                }
             }
             ImGui::EndTabItem();
         }
@@ -2820,6 +2832,444 @@ void BlueprintEditor::DrawDetailsPanel()
         }
         ImGui::Unindent(8.0f);
     }
+}
+
+// ============================================================================
+// 函数参数编辑面板（在 Functions Tab 中选中函数时显示）
+// ============================================================================
+
+void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
+{
+    auto* doc = ActiveDoc();
+    if (!doc) return;
+
+    float paneWidth = ImGui::GetContentRegionAvail().x;
+
+    // 类型选项（与变量面板保持一致）
+    static const char* typeNames[] = { "Boolean", "Integer", "Float", "String", "Object" };
+    static const RTPinDataType typeValues[] = {
+        RTPinDataType::Boolean, RTPinDataType::Integer, RTPinDataType::Float,
+        RTPinDataType::String, RTPinDataType::Object
+    };
+    static const int typeCount = 5;
+
+    auto dataTypeToIndex = [](RTPinDataType dt) -> int {
+        switch (dt) {
+        case RTPinDataType::Boolean: return 0;
+        case RTPinDataType::Integer: return 1;
+        case RTPinDataType::Float:   return 2;
+        case RTPinDataType::String:  return 3;
+        case RTPinDataType::Object:  return 4;
+        default:                     return 3; // 默认 String
+        }
+    };
+
+    // ── 函数信息标题 ──────────────────────────────────────────────────
+    {
+        auto* drawList = ImGui::GetWindowDrawList();
+        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+        float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+        drawList->AddRectFilled(
+            cursorPos,
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+            IM_COL32(30, 50, 30, 230), 0.0f);
+        drawList->AddLine(
+            ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
+            IM_COL32(96, 192, 96, 100));
+        drawList->AddText(
+            ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
+            IM_COL32(200, 210, 200, 230), (ICON_FA_CODE_BRANCH " " + func.name).c_str());
+        ImGui::Dummy(ImVec2(paneWidth, sectionH));
+    }
+
+    ImGui::Indent(4.0f);
+
+    // Public 标记
+    {
+        bool pub = func.isPublic;
+        if (ImGui::Checkbox("Public", &pub))
+        {
+            PushUndoState();
+            func.isPublic = pub;
+            doc->isDirty = true;
+        }
+    }
+
+    // Description
+    {
+        static char descBuf[256] = {};
+        static std::string lastFuncId;
+        if (lastFuncId != func.id)
+        {
+            snprintf(descBuf, sizeof(descBuf), "%s", func.description.c_str());
+            lastFuncId = func.id;
+        }
+        ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "Description:");
+        ImGui::SetNextItemWidth(paneWidth - 16.0f);
+        if (ImGui::InputText("##funcdesc", descBuf, sizeof(descBuf), ImGuiInputTextFlags_EnterReturnsTrue))
+        {
+            PushUndoState();
+            func.description = descBuf;
+            doc->isDirty = true;
+        }
+    }
+
+    ImGui::Spacing();
+
+    // ── Inputs（函数输入参数）────────────────────────────────────────────
+    {
+        auto* drawList = ImGui::GetWindowDrawList();
+        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+        float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+        drawList->AddRectFilled(
+            cursorPos,
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+            IM_COL32(30, 30, 38, 230), 0.0f);
+        drawList->AddLine(
+            ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
+            IM_COL32(0, 122, 204, 100));
+        drawList->AddText(
+            ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
+            IM_COL32(200, 200, 210, 230), ICON_FA_ARROW_RIGHT " Inputs");
+        ImGui::Dummy(ImVec2(paneWidth, sectionH));
+    }
+
+    ImGui::Indent(4.0f);
+    bool inputsChanged = false;
+    for (int i = 0; i < (int)func.inputs.size(); ++i)
+    {
+        auto& param = func.inputs[i];
+        ImGui::PushID(("fi" + std::to_string(i)).c_str());
+
+        // 类型下拉
+        int typeIdx = dataTypeToIndex(param.dataType);
+        ImGui::SetNextItemWidth(70.0f);
+        if (ImGui::Combo("##type", &typeIdx, typeNames, typeCount))
+        {
+            PushUndoState();
+            param.dataType = typeValues[typeIdx];
+            doc->isDirty = true;
+            inputsChanged = true;
+        }
+
+        // 名称编辑
+        ImGui::SameLine();
+        static char nameBuf[64] = {};
+        snprintf(nameBuf, sizeof(nameBuf), "%s", param.name.c_str());
+        ImGui::SetNextItemWidth(paneWidth - 130.0f);
+        if (ImGui::InputText("##name", nameBuf, sizeof(nameBuf), ImGuiInputTextFlags_EnterReturnsTrue))
+        {
+            PushUndoState();
+            param.name = nameBuf;
+            doc->isDirty = true;
+            inputsChanged = true;
+        }
+
+        // 删除按钮
+        ImGui::SameLine();
+        if (ImGui::SmallButton(ICON_FA_TRASH "##del"))
+        {
+            PushUndoState();
+            func.inputs.erase(func.inputs.begin() + i);
+            doc->isDirty = true;
+            inputsChanged = true;
+            ImGui::PopID();
+            --i;
+            continue;
+        }
+
+        ImGui::PopID();
+    }
+
+    // 添加输入参数按钮
+    if (ImGui::SmallButton(ICON_FA_PLUS " Add Input"))
+    {
+        PushUndoState();
+        RTVariableDefinition newParam;
+        newParam.name = "NewInput";
+        newParam.dataType = RTPinDataType::Float;
+        func.inputs.push_back(std::move(newParam));
+        doc->isDirty = true;
+        inputsChanged = true;
+    }
+    ImGui::Unindent(4.0f);
+
+    ImGui::Spacing();
+
+    // ── Outputs（函数输出参数）───────────────────────────────────────────
+    {
+        auto* drawList = ImGui::GetWindowDrawList();
+        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+        float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+        drawList->AddRectFilled(
+            cursorPos,
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+            IM_COL32(30, 30, 38, 230), 0.0f);
+        drawList->AddLine(
+            ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
+            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
+            IM_COL32(0, 122, 204, 100));
+        drawList->AddText(
+            ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
+            IM_COL32(200, 200, 210, 230), ICON_FA_ARROW_LEFT " Outputs");
+        ImGui::Dummy(ImVec2(paneWidth, sectionH));
+    }
+
+    ImGui::Indent(4.0f);
+    bool outputsChanged = false;
+    for (int i = 0; i < (int)func.outputs.size(); ++i)
+    {
+        auto& param = func.outputs[i];
+        ImGui::PushID(("fo" + std::to_string(i)).c_str());
+
+        // 类型下拉
+        int typeIdx = dataTypeToIndex(param.dataType);
+        ImGui::SetNextItemWidth(70.0f);
+        if (ImGui::Combo("##type", &typeIdx, typeNames, typeCount))
+        {
+            PushUndoState();
+            param.dataType = typeValues[typeIdx];
+            doc->isDirty = true;
+            outputsChanged = true;
+        }
+
+        // 名称编辑
+        ImGui::SameLine();
+        static char nameBuf[64] = {};
+        snprintf(nameBuf, sizeof(nameBuf), "%s", param.name.c_str());
+        ImGui::SetNextItemWidth(paneWidth - 130.0f);
+        if (ImGui::InputText("##name", nameBuf, sizeof(nameBuf), ImGuiInputTextFlags_EnterReturnsTrue))
+        {
+            PushUndoState();
+            param.name = nameBuf;
+            doc->isDirty = true;
+            outputsChanged = true;
+        }
+
+        // 删除按钮
+        ImGui::SameLine();
+        if (ImGui::SmallButton(ICON_FA_TRASH "##del"))
+        {
+            PushUndoState();
+            func.outputs.erase(func.outputs.begin() + i);
+            doc->isDirty = true;
+            outputsChanged = true;
+            ImGui::PopID();
+            --i;
+            continue;
+        }
+
+        ImGui::PopID();
+    }
+
+    // 添加输出参数按钮
+    if (ImGui::SmallButton(ICON_FA_PLUS " Add Output"))
+    {
+        PushUndoState();
+        RTVariableDefinition newParam;
+        newParam.name = "NewOutput";
+        newParam.dataType = RTPinDataType::Float;
+        func.outputs.push_back(std::move(newParam));
+        doc->isDirty = true;
+        outputsChanged = true;
+    }
+    ImGui::Unindent(4.0f);
+
+    ImGui::Unindent(4.0f);
+
+    // 如果参数发生变化，同步到画布上的 Function.Entry/Return 节点
+    if (inputsChanged || outputsChanged)
+    {
+        SyncFunctionPinsToNodes(func);
+    }
+
+    ImGui::Spacing();
+
+    // "Create Nodes" 按钮 —— 为尚无画布节点的函数一键创建 Entry/Return
+    {
+        bool hasEntry = false, hasReturn = false;
+        for (const auto& n : doc->nodes)
+        {
+            if (n.DefinitionId == "Function.Entry" && n.Name == func.name) hasEntry = true;
+            if (n.DefinitionId == "Function.Return" && n.Name == func.name) hasReturn = true;
+        }
+        if (!hasEntry || !hasReturn)
+        {
+            if (ImGui::Button(ICON_FA_PLUS " Create Entry/Return Nodes"))
+            {
+                PushUndoState();
+                float spawnY = 0.0f;
+                for (const auto& n : doc->nodes)
+                {
+                    auto pos = ed::GetNodePosition(n.ID);
+                    auto sz  = ed::GetNodeSize(n.ID);
+                    float bottom = pos.y + sz.y;
+                    if (bottom > spawnY) spawnY = bottom;
+                }
+                spawnY += 80.0f;
+
+                if (!hasEntry)
+                {
+                    Node* entryNode = SpawnNodeByDef("Function.Entry");
+                    if (entryNode)
+                    {
+                        entryNode->Name = func.name;
+                        ed::SetNodePosition(entryNode->ID, ImVec2(100.0f, spawnY));
+                    }
+                }
+                if (!hasReturn)
+                {
+                    Node* returnNode = SpawnNodeByDef("Function.Return");
+                    if (returnNode)
+                    {
+                        returnNode->Name = func.name;
+                        ed::SetNodePosition(returnNode->ID, ImVec2(500.0f, spawnY));
+                    }
+                }
+
+                // 同步参数引脚
+                SyncFunctionPinsToNodes(func);
+                BuildNodes();
+                doc->isDirty = true;
+            }
+        }
+    }
+}
+
+// ============================================================================
+// 同步函数参数到画布上的 Function.Entry / Function.Return 节点引脚
+// ============================================================================
+
+void BlueprintEditor::SyncFunctionPinsToNodes(const RTFunctionDefinition& func)
+{
+    auto* doc = ActiveDoc();
+    if (!doc) return;
+
+    // Function.Entry 节点：
+    //   Outputs = [Flow(exec)] + [函数输入参数作为数据输出引脚]
+    //   （调用者的输入 → 进入函数体 → 从 Entry 输出端流出）
+    for (auto& node : doc->nodes)
+    {
+        if (node.DefinitionId == "Function.Entry" && node.Name == func.name)
+        {
+            // 保留第一个 Flow 输出引脚，重建后面的数据引脚
+            std::vector<Pin> newOutputs;
+            if (!node.Outputs.empty() && node.Outputs[0].Type == PinType::Flow)
+                newOutputs.push_back(node.Outputs[0]);
+            else
+            {
+                newOutputs.emplace_back(GetNextId(), "", PinType::Flow);
+                newOutputs.back().Kind = PinKind::Output;
+                newOutputs.back().Node = &node;
+            }
+
+            // 为每个函数输入参数创建一个输出引脚
+            for (const auto& param : func.inputs)
+            {
+                PinType pt = MapRTPinDataType(param.dataType, false);
+                // 尝试复用同名同类型的现有引脚（保持连线）
+                bool reused = false;
+                for (size_t j = 1; j < node.Outputs.size(); ++j)
+                {
+                    if (node.Outputs[j].Name == param.name && node.Outputs[j].Type == pt)
+                    {
+                        newOutputs.push_back(node.Outputs[j]);
+                        reused = true;
+                        break;
+                    }
+                }
+                if (!reused)
+                {
+                    newOutputs.emplace_back(GetNextId(), param.name.c_str(), pt);
+                    newOutputs.back().Kind = PinKind::Output;
+                    newOutputs.back().Node = &node;
+                }
+            }
+
+            // 删除旧引脚不再存在的链接
+            for (size_t j = 1; j < node.Outputs.size(); ++j)
+            {
+                bool stillExists = false;
+                for (const auto& np : newOutputs)
+                {
+                    if (np.ID == node.Outputs[j].ID) { stillExists = true; break; }
+                }
+                if (!stillExists)
+                {
+                    auto pinId = node.Outputs[j].ID;
+                    doc->links.erase(std::remove_if(doc->links.begin(), doc->links.end(),
+                        [pinId](const Link& l) { return l.StartPinID == pinId || l.EndPinID == pinId; }),
+                        doc->links.end());
+                }
+            }
+
+            node.Outputs = std::move(newOutputs);
+            // 确保 Node 指针正确
+            for (auto& p : node.Outputs) p.Node = &node;
+            BuildNode(&node);
+        }
+
+        // Function.Return 节点：
+        //   Inputs = [Flow(exec)] + [函数输出参数作为数据输入引脚]
+        if (node.DefinitionId == "Function.Return" && node.Name == func.name)
+        {
+            std::vector<Pin> newInputs;
+            if (!node.Inputs.empty() && node.Inputs[0].Type == PinType::Flow)
+                newInputs.push_back(node.Inputs[0]);
+            else
+            {
+                newInputs.emplace_back(GetNextId(), "", PinType::Flow);
+                newInputs.back().Kind = PinKind::Input;
+                newInputs.back().Node = &node;
+            }
+
+            for (const auto& param : func.outputs)
+            {
+                PinType pt = MapRTPinDataType(param.dataType, false);
+                bool reused = false;
+                for (size_t j = 1; j < node.Inputs.size(); ++j)
+                {
+                    if (node.Inputs[j].Name == param.name && node.Inputs[j].Type == pt)
+                    {
+                        newInputs.push_back(node.Inputs[j]);
+                        reused = true;
+                        break;
+                    }
+                }
+                if (!reused)
+                {
+                    newInputs.emplace_back(GetNextId(), param.name.c_str(), pt);
+                    newInputs.back().Kind = PinKind::Input;
+                    newInputs.back().Node = &node;
+                }
+            }
+
+            // 删除旧引脚不再存在的链接
+            for (size_t j = 1; j < node.Inputs.size(); ++j)
+            {
+                bool stillExists = false;
+                for (const auto& np : newInputs)
+                {
+                    if (np.ID == node.Inputs[j].ID) { stillExists = true; break; }
+                }
+                if (!stillExists)
+                {
+                    auto pinId = node.Inputs[j].ID;
+                    doc->links.erase(std::remove_if(doc->links.begin(), doc->links.end(),
+                        [pinId](const Link& l) { return l.StartPinID == pinId || l.EndPinID == pinId; }),
+                        doc->links.end());
+                }
+            }
+
+            node.Inputs = std::move(newInputs);
+            for (auto& p : node.Inputs) p.Node = &node;
+            BuildNode(&node);
+        }
+    }
+
+    doc->invalidateEditorIndices();
 }
 
 // ============================================================================
