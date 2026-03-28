@@ -289,6 +289,47 @@ void RegisterHandlers_String(std::unordered_map<std::string, NodeHandler>& handl
         ctx.SetOutputValue("Result", Variant(str));
         return true;
     };
+
+    // ── 新增字符串节点 ─────────────────────────────────────────────────────
+    handlers["StringCount"] = [](ExecutionContext& ctx) {
+        auto hay    = ctx.GetInputValue("String").asString();
+        auto needle = ctx.GetInputValue("Substring").asString();
+        if (needle.empty()) { ctx.SetOutputValue("Count", Variant(static_cast<int64_t>(0))); return true; }
+        int64_t count = 0;
+        for (size_t pos = 0; (pos = hay.find(needle, pos)) != std::string::npos; pos += needle.size())
+            ++count;
+        ctx.SetOutputValue("Count", Variant(count));
+        return true;
+    };
+
+    handlers["StringIsEmpty"] = [](ExecutionContext& ctx) {
+        bool empty = ctx.GetInputValue("String").asString().empty();
+        ctx.SetOutputValue("Result", Variant(empty));
+        return true;
+    };
+
+    handlers["StringInsert"] = [](ExecutionContext& ctx) {
+        auto str   = ctx.GetInputValue("String").asString();
+        int64_t pos = ctx.GetInputValue("Position").asInt();
+        auto ins   = ctx.GetInputValue("Insert").asString();
+        if (pos < 0) pos = 0;
+        if (static_cast<size_t>(pos) > str.size()) pos = static_cast<int64_t>(str.size());
+        str.insert(static_cast<size_t>(pos), ins);
+        ctx.SetOutputValue("Result", Variant(str));
+        return true;
+    };
+
+    handlers["StringRemove"] = [](ExecutionContext& ctx) {
+        auto str   = ctx.GetInputValue("String").asString();
+        int64_t pos = ctx.GetInputValue("Position").asInt();
+        int64_t len = ctx.GetInputValue("Length").asInt();
+        if (pos < 0) pos = 0;
+        if (static_cast<size_t>(pos) < str.size())
+            str.erase(static_cast<size_t>(pos),
+                      len < 0 ? std::string::npos : static_cast<size_t>(len));
+        ctx.SetOutputValue("Result", Variant(str));
+        return true;
+    };
 }
 
 } // namespace Runtime
