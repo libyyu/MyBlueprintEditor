@@ -62,6 +62,7 @@ void BlueprintEditor::DrawLinks()
                     auto endPin   = FindPin(endPinId);
 
                     newLinkPin = startPin ? startPin : endPin;
+                    _doc->newLinkPinId = newLinkPin ? newLinkPin->ID : ed::PinId(0);
 
                     if (startPin && startPin->Kind == PinKind::Input)
                     {
@@ -141,7 +142,10 @@ void BlueprintEditor::DrawLinks()
                 }
             }
             else
+            {
                 newLinkPin = nullptr;
+                _doc->newLinkPinId = 0;
+            }
 
             ed::EndCreate();
 

@@ -187,6 +187,7 @@ public:
     bool       createNewNode      = false;
     Pin*       newNodeLinkPin     = nullptr;
     Pin*       newLinkPin         = nullptr;
+    ed::PinId  newLinkPinId       = 0;   // newLinkPin 对应的 PinId，用于每帧刷新指针防悬空
 
     // 变量拖拽到画布的待处理状态
     bool           pendingVarDrop     = false;  // 有待处理的拖拽放置

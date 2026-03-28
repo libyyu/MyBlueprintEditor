@@ -10,6 +10,13 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
 
     auto& newLinkPin = _doc->newLinkPin;
 
+    // 每帧通过 PinId 重新查找 newLinkPin，防止 SyncFunctionPinsToNodes 等操作
+    // 替换了引脚 vector 后 newLinkPin 变成悬空指针导致崩溃
+    if (_doc->newLinkPinId)
+        _doc->newLinkPin = FindPin(_doc->newLinkPinId);
+    else
+        _doc->newLinkPin = nullptr;
+
         auto cursorTopLeft = ImGui::GetCursorScreenPos();
 
 
