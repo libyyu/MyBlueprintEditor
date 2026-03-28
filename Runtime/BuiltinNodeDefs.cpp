@@ -72,18 +72,15 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
         if (d) d->customProperties["icon"] = u8"\uf0b0";
     }
 
-    // ExecuteBlueprint: Completed 引脚在同步模式下隐藏
+    // ExecuteBlueprint: 完全异步模式（无 Sync 选项）
     {
         NodeDefinition d;
         d.id = "ExecuteBlueprint";
         d.name = "Execute Blueprint";
         d.category = "Flow";
-        d.inputPins = { MakeFlowPin(""), MakePin("File", PinDataType::String), MakePin("Sync", PinDataType::Boolean) };
+        d.inputPins = { MakeFlowPin(""), MakePin("File", PinDataType::String) };
 
-        auto completedPin = MakeFlowPin("Completed");
-        completedPin.customProperties["hiddenWhen"] = "Sync==true";
-
-        d.outputPins = { MakeFlowPin("Done"), completedPin, MakePin("Success", PinDataType::Boolean), MakePin("Output", PinDataType::String) };
+        d.outputPins = { MakeFlowPin("Done"), MakeFlowPin("Completed"), MakePin("Success", PinDataType::Boolean), MakePin("Output", PinDataType::String) };
         d.color = "FFA040";
         registry.registerNode(d);
     }

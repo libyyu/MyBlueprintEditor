@@ -4,9 +4,6 @@
 #include "FileDialogs.h"
 #include <filesystem>
 
-// 前向声明（定义在本文件后段）
-static void DrawNewProjectDialog(BlueprintEditor* editor, bool& show, char* nameBuf, int nameBufSize);
-
 // ============================================================================
 // 引脚图标颜色
 // ============================================================================
@@ -681,26 +678,70 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
         Splitter("##HorizontalSplitter", true, splitterThickness, &m_LeftPanelWidth, &rightWidth, 150.0f, 200.0f, totalHeight);
 
-        // 绘制左侧面板
-        ImGui::BeginChild("##LeftPanel", ImVec2(m_LeftPanelWidth, totalHeight), true);
-        // 左侧 TabBar：Project（始终显示）+ Nodes（仅有文档时显示）
-        if (ImGui::BeginTabBar("##LeftTabs"))
+        // 绘制左侧面板（VS-style 垂直侧边栏按钮 + 内容区域）
+        static int leftTabIndex = 0;  // 0=Project, 1=Nodes
+        const float sidebarBtnW = 32.0f;
+        float contentW = m_LeftPanelWidth - sidebarBtnW - 2.0f;
+        if (contentW < 80.0f) contentW = 80.0f;
+
+        ImGui::BeginChild("##LeftPanel", ImVec2(m_LeftPanelWidth, totalHeight), true, ImGuiWindowFlags_NoScrollbar);
+
+        // 左侧窄按钮列
+        ImGui::BeginChild("##Sidebar", ImVec2(sidebarBtnW, totalHeight - 8.0f), false, ImGuiWindowFlags_NoScrollbar);
         {
-            if (ImGui::BeginTabItem(ICON_FA_DIAGRAM_PROJECT " Project"))
+            auto drawSidebarBtn = [&](int idx, const char* icon, const char* tooltip) {
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+                bool active = (leftTabIndex == idx);
+                if (active)
+                {
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.40f, 0.68f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.48f, 0.78f, 1.0f));
+                }
+                else
+                {
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.18f, 0.0f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.30f, 1.0f));
+                }
+                if (ImGui::Button(icon, ImVec2(sidebarBtnW - 4.0f, sidebarBtnW - 4.0f)))
+                    leftTabIndex = idx;
+                ImGui::PopStyleColor(2);
+                ImGui::PopStyleVar();
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s", tooltip);
+                // VS-style active indicator bar
+                if (active)
+                {
+                    auto* dl = ImGui::GetWindowDrawList();
+                    ImVec2 rmin = ImGui::GetItemRectMin();
+                    ImVec2 rmax = ImGui::GetItemRectMax();
+                    dl->AddRectFilled(ImVec2(rmin.x, rmin.y), ImVec2(rmin.x + 3.0f, rmax.y),
+                                      IM_COL32(0, 122, 204, 255), 2.0f);
+                }
+            };
+
+            drawSidebarBtn(0, ICON_FA_DIAGRAM_PROJECT, "Project");
+            ImGui::Spacing();
+            if (ActiveDoc())  // 无文档时隐藏 Nodes 按钮
+                drawSidebarBtn(1, ICON_FA_CUBES, "Nodes");
+        }
+        ImGui::EndChild();
+
+        ImGui::SameLine(0, 2.0f);
+
+        // 右侧内容区域
+        ImGui::BeginChild("##LeftContent", ImVec2(contentW, totalHeight - 8.0f), false);
+        {
+            if (leftTabIndex == 0)
             {
                 DrawProjectPanel();
-                ImGui::EndTabItem();
             }
-            if (ActiveDoc())   // 无工程/无文档时隐藏 Nodes tab
+            else if (leftTabIndex == 1 && ActiveDoc())
             {
-                if (ImGui::BeginTabItem(ICON_FA_CUBES " Nodes"))
-                {
-                    DrawNodeListPanel();
-                    ImGui::EndTabItem();
-                }
+                DrawNodeListPanel();
             }
-            ImGui::EndTabBar();
         }
+        ImGui::EndChild();
+
         ImGui::EndChild();
 
         ImGui::SameLine();
@@ -875,7 +916,6 @@ void BlueprintEditor::OnFrame(float deltaTime)
             ImGui::EndGroup();
             // 弹框仍需每帧处理
             ShowUnsavedChangesDialog();
-            DrawNewProjectDialog(this, m_ShowNewProjectDialog, m_NewProjNameBuf, sizeof(m_NewProjNameBuf));
             return;
         }
 
@@ -1436,6 +1476,120 @@ void BlueprintEditor::OnFrame(float deltaTime)
         DrawZoomBar(editorMin, editorMax);
 
     // ================================================================
+    // 调试工具条（编辑器顶部中央浮动 overlay）
+    // ================================================================
+    if (ActiveDoc() && editorMax.x > editorMin.x)
+    {
+        auto& runner = ActiveDoc()->persistentRunner;
+        bool isRunning = runner.IsRunning();
+        bool isPaused  = runner.IsPaused();
+        bool isStopped = runner.IsStopped();
+        bool isIdle    = runner.IsIdle();
+        bool bpIsLibrary = ActiveDoc()->blueprintClass == RTBlueprintClass::FunctionLibrary;
+
+        float toolbarW = 320.0f;
+        float toolbarH = 36.0f;
+        float centerX = (editorMin.x + editorMax.x) * 0.5f;
+        ImVec2 tbPos(centerX - toolbarW * 0.5f, editorMin.y + 6.0f);
+
+        ImGui::SetNextWindowPos(tbPos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(toolbarW, toolbarH));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 4));
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.12f, 0.12f, 0.15f, 0.92f));
+        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.48f, 0.80f, 0.40f));
+        if (ImGui::Begin("##DebugToolbar", nullptr,
+            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking))
+        {
+            float btnH = toolbarH - 10.0f;
+            float btnW = 52.0f;
+
+            // Execute / Run 按钮（绿色）
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.48f, 0.28f, 1.00f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.60f, 0.35f, 1.00f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.28f, 0.70f, 0.40f, 1.00f));
+            bool canRun = isIdle || isStopped;
+            if (!canRun || bpIsLibrary) ImGui::BeginDisabled();
+            if (ImGui::Button(ICON_FA_PLAY " Run", ImVec2(btnW, btnH)))
+            {
+                if (isStopped) runner.ResetState();
+                ExecuteBlueprint();
+            }
+            if (!canRun || bpIsLibrary) ImGui::EndDisabled();
+            if (bpIsLibrary && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("FunctionLibrary cannot execute directly.");
+            ImGui::PopStyleColor(3);
+
+            ImGui::SameLine(0, 4);
+
+            // Pause / Resume
+            if (!isRunning && !isPaused) ImGui::BeginDisabled();
+            if (isPaused)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.50f, 0.20f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.60f, 0.28f, 1.0f));
+                if (ImGui::Button(ICON_FA_PLAY "##resume", ImVec2(btnH, btnH)))
+                    runner.Resume();
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Resume");
+                ImGui::PopStyleColor(2);
+            }
+            else
+            {
+                if (ImGui::Button(ICON_FA_PAUSE "##pause", ImVec2(btnH, btnH)))
+                    runner.Pause();
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Pause");
+            }
+            if (!isRunning && !isPaused) ImGui::EndDisabled();
+
+            ImGui::SameLine(0, 4);
+
+            // Step
+            if (!isPaused) ImGui::BeginDisabled();
+            if (ImGui::Button(ICON_FA_ARROW_RIGHT "##step", ImVec2(btnH, btnH)))
+            {
+                runner.Resume();
+                runner.Tick(0.016f);
+                runner.Pause();
+                const auto& result = ActiveDoc()->lastExecutionResult;
+                if (!result.executedNodeIds.empty())
+                {
+                    auto lastNodeId = result.executedNodeIds.back();
+                    ActiveDoc()->executedNodeHighlight[static_cast<uint64_t>(lastNodeId)] = 3.0f;
+                }
+            }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Step");
+            if (!isPaused) ImGui::EndDisabled();
+
+            ImGui::SameLine(0, 4);
+
+            // Stop
+            if (isIdle || isStopped) ImGui::BeginDisabled();
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.55f, 0.15f, 0.15f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.70f, 0.20f, 0.20f, 1.0f));
+            if (ImGui::Button(ICON_FA_STOP "##stop", ImVec2(btnH, btnH)))
+                runner.Stop();
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Stop");
+            ImGui::PopStyleColor(2);
+            if (isIdle || isStopped) ImGui::EndDisabled();
+
+            // 状态指示
+            ImGui::SameLine(0, 12);
+            ImVec4 stateCol;
+            const char* stateText;
+            if (isRunning)      { stateCol = ImVec4(0.2f, 0.8f, 0.2f, 1.0f);  stateText = ICON_FA_CIRCLE_PLAY; }
+            else if (isPaused)  { stateCol = ImVec4(1.0f, 0.7f, 0.1f, 1.0f);  stateText = ICON_FA_PAUSE; }
+            else if (isStopped) { stateCol = ImVec4(1.0f, 0.3f, 0.3f, 1.0f);  stateText = ICON_FA_CIRCLE_STOP; }
+            else                { stateCol = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);  stateText = ""; }
+            if (stateText[0] != '\0')
+                ImGui::TextColored(stateCol, "%s", stateText);
+        }
+        ImGui::End();
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(2);
+    }
+
+    // ================================================================
     // 画布节点搜索覆盖层（Ctrl+F）
     // ================================================================
     DrawSearchOverlay();
@@ -1538,11 +1692,6 @@ void BlueprintEditor::OnFrame(float deltaTime)
     ShowUnsavedChangesDialog();
 
     // ================================================================
-    // 新建工程对话框
-    // ================================================================
-    DrawNewProjectDialog(this, m_ShowNewProjectDialog, m_NewProjNameBuf, sizeof(m_NewProjNameBuf));
-
-    // ================================================================
     // 样式编辑器浮动窗口
     // ================================================================
     if (m_ShowStyleEditorWindow)
@@ -1620,66 +1769,6 @@ void BlueprintEditor::ShowUnsavedChangesDialog()
             m_PendingQuitApp = false;
             ImGui::CloseCurrentPopup();
         }
-
-        ImGui::EndPopup();
-    }
-}
-
-// ============================================================================
-// 新建工程弹框（每帧调用）
-// ============================================================================
-
-static void DrawNewProjectDialog(BlueprintEditor* editor, bool& show, char* nameBuf, int nameBufSize)
-{
-    if (show)
-    {
-        ImGui::OpenPopup("New Project###NewProjDlg");
-        show = false;
-    }
-    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(360, 0), ImGuiCond_Appearing);
-
-    if (ImGui::BeginPopupModal("New Project###NewProjDlg", nullptr,
-        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
-    {
-        ImGui::Text("Project Name:");
-        ImGui::SetNextItemWidth(-1);
-        bool confirmed = ImGui::InputText("##projname", nameBuf, nameBufSize,
-            ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
-
-        ImGui::Spacing();
-
-        if (confirmed || ImGui::Button(ICON_FA_CHECK " Create", ImVec2(120, 0)))
-        {
-            std::string name(nameBuf);
-            if (name.empty()) name = "NewProject";
-
-            // 弹出保存路径
-            std::string path = SaveFileDialog(
-                "Blueprint Project (*.bp.proj)\0*.bp.proj\0",
-                "Save New Project",
-                (name + ".bp.proj").c_str()
-            );
-            if (!path.empty())
-            {
-                if (path.size() < 8 || path.substr(path.size() - 8) != ".bp.proj")
-                    path += ".bp.proj";
-                editor->CloseProject();
-                editor->m_Project = NewBpProject(name);
-                editor->m_Project.filePath   = std::filesystem::absolute(path).string();
-                editor->m_Project.projectDir = std::filesystem::path(editor->m_Project.filePath)
-                                               .parent_path().string();
-                SaveBpProject(editor->m_Project, editor->m_Project.filePath);
-                editor->AddRecentProject(editor->m_Project.filePath);
-                BPLOG("Created new project: " + name);
-                editor->SetTitle(("Blueprint Editor - [" + name + "]").c_str());
-            }
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button(ICON_FA_XMARK " Cancel", ImVec2(80, 0)))
-            ImGui::CloseCurrentPopup();
 
         ImGui::EndPopup();
     }
@@ -2016,7 +2105,57 @@ void BlueprintEditor::DrawNodeListPanel()
                     newFunc.category = "Custom";
                     newFunc.isPublic = true;
                     doc->functions.push_back(std::move(newFunc));
-                    doc->selectedFuncIdx = static_cast<int>(doc->functions.size()) - 1;
+                    int newFuncIdx = static_cast<int>(doc->functions.size()) - 1;
+                    doc->selectedFuncIdx = newFuncIdx;
+
+                    // 自动创建 Entry/Return 节点 + Flow 连线
+                    {
+                        auto& fn = doc->functions[newFuncIdx];
+                        float spawnY = 0.0f;
+                        for (const auto& n : doc->nodes)
+                        {
+                            auto pos = ed::GetNodePosition(n.ID);
+                            auto sz  = ed::GetNodeSize(n.ID);
+                            float bottom = pos.y + sz.y;
+                            if (bottom > spawnY) spawnY = bottom;
+                        }
+                        spawnY += 80.0f;
+
+                        Node* entryNode = SpawnNodeByDef("Function.Entry");
+                        Node* returnNode = SpawnNodeByDef("Function.Return");
+                        if (entryNode)
+                        {
+                            entryNode->Name = fn.name;
+                            ed::SetNodePosition(entryNode->ID, ImVec2(100.0f, spawnY));
+                        }
+                        if (returnNode)
+                        {
+                            returnNode->Name = fn.name;
+                            ed::SetNodePosition(returnNode->ID, ImVec2(500.0f, spawnY));
+                        }
+
+                        // 连接 Entry Flow → Return Flow
+                        if (entryNode && returnNode &&
+                            !entryNode->Outputs.empty() && !returnNode->Inputs.empty() &&
+                            entryNode->Outputs[0].Type == PinType::Flow &&
+                            returnNode->Inputs[0].Type == PinType::Flow)
+                        {
+                            doc->links.push_back(Link(GetNextLinkId(),
+                                entryNode->Outputs[0].ID, returnNode->Inputs[0].ID));
+                            doc->links.back().Color = GetIconColor(PinType::Flow);
+                        }
+
+                        SyncFunctionPinsToNodes(fn);
+                        BuildNodes();
+
+                        // 导航到新创建的 Entry 节点
+                        if (entryNode)
+                        {
+                            ed::ClearSelection();
+                            ed::SelectNode(entryNode->ID, false);
+                            ed::NavigateToSelection();
+                        }
+                    }
                     doc->isDirty = true;
                 }
                 ImGui::Separator();
@@ -2024,6 +2163,7 @@ void BlueprintEditor::DrawNodeListPanel()
                 // --- 函数列表 ---
                 static int renamingIdx = -1;
                 static char renameBuf[128] = {};
+                int deleteIdx = -1;  // 延迟删除索引
                 for (int i = 0; i < (int)doc->functions.size(); ++i)
                 {
                     auto& func = doc->functions[i];
@@ -2036,7 +2176,6 @@ void BlueprintEditor::DrawNodeListPanel()
                         if (ImGui::InputText("##rename", renameBuf, sizeof(renameBuf),
                                              ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
                         {
-                            // 重命名时同步更新画布上对应的 Entry/Return 节点名
                             std::string oldName = func.name;
                             func.name = renameBuf;
                             for (auto& node : doc->nodes)
@@ -2063,40 +2202,47 @@ void BlueprintEditor::DrawNodeListPanel()
                             snprintf(renameBuf, sizeof(renameBuf), "%s", func.name.c_str());
                             ImGui::SetKeyboardFocusHere(-1);
                         }
+
+                        // 右键上下文菜单
+                        if (ImGui::BeginPopupContextItem("##funcctx"))
+                        {
+                            if (ImGui::MenuItem(ICON_FA_PEN " Rename"))
+                            {
+                                renamingIdx = i;
+                                snprintf(renameBuf, sizeof(renameBuf), "%s", func.name.c_str());
+                            }
+                            if (ImGui::MenuItem(ICON_FA_MAGNIFYING_GLASS " Jump to Entry"))
+                            {
+                                for (const auto& node : doc->nodes)
+                                {
+                                    if (node.DefinitionId == "Function.Entry" && node.Name == func.name)
+                                    {
+                                        ed::ClearSelection();
+                                        ed::SelectNode(node.ID, false);
+                                        ed::NavigateToSelection();
+                                        break;
+                                    }
+                                }
+                            }
+                            ImGui::Separator();
+                            if (ImGui::MenuItem(ICON_FA_TRASH " Delete"))
+                            {
+                                deleteIdx = i;
+                            }
+                            ImGui::EndPopup();
+                        }
+
                         // Delete 键删除
                         if (ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Delete))
-                        {
-                            PushUndoState();
-                            // 删除画布上对应的 Entry/Return 节点和相关链接
-                            for (auto nit = doc->nodes.begin(); nit != doc->nodes.end(); )
-                            {
-                                if ((nit->DefinitionId == "Function.Entry" || nit->DefinitionId == "Function.Return")
-                                    && nit->Name == func.name)
-                                {
-                                    // 删除连接到此节点的所有链接
-                                    auto nodeId = nit->ID;
-                                    doc->links.erase(std::remove_if(doc->links.begin(), doc->links.end(),
-                                        [&](const Link& lnk) {
-                                            for (auto& p : nit->Inputs)
-                                                if (lnk.StartPinID == p.ID || lnk.EndPinID == p.ID) return true;
-                                            for (auto& p : nit->Outputs)
-                                                if (lnk.StartPinID == p.ID || lnk.EndPinID == p.ID) return true;
-                                            return false;
-                                        }), doc->links.end());
-                                    nit = doc->nodes.erase(nit);
-                                }
-                                else
-                                    ++nit;
-                            }
-                            doc->functions.erase(doc->functions.begin() + i);
-                            if (doc->selectedFuncIdx >= (int)doc->functions.size())
-                                doc->selectedFuncIdx = (int)doc->functions.size() - 1;
-                            doc->isDirty = true;
-                            BuildNodes();
-                            ImGui::PopID();
-                            break;
-                        }
+                            deleteIdx = i;
                     }
+
+                    // 删除按钮（🗑）
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton(ICON_FA_TRASH "##delfunc"))
+                        deleteIdx = i;
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Delete function");
 
                     // 跳转按钮
                     ImGui::SameLine();
@@ -2117,6 +2263,36 @@ void BlueprintEditor::DrawNodeListPanel()
                         ImGui::SetTooltip("Jump to Function.Entry node");
 
                     ImGui::PopID();
+                }
+
+                // 延迟执行删除（避免在迭代中删除）
+                if (deleteIdx >= 0 && deleteIdx < (int)doc->functions.size())
+                {
+                    PushUndoState();
+                    const auto& funcName = doc->functions[deleteIdx].name;
+                    for (auto nit = doc->nodes.begin(); nit != doc->nodes.end(); )
+                    {
+                        if ((nit->DefinitionId == "Function.Entry" || nit->DefinitionId == "Function.Return")
+                            && nit->Name == funcName)
+                        {
+                            doc->links.erase(std::remove_if(doc->links.begin(), doc->links.end(),
+                                [&](const Link& lnk) {
+                                    for (auto& p : nit->Inputs)
+                                        if (lnk.StartPinID == p.ID || lnk.EndPinID == p.ID) return true;
+                                    for (auto& p : nit->Outputs)
+                                        if (lnk.StartPinID == p.ID || lnk.EndPinID == p.ID) return true;
+                                    return false;
+                                }), doc->links.end());
+                            nit = doc->nodes.erase(nit);
+                        }
+                        else
+                            ++nit;
+                    }
+                    doc->functions.erase(doc->functions.begin() + deleteIdx);
+                    if (doc->selectedFuncIdx >= (int)doc->functions.size())
+                        doc->selectedFuncIdx = (int)doc->functions.size() - 1;
+                    doc->isDirty = true;
+                    BuildNodes();
                 }
 
                 if (doc->functions.empty())
@@ -2896,6 +3072,25 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
         }
     }
 
+    // Category
+    {
+        static char catBuf[128] = {};
+        static std::string lastCatFuncId;
+        if (lastCatFuncId != func.id)
+        {
+            snprintf(catBuf, sizeof(catBuf), "%s", func.category.c_str());
+            lastCatFuncId = func.id;
+        }
+        ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "Category:");
+        ImGui::SetNextItemWidth(paneWidth - 16.0f);
+        if (ImGui::InputText("##funccat", catBuf, sizeof(catBuf), ImGuiInputTextFlags_EnterReturnsTrue))
+        {
+            PushUndoState();
+            func.category = catBuf;
+            doc->isDirty = true;
+        }
+    }
+
     // Description
     {
         static char descBuf[256] = {};
@@ -3086,56 +3281,6 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
     }
 
     ImGui::Spacing();
-
-    // "Create Nodes" 按钮 —— 为尚无画布节点的函数一键创建 Entry/Return
-    {
-        bool hasEntry = false, hasReturn = false;
-        for (const auto& n : doc->nodes)
-        {
-            if (n.DefinitionId == "Function.Entry" && n.Name == func.name) hasEntry = true;
-            if (n.DefinitionId == "Function.Return" && n.Name == func.name) hasReturn = true;
-        }
-        if (!hasEntry || !hasReturn)
-        {
-            if (ImGui::Button(ICON_FA_PLUS " Create Entry/Return Nodes"))
-            {
-                PushUndoState();
-                float spawnY = 0.0f;
-                for (const auto& n : doc->nodes)
-                {
-                    auto pos = ed::GetNodePosition(n.ID);
-                    auto sz  = ed::GetNodeSize(n.ID);
-                    float bottom = pos.y + sz.y;
-                    if (bottom > spawnY) spawnY = bottom;
-                }
-                spawnY += 80.0f;
-
-                if (!hasEntry)
-                {
-                    Node* entryNode = SpawnNodeByDef("Function.Entry");
-                    if (entryNode)
-                    {
-                        entryNode->Name = func.name;
-                        ed::SetNodePosition(entryNode->ID, ImVec2(100.0f, spawnY));
-                    }
-                }
-                if (!hasReturn)
-                {
-                    Node* returnNode = SpawnNodeByDef("Function.Return");
-                    if (returnNode)
-                    {
-                        returnNode->Name = func.name;
-                        ed::SetNodePosition(returnNode->ID, ImVec2(500.0f, spawnY));
-                    }
-                }
-
-                // 同步参数引脚
-                SyncFunctionPinsToNodes(func);
-                BuildNodes();
-                doc->isDirty = true;
-            }
-        }
-    }
 }
 
 // ============================================================================
@@ -3309,30 +3454,9 @@ void BlueprintEditor::DrawExecutionPanel()
 
     ImGui::Spacing();
 
-    // 执行按钮栏（带样式增强）
+    // 日志工具栏（Execute 按钮已移至顶部调试工具条）
     ImGui::BeginHorizontal("ExecButtons", ImVec2(paneWidth, 0));
 
-    // Execute 按钮（绿色强调 + 更圆润）
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.48f, 0.28f, 1.00f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.60f, 0.35f, 1.00f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.28f, 0.70f, 0.40f, 1.00f));
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
-    // FunctionLibrary 蓝图不能直接 Execute，禁用按钮
-    bool bpIsLibrary = ActiveDoc() && ActiveDoc()->blueprintClass == RTBlueprintClass::FunctionLibrary;
-    if (bpIsLibrary) ImGui::BeginDisabled();
-    if (ImGui::Button(ICON_FA_PLAY " Execute", ImVec2(90, 0)))
-    {
-        ExecuteBlueprint();
-    }
-    if (bpIsLibrary)
-    {
-        ImGui::EndDisabled();
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            ImGui::SetTooltip("FunctionLibrary 蓝图不可直接执行，\n请通过 Function.Call 节点调用其函数。");
-    }
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(3);
-    ImGui::Spring(0.0f);
     if (ImGui::Button(ICON_FA_COPY " Copy Log", ImVec2(100, 0)))
     {
         if (!ActiveDoc()->executionLog.empty())

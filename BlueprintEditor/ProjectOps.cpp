@@ -13,9 +13,35 @@ namespace fs = std::filesystem;
 
 void BlueprintEditor::NewProject()
 {
-    m_ShowNewProjectDialog = true;
-    memset(m_NewProjNameBuf, 0, sizeof(m_NewProjNameBuf));
-    snprintf(m_NewProjNameBuf, sizeof(m_NewProjNameBuf), "%s", "NewProject");
+    // 直接弹出系统保存对话框（不再先弹 ImGui 输入框）
+    std::string path = SaveFileDialog(
+        "Blueprint Project (*.bp.proj)\0*.bp.proj\0",
+        "New Blueprint Project",
+        "NewProject.bp.proj"
+    );
+    if (path.empty()) return;
+
+    if (path.size() < 8 || path.substr(path.size() - 8) != ".bp.proj")
+        path += ".bp.proj";
+
+    // 从文件名提取工程名
+    std::string name;
+    {
+        std::string fname = fs::path(path).stem().string();
+        // 去掉 .bp 后缀
+        if (fname.size() > 3 && fname.substr(fname.size() - 3) == ".bp")
+            fname = fname.substr(0, fname.size() - 3);
+        name = fname.empty() ? "NewProject" : fname;
+    }
+
+    CloseProject();
+    m_Project = NewBpProject(name);
+    m_Project.filePath   = fs::absolute(path).string();
+    m_Project.projectDir = fs::path(m_Project.filePath).parent_path().string();
+    SaveBpProject(m_Project, m_Project.filePath);
+    AddRecentProject(m_Project.filePath);
+    BPLOG("Created new project: " + name);
+    SetTitle(("Blueprint Editor - [" + name + "]").c_str());
 }
 
 // ============================================================================

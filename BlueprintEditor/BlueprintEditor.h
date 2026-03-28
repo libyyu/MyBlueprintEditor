@@ -469,8 +469,6 @@ struct BlueprintEditor : public Application
     void        AddCurrentDocToProject();            // 将当前文档加入工程列表
     void        SyncProjectLibrariesToRegistry();    // 按工程 libraries 刷新节点定义注册表
     void        DrawProjectPanel();                  // 工程面板（左侧栏）
-    bool        m_ShowNewProjectDialog = false;      // 新建工程弹框
-    char        m_NewProjNameBuf[128]  = "NewProject";
 
     BlueprintDocument* ActiveDoc()
     {

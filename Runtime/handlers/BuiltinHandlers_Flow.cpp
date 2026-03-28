@@ -60,14 +60,11 @@ void RegisterHandlers_Flow(
         return true;
     };
 
-    // ExecuteBlueprint — 加载并执行另一个蓝图文件
+    // ExecuteBlueprint — 加载并执行另一个蓝图文件（完全异步）
     // 依赖：basePath（路径解析）、runner（获取 handlers + timer）
-    // 注意：不能捕获 &handlers（局部变量引用，函数返回后悬垂），
-    //       改为运行时从 runner.GetHandlers() 获取
     handlers["ExecuteBlueprint"] = [&runner, basePath](ExecutionContext& ctx) {
         auto filePath = ctx.GetInputValue("File").asString();
-        bool isSync = ctx.GetInputValue("Sync").asBool();
-        ctx.Log("  [ExecuteBlueprint] File: \"" + filePath + "\"  Sync: " + (isSync ? "true" : "false"));
+        ctx.Log("  [ExecuteBlueprint] File: \"" + filePath + "\"");
 
         if (filePath.empty())
         {
@@ -78,8 +75,17 @@ void RegisterHandlers_Flow(
             return true;
         }
 
+        // 自动补全扩展名：如果没有 .bp.json 后缀则自动添加
+        {
+            auto hasExt = [](const std::string& s, const std::string& ext) {
+                if (s.size() < ext.size()) return false;
+                return s.compare(s.size() - ext.size(), ext.size(), ext) == 0;
+            };
+            if (!hasExt(filePath, ".bp.json") && !hasExt(filePath, ".json"))
+                filePath += ".bp.json";
+        }
+
         // 如果路径是相对路径，基于 basePath（目录路径）解析
-        // basePath 约定为目录路径（如 "C:/examples/sample" 或 "."），由调用方保证
         std::string resolvedPath = filePath;
         if (!basePath.empty() && 
             filePath.find(':') == std::string::npos && 
@@ -109,69 +115,11 @@ void RegisterHandlers_Flow(
 
         ctx.Log("  [ExecuteBlueprint] Loaded " + std::to_string(importResult.data.nodes.size()) + " nodes");
 
-        // 共享 handler 表：用 shared_ptr 包装避免异步 lambda 捕获时全量拷贝
-        // GetHandlers() 返回 const&，此处拷贝一次后共享给同步/异步两条路径
+        // 共享 handler 表
         auto currentHandlers = std::make_shared<std::unordered_map<std::string, NodeHandler>>(
             runner.GetHandlers());
 
-        // 同步模式
-        if (isSync)
-        {
-            BlueprintRunner subRunner(runner.GetFileSystem());
-            
-            // 子蓝图以 weak_ptr 持有父的 timerManager；
-            // 父析构后 weak_ptr 失效，子自动回退到自身 manager，不会 UAF
-            subRunner.SetParentTimerManager(runner.GetTimerManagerPtr());
-
-            // subLog 只收集用户可见的 Print 输出（用于填充 Output 引脚）
-            // verbose 节点执行日志和 Print 输出都通过 ctx.Print() 转发给父蓝图显示
-            // 注意：必须用 Print() 而非 Log()，因为 Log() 受 loggingEnabled 门控，
-            // Release 模式下默认关闭，会导致子蓝图输出被静默丢弃
-            std::vector<std::string> subLog;
-            subRunner.SetLogCallback([&ctx](LogLevel lv, const std::string& msg) {
-                ctx.Print("    | " + msg, lv);
-            });
-            subRunner.SetPrintCallback([&subLog, &ctx](LogLevel lv, const std::string& msg) {
-                subLog.push_back(msg);
-                ctx.Print("    | " + msg, lv);
-            });
-
-            if (!subRunner.Load(importResult.data))
-            {
-                ctx.LogError("[ExecuteBlueprint] Failed to load sub-blueprint");
-                ctx.SetOutputValue("Success", Variant(false));
-                ctx.SetOutputValue("Output", Variant(std::string("Load failed")));
-                ctx.ActivateOutputFlow("Done");
-                return true;
-            }
-
-            // 默认处理器：pass-through
-            subRunner.SetDefaultHandler([](ExecutionContext& subCtx) {
-                subCtx.Log("  [Default Handler] pass-through");
-                return true;
-            });
-            subRunner.RegisterHandlers(*currentHandlers);
-
-            auto execResult = subRunner.Execute();
-
-            ctx.Print("  [ExecuteBlueprint] Sync result: " + std::string(execResult.success ? "SUCCESS" : "FAILED") +
-                    " (" + std::to_string(execResult.nodesExecuted) + " nodes executed)", LogLevel::Verbose);
-
-            ctx.SetOutputValue("Success", Variant(execResult.success));
-
-            std::string outputText;
-            for (const auto& line : subLog)
-            {
-                if (!outputText.empty()) outputText += "\n";
-                outputText += line;
-            }
-            ctx.SetOutputValue("Output", Variant(outputText));
-
-            ctx.ActivateOutputFlow("Done");
-            return true;
-        }
-
-        // 异步模式（默认）
+        // 异步执行
         ctx.Log("  [ExecuteBlueprint] Async: scheduling sub-blueprint for next frame...");
 
         ctx.SetOutputValue("Success", Variant(true));
@@ -197,23 +145,14 @@ void RegisterHandlers_Flow(
         auto sharedData = std::make_shared<BlueprintData>(std::move(importResult.data));
 
         ExecutionContext* pCtx = &ctx;
-        // 捕获 alive 标志，在回调时检查 runner 是否仍存活
         auto alive = runner.GetAliveFlag();
         ctx.Delay(0.0f, [pCtx, &runner, sharedData, currentHandlers, completedPinId, resolvedPath, alive]() {
-            // 检查 runner 是否已析构
             if (!alive->load(std::memory_order_acquire)) return;
             pCtx->Log("  [ExecuteBlueprint] Async: executing \"" + resolvedPath + "\"...");
 
             auto subRunner = std::make_shared<BlueprintRunner>(runner.GetFileSystem());
-
-            // 子蓝图以 weak_ptr 持有父的 timerManager；
-            // 父析构后 weak_ptr 失效，子自动回退到自身 manager，不会 UAF
             subRunner->SetParentTimerManager(runner.GetTimerManagerPtr());
 
-            // subLog 只收集用户可见的 Print 输出（用于填充 Output 引脚）
-            // verbose 节点执行日志和 Print 输出都通过 pCtx->Print() 转发给父蓝图显示
-            // 注意：必须用 Print() 而非 Log()，因为 Log() 受 loggingEnabled 门控，
-            // Release 模式下默认关闭，会导致子蓝图输出被静默丢弃
             auto subLog = std::make_shared<std::vector<std::string>>();
             subRunner->SetLogCallback([pCtx](LogLevel lv, const std::string& msg) {
                 pCtx->Print("    | " + msg, lv);
@@ -221,7 +160,6 @@ void RegisterHandlers_Flow(
             subRunner->SetPrintCallback([subLog, pCtx](LogLevel lv, const std::string& msg) {
                 subLog->push_back(msg);
                 pCtx->Print("    | " + msg, lv);
-                // 动态更新 Output 引脚值（子蓝图内异步 Delay/Timer 触发的 Print 也会被收集）
                 std::string outputText;
                 for (const auto& line : *subLog)
                 {
@@ -263,9 +201,6 @@ void RegisterHandlers_Flow(
             pCtx->SetOutputValue("Success", Variant(execResult.success));
             pCtx->SetOutputValue("Output", Variant(outputText));
 
-            // 将 subRunner 注册到父 runner 中保持存活
-            // 子蓝图的 Delay/SetTimer 回调引用了 subRunner 的 context，
-            // subRunner 必须在所有 timer 回调完成前保持存活
             runner.KeepAlive(subRunner);
 
             if (completedPinId != 0)
