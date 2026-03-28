@@ -103,7 +103,7 @@
             "isCollapsed": false
         },
         {
-            "id": 44,
+            "id": 36,
             "position": {
                 "x": 1601,
                 "y": 558
@@ -115,7 +115,7 @@
             "isCollapsed": false
         },
         {
-            "id": 48,
+            "id": 40,
             "position": {
                 "x": 1601,
                 "y": 718
@@ -127,7 +127,7 @@
             "isCollapsed": false
         },
         {
-            "id": 52,
+            "id": 44,
             "position": {
                 "x": 1472,
                 "y": 878
@@ -139,7 +139,7 @@
             "isCollapsed": false
         },
         {
-            "id": 58,
+            "id": 50,
             "position": {
                 "x": 1160,
                 "y": 908
@@ -151,7 +151,7 @@
             "isCollapsed": false
         },
         {
-            "id": 77,
+            "id": 53,
             "position": {
                 "x": 1038,
                 "y": 558
@@ -159,18 +159,6 @@
             "size": {
                 "width": 314,
                 "height": 156
-            },
-            "isCollapsed": false
-        },
-        {
-            "id": 89,
-            "position": {
-                "x": 2073,
-                "y": 556
-            },
-            "size": {
-                "width": 303,
-                "height": 196
             },
             "isCollapsed": false
         }
@@ -431,26 +419,26 @@
             ]
         },
         {
-            "id": 44,
+            "id": 36,
             "definitionId": "PrintString",
             "definitionVersion": 1,
             "name": "Print String",
             "pins": [
                 {
-                    "id": 45,
+                    "id": 37,
                     "kind": 0,
                     "dataType": 0,
                     "isExec": true
                 },
                 {
-                    "id": 46,
+                    "id": 38,
                     "kind": 0,
                     "dataType": 4,
                     "name": "In String",
                     "defaultValue": "sub done"
                 },
                 {
-                    "id": 47,
+                    "id": 39,
                     "kind": 1,
                     "dataType": 0,
                     "isExec": true
@@ -458,26 +446,26 @@
             ]
         },
         {
-            "id": 48,
+            "id": 40,
             "definitionId": "PrintString",
             "definitionVersion": 1,
             "name": "Print String",
             "pins": [
                 {
-                    "id": 49,
+                    "id": 41,
                     "kind": 0,
                     "dataType": 0,
                     "isExec": true
                 },
                 {
-                    "id": 50,
+                    "id": 42,
                     "kind": 0,
                     "dataType": 4,
                     "name": "In String",
                     "defaultValue": "sub component"
                 },
                 {
-                    "id": 51,
+                    "id": 43,
                     "kind": 1,
                     "dataType": 0,
                     "isExec": true
@@ -485,41 +473,41 @@
             ]
         },
         {
-            "id": 52,
+            "id": 44,
             "definitionId": "AppendString",
             "definitionVersion": 1,
             "name": "Append String",
             "pins": [
                 {
-                    "id": 53,
+                    "id": 45,
                     "kind": 0,
                     "dataType": 4,
                     "name": "A",
                     "defaultValue": "sub result:"
                 },
                 {
-                    "id": 54,
+                    "id": 46,
                     "kind": 0,
                     "dataType": 4,
                     "name": "B",
                     "defaultValue": ""
                 },
                 {
-                    "id": 55,
+                    "id": 47,
                     "kind": 0,
                     "dataType": 4,
                     "name": "C",
                     "defaultValue": ",sub message:"
                 },
                 {
-                    "id": 56,
+                    "id": 48,
                     "kind": 0,
                     "dataType": 4,
                     "name": "D",
                     "defaultValue": ""
                 },
                 {
-                    "id": 57,
+                    "id": 49,
                     "kind": 1,
                     "dataType": 4,
                     "name": "Result"
@@ -527,20 +515,20 @@
             ]
         },
         {
-            "id": 58,
+            "id": 50,
             "definitionId": "BoolToString",
             "definitionVersion": 1,
             "name": "Bool to String",
             "pins": [
                 {
-                    "id": 59,
+                    "id": 51,
                     "kind": 0,
                     "dataType": 1,
                     "name": "Value",
                     "defaultValue": false
                 },
                 {
-                    "id": 60,
+                    "id": 52,
                     "kind": 1,
                     "dataType": 4,
                     "name": "Result"
@@ -548,208 +536,148 @@
             ]
         },
         {
-            "id": 77,
+            "id": 53,
             "definitionId": "ExecuteBlueprint",
             "definitionVersion": 1,
             "name": "Execute Blueprint",
             "pins": [
                 {
-                    "id": 78,
+                    "id": 54,
                     "kind": 0,
                     "dataType": 0,
                     "isExec": true
                 },
                 {
-                    "id": 79,
+                    "id": 55,
                     "kind": 0,
                     "dataType": 4,
                     "name": "File",
                     "defaultValue": "TestBP.02"
                 },
                 {
-                    "id": 80,
+                    "id": 56,
                     "kind": 1,
                     "dataType": 0,
                     "name": "Done",
                     "isExec": true
                 },
                 {
-                    "id": 81,
+                    "id": 57,
                     "kind": 1,
                     "dataType": 0,
                     "name": "Completed",
                     "isExec": true
                 },
                 {
-                    "id": 82,
+                    "id": 58,
                     "kind": 1,
                     "dataType": 1,
                     "name": "Success"
                 },
                 {
-                    "id": 83,
+                    "id": 59,
                     "kind": 1,
                     "dataType": 4,
                     "name": "Output"
-                }
-            ]
-        },
-        {
-            "id": 89,
-            "definitionId": "FuncLib.TestBp.Lib.01.func_1",
-            "definitionVersion": 1,
-            "name": "LibFun01",
-            "pins": [
-                {
-                    "id": 90,
-                    "kind": 0,
-                    "dataType": 0,
-                    "isExec": true
-                },
-                {
-                    "id": 91,
-                    "kind": 0,
-                    "dataType": 3,
-                    "name": "fArgs",
-                    "defaultValue": 1.200000
-                },
-                {
-                    "id": 92,
-                    "kind": 0,
-                    "dataType": 1,
-                    "name": "bArgs",
-                    "defaultValue": true
-                },
-                {
-                    "id": 93,
-                    "kind": 0,
-                    "dataType": 2,
-                    "name": "iArgs",
-                    "defaultValue": 8
-                },
-                {
-                    "id": 94,
-                    "kind": 0,
-                    "dataType": 4,
-                    "name": "sArgs",
-                    "defaultValue": "test lib"
-                },
-                {
-                    "id": 95,
-                    "kind": 1,
-                    "dataType": 0,
-                    "isExec": true
-                },
-                {
-                    "id": 96,
-                    "kind": 1,
-                    "dataType": 4,
-                    "name": "oString"
                 }
             ]
         }
     ],
     "links": [
         {
-            "id": 61,
+            "id": 68,
             "startPinId": 5,
             "endPinId": 9,
             "isEnabled": true
         },
         {
-            "id": 62,
+            "id": 69,
             "startPinId": 6,
             "endPinId": 17,
             "isEnabled": true
         },
         {
-            "id": 63,
+            "id": 70,
             "startPinId": 18,
             "endPinId": 14,
             "isEnabled": true
         },
         {
-            "id": 64,
+            "id": 71,
             "startPinId": 15,
             "endPinId": 10,
             "isEnabled": true
         },
         {
-            "id": 65,
+            "id": 72,
             "startPinId": 7,
             "endPinId": 20,
             "isEnabled": true
         },
         {
-            "id": 66,
+            "id": 73,
             "startPinId": 6,
             "endPinId": 24,
             "isEnabled": true
         },
         {
-            "id": 67,
+            "id": 74,
             "startPinId": 11,
             "endPinId": 28,
             "isEnabled": true
         },
         {
-            "id": 68,
+            "id": 75,
             "startPinId": 26,
             "endPinId": 29,
             "isEnabled": true
         },
         {
-            "id": 69,
+            "id": 76,
             "startPinId": 30,
             "endPinId": 33,
             "isEnabled": true
         },
         {
-            "id": 74,
-            "startPinId": 60,
+            "id": 77,
+            "startPinId": 52,
+            "endPinId": 46,
+            "isEnabled": true
+        },
+        {
+            "id": 78,
+            "startPinId": 49,
+            "endPinId": 42,
+            "isEnabled": true
+        },
+        {
+            "id": 79,
+            "startPinId": 22,
             "endPinId": 54,
             "isEnabled": true
         },
         {
-            "id": 76,
+            "id": 80,
+            "startPinId": 56,
+            "endPinId": 37,
+            "isEnabled": true
+        },
+        {
+            "id": 81,
             "startPinId": 57,
-            "endPinId": 50,
+            "endPinId": 41,
             "isEnabled": true
         },
         {
-            "id": 84,
-            "startPinId": 22,
-            "endPinId": 78,
+            "id": 82,
+            "startPinId": 58,
+            "endPinId": 51,
             "isEnabled": true
         },
         {
-            "id": 85,
-            "startPinId": 80,
-            "endPinId": 45,
-            "isEnabled": true
-        },
-        {
-            "id": 86,
-            "startPinId": 81,
-            "endPinId": 49,
-            "isEnabled": true
-        },
-        {
-            "id": 87,
-            "startPinId": 82,
-            "endPinId": 59,
-            "isEnabled": true
-        },
-        {
-            "id": 88,
-            "startPinId": 83,
-            "endPinId": 56,
-            "isEnabled": true
-        },
-        {
-            "id": 97,
-            "startPinId": 47,
-            "endPinId": 90,
+            "id": 83,
+            "startPinId": 59,
+            "endPinId": 48,
             "isEnabled": true
         }
     ]

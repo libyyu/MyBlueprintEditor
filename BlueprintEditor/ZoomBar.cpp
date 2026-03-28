@@ -67,65 +67,69 @@ void BlueprintEditor::DrawZoomBar(ImVec2 editorMin, ImVec2 editorMax)
     // ── 位置：右下角，状态栏上方 ─────────────────────────────────────────
     ImVec2 wPos = ImVec2(editorMax.x - kBarW - kMarginR,
                           editorMax.y - kBarH - kMarginB);
-    ImVec2 wMax = ImVec2(wPos.x + kBarW, wPos.y + kBarH);
 
+    // 使用独立浮动窗口，确保 InvisibleButton 的鼠标事件不被 editor 子窗口拦截
+    ImGui::SetNextWindowPos(wPos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(kBarW, kBarH));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,  ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize,  ImVec2(kBarW, kBarH));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 5.0f);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg,   ImVec4(22/255.f, 25/255.f, 35/255.f, 0.82f));
+    ImGui::PushStyleColor(ImGuiCol_Border,     ImVec4(60/255.f, 75/255.f, 110/255.f, 0.55f));
+    bool open = ImGui::Begin("##ZoomBarWnd", nullptr,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
+        ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav);
+    ImGui::PopStyleColor(2);
+    ImGui::PopStyleVar(3);
+
+    if (!open) { ImGui::End(); return; }
+
+    // 从现在起绘图坐标相对于此窗口（左上角 = wPos）
     auto* dl = ImGui::GetWindowDrawList();
+    ImVec2 wp  = ImGui::GetWindowPos();   // 等于 wPos
+    float  cx  = 5.0f;                    // 窗口内 x 偏移
+    float  cy  = kBarH * 0.5f;            // 窗口内 y 中线
 
-    // ── 背景 ─────────────────────────────────────────────────────────────
-    dl->AddRectFilled(wPos, wMax, IM_COL32(22, 25, 35, 210), 5.0f);
-    dl->AddRect(wPos, wMax, IM_COL32(60, 75, 110, 140), 5.0f);
-
-    float cx = wPos.x + 5.0f;
-    float cy = wPos.y + kBarH * 0.5f;
-
-    // ── 百分比文本（左侧固定宽度，双击复位到 100%） ─────────────────────
+    // ── 百分比文本（双击复位到 100%） ────────────────────────────────────
     char pctBuf[16];
     snprintf(pctBuf, sizeof(pctBuf), "%.0f%%", curZoom * 100.0f);
 
-    ImVec2 pctMin(cx, wPos.y + 1.0f);
-    ImVec2 pctMax(cx + kPctW, wMax.y - 1.0f);
-
-    ImGui::SetCursorScreenPos(pctMin);
+    ImVec2 pctMin(cx, 1.0f);
+    ImVec2 pctMax(cx + kPctW, kBarH - 1.0f);
+    ImGui::SetCursorPos(pctMin);
     ImGui::InvisibleButton("##zoom_pct", pctMax - pctMin);
     if (ImGui::IsItemHovered())
     {
         ImGui::SetTooltip("Double-click to reset to 100%%\nCurrent: %.0f%%", curZoom * 100.0f);
-        dl->AddRectFilled(pctMin, pctMax, IM_COL32(60, 80, 120, 80), 3.0f);
+        dl->AddRectFilled(wp + pctMin, wp + pctMax, IM_COL32(60, 80, 120, 80), 3.0f);
     }
-    if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
+    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
         ApplyZoom(kZoomDefault, editorMin, editorMax);
 
-    // 颜色跟状态栏保持一致
     ImU32 pctCol = IM_COL32(160, 185, 220, 220);
     if (curZoom < 0.3f)      pctCol = IM_COL32(220, 140, 80, 230);
     else if (curZoom > 2.0f) pctCol = IM_COL32(120, 210, 120, 230);
-
     ImVec2 pctTextSz = ImGui::CalcTextSize(pctBuf);
-    dl->AddText(ImVec2(pctMin.x + (kPctW - pctTextSz.x) * 0.5f,
-                       cy - pctTextSz.y * 0.5f),
-                pctCol, pctBuf);
+    dl->AddText(wp + ImVec2(cx + (kPctW - pctTextSz.x) * 0.5f, cy - pctTextSz.y * 0.5f), pctCol, pctBuf);
 
     cx += kPctW + 4.0f;
 
     // ── 减号按钮 ─────────────────────────────────────────────────────────
-    ImVec2 btnMinusMin(cx, wPos.y + 2.0f);
-    ImVec2 btnMinusMax(cx + kBtnW, wMax.y - 2.0f);
-    ImGui::SetCursorScreenPos(btnMinusMin);
+    ImVec2 btnMinusMin(cx, 2.0f);
+    ImVec2 btnMinusMax(cx + kBtnW, kBarH - 2.0f);
+    ImGui::SetCursorPos(btnMinusMin);
     ImGui::InvisibleButton("##zoom_minus", btnMinusMax - btnMinusMin);
     bool minusHov = ImGui::IsItemHovered();
     bool minusClk = ImGui::IsItemClicked();
-    dl->AddRectFilled(btnMinusMin, btnMinusMax,
-                      minusHov ? IM_COL32(80, 100, 150, 160) : IM_COL32(50, 60, 90, 120), 3.0f);
-    ImVec2 minusTxtSz = ImGui::CalcTextSize("-");
-    dl->AddText(ImVec2(btnMinusMin.x + (kBtnW - minusTxtSz.x) * 0.5f,
-                       cy - minusTxtSz.y * 0.5f),
+    dl->AddRectFilled(wp + btnMinusMin, wp + btnMinusMax,
+                      minusHov ? IM_COL32(80, 100, 150, 200) : IM_COL32(50, 60, 90, 120), 3.0f);
+    ImVec2 mTxtSz = ImGui::CalcTextSize("-");
+    dl->AddText(wp + ImVec2(cx + (kBtnW - mTxtSz.x) * 0.5f, cy - mTxtSz.y * 0.5f),
                 IM_COL32(200, 210, 240, 230), "-");
     if (minusClk)
-    {
-        // 按档位缩小（每次缩小约 20%）
-        float newZ = curZoom / 1.25f;
-        ApplyZoom(newZ, editorMin, editorMax);
-    }
+        ApplyZoom(curZoom / 1.25f, editorMin, editorMax);
 
     cx += kBtnW + 4.0f;
 
@@ -134,74 +138,64 @@ void BlueprintEditor::DrawZoomBar(ImVec2 editorMin, ImVec2 editorMax)
     float trackRight = trackLeft + kTrackW;
     float trackY     = cy;
 
-    // 滑轨背景
-    dl->AddRectFilled(ImVec2(trackLeft, trackY - kTrackH * 0.5f),
-                      ImVec2(trackRight, trackY + kTrackH * 0.5f),
+    dl->AddRectFilled(wp + ImVec2(trackLeft, trackY - kTrackH * 0.5f),
+                      wp + ImVec2(trackRight, trackY + kTrackH * 0.5f),
                       IM_COL32(45, 55, 80, 200), kTrackH * 0.5f);
 
-    // 已填充部分（蓝色）
-    float t     = ZoomToT(curZoom);
+    float t      = ZoomToT(curZoom);
     float thumbX = trackLeft + t * kTrackW;
     if (thumbX > trackLeft)
     {
-        dl->AddRectFilled(ImVec2(trackLeft, trackY - kTrackH * 0.5f),
-                          ImVec2(thumbX, trackY + kTrackH * 0.5f),
+        dl->AddRectFilled(wp + ImVec2(trackLeft, trackY - kTrackH * 0.5f),
+                          wp + ImVec2(thumbX,    trackY + kTrackH * 0.5f),
                           IM_COL32(80, 130, 220, 200), kTrackH * 0.5f);
     }
 
-    // 100% 刻度线（中间）
     float midX = trackLeft + ZoomToT(1.0f) * kTrackW;
-    dl->AddLine(ImVec2(midX, trackY - 5.0f), ImVec2(midX, trackY + 5.0f),
+    dl->AddLine(wp + ImVec2(midX, trackY - 5.0f), wp + ImVec2(midX, trackY + 5.0f),
                 IM_COL32(120, 160, 220, 120), 1.0f);
 
-    // 滑块圆
     ImU32 thumbCol = IM_COL32(130, 175, 255, 255);
 
-    // 可拖动区域（整条轨道 + thumb）
-    ImVec2 trackHitMin(trackLeft - 4.0f, wPos.y + 2.0f);
-    ImVec2 trackHitMax(trackRight + 4.0f, wMax.y - 2.0f);
-    ImGui::SetCursorScreenPos(trackHitMin);
+    ImVec2 trackHitMin(trackLeft - 4.0f, 2.0f);
+    ImVec2 trackHitMax(trackRight + 4.0f, kBarH - 2.0f);
+    ImGui::SetCursorPos(trackHitMin);
     ImGui::InvisibleButton("##zoom_track", trackHitMax - trackHitMin);
 
-    bool trackHov  = ImGui::IsItemHovered();
-    bool trackAct  = ImGui::IsItemActive();
+    bool trackHov = ImGui::IsItemHovered();
+    bool trackAct = ImGui::IsItemActive();
 
     if (trackHov || trackAct)
     {
         thumbCol = IM_COL32(180, 210, 255, 255);
         ImGui::SetTooltip("Drag to adjust zoom\n%.0f%%  (%.2fx)", curZoom * 100.0f, curZoom);
     }
-
     if (trackAct && ImGui::IsMouseDown(0))
     {
-        float mx    = ImGui::GetMousePos().x;
-        float newT  = ImClamp((mx - trackLeft) / kTrackW, 0.0f, 1.0f);
-        float newZ  = TToZoom(newT);
-        ApplyZoom(newZ, editorMin, editorMax);
+        float mx   = ImGui::GetMousePos().x - wp.x;  // 转为窗口内坐标
+        float newT = ImClamp((mx - trackLeft) / kTrackW, 0.0f, 1.0f);
+        ApplyZoom(TToZoom(newT), editorMin, editorMax);
     }
 
-    dl->AddCircleFilled(ImVec2(thumbX, trackY), kThumbR, thumbCol);
-    // 圆心高亮
-    dl->AddCircleFilled(ImVec2(thumbX, trackY), kThumbR * 0.45f, IM_COL32(220, 235, 255, 200));
+    dl->AddCircleFilled(wp + ImVec2(thumbX, trackY), kThumbR, thumbCol);
+    dl->AddCircleFilled(wp + ImVec2(thumbX, trackY), kThumbR * 0.45f, IM_COL32(220, 235, 255, 200));
 
     cx = trackRight + 4.0f;
 
     // ── 加号按钮 ─────────────────────────────────────────────────────────
-    ImVec2 btnPlusMin(cx, wPos.y + 2.0f);
-    ImVec2 btnPlusMax(cx + kBtnW, wMax.y - 2.0f);
-    ImGui::SetCursorScreenPos(btnPlusMin);
+    ImVec2 btnPlusMin(cx, 2.0f);
+    ImVec2 btnPlusMax(cx + kBtnW, kBarH - 2.0f);
+    ImGui::SetCursorPos(btnPlusMin);
     ImGui::InvisibleButton("##zoom_plus", btnPlusMax - btnPlusMin);
     bool plusHov = ImGui::IsItemHovered();
     bool plusClk = ImGui::IsItemClicked();
-    dl->AddRectFilled(btnPlusMin, btnPlusMax,
-                      plusHov ? IM_COL32(80, 100, 150, 160) : IM_COL32(50, 60, 90, 120), 3.0f);
-    ImVec2 plusTxtSz = ImGui::CalcTextSize("+");
-    dl->AddText(ImVec2(btnPlusMin.x + (kBtnW - plusTxtSz.x) * 0.5f,
-                       cy - plusTxtSz.y * 0.5f),
+    dl->AddRectFilled(wp + btnPlusMin, wp + btnPlusMax,
+                      plusHov ? IM_COL32(80, 100, 150, 200) : IM_COL32(50, 60, 90, 120), 3.0f);
+    ImVec2 pTxtSz = ImGui::CalcTextSize("+");
+    dl->AddText(wp + ImVec2(cx + (kBtnW - pTxtSz.x) * 0.5f, cy - pTxtSz.y * 0.5f),
                 IM_COL32(200, 210, 240, 230), "+");
     if (plusClk)
-    {
-        float newZ = curZoom * 1.25f;
-        ApplyZoom(newZ, editorMin, editorMax);
-    }
+        ApplyZoom(curZoom * 1.25f, editorMin, editorMax);
+
+    ImGui::End();
 }
