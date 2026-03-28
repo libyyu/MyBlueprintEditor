@@ -342,6 +342,35 @@ void RegisterHandlers_Math(std::unordered_map<std::string, NodeHandler>& handler
         return true;
     };
 
+    handlers["Asin"] = [](ExecutionContext& ctx) {
+        ctx.SetOutputValue("Result (Rad)", Variant(std::asin(ctx.GetInputValue("Value").asFloat())));
+        return true;
+    };
+    handlers["Acos"] = [](ExecutionContext& ctx) {
+        ctx.SetOutputValue("Result (Rad)", Variant(std::acos(ctx.GetInputValue("Value").asFloat())));
+        return true;
+    };
+    handlers["Atan"] = [](ExecutionContext& ctx) {
+        ctx.SetOutputValue("Result (Rad)", Variant(std::atan(ctx.GetInputValue("Value").asFloat())));
+        return true;
+    };
+    handlers["Hypot"] = [](ExecutionContext& ctx) {
+        double a = ctx.GetInputValue("A").asFloat();
+        double b = ctx.GetInputValue("B").asFloat();
+        ctx.SetOutputValue("Result", Variant(std::hypot(a, b)));
+        return true;
+    };
+    handlers["DegreesToRadians"] = [](ExecutionContext& ctx) {
+        constexpr double kPi = 3.14159265358979323846;
+        ctx.SetOutputValue("Radians", Variant(ctx.GetInputValue("Degrees").asFloat() * kPi / 180.0));
+        return true;
+    };
+    handlers["RadiansToDegrees"] = [](ExecutionContext& ctx) {
+        constexpr double kPi = 3.14159265358979323846;
+        ctx.SetOutputValue("Degrees", Variant(ctx.GetInputValue("Radians").asFloat() * 180.0 / kPi));
+        return true;
+    };
+
     handlers["Lerp"] = [](ExecutionContext& ctx) {
         double a = ctx.GetInputValue("A").asFloat();
         double b = ctx.GetInputValue("B").asFloat();
