@@ -6,7 +6,8 @@ namespace Runtime {
 
 void RegisterHandlers_Map(std::unordered_map<std::string, NodeHandler>& handlers)
 {
-    handlers["MakeMap"] = [](ExecutionContext& ctx) {
+    // NodeDef id 是 "MapMake"，同时保留 "MakeMap" 兼容旧蓝图
+    handlers["MapMake"] = handlers["MakeMap"] = [](ExecutionContext& ctx) {
         const auto* node = ctx.GetCurrentNode();
         std::unordered_map<std::string, Variant> result;
         if (node)
@@ -71,7 +72,8 @@ void RegisterHandlers_Map(std::unordered_map<std::string, NodeHandler>& handlers
         return true;
     };
 
-    handlers["MapSize"] = [](ExecutionContext& ctx) {
+    // NodeDef 里有 "MapLength" 和 "MapSize" 两个，逻辑相同
+    handlers["MapSize"] = handlers["MapLength"] = [](ExecutionContext& ctx) {
         auto map = ctx.GetInputValue("Map");
         ctx.SetOutputValue("Size", Variant(static_cast<int64_t>(map.mapSize())));
         return true;
