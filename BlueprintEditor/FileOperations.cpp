@@ -122,10 +122,17 @@ void BlueprintEditor::NewFile(RTBlueprintClass bpClass)
 
     CreateNewDocument();
 
-    // 给新文档生成编号名（Untitled-1 / Untitled-2 ...）
-    static int s_untitledCounter = 0;
-    ++s_untitledCounter;
-    ActiveDoc()->untitledName = "Untitled-" + std::to_string(s_untitledCounter);
+    // 动态计算下一个可用 Untitled 编号（基于当前已打开的文档）
+    int maxNum = 0;
+    for (auto& doc : m_Documents)
+    {
+        if (doc->untitledName.rfind("Untitled-", 0) == 0)
+        {
+            int num = std::atoi(doc->untitledName.c_str() + 9);
+            if (num > maxNum) maxNum = num;
+        }
+    }
+    ActiveDoc()->untitledName = "Untitled-" + std::to_string(maxNum + 1);
 
     // 设置蓝图类型
     ActiveDoc()->blueprintClass = bpClass;

@@ -797,6 +797,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
                     bool isOpen = true;
                     ImGuiTabItemFlags flags = 0;
+                    if (m_PendingSwitchTabIndex == i)
+                        flags |= ImGuiTabItemFlags_SetSelected;
 
                     if (ImGui::BeginTabItem((tabTitle + "###tab" + std::to_string(i)).c_str(), &isOpen, flags))
                     {
