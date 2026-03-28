@@ -191,9 +191,11 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
     reg("SwitchOnString", "Switch on String", "Flow",
         { MakeFlowPin(""), MakePin("Selection", PinDataType::String),
           MakePin("Case 0", PinDataType::String), MakePin("Case 1", PinDataType::String),
-          MakePin("Case 2", PinDataType::String) },
+          MakePin("Case 2", PinDataType::String), MakePin("Case 3", PinDataType::String),
+          MakePin("Case 4", PinDataType::String), MakePin("Case 5", PinDataType::String) },
         { MakeFlowPin("Case 0"), MakeFlowPin("Case 1"),
-          MakeFlowPin("Case 2"), MakeFlowPin("Default") });
+          MakeFlowPin("Case 2"), MakeFlowPin("Case 3"),
+          MakeFlowPin("Case 4"), MakeFlowPin("Case 5"), MakeFlowPin("Default") });
 }
 
 static void RegisterNodeDefs_Action(INodeRegistry& registry)
@@ -492,6 +494,36 @@ static void RegisterNodeDefs_Math(INodeRegistry& registry)
         { MakePin("Result (Rad)", PinDataType::Float) },
         "80C3F8", "Simple");
 
+    reg("Asin", "Asin", "Math/Functions",
+        { MakePin("Value", PinDataType::Float) },
+        { MakePin("Result (Rad)", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Acos", "Acos", "Math/Functions",
+        { MakePin("Value", PinDataType::Float) },
+        { MakePin("Result (Rad)", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Atan", "Atan", "Math/Functions",
+        { MakePin("Value", PinDataType::Float) },
+        { MakePin("Result (Rad)", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("Hypot", "Hypot", "Math/Functions",
+        { MakePin("A", PinDataType::Float), MakePin("B", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("DegreesToRadians", "Degrees to Radians", "Math/Functions",
+        { MakePin("Degrees", PinDataType::Float) },
+        { MakePin("Radians", PinDataType::Float) },
+        "80C3F8", "Simple");
+
+    reg("RadiansToDegrees", "Radians to Degrees", "Math/Functions",
+        { MakePin("Radians", PinDataType::Float) },
+        { MakePin("Degrees", PinDataType::Float) },
+        "80C3F8", "Simple");
+
     reg("Lerp", "Lerp", "Math/Functions",
         { MakePin("A", PinDataType::Float), MakePin("B", PinDataType::Float), MakePin("Alpha", PinDataType::Float) },
         { MakePin("Result", PinDataType::Float) },
@@ -770,6 +802,27 @@ static void RegisterNodeDefs_String(INodeRegistry& registry)
     // StringReverse — 反转字符串
     reg("StringReverse", "String Reverse", "Misc/String",
         { MakePin("String", PinDataType::String) },
+        { MakePin("Result", PinDataType::String) },
+        "", "Simple");
+
+    // ── 新增字符串节点 ──────────────────────────────────────────────────────
+    reg("StringCount", "String Count", "Misc/String",
+        { MakePin("String", PinDataType::String), MakePin("Substring", PinDataType::String) },
+        { MakePin("Count", PinDataType::Integer) },
+        "", "Simple");
+
+    reg("StringIsEmpty", "String Is Empty", "Misc/String",
+        { MakePin("String", PinDataType::String) },
+        { MakePin("Result", PinDataType::Boolean) },
+        "", "Simple");
+
+    reg("StringInsert", "String Insert", "Misc/String",
+        { MakePin("String", PinDataType::String), MakePin("Position", PinDataType::Integer), MakePin("Insert", PinDataType::String) },
+        { MakePin("Result", PinDataType::String) },
+        "", "Simple");
+
+    reg("StringRemove", "String Remove", "Misc/String",
+        { MakePin("String", PinDataType::String), MakePin("Position", PinDataType::Integer), MakePin("Length", PinDataType::Integer) },
         { MakePin("Result", PinDataType::String) },
         "", "Simple");
 }

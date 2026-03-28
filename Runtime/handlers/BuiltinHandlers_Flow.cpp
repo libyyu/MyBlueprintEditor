@@ -540,15 +540,22 @@ void RegisterHandlers_Flow(
     // ── SwitchOnString ─────────────────────────────────────────────────────
     handlers["SwitchOnString"] = [](ExecutionContext& ctx) {
         std::string sel = ctx.GetInputValue("Selection").asString();
-        // Case 0/1/2 是输入引脚，存放期望的字符串值
-        for (int i = 0; i < 3; ++i)
+        // 动态扫描所有 "Case N" 输入引脚，找到匹配的激活对应输出
+        const auto* node = ctx.GetCurrentNode();
+        if (node)
         {
-            std::string pinName = "Case " + std::to_string(i);
-            std::string caseVal = ctx.GetInputValue(pinName.c_str()).asString();
-            if (sel == caseVal)
+            for (const auto& pin : node->pins)
             {
-                ctx.ActivateOutputFlow(pinName.c_str());
-                return true;
+                if (pin.kind == PinKind::Input && !pin.isExec &&
+                    pin.name.rfind("Case ", 0) == 0)
+                {
+                    std::string caseVal = ctx.GetInputValue(pin.id).asString();
+                    if (sel == caseVal)
+                    {
+                        ctx.ActivateOutputFlow(pin.name.c_str());
+                        return true;
+                    }
+                }
             }
         }
         ctx.ActivateOutputFlow("Default");
