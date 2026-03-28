@@ -1,0 +1,54 @@
+{
+    "fileType": "runtime",
+    "metadata": {
+        "schemaVersion": 2,
+        "blueprintClass": 1,
+        "name": "TestBP.Lib01",
+        "description": "Blueprint Editor file",
+        "version": ""
+    },
+    "nodes": [
+        {
+            "id": 1,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print String",
+            "pins": [
+                {
+                    "id": 2,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 3,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 4,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        }
+    ],
+    "links": [
+    ],
+    "functions": [
+        {
+            "id": "func_1",
+            "name": "LibTestFun01",
+            "category": "Custom",
+            "description": "",
+            "isPublic": true,
+            "inputs": [],
+            "outputs": [],
+            "nodes": [],
+            "links": []
+        }
+    ]
+}

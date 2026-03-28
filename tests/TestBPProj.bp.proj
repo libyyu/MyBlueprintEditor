@@ -1,1 +1,1 @@
-{"blueprints":[{"name":"TestBP.01","path":"TestBP.01.json"},{"name":"TestBP.02","path":"TestBP.02.json"}],"description":"","libraries":[],"name":"TestBPProj","projVersion":1,"version":"1.0"}
+{"blueprints":[{"name":"TestBP.01","path":"TestBP.01.json"},{"name":"TestBP.02","path":"TestBP.02.json"}],"description":"","libraries":[{"name":"TestBP.Lib01","path":"TestBP.Lib01.json"}],"name":"TestBPProj","projVersion":1,"version":"1.0"}
