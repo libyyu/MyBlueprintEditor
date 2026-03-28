@@ -574,6 +574,23 @@ void BlueprintEditor::OnFrame(float deltaTime)
                                static_cast<int>(ActiveDoc()->nodes.size()), static_cast<int>(ActiveDoc()->links.size()));
         }
 
+        // 菜单栏最右侧：侧边栏切换按钮（点击显示/隐藏左侧面板）
+        {
+            float btnW = ImGui::CalcTextSize(ICON_FA_LIST).x + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f;
+            float avail = ImGui::GetContentRegionAvail().x;
+            if (avail > btnW + 4.0f)
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - btnW - 4.0f);
+            ImGui::PushStyleColor(ImGuiCol_Button,        m_ShowNodeListWindow ? IM_COL32(0, 122, 204, 80) : IM_COL32(0,0,0,0));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(0, 122, 204, 50));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(0, 122, 204, 120));
+            ImGui::PushStyleColor(ImGuiCol_Text,          m_ShowNodeListWindow ? IM_COL32(100, 190, 255, 255) : IM_COL32(160, 165, 175, 220));
+            if (ImGui::Button(ICON_FA_LIST "##toggleSidebar"))
+                m_ShowNodeListWindow = !m_ShowNodeListWindow;
+            ImGui::PopStyleColor(4);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(m_ShowNodeListWindow ? "Hide Side Panel" : "Show Side Panel");
+        }
+
         ImGui::EndMenuBar();
     }
 
