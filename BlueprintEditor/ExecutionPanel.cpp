@@ -4,6 +4,8 @@
 #include <ctime>
 #include <chrono>
 #include <unordered_set>
+#include <stdexcept>
+#include <functional>
 #ifndef __EMSCRIPTEN__
 #include <filesystem>
 #endif
@@ -209,9 +211,39 @@ void BlueprintEditor::ExecuteBlueprint()
         return capturedDoc->breakpoints.count(static_cast<uint64_t>(nid)) > 0;
     });
 
-    // 4. 执行
+    // 4. 执行（用 try-catch 防止 bad_function_call / bad_variant_access 等异常崩溃）
     auto startTime = std::chrono::high_resolution_clock::now();
-    auto result = ActiveDoc()->persistentRunner.Execute();
+    ::NodeEditor::Runtime::ExecutionResult result;
+    try
+    {
+        result = ActiveDoc()->persistentRunner.Execute();
+    }
+    catch (const std::bad_function_call& e)
+    {
+        capturedDoc->executionLog.push_back("[ERROR] Execution exception (bad_function_call): " + std::string(e.what()));
+        capturedDoc->executionLog.push_back("  Hint: a callback/handler was called while null.");
+        capturedDoc->lastExecutionStatus = "FAILED: bad_function_call";
+        capturedDoc->isExecuting = false;
+        capturedDoc->executionLogDirty = true;
+        return;
+    }
+    catch (const std::bad_variant_access& e)
+    {
+        capturedDoc->executionLog.push_back("[ERROR] Execution exception (bad_variant_access): " + std::string(e.what()));
+        capturedDoc->executionLog.push_back("  Hint: Variant type mismatch during execution.");
+        capturedDoc->lastExecutionStatus = "FAILED: bad_variant_access";
+        capturedDoc->isExecuting = false;
+        capturedDoc->executionLogDirty = true;
+        return;
+    }
+    catch (const std::exception& e)
+    {
+        capturedDoc->executionLog.push_back("[ERROR] Execution exception: " + std::string(e.what()));
+        capturedDoc->lastExecutionStatus = "FAILED: exception";
+        capturedDoc->isExecuting = false;
+        capturedDoc->executionLogDirty = true;
+        return;
+    }
     ActiveDoc()->lastExecutionResult = result;  // 保存执行结果供面板展示
     auto endTime = std::chrono::high_resolution_clock::now();
     double elapsed = std::chrono::duration<double, std::milli>(endTime - startTime).count();

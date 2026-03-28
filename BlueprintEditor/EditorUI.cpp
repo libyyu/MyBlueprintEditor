@@ -3604,8 +3604,10 @@ void BlueprintEditor::SyncFunctionPinsToNodes(const RTFunctionDefinition& func)
 
     // 引脚 vector 已被替换，清除任何可能持有旧 Pin* 的拖拽状态
     // （下一帧 DrawNodes 开头会通过 PinId 重新查找有效指针）
-    doc->newLinkPin     = nullptr;
-    doc->newNodeLinkPin = nullptr;
+    doc->newLinkPin      = nullptr;
+    doc->newLinkPinId    = 0;
+    doc->newNodeLinkPin  = nullptr;
+    doc->newNodeLinkPinId= 0;
 }
 
 // ============================================================================

@@ -9,19 +9,19 @@
     },
     "nodes": [
         {
-            "id": 19,
+            "id": 1,
             "definitionId": "Function.Entry",
             "definitionVersion": 1,
             "name": "TestFunc1",
             "pins": [
                 {
-                    "id": 20,
+                    "id": 2,
                     "kind": 1,
                     "dataType": 0,
                     "isExec": true
                 },
                 {
-                    "id": 25,
+                    "id": 3,
                     "kind": 1,
                     "dataType": 4,
                     "name": "NewInput"
@@ -29,13 +29,13 @@
             ]
         },
         {
-            "id": 21,
+            "id": 4,
             "definitionId": "Function.Return",
             "definitionVersion": 1,
             "name": "TestFunc1",
             "pins": [
                 {
-                    "id": 22,
+                    "id": 5,
                     "kind": 0,
                     "dataType": 0,
                     "isExec": true
@@ -43,26 +43,26 @@
             ]
         },
         {
-            "id": 26,
+            "id": 6,
             "definitionId": "PrintString",
             "definitionVersion": 1,
             "name": "Print String",
             "pins": [
                 {
-                    "id": 27,
+                    "id": 7,
                     "kind": 0,
                     "dataType": 0,
                     "isExec": true
                 },
                 {
-                    "id": 28,
+                    "id": 8,
                     "kind": 0,
                     "dataType": 4,
                     "name": "In String",
                     "defaultValue": ""
                 },
                 {
-                    "id": 29,
+                    "id": 9,
                     "kind": 1,
                     "dataType": 0,
                     "isExec": true
@@ -72,21 +72,21 @@
     ],
     "links": [
         {
-            "id": 30,
-            "startPinId": 25,
-            "endPinId": 28,
+            "id": 10,
+            "startPinId": 3,
+            "endPinId": 8,
             "isEnabled": true
         },
         {
-            "id": 31,
-            "startPinId": 20,
-            "endPinId": 27,
+            "id": 11,
+            "startPinId": 2,
+            "endPinId": 7,
             "isEnabled": true
         },
         {
-            "id": 32,
-            "startPinId": 29,
-            "endPinId": 22,
+            "id": 12,
+            "startPinId": 9,
+            "endPinId": 5,
             "isEnabled": true
         }
     ],
