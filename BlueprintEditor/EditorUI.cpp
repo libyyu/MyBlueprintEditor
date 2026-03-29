@@ -2092,16 +2092,6 @@ void BlueprintEditor::DrawNodeListPanel()
             selectedNodes.resize(nodeCount);
             selectedLinks.resize(linkCount);
 
-            int saveIconWidth     = GetTextureWidth(m_SaveIcon);
-            int saveIconHeight    = GetTextureHeight(m_SaveIcon);
-            int restoreIconWidth  = GetTextureWidth(m_RestoreIcon);
-            int restoreIconHeight = GetTextureHeight(m_RestoreIcon);
-
-            if (saveIconWidth <= 0)    saveIconWidth    = 24;
-            if (saveIconHeight <= 0)   saveIconHeight   = 24;
-            if (restoreIconWidth <= 0) restoreIconWidth = 24;
-            if (restoreIconHeight <= 0) restoreIconHeight = 24;
-
             // 节点列表 — Header bar（显示节点数 + 过滤状态）
             {
                 int totalNodes   = static_cast<int>(ActiveDoc()->nodes.size());
@@ -2299,58 +2289,6 @@ void BlueprintEditor::DrawNodeListPanel()
                         idStr.c_str());
                 }
 
-                // ── Save / Restore 按钮（保留原功能，紧凑显示）────────────
-                auto drawList2 = ImGui::GetWindowDrawList();
-                float btnSize  = (float)std::min(saveIconWidth, 16);
-                float btnY     = rowY + (ImGui::GetTextLineHeight() - btnSize) * 0.5f;
-                float btnX     = rowRight - btnSize * 2.0f - ImGui::GetStyle().ItemInnerSpacing.x * 2.0f - 20.0f;
-
-                ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
-#if IMGUI_VERSION_NUM < 18967
-                ImGui::SetItemAllowOverlap();
-#else
-                ImGui::SetNextItemAllowOverlap();
-#endif
-                if (node.SavedState.empty())
-                {
-                    if (ImGui::InvisibleButton("save", ImVec2(btnSize, btnSize)))
-                        node.SavedState = node.State;
-                    ImU32 c = ImGui::IsItemHovered() ? IM_COL32(255,255,255,200) : IM_COL32(255,255,255,100);
-                    drawList2->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), c);
-                }
-                else
-                {
-                    ImGui::Dummy(ImVec2(btnSize, btnSize));
-                    drawList2->AddImage(m_SaveIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,30));
-                }
-                ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-#if IMGUI_VERSION_NUM < 18967
-                ImGui::SetItemAllowOverlap();
-#else
-                ImGui::SetNextItemAllowOverlap();
-#endif
-                if (!node.SavedState.empty())
-                {
-                    if (ImGui::InvisibleButton("restore", ImVec2(btnSize, btnSize)))
-                    {
-                        node.State = node.SavedState;
-                        ed::RestoreNodeState(node.ID);
-                        node.SavedState.clear();
-                    }
-                    ImU32 c = ImGui::IsItemHovered() ? IM_COL32(255,255,255,200) : IM_COL32(255,255,255,120);
-                    drawList2->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), c);
-                }
-                else
-                {
-                    ImGui::Dummy(ImVec2((float)restoreIconWidth, (float)restoreIconHeight));
-                    drawList2->AddImage(m_RestoreIcon, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,32));
-                }
-
-                ImGui::SameLine(0, 0);
-#if IMGUI_VERSION_NUM < 18967
-                ImGui::SetItemAllowOverlap();
-#endif
-                ImGui::Dummy(ImVec2(0, (float)restoreIconHeight));
                 ImGui::PopID();
             }
             ImGui::Unindent();
