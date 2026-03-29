@@ -6,11 +6,8 @@
 static constexpr float kZoomMin     = 0.10f;   // 最小缩放 10%
 static constexpr float kZoomMax     = 4.00f;   // 最大缩放 400%
 static constexpr float kZoomDefault = 1.00f;   // 双击复位目标
-static constexpr float kBarW        = 220.0f;  // 整个 widget 宽度
-static constexpr float kBarH        = 26.0f;   // widget 高度
-static constexpr float kTrackW      = 110.0f;  // 滑轨宽度
-static constexpr float kBtnW        = 22.0f;   // -/+ 按钮宽
-static constexpr float kPctW        = 46.0f;   // 百分比文字区宽
+// 注意：kBarW/kBarH/kBtnW/kPctW 现在在运行时根据字体大小动态计算
+static constexpr float kTrackW      = 110.0f;  // 滑轨宽度（可适当固定）
 static constexpr float kMarginR     = 12.0f;   // 距右边距
 static constexpr float kMarginB     = 28.0f;   // 距底部（在状态栏上方）
 static constexpr float kThumbR      = 5.0f;    // 滑块圆半径
@@ -64,9 +61,19 @@ void BlueprintEditor::DrawZoomBar(ImVec2 editorMin, ImVec2 editorMax)
 
     float curZoom = ed::GetCurrentZoom();
 
+    // ── DPI 自适应尺寸 ────────────────────────────────────────────────────
+    float lineH  = ImGui::GetTextLineHeight();
+    float padX   = ImGui::GetStyle().FramePadding.x;
+    float kBarH  = lineH + 10.0f;                          // widget 高度
+    float kBtnW  = lineH + padX * 2.0f + 2.0f;            // -/+ 按钮宽
+    float kPctW  = ImGui::CalcTextSize("100%").x + padX * 2.0f + 6.0f;  // 百分比区宽
+    float kBarW  = kPctW + 4 + kBtnW + 4 + kTrackW + 4 + kBtnW + 8;    // 总宽
+
     // ── 位置：右下角，状态栏上方 ─────────────────────────────────────────
+    // kMarginB 需要考虑状态栏高度（也是动态的）
+    float statusBarH = lineH + 8.0f;
     ImVec2 wPos = ImVec2(editorMax.x - kBarW - kMarginR,
-                          editorMax.y - kBarH - kMarginB);
+                          editorMax.y - kBarH - statusBarH - 4.0f);
 
     // 使用独立浮动窗口，确保 InvisibleButton 的鼠标事件不被 editor 子窗口拦截
     ImGui::SetNextWindowPos(wPos, ImGuiCond_Always);
@@ -89,7 +96,7 @@ void BlueprintEditor::DrawZoomBar(ImVec2 editorMin, ImVec2 editorMax)
     // 从现在起绘图坐标相对于此窗口（左上角 = wPos）
     auto* dl = ImGui::GetWindowDrawList();
     ImVec2 wp  = ImGui::GetWindowPos();   // 等于 wPos
-    float  cx  = 5.0f;                    // 窗口内 x 偏移
+    float  cx  = 4.0f;                    // 窗口内 x 偏移
     float  cy  = kBarH * 0.5f;            // 窗口内 y 中线
 
     // ── 百分比文本（双击复位到 100%） ────────────────────────────────────

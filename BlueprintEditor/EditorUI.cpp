@@ -1509,11 +1509,13 @@ void BlueprintEditor::OnFrame(float deltaTime)
         bool isIdle    = runner.IsIdle();
         bool bpIsLibrary = ActiveDoc()->blueprintClass == RTBlueprintClass::FunctionLibrary;
 
-        float tbH   = 36.0f;
-        float btnH  = tbH - 10.0f;
+        // DPI 自适应：所有尺寸基于字体行高
+        float lineH = ImGui::GetTextLineHeight();
+        float tbH   = lineH + ImGui::GetStyle().FramePadding.y * 2.0f + 10.0f;
+        float btnH  = lineH + ImGui::GetStyle().FramePadding.y * 2.0f + 2.0f;
         // Run 按钮宽度动态计算，避免字体缩放时截断
         float btnW  = ImGui::CalcTextSize(ICON_FA_PLAY " Run").x + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f;
-        float iconW = btnH + 2.0f;
+        float iconW = ImGui::CalcTextSize(ICON_FA_PAUSE).x + ImGui::GetStyle().FramePadding.x * 2.0f + 6.0f;
         // 工具条宽度自适应（AlwaysAutoResize），只用 totalW 估算初始水平居中位置
         float totalW = btnW + 4 + iconW + 4 + iconW + 4 + iconW + 14 + iconW + 4 + iconW + 24;
         float centerX = (editorMin.x + editorMax.x) * 0.5f;
