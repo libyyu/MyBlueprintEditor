@@ -3417,22 +3417,24 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
     ImGui::Spacing();
 
     // ── Inputs（函数输入参数）────────────────────────────────────────────
+    ImGui::Unindent(4.0f);  // 先恢复到全宽，section header 从窗口左边缘开始
     {
         auto* drawList = ImGui::GetWindowDrawList();
         ImVec2 cursorPos = ImGui::GetCursorScreenPos();
         float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+        float fullW = ImGui::GetContentRegionAvail().x;
         drawList->AddRectFilled(
             cursorPos,
-            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+            ImVec2(cursorPos.x + fullW, cursorPos.y + sectionH),
             IM_COL32(30, 30, 38, 230), 0.0f);
         drawList->AddLine(
             ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
-            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
+            ImVec2(cursorPos.x + fullW, cursorPos.y + sectionH - 1.0f),
             IM_COL32(0, 122, 204, 100));
         drawList->AddText(
             ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
             IM_COL32(200, 200, 210, 230), ICON_FA_ARROW_RIGHT " Inputs");
-        ImGui::Dummy(ImVec2(paneWidth, sectionH));
+        ImGui::Dummy(ImVec2(fullW, sectionH));
     }
 
     ImGui::Indent(4.0f);
@@ -3535,22 +3537,24 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
     ImGui::Spacing();
 
     // ── Outputs（函数输出参数）───────────────────────────────────────────
+    ImGui::Unindent(4.0f);  // 先恢复到全宽
     {
         auto* drawList = ImGui::GetWindowDrawList();
         ImVec2 cursorPos = ImGui::GetCursorScreenPos();
         float sectionH = ImGui::GetTextLineHeight() + 4.0f;
+        float fullW = ImGui::GetContentRegionAvail().x;
         drawList->AddRectFilled(
             cursorPos,
-            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+            ImVec2(cursorPos.x + fullW, cursorPos.y + sectionH),
             IM_COL32(30, 30, 38, 230), 0.0f);
         drawList->AddLine(
             ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
-            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
+            ImVec2(cursorPos.x + fullW, cursorPos.y + sectionH - 1.0f),
             IM_COL32(0, 122, 204, 100));
         drawList->AddText(
             ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
             IM_COL32(200, 200, 210, 230), ICON_FA_ARROW_LEFT " Outputs");
-        ImGui::Dummy(ImVec2(paneWidth, sectionH));
+        ImGui::Dummy(ImVec2(fullW, sectionH));
     }
 
     ImGui::Indent(4.0f);
@@ -3639,9 +3643,7 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
         doc->isDirty = true;
         outputsChanged = true;
     }
-    ImGui::Unindent(4.0f);
-
-    ImGui::Unindent(4.0f);
+    ImGui::Unindent(4.0f);  // outputs 参数行的 Indent 对应
 
     // 如果参数发生变化，同步到画布上的 Function.Entry/Return 节点
     if (inputsChanged || outputsChanged)
