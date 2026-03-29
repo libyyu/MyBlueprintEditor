@@ -1863,7 +1863,9 @@ void BlueprintEditor::DrawSaveNameDialog()
     {
         namespace fs = std::filesystem;
         std::string assetsDir = (fs::path(m_Project.projectDir) / "assets").string();
-        ImGui::TextDisabled("Root: %s", assetsDir.c_str());
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        ImGui::TextWrapped("Root: %s", assetsDir.c_str());
+        ImGui::PopStyleColor();
     }
     ImGui::Spacing();
 
@@ -1887,9 +1889,9 @@ void BlueprintEditor::DrawSaveNameDialog()
     if (!resolved.empty())
     {
         ImGui::Spacing();
-        ImGui::TextDisabled("Full path:");
-        ImGui::SameLine();
-        ImGui::TextUnformatted(resolved.c_str());
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        ImGui::TextWrapped("Full path: %s", resolved.c_str());
+        ImGui::PopStyleColor();
         if (std::filesystem::exists(resolved))
             ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f),
                 ICON_FA_TRIANGLE_EXCLAMATION " File exists — will be overwritten.");
