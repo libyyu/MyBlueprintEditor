@@ -1727,6 +1727,11 @@ void BlueprintEditor::OnFrame(float deltaTime)
     ShowUnsavedChangesDialog();
 
     // ================================================================
+    // 工程内命名对话框（有工程时替代系统 Dialog）
+    // ================================================================
+    DrawSaveNameDialog();
+
+    // ================================================================
     // 样式编辑器浮动窗口
     // ================================================================
     if (m_ShowStyleEditorWindow)
@@ -1810,8 +1815,168 @@ void BlueprintEditor::ShowUnsavedChangesDialog()
 }
 
 // ============================================================================
-// 左侧节点列表面板（嵌入式）
+// 工程内命名对话框 — DrawSaveNameDialog
+// 在有工程时替代系统文件对话框，让用户输入相对于 assets/ 的文件路径（含子目录）
 // ============================================================================
+
+void BlueprintEditor::DrawSaveNameDialog()
+{
+    auto& d = m_SaveNameDialog;
+
+    // 触发 OpenPopup（仅在 open 标志为 true 时）
+    if (d.open)
+    {
+        d.open = false;
+        ImGui::OpenPopup("###SaveNameDlg");
+        ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    }
+
+    // Modal 标题根据操作类型切换（### 后 ID 固定，保证 OpenPopup 能匹配）
+    const char* title = d.isNew
+        ? (ICON_FA_FILE " New Blueprint###SaveNameDlg")
+        : (ICON_FA_FLOPPY_DISK " Save Blueprint As###SaveNameDlg");
+
+    ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Always);
+    if (!ImGui::BeginPopupModal(title, nullptr,
+        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+        return;
+
+    // ── 头部信息 ────────────────────────────────────────────────────────────
+    ImGui::TextDisabled("Project: %s", m_Project.name.c_str());
+    {
+        namespace fs = std::filesystem;
+        std::string assetsDir = (fs::path(m_Project.projectDir) / "assets").string();
+        ImGui::TextDisabled("Root: %s", assetsDir.c_str());
+    }
+    ImGui::Spacing();
+
+    // 文件类型标签
+    const char* typeLabel = (d.bpClass == RTBlueprintClass::FunctionLibrary)
+        ? (ICON_FA_CUBE " Function Library")
+        : (ICON_FA_DIAGRAM_PROJECT " Blueprint");
+    ImGui::TextColored(ImVec4(0.5f, 0.85f, 0.5f, 1.0f), "%s", typeLabel);
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // ── 路径输入 ─────────────────────────────────────────────────────────────
+    ImGui::TextUnformatted("File path (relative to assets/, subdirs OK, no extension):");
+    ImGui::SetNextItemWidth(-1.0f);
+    bool enterPressed = ImGui::InputText("##saveNameInput", d.inputBuf, sizeof(d.inputBuf),
+        ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+
+    // 实时预览完整路径
+    std::string resolved = ResolveSaveDialogPath();
+    if (!resolved.empty())
+    {
+        ImGui::Spacing();
+        ImGui::TextDisabled("Full path:");
+        ImGui::SameLine();
+        ImGui::TextUnformatted(resolved.c_str());
+        if (std::filesystem::exists(resolved))
+            ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f),
+                ICON_FA_TRIANGLE_EXCLAMATION " File exists — will be overwritten.");
+    }
+
+    // 错误提示
+    if (!d.errorMsg.empty())
+    {
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f),
+            ICON_FA_CIRCLE_EXCLAMATION " %s", d.errorMsg.c_str());
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // ── 按钮行 ───────────────────────────────────────────────────────────────
+    float btnW      = 110.0f;
+    float totalBtnW = btnW * 2 + ImGui::GetStyle().ItemSpacing.x;
+    float indentX   = (ImGui::GetContentRegionAvail().x - totalBtnW) * 0.5f;
+    if (indentX > 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indentX);
+
+    bool confirmed = false;
+    ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(30, 100, 50, 255));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(45, 135, 70, 255));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(55, 160, 85, 255));
+    if (ImGui::Button(ICON_FA_CHECK " Confirm", ImVec2(btnW, 0)) || enterPressed)
+        confirmed = true;
+    ImGui::PopStyleColor(3);
+
+    ImGui::SameLine();
+    if (ImGui::Button(ICON_FA_XMARK " Cancel", ImVec2(btnW, 0)))
+    {
+        // 取消新建时：如果文档刚被创建且未修改，自动关闭它
+        if (d.isNew && ActiveDoc() && ActiveDoc()->filePath.empty() && !ActiveDoc()->isDirty)
+            CloseDocument(m_ActiveDocIndex);
+        ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+        return;
+    }
+
+    // ── 确认逻辑 ─────────────────────────────────────────────────────────────
+    if (confirmed)
+    {
+        d.errorMsg.clear();
+
+        std::string raw = d.inputBuf;
+        // 去首尾空白
+        while (!raw.empty() && (raw.front() == ' ' || raw.front() == '\t')) raw.erase(raw.begin());
+        while (!raw.empty() && (raw.back()  == ' ' || raw.back()  == '\t')) raw.pop_back();
+        // 统一斜杠
+        for (char& c : raw) if (c == '\\') c = '/';
+
+        if (raw.empty())
+            d.errorMsg = "File name cannot be empty.";
+        else if (raw.front() == '/')
+            d.errorMsg = "Path must be relative (do not start with /).";
+        else if (raw.find("..") != std::string::npos)
+            d.errorMsg = "Path must not contain '..'.";
+        else if (raw.back() == '/')
+            d.errorMsg = "Path must end with a file name, not a directory.";
+        else
+        {
+            for (char c : raw)
+            {
+                if (c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|' || c == ':')
+                {
+                    d.errorMsg = std::string("Invalid character '") + c + "'.";
+                    break;
+                }
+            }
+        }
+
+        if (d.errorMsg.empty())
+        {
+            std::string fullPath = ResolveSaveDialogPath();
+            if (fullPath.empty())
+            {
+                d.errorMsg = "Could not resolve path. Please check the input.";
+            }
+            else
+            {
+                // 自动创建 assets 及子目录
+                try {
+                    std::filesystem::create_directories(
+                        std::filesystem::path(fullPath).parent_path());
+                } catch (const std::exception& e) {
+                    d.errorMsg = std::string("Failed to create directory: ") + e.what();
+                }
+
+                if (d.errorMsg.empty() && ActiveDoc())
+                {
+                    ActiveDoc()->filePath = fullPath;
+                    DoSaveFile(fullPath);
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+        }
+    }
+
+    ImGui::EndPopup();
+}
 
 void BlueprintEditor::DrawNodeListPanel()
 {

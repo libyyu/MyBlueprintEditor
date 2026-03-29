@@ -12,6 +12,10 @@
 
 #include <sstream>
 #include <chrono>
+#include <filesystem>
+#include <cstring>
+
+namespace fs = std::filesystem;
 
 // ============================================================================
 // 平台文件对话框（外部链接，供 EditorUI / ProjectOps 调用）
@@ -120,6 +124,31 @@ void BlueprintEditor::NewFile(RTBlueprintClass bpClass)
         return;
     s_lastNewFileTime = now;
 
+    if (m_Project.IsOpen())
+    {
+        // 有工程：先创建临时文档，弹出编辑器内命名对话框，用户确认后再保存到 assets/
+        CreateNewDocument();
+
+        int maxNum = 0;
+        for (auto& doc : m_Documents)
+        {
+            if (doc->untitledName.rfind("Untitled-", 0) == 0)
+            {
+                int num = std::atoi(doc->untitledName.c_str() + 9);
+                if (num > maxNum) maxNum = num;
+            }
+        }
+        ActiveDoc()->untitledName = "Untitled-" + std::to_string(maxNum + 1);
+        ActiveDoc()->blueprintClass = bpClass;
+        ed::SetCurrentEditor(ActiveDoc()->editorContext);
+        SetTitle("Blueprint Editor");
+
+        // 打开命名对话框，预填类型对应的建议文件名
+        OpenSaveNameDialog(/*isNew=*/true, bpClass);
+        return;
+    }
+
+    // 无工程：原有逻辑，直接创建临时文档（首次保存时走系统 Dialog）
     CreateNewDocument();
 
     // 动态计算下一个可用 Untitled 编号（基于当前已打开的文档）
@@ -287,12 +316,21 @@ void BlueprintEditor::SaveFile()
 
 void BlueprintEditor::SaveFileAs()
 {
+    if (m_Project.IsOpen())
+    {
+        // 有工程：弹出编辑器内命名对话框，限定在 assets/ 目录下
+        RTBlueprintClass bpClass = ActiveDoc() ? ActiveDoc()->blueprintClass : RTBlueprintClass::Actor;
+        OpenSaveNameDialog(/*isNew=*/false, bpClass);
+        return;
+    }
+
+    // 无工程：原有系统 Dialog
     std::string path = SaveFileDialog(
         "Blueprint Files (*.json)\0*.json\0All Files (*.*)\0*.*\0",
         "Save Blueprint As",
         "json"
     );
-    
+
     if (!path.empty())
     {
         ActiveDoc()->filePath = path;
@@ -1136,4 +1174,76 @@ void BlueprintEditor::DrawRecentProjectsMenu()
         m_RecentProjects.clear();
         SaveRecentProjects();
     }
+}
+
+// ============================================================================
+// 工程内命名对话框 — OpenSaveNameDialog / ResolveSaveDialogPath
+// ============================================================================
+
+void BlueprintEditor::OpenSaveNameDialog(bool isNew, RTBlueprintClass bpClass)
+{
+    auto& d = m_SaveNameDialog;
+    d.open    = true;
+    d.isNew   = isNew;
+    d.bpClass = bpClass;
+    d.errorMsg.clear();
+
+    // 预填默认文件名：当前文档已有路径时，取相对于 assets/ 的路径（去掉扩展名），
+    // 否则填空让用户自行输入
+    std::memset(d.inputBuf, 0, sizeof(d.inputBuf));
+    if (!isNew && ActiveDoc() && !ActiveDoc()->filePath.empty())
+    {
+        std::string assetsDir = (fs::path(m_Project.projectDir) / "assets").string();
+        fs::path fp(ActiveDoc()->filePath);
+        // 去掉所有已知扩展名（.editor.json / .json）
+        std::string stem = fp.filename().string();
+        if (stem.size() > 12 && stem.substr(stem.size() - 12) == ".editor.json")
+            stem = stem.substr(0, stem.size() - 12);
+        else if (stem.size() > 5 && stem.substr(stem.size() - 5) == ".json")
+            stem = stem.substr(0, stem.size() - 5);
+
+        // 若当前文件已在 assets 下，计算子目录路径
+        try {
+            fs::path rel = fs::relative(fp.parent_path(), assetsDir);
+            std::string relStr = rel.string();
+            if (!relStr.empty() && relStr != "." && relStr.find("..") == std::string::npos)
+                stem = (fs::path(relStr) / stem).string();
+        } catch (...) {}
+
+        std::strncpy(d.inputBuf, stem.c_str(), sizeof(d.inputBuf) - 1);
+    }
+}
+
+std::string BlueprintEditor::ResolveSaveDialogPath() const
+{
+    const auto& d = m_SaveNameDialog;
+    if (!m_Project.IsOpen()) return "";
+
+    std::string raw = d.inputBuf;
+    // 去掉首尾空白
+    while (!raw.empty() && (raw.front() == ' ' || raw.front() == '\t')) raw.erase(raw.begin());
+    while (!raw.empty() && (raw.back()  == ' ' || raw.back()  == '\t')) raw.pop_back();
+    if (raw.empty()) return "";
+
+    // 规范化分隔符（Windows 反斜杠 → 正斜杠）
+    for (char& c : raw) if (c == '\\') c = '/';
+
+    // 不允许绝对路径或上溯
+    if (raw.front() == '/' || raw.find("..") != std::string::npos)
+        return "";
+
+    // 拼接 assets/ 根目录
+    fs::path assetsDir = fs::path(m_Project.projectDir) / "assets";
+    fs::path full      = assetsDir / raw;
+
+    // 追加扩展名（去掉用户自己加的，统一加 .json）
+    std::string fullStr = full.string();
+    // 剥掉 .editor.json / .json
+    if (fullStr.size() > 12 && fullStr.substr(fullStr.size() - 12) == ".editor.json")
+        fullStr = fullStr.substr(0, fullStr.size() - 12);
+    else if (fullStr.size() > 5 && fullStr.substr(fullStr.size() - 5) == ".json")
+        fullStr = fullStr.substr(0, fullStr.size() - 5);
+
+    fullStr += ".json";
+    return fullStr;
 }

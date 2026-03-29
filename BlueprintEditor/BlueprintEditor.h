@@ -441,6 +441,25 @@ struct BlueprintEditor : public Application
     void  ShowUnsavedChangesDialog();
 
     // ------------------------------------------------------------------
+    // 工程内保存名称对话框（有工程时替代系统 Dialog）
+    // 用户在编辑器窗口内输入相对于 assets/ 的路径（支持子目录），
+    // 确认后自动创建目录并保存蓝图文件。
+    // ------------------------------------------------------------------
+    struct SaveNameDialogState
+    {
+        bool        open       = false;   // 是否显示
+        bool        isNew      = false;   // true=新建, false=另存为
+        RTBlueprintClass bpClass = RTBlueprintClass::Actor;
+        char        inputBuf[256] = {};   // 用户输入的相对路径（不含扩展名）
+        std::string errorMsg;             // 路径校验错误提示（空=无错误）
+    };
+    SaveNameDialogState m_SaveNameDialog;
+    void  OpenSaveNameDialog(bool isNew, RTBlueprintClass bpClass = RTBlueprintClass::Actor);
+    void  DrawSaveNameDialog();           // 每帧在主 UI 中调用
+    // 从 inputBuf 解析出完整绝对路径（含扩展名），空串表示校验失败
+    std::string ResolveSaveDialogPath() const;
+
+    // ------------------------------------------------------------------
     // 最近打开文件（持久化到磁盘）
     // ------------------------------------------------------------------
     static const int MaxRecentFiles = 10;
