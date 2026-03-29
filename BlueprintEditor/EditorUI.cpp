@@ -2190,7 +2190,9 @@ void BlueprintEditor::DrawNodeListPanel()
                 float rowH     = ImGui::GetTextLineHeight() + ImGui::GetStyle().ItemSpacing.y;
                 float rowY     = ImGui::GetCursorScreenPos().y;
                 float rowX     = ImGui::GetCursorScreenPos().x;
-                float rowRight = rowX + paneWidth - ImGui::GetStyle().ScrollbarSize - 4.0f;
+                // rowRight 基于窗口内容区域右边界（不受 Indent 影响）
+                float rowRight = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x
+                                 - ImGui::GetStyle().ScrollbarSize - 2.0f;
 
                 // ── 选中 / hover 背景 ───────────────────────────────────────
                 ImVec2 rowMin(rowX - ImGui::GetStyle().IndentSpacing, rowY);
