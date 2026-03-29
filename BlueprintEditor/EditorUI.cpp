@@ -2976,7 +2976,7 @@ void BlueprintEditor::DrawDetailsPanel()
 
     ImGui::Indent(8.0f);
 
-    // 动态计算标签列宽（取所有标签中最宽的，加8px间距）
+    // 动态计算标签列宽（最宽标签 + 12px 间距）
     float labelCol = std::max({
         ImGui::CalcTextSize("Name:").x,
         ImGui::CalcTextSize("ID:").x,
@@ -2985,36 +2985,35 @@ void BlueprintEditor::DrawDetailsPanel()
         ImGui::CalcTextSize("Type:").x,
         ImGui::CalcTextSize("Pure:").x,
     }) + 12.0f;
-    // SameLine 的 offset 是相对于当前窗口内容区域左边缘（受 Indent 影响）
-    // 用 GetCursorPosX() baseline + labelCol 代替硬编码的 90.0f
-    float indentedX = ImGui::GetCursorPosX();  // Indent 后的基准 X（窗口内坐标）
-    float valueX = indentedX + labelCol;
+    float indentedX = ImGui::GetCursorPosX();  // Indent 后的基准 X
+    float valueX    = indentedX + labelCol;    // 值列 X（窗口内坐标）
+
+    // 辅助 lambda：绘制标签-值对
+    auto drawRow = [&](const char* label, auto drawValue) {
+        ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "%s", label);
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(valueX);
+        drawValue();
+    };
 
     // 名称
-    ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "Name:");
-    ImGui::SameLine(valueX);
-    ImGui::TextUnformatted(node->Name.c_str());
+    drawRow("Name:", [&]{ ImGui::TextUnformatted(node->Name.c_str()); });
 
     // ID
-    ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "ID:");
-    ImGui::SameLine(valueX);
-    ImGui::Text("%llu", static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(node->ID.AsPointer())));
+    drawRow("ID:", [&]{
+        ImGui::Text("%llu", static_cast<unsigned long long>(
+            reinterpret_cast<uintptr_t>(node->ID.AsPointer())));
+    });
 
     // 定义 ID
-    ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "Definition:");
-    ImGui::SameLine(valueX);
-    ImGui::TextUnformatted(node->DefinitionId.c_str());
+    drawRow("Definition:", [&]{ ImGui::TextUnformatted(node->DefinitionId.c_str()); });
 
     // 从注册表查找节点定义
     const RTNodeDef* def = m_NodeRegistry.getNodeDefinition(node->DefinitionId);
 
     // 类别
     if (def && !def->category.empty())
-    {
-        ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "Category:");
-        ImGui::SameLine(valueX);
-        ImGui::TextUnformatted(def->category.c_str());
-    }
+        drawRow("Category:", [&]{ ImGui::TextUnformatted(def->category.c_str()); });
 
     // 节点类型
     {
@@ -3027,9 +3026,7 @@ void BlueprintEditor::DrawDetailsPanel()
         case NodeType::Comment:   typeStr = "Comment";   break;
         default: break;
         }
-        ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "Type:");
-        ImGui::SameLine(valueX);
-        ImGui::TextUnformatted(typeStr);
+        drawRow("Type:", [&]{ ImGui::TextUnformatted(typeStr); });
     }
 
     // 描述
@@ -3045,10 +3042,11 @@ void BlueprintEditor::DrawDetailsPanel()
     // 纯函数标记
     if (def)
     {
-        ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "Pure:");
-        ImGui::SameLine(valueX);
-        ImGui::TextColored(def->isPure ? ImVec4(0.35f, 0.85f, 0.45f, 1.0f) : ImVec4(0.85f, 0.55f, 0.35f, 1.0f),
-            "%s", def->isPure ? "Yes" : "No");
+        drawRow("Pure:", [&]{
+            ImGui::TextColored(
+                def->isPure ? ImVec4(0.35f, 0.85f, 0.45f, 1.0f) : ImVec4(0.85f, 0.55f, 0.35f, 1.0f),
+                "%s", def->isPure ? "Yes" : "No");
+        });
     }
 
     // 错误状态
