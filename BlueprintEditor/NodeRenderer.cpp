@@ -87,6 +87,20 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                 { hasOutputDelegates = true; break; }
             }
 
+            // 引脚 tooltip 延迟到 builder.End() 之后显示，避免在 BeginPin 布局栈内调用 ed::Suspend()
+            struct PinTooltipInfo {
+                bool        show       = false;
+                std::string name;
+                std::string typeName;
+                bool        linked     = false;
+                bool        isBool     = false; bool boolVal = false;
+                bool        isInt      = false; int64_t intVal = 0;
+                bool        isFloat    = false; float floatVal = 0.f;
+                bool        isStr      = false; std::string strVal;
+                bool        isObj      = false; std::string objVal;
+                bool        hasRuntime = false; std::string runtimeVal;
+            } pendingPinTip;
+
             builder.Begin(node.ID);
                 if (!isSimple)
                 {
@@ -238,61 +252,45 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                     builder.Input(input.ID);
                     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
                     DrawPinIcon(input, IsPinLinked(input.ID), (int)(alpha * 255));
-                    // Input pin tooltip：悬浮在图标上时显示引脚类型 + 当前值
-                    // 注意：必须先 PopStyleVar 再 Suspend，否则跨 context 时 style 栈不平衡导致崩溃
-                    bool inputPinHovered = ImGui::IsItemHovered() && input.Type != PinType::Flow;
-                    ImGui::PopStyleVar();
-                    if (inputPinHovered)
+                    // 记录 hover 状态和数据，延迟到 builder.End() 之后再显示 tooltip
+                    // 不能在 builder.Input()/EndInput() 之间调用 ed::Suspend()，会破坏节点编辑器内部布局栈
+                    if (ImGui::IsItemHovered() && input.Type != PinType::Flow && !pendingPinTip.show)
                     {
-                        ed::Suspend();
-                        if (ImGui::BeginTooltip())
-                        {
-                            // 类型标签
-                            const char* typeName = "Unknown";
+                        pendingPinTip.show   = true;
+                        pendingPinTip.name   = input.Name;
+                        pendingPinTip.linked = IsPinLinked(input.ID);
+                        switch (input.Type) {
+                            case PinType::Bool:     pendingPinTip.typeName = "Bool";     break;
+                            case PinType::Int:      pendingPinTip.typeName = "Int";      break;
+                            case PinType::Float:    pendingPinTip.typeName = "Float";    break;
+                            case PinType::String:   pendingPinTip.typeName = "String";   break;
+                            case PinType::Object:   pendingPinTip.typeName = "Object";   break;
+                            case PinType::Function: pendingPinTip.typeName = "Function"; break;
+                            case PinType::Array:    pendingPinTip.typeName = "Array";    break;
+                            case PinType::Map:      pendingPinTip.typeName = "Map";      break;
+                            case PinType::Delegate: pendingPinTip.typeName = "Delegate"; break;
+                            default:                pendingPinTip.typeName = "Unknown";  break;
+                        }
+                        if (!pendingPinTip.linked) {
                             switch (input.Type) {
-                                case PinType::Bool:     typeName = "Bool";     break;
-                                case PinType::Int:      typeName = "Int";      break;
-                                case PinType::Float:    typeName = "Float";    break;
-                                case PinType::String:   typeName = "String";   break;
-                                case PinType::Object:   typeName = "Object";   break;
-                                case PinType::Function: typeName = "Function"; break;
-                                case PinType::Array:    typeName = "Array";    break;
-                                case PinType::Map:      typeName = "Map";      break;
-                                case PinType::Delegate: typeName = "Delegate"; break;
+                                case PinType::Bool:   pendingPinTip.isBool  = true; pendingPinTip.boolVal  = input.BoolValue;  break;
+                                case PinType::Int:    pendingPinTip.isInt   = true; pendingPinTip.intVal   = input.IntValue;   break;
+                                case PinType::Float:  pendingPinTip.isFloat = true; pendingPinTip.floatVal = input.FloatValue; break;
+                                case PinType::String: pendingPinTip.isStr   = true; pendingPinTip.strVal   = input.StringValue; break;
+                                case PinType::Object: pendingPinTip.isObj   = true; pendingPinTip.objVal   = input.ObjectValue; break;
                                 default: break;
                             }
-                            ImGui::TextColored(ImVec4(0.5f, 0.75f, 1.0f, 1.0f), "%s", input.Name.c_str());
-                            ImGui::SameLine();
-                            ImGui::TextDisabled("(%s)", typeName);
-                            // 当前默认值
-                            if (!IsPinLinked(input.ID))
-                            {
-                                ImGui::Separator();
-                                ImGui::TextDisabled("Default: ");
-                                ImGui::SameLine();
-                                switch (input.Type) {
-                                    case PinType::Bool:   ImGui::Text("%s", input.BoolValue ? "true" : "false"); break;
-                                    case PinType::Int:    ImGui::Text("%" PRId64, input.IntValue); break;
-                                    case PinType::Float:  ImGui::Text("%.4g", input.FloatValue); break;
-                                    case PinType::String: ImGui::Text("\"%s\"", input.StringValue.c_str()); break;
-                                    case PinType::Object: ImGui::Text("%s", input.ObjectValue.empty() ? "(empty)" : input.ObjectValue.c_str()); break;
-                                    default:              ImGui::TextDisabled("(no value)"); break;
-                                }
-                            }
-                            // 运行时最后执行值
-                            const auto& outVals = ActiveDoc()->lastExecutionResult.outputValues;
-                            ::NodeEditor::Runtime::PinId pid = reinterpret_cast<uintptr_t>(input.ID.AsPointer());
-                            auto valIt = outVals.find(pid);
-                            if (valIt != outVals.end())
-                            {
-                                ImGui::Separator();
-                                ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Runtime: %s",
-                                    valIt->second.asString().c_str());
-                            }
-                            ImGui::EndTooltip();
                         }
-                        ed::Resume();
+                        // 运行时值
+                        const auto& outVals = ActiveDoc()->lastExecutionResult.outputValues;
+                        ::NodeEditor::Runtime::PinId pid = reinterpret_cast<uintptr_t>(input.ID.AsPointer());
+                        auto valIt = outVals.find(pid);
+                        if (valIt != outVals.end()) {
+                            pendingPinTip.hasRuntime = true;
+                            pendingPinTip.runtimeVal = valIt->second.asString();
+                        }
                     }
+                    ImGui::PopStyleVar();
                     ImGui::Spring(0);
                     if (!input.Name.empty())
                     {
@@ -634,6 +632,39 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                 } // if (!node.isCollapsed) else
 
             builder.End();
+
+            // 引脚 tooltip：在 builder.End() 之后安全调用 ed::Suspend()
+            if (pendingPinTip.show)
+            {
+                ed::Suspend();
+                if (ImGui::BeginTooltip())
+                {
+                    ImGui::TextColored(ImVec4(0.5f, 0.75f, 1.0f, 1.0f), "%s",
+                        pendingPinTip.name.empty() ? "(pin)" : pendingPinTip.name.c_str());
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("(%s)", pendingPinTip.typeName.c_str());
+                    if (!pendingPinTip.linked)
+                    {
+                        ImGui::Separator();
+                        ImGui::TextDisabled("Default: ");
+                        ImGui::SameLine();
+                        if      (pendingPinTip.isBool)  ImGui::Text("%s", pendingPinTip.boolVal ? "true" : "false");
+                        else if (pendingPinTip.isInt)   ImGui::Text("%" PRId64, pendingPinTip.intVal);
+                        else if (pendingPinTip.isFloat) ImGui::Text("%.4g", pendingPinTip.floatVal);
+                        else if (pendingPinTip.isStr)   ImGui::Text("\"%s\"", pendingPinTip.strVal.c_str());
+                        else if (pendingPinTip.isObj)   ImGui::Text("%s", pendingPinTip.objVal.empty() ? "(empty)" : pendingPinTip.objVal.c_str());
+                        else                            ImGui::TextDisabled("(no value)");
+                    }
+                    if (pendingPinTip.hasRuntime)
+                    {
+                        ImGui::Separator();
+                        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Runtime: %s",
+                            pendingPinTip.runtimeVal.c_str());
+                    }
+                    ImGui::EndTooltip();
+                }
+                ed::Resume();
+            }
 
             // ---- 错误节点视觉反馈（UE4 风格）----
             if (node.HasError)

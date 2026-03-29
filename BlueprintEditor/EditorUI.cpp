@@ -1508,18 +1508,18 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
         float tbH   = 36.0f;
         float btnH  = tbH - 10.0f;
-        // Run 按钮宽度：图标 + 空格 + "Run" 文字 + 两侧 FramePadding，动态计算避免字体缩放时截断
+        // Run 按钮宽度动态计算，避免字体缩放时截断
         float btnW  = ImGui::CalcTextSize(ICON_FA_PLAY " Run").x + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f;
         float iconW = btnH + 2.0f;
-        // 估算工具条宽度
+        // 工具条宽度自适应（AlwaysAutoResize），只用 totalW 估算初始水平居中位置
         float totalW = btnW + 4 + iconW + 4 + iconW + 4 + iconW + 14 + iconW + 4 + iconW + 24;
         float centerX = (editorMin.x + editorMax.x) * 0.5f;
         ImVec2 tbPos(centerX - totalW * 0.5f, editorMin.y + 6.0f);
 
         ImGui::SetNextWindowPos(tbPos, ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(totalW, tbH));
+        // 不手动设置 Size，改用 AlwaysAutoResize，让窗口自适应内容宽高
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,  ImVec2(8.0f, 4.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,  ImVec2(8.0f, 5.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,    ImVec2(4.0f, 4.0f));
         ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(18, 20, 26, 235));
         ImGui::PushStyleColor(ImGuiCol_Border,
@@ -1529,7 +1529,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
         bool tbOpen = ImGui::Begin("##DebugToolbar", nullptr,
             ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoMove     | ImGuiWindowFlags_NoScrollbar |
-            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking);
+            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
+            ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::PopStyleColor(2);
         ImGui::PopStyleVar(3);
 
@@ -1614,6 +1615,11 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.1f, 1.0f),   ICON_FA_PAUSE);
             else if (isStopped)
                 ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.30f, 1.0f),  ICON_FA_CIRCLE_STOP);
+
+            // 用本帧实际窗口宽度修正居中位置（AlwaysAutoResize 场景下确保居中）
+            float actualW = ImGui::GetWindowSize().x;
+            float correctedX = centerX - actualW * 0.5f;
+            ImGui::SetWindowPos(ImVec2(correctedX, editorMin.y + 6.0f));
         }
         ImGui::End();
     }
