@@ -352,6 +352,8 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
             if (ImGui::Button(ICON_FA_ERASER " Clear##logclear"))
             {
                 ActiveDoc()->executionLog.clear();
+                ActiveDoc()->executionLogText.clear();
+                ActiveDoc()->execLogCachedFilter.clear();
                 ActiveDoc()->executionLogDirty = false;
                 ActiveDoc()->lastExecutionStatus.clear();
                 ActiveDoc()->lastExecutionResult = RTExecutionResult{};
@@ -360,10 +362,9 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
             float logH = ImGui::GetContentRegionAvail().y - 4.0f;
             if (logH < 40.0f) logH = 40.0f;
 
-            // 合并日志文本（应用过滤器），存入文档缓存供 InputTextMultiline 使用
+            // 同步 executionLogText 缓存（供 InputTextMultiline 文字选取使用）
             std::string filter(ActiveDoc()->execLogFilter);
             {
-                // 仅在日志内容或过滤器变化时重建（用 doc 自身字段，支持多标签页）
                 bool needRebuild = ActiveDoc()->executionLogDirty
                                 || (ActiveDoc()->execLogCachedFilter != filter);
                 if (needRebuild)
@@ -381,26 +382,40 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
                 }
             }
 
-            // 只读 InputTextMultiline：支持鼠标选取 / Ctrl+C / Ctrl+A
-            auto& logText = ActiveDoc()->executionLogText;
-            bool shouldScroll = ActiveDoc()->executionLogDirty;
-            ImGui::InputTextMultiline("##ExecLogText",
-                const_cast<char*>(logText.c_str()), logText.size() + 1,
-                ImVec2(paneWidth, logH),
-                ImGuiInputTextFlags_ReadOnly);
+            // ── 彩色日志显示 + 可选取文字（双层叠加）────────────────────────
+            // 底层：BeginChild 内用 DrawColoredLogLine 渲染彩色文字
+            ImVec2 logAreaPos = ImGui::GetCursorScreenPos();
+            ImGui::BeginChild("##ExecLog", ImVec2(paneWidth, logH), true,
+                ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
-            // 自动滚到底部：通过内部子窗口直接设置 ScrollY
+            for (const auto& line : ActiveDoc()->executionLog)
+            {
+                if (!filter.empty() && line.find(filter) == std::string::npos)
+                    continue;
+                DrawColoredLogLine(line);
+            }
+
+            bool shouldScroll = ActiveDoc()->executionLogDirty;
             if (shouldScroll)
             {
-                ImGuiID childId = ImGui::GetCurrentWindow()->GetID("##ExecLogText");
-                ImGuiWindow* childWin = ImGui::FindWindowByID(childId);
-                if (childWin)
-                {
-                    childWin->ScrollTarget.y = childWin->ScrollMax.y;
-                    childWin->ScrollTargetCenterRatio.y = 0.0f;
-                }
+                ImGui::SetScrollHereY(1.0f);
                 ActiveDoc()->executionLogDirty = false;
             }
+            ImGui::EndChild();
+
+            // 上层：透明只读 InputTextMultiline 叠在同一区域，用于文字选取
+            // SetCursorScreenPos 回到 BeginChild 起始位置
+            ImGui::SetCursorScreenPos(logAreaPos);
+            ImGui::PushStyleColor(ImGuiCol_FrameBg,         ImVec4(0,0,0,0));
+            ImGui::PushStyleColor(ImGuiCol_ScrollbarBg,     ImVec4(0,0,0,0));
+            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab,   ImVec4(0,0,0,0));
+            ImGui::PushStyleColor(ImGuiCol_Text,            ImVec4(0,0,0,0));
+            auto& logText = ActiveDoc()->executionLogText;
+            ImGui::InputTextMultiline("##ExecLogSel",
+                const_cast<char*>(logText.c_str()), logText.size() + 1,
+                ImVec2(paneWidth, logH),
+                ImGuiInputTextFlags_ReadOnly | ImGuiInputTextFlags_NoHorizontalScroll);
+            ImGui::PopStyleColor(4);
             ImGui::EndTabItem();
         }
 
