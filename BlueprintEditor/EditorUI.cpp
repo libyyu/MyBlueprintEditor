@@ -697,14 +697,15 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
         // 绘制左侧面板（VS-style 垂直侧边栏按钮 + 内容区域）
         static int leftTabIndex = 0;  // 0=Project, 1=Nodes
-        const float sidebarBtnW = 32.0f;
+        // DPI 自适应：侧边栏宽度 = 图标宽度 + padding，避免高 DPI 下图标被截断
+        const float sidebarBtnW = ImGui::GetTextLineHeight() + ImGui::GetStyle().FramePadding.x * 2.0f + 8.0f;
         float contentW = m_LeftPanelWidth - sidebarBtnW - 2.0f;
         if (contentW < 80.0f) contentW = 80.0f;
 
         ImGui::BeginChild("##LeftPanel", ImVec2(m_LeftPanelWidth, totalHeight), true, ImGuiWindowFlags_NoScrollbar);
 
         // 左侧窄按钮列
-        ImGui::BeginChild("##Sidebar", ImVec2(sidebarBtnW, totalHeight - 8.0f), false, ImGuiWindowFlags_NoScrollbar);
+        ImGui::BeginChild("##Sidebar", ImVec2(sidebarBtnW, totalHeight - 4.0f), false, ImGuiWindowFlags_NoScrollbar);
         {
             auto drawSidebarBtn = [&](int idx, const char* icon, const char* tooltip) {
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
@@ -719,7 +720,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.18f, 0.0f));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.30f, 1.0f));
                 }
-                if (ImGui::Button(icon, ImVec2(sidebarBtnW - 4.0f, sidebarBtnW - 4.0f)))
+                if (ImGui::Button(icon, ImVec2(sidebarBtnW - 2.0f, sidebarBtnW - 2.0f)))
                     leftTabIndex = idx;
                 ImGui::PopStyleColor(2);
                 ImGui::PopStyleVar();
@@ -746,7 +747,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         ImGui::SameLine(0, 2.0f);
 
         // 右侧内容区域
-        ImGui::BeginChild("##LeftContent", ImVec2(contentW, totalHeight - 8.0f), false);
+        ImGui::BeginChild("##LeftContent", ImVec2(contentW, totalHeight - 4.0f), false);
         {
             if (leftTabIndex == 0)
             {
@@ -1036,15 +1037,17 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
         if (m_ShowExecutionWindow)
         {
-            // 约束底部面板高度
-            if (m_BottomPanelHeight < 100.0f) m_BottomPanelHeight = 100.0f;
+            // 约束底部面板高度（DPI 自适应：最小高度至少能容纳 TabBar + Filter + 2行日志）
+            float minPanelH = ImGui::GetTextLineHeightWithSpacing() * 5.0f + ImGui::GetStyle().FramePadding.y * 4.0f + 8.0f;
+            if (minPanelH < 100.0f) minPanelH = 100.0f;
+            if (m_BottomPanelHeight < minPanelH) m_BottomPanelHeight = minPanelH;
             if (m_BottomPanelHeight > remainingHeight * 0.6f) m_BottomPanelHeight = remainingHeight * 0.6f;
 
             editorHeight = remainingHeight - m_BottomPanelHeight - splitterThickness;
             if (editorHeight < 200.0f) editorHeight = 200.0f;
             bottomHeight = remainingHeight - editorHeight - splitterThickness;
 
-            Splitter("##VerticalSplitter", false, splitterThickness, &editorHeight, &bottomHeight, 200.0f, 100.0f, rightWidth);
+            Splitter("##VerticalSplitter", false, splitterThickness, &editorHeight, &bottomHeight, 200.0f, minPanelH, rightWidth);
 
             // 将 Splitter 拖动的结果写回成员变量，否则下一帧会被还原
             m_BottomPanelHeight = bottomHeight;
@@ -1619,6 +1622,12 @@ void BlueprintEditor::OnFrame(float deltaTime)
             // 用本帧实际窗口宽度修正居中位置（AlwaysAutoResize 场景下确保居中）
             float actualW = ImGui::GetWindowSize().x;
             float correctedX = centerX - actualW * 0.5f;
+            // 限制不超出画布左右边界（防止 DPI 缩放下工具条被裁剪）
+            float margin = 4.0f;
+            if (correctedX < editorMin.x + margin)
+                correctedX = editorMin.x + margin;
+            if (correctedX + actualW > editorMax.x - margin)
+                correctedX = editorMax.x - margin - actualW;
             ImGui::SetWindowPos(ImVec2(correctedX, editorMin.y + 6.0f));
         }
         ImGui::End();
@@ -1635,7 +1644,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
     if (ActiveDoc() && editorMax.x > editorMin.x)
     {
         auto* dl = ImGui::GetWindowDrawList();
-        float barH = 22.0f;
+        // DPI 自适应高度：根据字体行高动态计算，避免高 DPI 下文字被截断
+        float barH = ImGui::GetTextLineHeight() + 8.0f;
         ImVec2 barMin(editorMin.x, editorMax.y - barH);
         ImVec2 barMax(editorMax.x, editorMax.y);
 
