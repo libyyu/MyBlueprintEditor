@@ -344,6 +344,24 @@ void BlueprintEditor::DrawProjectPanel()
                               IM_COL32(255, 255, 255, 8));
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
                 *pOpen = !*pOpen;
+            // 右键打开 Section 菜单
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+            {
+                std::string secCtxId = std::string("##secCtx_") + openStateKey;
+                ImGui::OpenPopup(secCtxId.c_str());
+            }
+        }
+        {
+            std::string secCtxId = std::string("##secCtx_") + openStateKey;
+            if (ImGui::BeginPopup(secCtxId.c_str()))
+            {
+                const char* newLabel = (bpClass == RTBlueprintClass::FunctionLibrary)
+                    ? ICON_FA_CUBE " New Library"
+                    : ICON_FA_FILE " New Blueprint";
+                if (ImGui::MenuItem(newLabel))
+                    NewFile(bpClass);
+                ImGui::EndPopup();
+            }
         }
 
         // 推进光标
