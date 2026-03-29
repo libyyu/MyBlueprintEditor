@@ -58,7 +58,8 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
 
     reg("Branch", "Branch", "Flow",
         { MakeFlowPin(""), MakePin("Condition", PinDataType::Boolean) },
-        { MakeFlowPin("True"), MakeFlowPin("False") });
+        { MakeFlowPin("True"), MakeFlowPin("False") },
+        "8B3DB8");
     {
         auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("Branch"));
         if (d) d->customProperties["icon"] = u8"\uf126";
@@ -89,7 +90,8 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
         { MakeFlowPin(""), MakePin("First Index", PinDataType::Integer),
           MakePin("Last Index", PinDataType::Integer) },
         { MakeFlowPin("Loop Body"), MakePin("Index", PinDataType::Integer),
-          MakeFlowPin("Completed") });
+          MakeFlowPin("Completed") },
+        "2A7FAA");
     {
         auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("ForLoop"));
         if (d) d->customProperties["icon"] = u8"\uf01e";
@@ -97,7 +99,8 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
 
     reg("WhileLoop", "While Loop", "Flow",
         { MakeFlowPin(""), MakePin("Condition", PinDataType::Boolean) },
-        { MakeFlowPin("Loop Body"), MakeFlowPin("Completed") });
+        { MakeFlowPin("Loop Body"), MakeFlowPin("Completed") },
+        "2A7FAA");
     {
         auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("WhileLoop"));
         if (d) d->customProperties["icon"] = u8"\uf021";
@@ -105,7 +108,8 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
 
     reg("Delay", "Delay", "Flow",
         { MakeFlowPin(""), MakePin("Duration", PinDataType::Float) },
-        { MakeFlowPin("Exec"), MakeFlowPin("Completed"), MakePin("TimerHandle", PinDataType::Integer) });
+        { MakeFlowPin("Exec"), MakeFlowPin("Completed"), MakePin("TimerHandle", PinDataType::Integer) },
+        "6A4AAA");
     {
         auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("Delay"));
         if (d) d->customProperties["icon"] = u8"\uf017";
@@ -113,12 +117,14 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
 
     reg("FlipFlop", "Flip Flop", "Flow",
         { MakeFlowPin("") },
-        { MakeFlowPin("A"), MakeFlowPin("B"), MakePin("Is A", PinDataType::Boolean) });
+        { MakeFlowPin("A"), MakeFlowPin("B"), MakePin("Is A", PinDataType::Boolean) },
+        "2A7FAA");
 
     reg("Gate", "Gate", "Flow",
         { MakeFlowPin("Enter"), MakeFlowPin("Open"), MakeFlowPin("Close"),
           MakeFlowPin("Toggle") },
-        { MakeFlowPin("Exit") });
+        { MakeFlowPin("Exit") },
+        "2A7FAA");
     {
         auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("Gate"));
         if (d) d->customProperties["icon"] = u8"\uf0b0";
@@ -126,7 +132,8 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
 
     reg("DoOnce", "Do Once", "Flow",
         { MakeFlowPin(""), MakeFlowPin("Reset") },
-        { MakeFlowPin("Completed") });
+        { MakeFlowPin("Completed") },
+        "2A7FAA");
     {
         auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("DoOnce"));
         if (d) d->customProperties["icon"] = u8"\uf0b0";
@@ -176,7 +183,8 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
         { MakeFlowPin(""), MakePin("First Index", PinDataType::Integer),
           MakePin("Last Index", PinDataType::Integer), MakeFlowPin("Break") },
         { MakeFlowPin("Loop Body"), MakePin("Index", PinDataType::Integer),
-          MakeFlowPin("Completed") });
+          MakeFlowPin("Completed") },
+        "2A7FAA");
     {
         auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("ForLoopWithBreak"));
         if (d) d->customProperties["icon"] = u8"\uf01e";
@@ -185,7 +193,8 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
     // Switch on Bool — 根据 Bool 值二选一
     reg("SwitchOnBool", "Switch on Bool", "Flow",
         { MakeFlowPin(""), MakePin("Condition", PinDataType::Boolean) },
-        { MakeFlowPin("True"), MakeFlowPin("False") });
+        { MakeFlowPin("True"), MakeFlowPin("False") },
+        "8B3DB8");
 
     // Switch on String — 字符串多分支
     reg("SwitchOnString", "Switch on String", "Flow",
@@ -628,7 +637,8 @@ static void RegisterNodeDefs_Debug(INodeRegistry& registry)
 
     reg("PrintString", "Print String", "Debug",
         { MakeFlowPin(""), MakePin("In String", PinDataType::String) },
-        { MakeFlowPin("") });
+        { MakeFlowPin("") },
+        "3D8B45");
     {
         auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("PrintString"));
         if (d) d->customProperties["icon"] = u8"\uf188";
@@ -636,7 +646,8 @@ static void RegisterNodeDefs_Debug(INodeRegistry& registry)
 
     reg("Log", "Log", "Debug",
         { MakeFlowPin(""), MakePin("Message", PinDataType::String) },
-        { MakeFlowPin("") });
+        { MakeFlowPin("") },
+        "3D8B45");
     {
         auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("Log"));
         if (d) d->customProperties["icon"] = u8"\uf188";
