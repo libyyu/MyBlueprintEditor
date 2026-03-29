@@ -230,8 +230,7 @@ void BlueprintEditor::DrawProjectPanel()
         // 左侧项目名（垂直居中）
         ImVec2 textPos(hdrMin.x + 8.0f, hdrMin.y + (hdrH - lineH) * 0.5f);
         dl->AddText(textPos, IM_COL32(200, 210, 220, 255),
-                    (std::string(ICON_FA_DIAGRAM_PROJECT "  ") +
-                     (m_Project.name.empty() ? "(untitled)" : m_Project.name)).c_str());
+                    (m_Project.name.empty() ? "(untitled)" : m_Project.name).c_str());
 
         // 右侧 4 个按钮（New BP, New Lib, Refresh, Add Current）
         const float btnSz  = hdrH - 6.0f;

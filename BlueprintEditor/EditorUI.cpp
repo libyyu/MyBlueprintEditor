@@ -2009,31 +2009,6 @@ void BlueprintEditor::DrawNodeListPanel()
     auto& io = ImGui::GetIO();
     float paneWidth = ImGui::GetContentRegionAvail().x;
 
-    // 面板标题（VS 2022 风格：扁平低调）
-    {
-        auto* drawList = ImGui::GetWindowDrawList();
-        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-        float headerH = ImGui::GetTextLineHeight() + 6.0f;
-
-        // VS 风格：扁平色带，与背景微差
-        drawList->AddRectFilled(
-            cursorPos,
-            ImVec2(cursorPos.x + paneWidth, cursorPos.y + headerH),
-            IM_COL32(30, 30, 38, 230), 0.0f);
-        // 底部 1px 分隔线
-        drawList->AddLine(
-            ImVec2(cursorPos.x, cursorPos.y + headerH - 1.0f),
-            ImVec2(cursorPos.x + paneWidth, cursorPos.y + headerH - 1.0f),
-            IM_COL32(0, 122, 204, 100));
-        drawList->AddText(
-            ImVec2(cursorPos.x + 8.0f, cursorPos.y + 3.0f),
-            IM_COL32(140, 170, 210, 240), ICON_FA_SITEMAP);
-        drawList->AddText(
-            ImVec2(cursorPos.x + 26.0f, cursorPos.y + 3.0f),
-            IM_COL32(200, 210, 225, 240), "Inspector");
-        ImGui::Dummy(ImVec2(paneWidth, headerH));
-    }
-
     ImGui::Spacing();
 
     // 工具栏按钮（紧凑行）
