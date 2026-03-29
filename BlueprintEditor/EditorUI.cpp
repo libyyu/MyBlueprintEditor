@@ -1849,7 +1849,11 @@ void BlueprintEditor::DrawSaveNameDialog()
         ? (ICON_FA_FILE " New Blueprint###SaveNameDlg")
         : (ICON_FA_FLOPPY_DISK " Save Blueprint As###SaveNameDlg");
 
-    ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Always);
+    // 宽度基于字体动态计算，确保长路径文本和按钮都能完整显示
+    float dlgW = ImGui::CalcTextSize("File path (relative to assets/, subdirs OK, no extension):").x
+                 + ImGui::GetStyle().WindowPadding.x * 2.0f + 16.0f;
+    if (dlgW < 420.0f) dlgW = 420.0f;
+    ImGui::SetNextWindowSize(ImVec2(dlgW, 0), ImGuiCond_Always);
     if (!ImGui::BeginPopupModal(title, nullptr,
         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
         return;
@@ -1904,7 +1908,10 @@ void BlueprintEditor::DrawSaveNameDialog()
     ImGui::Spacing();
 
     // ── 按钮行 ───────────────────────────────────────────────────────────────
-    float btnW      = 110.0f;
+    float btnW = std::max(
+        ImGui::CalcTextSize(ICON_FA_CHECK " Confirm").x,
+        ImGui::CalcTextSize(ICON_FA_XMARK  " Cancel").x)
+        + ImGui::GetStyle().FramePadding.x * 2.0f + 16.0f;
     float totalBtnW = btnW * 2 + ImGui::GetStyle().ItemSpacing.x;
     float indentX   = (ImGui::GetContentRegionAvail().x - totalBtnW) * 0.5f;
     if (indentX > 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indentX);
