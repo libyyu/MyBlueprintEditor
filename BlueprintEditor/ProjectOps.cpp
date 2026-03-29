@@ -297,7 +297,7 @@ void BlueprintEditor::DrawProjectPanel()
         ImGui::PushID(openStateKey);
         // 用 ImGui Storage 维护折叠状态（比 static 更安全，跨帧稳定）
         ImGuiID stateId = ImGui::GetID(openStateKey);
-        bool* pOpen = ImGui::GetStateStorage()->GetBoolRef(stateId, true);
+        bool* pOpen = ImGui::GetStateStorage()->GetBoolRef(stateId, false);
 
         float secH   = lineH + 6.0f;
         ImVec2 secMin = ImGui::GetCursorScreenPos();
@@ -550,7 +550,7 @@ void BlueprintEditor::DrawProjectPanel()
                     std::string fullDirPath = dirPath.empty() ? name : (dirPath + "/" + name);
                     std::string dirStateKey = openStateKey + std::string("/") + fullDirPath;
                     ImGuiID dirStateId = ImGui::GetID(dirStateKey.c_str());
-                    bool* pDirOpen = ImGui::GetStateStorage()->GetBoolRef(dirStateId, true);
+                    bool* pDirOpen = ImGui::GetStateStorage()->GetBoolRef(dirStateId, false);
 
                     float rowH = lineH + 4.0f;
                     ImVec2 rowMin = ImGui::GetCursorScreenPos();
