@@ -293,6 +293,8 @@ void BlueprintEditor::DrawProjectPanel()
                            const char* entryIcon,
                            RTBlueprintClass bpClass)
     {
+        // 用 openStateKey 作为本 section 的 ID 隔离作用域，避免两个 section 里相同 i 产生相同 PushID 散列
+        ImGui::PushID(openStateKey);
         // 用 ImGui Storage 维护折叠状态（比 static 更安全，跨帧稳定）
         ImGuiID stateId = ImGui::GetID(openStateKey);
         bool* pOpen = ImGui::GetStateStorage()->GetBoolRef(stateId, true);
@@ -429,6 +431,7 @@ void BlueprintEditor::DrawProjectPanel()
         }
 
         ImGui::Spacing();
+        ImGui::PopID(); // 对应 drawSection 开头的 PushID(openStateKey)
     };
 
     drawSection(m_Project.blueprints, "##sec_bp",  "BLUEPRINTS", ICON_FA_FILE, RTBlueprintClass::Actor);

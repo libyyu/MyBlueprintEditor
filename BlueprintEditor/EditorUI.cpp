@@ -1508,7 +1508,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
         float tbH   = 36.0f;
         float btnH  = tbH - 10.0f;
-        float btnW  = 54.0f;
+        // Run 按钮宽度：图标 + 空格 + "Run" 文字 + 两侧 FramePadding，动态计算避免字体缩放时截断
+        float btnW  = ImGui::CalcTextSize(ICON_FA_PLAY " Run").x + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f;
         float iconW = btnH + 2.0f;
         // 估算工具条宽度
         float totalW = btnW + 4 + iconW + 4 + iconW + 4 + iconW + 14 + iconW + 4 + iconW + 24;

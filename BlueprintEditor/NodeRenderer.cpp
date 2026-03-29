@@ -165,8 +165,10 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                     ImGui::Spring(0);
                                 }
                                 DrawPinIcon(output, IsPinLinked(output.ID), (int)(alpha * 255));
-                                // Output pin tooltip
-                                if (ImGui::IsItemHovered() && output.Type != PinType::Flow)
+                                // Output pin tooltip：必须先 PopStyleVar 再 Suspend，避免 style 栈跨 context 崩溃
+                                bool outputPinHovered = ImGui::IsItemHovered() && output.Type != PinType::Flow;
+                                ImGui::PopStyleVar();
+                                if (outputPinHovered)
                                 {
                                     ed::Suspend();
                                     if (ImGui::BeginTooltip())
@@ -190,7 +192,6 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 }
                                 ImGui::Spring(0, ImGui::GetStyle().ItemSpacing.x / 2);
                                 ImGui::EndHorizontal();
-                                ImGui::PopStyleVar();
                                 ed::EndPin();
                             }
                             ImGui::Spring(1, 0);
@@ -238,7 +239,10 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
                     DrawPinIcon(input, IsPinLinked(input.ID), (int)(alpha * 255));
                     // Input pin tooltip：悬浮在图标上时显示引脚类型 + 当前值
-                    if (ImGui::IsItemHovered() && input.Type != PinType::Flow)
+                    // 注意：必须先 PopStyleVar 再 Suspend，否则跨 context 时 style 栈不平衡导致崩溃
+                    bool inputPinHovered = ImGui::IsItemHovered() && input.Type != PinType::Flow;
+                    ImGui::PopStyleVar();
+                    if (inputPinHovered)
                     {
                         ed::Suspend();
                         if (ImGui::BeginTooltip())
@@ -456,7 +460,6 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                         }
                     }
 
-                    ImGui::PopStyleVar();
                     builder.EndInput();
                 }
 
