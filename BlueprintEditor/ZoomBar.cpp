@@ -3,7 +3,7 @@
 #include "BlueprintEditor.h"
 
 // ── 常量 ─────────────────────────────────────────────────────────────────────
-static constexpr float kZoomMin     = 0.10f;   // 最小缩放 10%
+static constexpr float kZoomMin     = 0.25f;   // 最小缩放 25%（与 kZoomMax=4.0 关于 1.0 对数对称，使 100% 在滑轨中间）
 static constexpr float kZoomMax     = 4.00f;   // 最大缩放 400%
 static constexpr float kZoomDefault = 1.00f;   // 双击复位目标
 // 注意：kBarW/kBarH/kBtnW/kPctW 现在在运行时根据字体大小动态计算
