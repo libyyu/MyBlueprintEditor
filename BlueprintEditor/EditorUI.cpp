@@ -3438,6 +3438,12 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
     ImGui::Indent(4.0f);
     bool inputsChanged = false;
     int inputDeleteIdx = -1;
+    // 动态计算 InputText 宽度：paneWidth - Indent - ComboW - TrashBtnW - spacing
+    float comboW  = 70.0f;
+    float trashW  = ImGui::CalcTextSize(ICON_FA_TRASH).x + ImGui::GetStyle().FramePadding.x * 2.0f + 2.0f;
+    float spacingX = ImGui::GetStyle().ItemSpacing.x;
+    float nameW   = paneWidth - 4.0f - comboW - trashW - spacingX * 2.0f - 4.0f;
+    if (nameW < 40.0f) nameW = 40.0f;
     for (int i = 0; i < (int)func.inputs.size(); ++i)
     {
         auto& param = func.inputs[i];
@@ -3445,7 +3451,7 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
 
         // 类型下拉
         int typeIdx = dataTypeToIndex(param.dataType);
-        ImGui::SetNextItemWidth(70.0f);
+        ImGui::SetNextItemWidth(comboW);
         if (ImGui::Combo("##type", &typeIdx, typeNames, typeCount))
         {
             PushUndoState();
@@ -3454,11 +3460,11 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
             inputsChanged = true;
         }
 
-        // 名称编辑（每个参数独立 buffer，避免 static 共享导致卡死）
+        // 名称编辑
         ImGui::SameLine();
         char nameBuf[64];
         snprintf(nameBuf, sizeof(nameBuf), "%s", param.name.c_str());
-        ImGui::SetNextItemWidth(paneWidth - 130.0f);
+        ImGui::SetNextItemWidth(nameW);
         if (ImGui::InputText("##name", nameBuf, sizeof(nameBuf), ImGuiInputTextFlags_EnterReturnsTrue))
         {
             // 检查重名：若与其他参数同名则加序号
@@ -3557,7 +3563,7 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
 
         // 类型下拉
         int typeIdx = dataTypeToIndex(param.dataType);
-        ImGui::SetNextItemWidth(70.0f);
+        ImGui::SetNextItemWidth(comboW);
         if (ImGui::Combo("##type", &typeIdx, typeNames, typeCount))
         {
             PushUndoState();
@@ -3570,7 +3576,7 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
         ImGui::SameLine();
         char nameBuf[64];
         snprintf(nameBuf, sizeof(nameBuf), "%s", param.name.c_str());
-        ImGui::SetNextItemWidth(paneWidth - 130.0f);
+        ImGui::SetNextItemWidth(nameW);
         if (ImGui::InputText("##name", nameBuf, sizeof(nameBuf), ImGuiInputTextFlags_EnterReturnsTrue))
         {
             std::string newName(nameBuf);
