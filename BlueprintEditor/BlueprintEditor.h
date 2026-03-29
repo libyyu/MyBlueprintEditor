@@ -651,6 +651,7 @@ struct BlueprintEditor : public Application
     bool                 m_ShowExecutionWindow = true;    // 底部面板可见
     bool                 m_ShowTimerWindow = false;       // 计时器监控面板可见
     bool                 m_ShowStyleEditorWindow = false; // 样式编辑器窗口可见
+    bool                 m_ShowLibraryWindow = false;     // 节点库浮动面板可见
 
     // VSCode 风格布局尺寸（可拖拽调整）
     float                m_LeftPanelWidth  = 320.0f;

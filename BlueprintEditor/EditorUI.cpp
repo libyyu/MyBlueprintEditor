@@ -489,6 +489,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 ImGui::MenuItem(ICON_FA_TERMINAL " Execution Output", nullptr, &m_ShowExecutionWindow);
                 ImGui::MenuItem(ICON_FA_STOPWATCH " Timer Monitor", nullptr, &m_ShowTimerWindow);
                 ImGui::MenuItem(ICON_FA_MAP " Minimap", nullptr, &m_ShowMinimap);
+                ImGui::MenuItem(ICON_FA_LAYER_GROUP " Node Library", nullptr, &m_ShowLibraryWindow);
                 ImGui::MenuItem(ICON_FA_TABLE_CELLS " Show Ordinals", nullptr, &m_ShowOrdinals);
                 ImGui::Separator();
                 if (ImGui::MenuItem(ICON_FA_EXPAND " Zoom to Content"))
@@ -1748,6 +1749,22 @@ void BlueprintEditor::OnFrame(float deltaTime)
     // ================================================================
     if (m_ShowStyleEditorWindow)
         ShowStyleEditor(&m_ShowStyleEditorWindow);
+
+    // ================================================================
+    // 节点库浮动面板（右侧浮动，可通过 Inspector 工具栏 Library 按钮切换）
+    // ================================================================
+    if (m_ShowLibraryWindow)
+    {
+        ImVec2 viewport = ImGui::GetMainViewport()->Size;
+        ImGui::SetNextWindowSize(ImVec2(300, viewport.y * 0.65f), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(viewport.x - 320, 80), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin(ICON_FA_LAYER_GROUP " Node Library", &m_ShowLibraryWindow,
+            ImGuiWindowFlags_NoSavedSettings))
+        {
+            DrawNodeLibraryPanel();
+        }
+        ImGui::End();
+    }
 }
 
 // ============================================================================
@@ -2025,6 +2042,19 @@ void BlueprintEditor::DrawNodeListPanel()
         for (auto& link : ActiveDoc()->links)
             ed::Flow(link.ID);
     }
+    ImGui::Spring(0.0f);
+    {
+        bool libActive = m_ShowLibraryWindow;
+        if (libActive)
+        {
+            ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(0, 122, 204, 80));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(0, 122, 204, 120));
+        }
+        if (ImGui::Button(ICON_FA_LAYER_GROUP " Library"))
+            m_ShowLibraryWindow = !m_ShowLibraryWindow;
+        if (libActive) ImGui::PopStyleColor(2);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Toggle Node Library panel");
+    }
     ImGui::Spring();
     if (ImGui::Button(ICON_FA_PALETTE " Style"))
         showStyleEditor = true;
@@ -2182,7 +2212,12 @@ void BlueprintEditor::DrawNodeListPanel()
                 else if (defId.rfind("Math", 0) == 0 ||
                          defId == "Add" || defId == "Sub" ||
                          defId == "Mul" || defId == "Div")      accentCol = IM_COL32(255, 210,  80, 220);
-                else if (defId.rfind("Function.", 0) == 0)      accentCol = IM_COL32(220,  80, 180, 220);
+                else if (defId.rfind("Function.", 0) == 0)
+                {
+                    if (defId == "Function.Entry")        accentCol = IM_COL32( 60, 200,  80, 220);
+                    else if (defId == "Function.Return")  accentCol = IM_COL32(255, 140,  40, 220);
+                    else                                  accentCol = IM_COL32(220,  80, 180, 220);
+                }
 
                 dl->AddRectFilled(
                     ImVec2(rowMin.x, rowMin.y + 2.0f),
@@ -2206,6 +2241,8 @@ void BlueprintEditor::DrawNodeListPanel()
                 else if (defId.rfind("Print", 0) == 0)     nodeIcon = ICON_FA_TERMINAL;
                 else if (defId == "Delay")                  nodeIcon = ICON_FA_CLOCK;
                 else if (defId == "ExecuteBlueprint")       nodeIcon = ICON_FA_DIAGRAM_PROJECT;
+                else if (defId == "Function.Entry")        nodeIcon = ICON_FA_ARROW_RIGHT;
+                else if (defId == "Function.Return")       nodeIcon = ICON_FA_ARROW_LEFT;
                 else if (defId.rfind("Function.", 0) == 0) nodeIcon = ICON_FA_BOLT;
 
                 // ── Selectable（透明背景，自定义绘制）────────────────────
@@ -2672,11 +2709,7 @@ void BlueprintEditor::DrawNodeListPanel()
             ImGui::EndTabItem();
         }
 
-        if (ImGui::BeginTabItem(ICON_FA_LIST " Library"))
-        {
-            DrawNodeLibraryPanel();
-            ImGui::EndTabItem();
-        }
+        // Library 已移至右侧浮动窗口，通过工具栏按钮切换显示
 
         // ── Details Tab ─────────────────────────────────────────────────────
         if (ImGui::BeginTabItem(ICON_FA_CIRCLE_INFO " Details"))
