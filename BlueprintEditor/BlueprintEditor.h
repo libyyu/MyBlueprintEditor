@@ -176,6 +176,7 @@ public:
     // 上次执行结果（用于面板展示）
     RTExecutionResult           lastExecutionResult;
     char                        execLogFilter[128] = {};  // 日志过滤输入框
+    std::string                 execLogCachedFilter;      // 上次构建 executionLogText 时的过滤条件
 
     // 持久 Runner
     RTBlueprintRunner           persistentRunner;

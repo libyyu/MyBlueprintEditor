@@ -360,23 +360,47 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
             float logH = ImGui::GetContentRegionAvail().y - 4.0f;
             if (logH < 40.0f) logH = 40.0f;
 
-            ImGui::BeginChild("##ExecLog", ImVec2(paneWidth, logH), true,
-                ImGuiWindowFlags_HorizontalScrollbar);
-
+            // 合并日志文本（应用过滤器），存入文档缓存供 InputTextMultiline 使用
             std::string filter(ActiveDoc()->execLogFilter);
-            for (const auto& line : ActiveDoc()->executionLog)
             {
-                if (!filter.empty() && line.find(filter) == std::string::npos)
-                    continue;
-                DrawColoredLogLine(line);
+                // 仅在日志内容或过滤器变化时重建（用 doc 自身字段，支持多标签页）
+                bool needRebuild = ActiveDoc()->executionLogDirty
+                                || (ActiveDoc()->execLogCachedFilter != filter);
+                if (needRebuild)
+                {
+                    ActiveDoc()->execLogCachedFilter = filter;
+                    auto& txt = ActiveDoc()->executionLogText;
+                    txt.clear();
+                    for (const auto& line : ActiveDoc()->executionLog)
+                    {
+                        if (!filter.empty() && line.find(filter) == std::string::npos)
+                            continue;
+                        txt += line;
+                        txt += '\n';
+                    }
+                }
             }
 
-            if (ActiveDoc()->executionLogDirty)
+            // 只读 InputTextMultiline：支持鼠标选取 / Ctrl+C / Ctrl+A
+            auto& logText = ActiveDoc()->executionLogText;
+            bool shouldScroll = ActiveDoc()->executionLogDirty;
+            ImGui::InputTextMultiline("##ExecLogText",
+                const_cast<char*>(logText.c_str()), logText.size() + 1,
+                ImVec2(paneWidth, logH),
+                ImGuiInputTextFlags_ReadOnly);
+
+            // 自动滚到底部：通过内部子窗口直接设置 ScrollY
+            if (shouldScroll)
             {
-                ImGui::SetScrollHereY(1.0f);
+                ImGuiID childId = ImGui::GetCurrentWindow()->GetID("##ExecLogText");
+                ImGuiWindow* childWin = ImGui::FindWindowByID(childId);
+                if (childWin)
+                {
+                    childWin->ScrollTarget.y = childWin->ScrollMax.y;
+                    childWin->ScrollTargetCenterRatio.y = 0.0f;
+                }
                 ActiveDoc()->executionLogDirty = false;
             }
-            ImGui::EndChild();
             ImGui::EndTabItem();
         }
 

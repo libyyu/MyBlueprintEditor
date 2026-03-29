@@ -69,10 +69,13 @@ void BlueprintEditor::DrawZoomBar(ImVec2 editorMin, ImVec2 editorMax)
     float kPctW  = ImGui::CalcTextSize("100%").x + padX * 2.0f + 6.0f;  // 百分比区宽
     float kBarW  = kPctW + 4 + kBtnW + 4 + kTrackW + 4 + kBtnW + 8;    // 总宽
 
-    // ── 位置：右下角，状态栏上方 ─────────────────────────────────────────
-    // kMarginB 需要考虑状态栏高度（也是动态的）
+    // ── 位置：右下角，状态栏上方，且不与 Minimap 重叠 ─────────────────────
     float statusBarH = lineH + 8.0f;
-    ImVec2 wPos = ImVec2(editorMax.x - kBarW - kMarginR,
+    // 若 Minimap 可见，缩放条靠左放置（Minimap 占据右下角）
+    float minimapReserve = 0.0f;
+    if (m_ShowMinimap && ActiveDoc() && !ActiveDoc()->nodes.empty())
+        minimapReserve = m_MinimapSize + 10.0f + kMarginR;  // mapSize + padding + margin
+    ImVec2 wPos = ImVec2(editorMax.x - kBarW - kMarginR - minimapReserve,
                           editorMax.y - kBarH - statusBarH - 4.0f);
 
     // 使用独立浮动窗口，确保 InvisibleButton 的鼠标事件不被 editor 子窗口拦截
