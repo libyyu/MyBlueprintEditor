@@ -392,7 +392,9 @@ void BlueprintEditor::DrawProjectPanel()
                     if (!found && fs::exists(absPath))
                         DoOpenFile(absPath);
                 }
-                if (rowHov && ImGui::BeginTooltip())
+                // Tooltip 显示相对路径（右键菜单打开时不显示，避免重叠）
+                bool ctxOpen = ImGui::IsPopupOpen("##projEntryCtx");
+                if (rowHov && !ctxOpen && ImGui::BeginTooltip())
                 {
                     ImGui::TextUnformatted(e.relativePath.c_str());
                     ImGui::EndTooltip();
