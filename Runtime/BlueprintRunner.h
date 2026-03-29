@@ -706,6 +706,8 @@ private:
 
     // 断点单步调试：记录当前已执行到拓扑序的第几个节点（Paused 时有效）
     size_t                                              m_stepTopoIndex = 0;
+    // 断点命中时暂存的节点 id（由 executeDownstreamFromPin 设置，Execute 用于定位 stepTopoIndex）
+    NodeId                                              m_pausedAtNodeId = 0;
 
     // 缓存：拓扑排序结果
     mutable std::vector<NodeId>                         m_topoCache;

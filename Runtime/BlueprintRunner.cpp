@@ -675,6 +675,13 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
         // 执行成功，传播输出值到下游
         propagatePinValues(node);
     }
+    else if (m_runState.load() == RunState::Paused)
+    {
+        // handler 内部因断点暂停而返回 false（ActivateOutputFlow 返回 false）
+        // 这不是真正的执行错误，让调用层通过 RunState::Paused 检测来停止
+        propagatePinValues(node);
+        return true;
+    }
 
     return ok;
 }
@@ -771,12 +778,28 @@ ExecutionResult BlueprintRunner::Execute()
         result.nodesExecuted++;
         result.executedNodeIds.push_back(node->id);
 
-        // 断点命中后 Pause：记录当前 topo 进度
-        // executeNodeInternal 里命中断点会 return true（跳过该节点执行）
-        // m_stepTopoIndex 指向该节点本身（i），StepNextNode 下次从它开始执行
+        // 断点命中后 Pause：检查是否暂停（可能来自直接命中或内部 executeDownstreamFromPin）
         if (m_runState.load() == RunState::Paused)
         {
-            m_stepTopoIndex = i;  // 指向断点节点，StepNextNode 将执行它
+            // 如果断点是在 executeDownstreamFromPin 内部的子流命中的（m_pausedAtNodeId != 0），
+            // 需要在 topo 序中定位该节点的 index；否则直接用当前 i（主循环直接命中）
+            if (m_pausedAtNodeId != 0)
+            {
+                // 在 topo 序中找到断点节点的位置
+                for (size_t j = 0; j < order.size(); ++j)
+                {
+                    if (order[j] == m_pausedAtNodeId)
+                    {
+                        m_stepTopoIndex = j;
+                        break;
+                    }
+                }
+                m_pausedAtNodeId = 0;
+            }
+            else
+            {
+                m_stepTopoIndex = i;  // 主循环直接命中，指向当前断点节点
+            }
             auto endTime = std::chrono::high_resolution_clock::now();
             result.elapsedMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
             result.success = false;
@@ -1663,6 +1686,14 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
             break;
         }
 
+        // 断点命中：executeNodeInternal 已调用 Pause()，立即停止当前流执行
+        if (m_runState.load() == RunState::Paused)
+        {
+            // 记录断点所在的节点 id，供主循环 Execute() 设置 m_stepTopoIndex
+            m_pausedAtNodeId = node->id;
+            ok = false;
+            break;
+        }
         // 清除已用完的激活引脚信息
         m_state.activatedInputPinId = InvalidPinId;
 
