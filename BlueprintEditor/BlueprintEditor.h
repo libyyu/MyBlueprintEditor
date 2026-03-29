@@ -653,7 +653,7 @@ struct BlueprintEditor : public Application
     bool                 m_ShowStyleEditorWindow = false; // 样式编辑器窗口可见
 
     // VSCode 风格布局尺寸（可拖拽调整）
-    float                m_LeftPanelWidth  = 250.0f;
+    float                m_LeftPanelWidth  = 320.0f;
     float                m_BottomPanelHeight = 200.0f;
 
     // 节点定义注册表 & 处理器注册表（全局共享）
