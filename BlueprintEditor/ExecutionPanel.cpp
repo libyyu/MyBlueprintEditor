@@ -382,11 +382,9 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
                 }
             }
 
-            // ── 彩色日志显示 + 可选取文字（双层叠加）────────────────────────
-            // 底层：BeginChild 内用 DrawColoredLogLine 渲染彩色文字
-            ImVec2 logAreaPos = ImGui::GetCursorScreenPos();
+            // ── 彩色日志显示（BeginChild + DrawColoredLogLine）────────────────
             ImGui::BeginChild("##ExecLog", ImVec2(paneWidth, logH), true,
-                ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+                ImGuiWindowFlags_HorizontalScrollbar);
 
             for (const auto& line : ActiveDoc()->executionLog)
             {
@@ -402,20 +400,6 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
                 ActiveDoc()->executionLogDirty = false;
             }
             ImGui::EndChild();
-
-            // 上层：透明只读 InputTextMultiline 叠在同一区域，用于文字选取
-            // SetCursorScreenPos 回到 BeginChild 起始位置
-            ImGui::SetCursorScreenPos(logAreaPos);
-            ImGui::PushStyleColor(ImGuiCol_FrameBg,         ImVec4(0,0,0,0));
-            ImGui::PushStyleColor(ImGuiCol_ScrollbarBg,     ImVec4(0,0,0,0));
-            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab,   ImVec4(0,0,0,0));
-            ImGui::PushStyleColor(ImGuiCol_Text,            ImVec4(0,0,0,0));
-            auto& logText = ActiveDoc()->executionLogText;
-            ImGui::InputTextMultiline("##ExecLogSel",
-                const_cast<char*>(logText.c_str()), logText.size() + 1,
-                ImVec2(paneWidth, logH),
-                ImGuiInputTextFlags_ReadOnly | ImGuiInputTextFlags_NoHorizontalScroll);
-            ImGui::PopStyleColor(4);
             ImGui::EndTabItem();
         }
 
