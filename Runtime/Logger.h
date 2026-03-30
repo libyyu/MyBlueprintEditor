@@ -3,6 +3,7 @@
 // 使用方：设置 callback 后即可接收所有日志，不设则静默（不依赖 ImGui）
 #pragma once
 #include "BlueprintExport.h"
+#include "Types.h"   // LogLevel 定义在此，避免重复定义
 #include <string>
 #include <functional>
 
@@ -15,7 +16,7 @@
 namespace NodeEditor {
 namespace Runtime {
 
-enum class LogLevel { Verbose = 0, Info = 1, Warning = 2, Error = 3 };
+// LogLevel 已定义在 Types.h，此处不再重复声明
 
 class BLUEPRINT_API Logger
 {
