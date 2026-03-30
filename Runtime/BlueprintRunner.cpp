@@ -800,9 +800,12 @@ ExecutionResult BlueprintRunner::Execute()
             {
                 m_stepTopoIndex = i;  // 主循环直接命中，指向当前断点节点
             }
+            // 统计总执行节点数（主循环顶层 + 子流执行的节点）
+            result.nodesExecuted = static_cast<int>(m_flowExecutedNodes.size()) + result.nodesExecuted;
             auto endTime = std::chrono::high_resolution_clock::now();
             result.elapsedMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
-            result.success = false;
+            // 断点暂停：success=true（不是错误），errorMessage 说明原因
+            result.success = true;
             result.errorMessage = "Paused at breakpoint";
             return result;
         }

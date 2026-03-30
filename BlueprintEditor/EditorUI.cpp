@@ -1723,6 +1723,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
             ImU32 statusCol;
             if (status.rfind("OK", 0) == 0)
                 statusCol = IM_COL32(80, 220, 100, 230);
+            else if (status.rfind("Paused", 0) == 0)
+                statusCol = IM_COL32(240, 180, 40, 230);
             else if (status.rfind("FAILED", 0) == 0 || status.rfind("Load Failed", 0) == 0)
                 statusCol = IM_COL32(230, 80, 80, 230);
             else
@@ -3848,9 +3850,12 @@ void BlueprintEditor::DrawExecutionPanel()
     // 状态信息
     if (!ActiveDoc()->lastExecutionStatus.empty())
     {
-        bool isOk = ActiveDoc()->lastExecutionStatus.find("OK") == 0;
-        ImGui::TextColored(isOk ? ImVec4(0.4f, 1.0f, 0.4f, 1.0f) : ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
-            "Status: %s", ActiveDoc()->lastExecutionStatus.c_str());
+        bool isOk     = ActiveDoc()->lastExecutionStatus.find("OK")     == 0;
+        bool isPaused = ActiveDoc()->lastExecutionStatus.find("Paused") == 0;
+        ImVec4 col = isOk     ? ImVec4(0.4f, 1.0f, 0.4f, 1.0f)
+                   : isPaused ? ImVec4(1.0f, 0.75f, 0.2f, 1.0f)
+                              : ImVec4(1.0f, 0.4f, 0.4f, 1.0f);
+        ImGui::TextColored(col, "Status: %s", ActiveDoc()->lastExecutionStatus.c_str());
     }
 
     // 彩色日志输出区域

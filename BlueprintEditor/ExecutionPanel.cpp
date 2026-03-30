@@ -251,7 +251,16 @@ void BlueprintEditor::ExecuteBlueprint()
     ActiveDoc()->executionLog.push_back("");
     ActiveDoc()->executionLog.push_back("========================================");
     std::string ts2 = NowTimestamp();
-    if (result.success)
+    bool isPausedAtBreakpoint = (result.errorMessage == "Paused at breakpoint");
+    if (isPausedAtBreakpoint)
+    {
+        ActiveDoc()->executionLog.push_back("  [" + ts2 + "] Paused at breakpoint");
+        char statusBuf[128];
+        snprintf(statusBuf, sizeof(statusBuf), "Paused (%d nodes, %.2fms)",
+                 result.nodesExecuted, elapsed);
+        ActiveDoc()->lastExecutionStatus = statusBuf;
+    }
+    else if (result.success)
     {
         ActiveDoc()->executionLog.push_back("  [" + ts2 + "] Completed Successfully!");
         char statusBuf[128];
@@ -295,8 +304,9 @@ void BlueprintEditor::ExecuteBlueprint()
         }
     }
 
-    // isExecuting 仅在 runner 确实不再运行时才关闭（异步 Delay/Timer 可能仍在进行）
-    ActiveDoc()->isExecuting = ActiveDoc()->persistentRunner.IsRunning();
+    // isExecuting 在 runner 运行或暂停（断点）时保持 true
+    ActiveDoc()->isExecuting = ActiveDoc()->persistentRunner.IsRunning()
+                             || ActiveDoc()->persistentRunner.IsPaused();
     ActiveDoc()->executionLogDirty = true;
 }
 
