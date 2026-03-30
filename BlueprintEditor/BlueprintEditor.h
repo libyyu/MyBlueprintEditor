@@ -90,6 +90,9 @@ bool Splitter(const char* str_id, bool split_vertically, float thickness, float*
 // 彩色日志行渲染辅助（实现在 EditorUtils.cpp）
 void DrawColoredLogLine(const std::string& line);
 
+// 节点颜色映射（统一入口，实现在 EditorUtils.cpp）
+ImColor GetNodeColor(const RTNodeDef* def);
+
 // ============================================================================
 // 变量拖拽 Payload（变量面板 → 画布）
 // ============================================================================

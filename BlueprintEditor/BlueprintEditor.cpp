@@ -424,6 +424,32 @@ static NodeType ParseNodeType(const std::string& s)
     return NodeType::Blueprint;
 }
 
+// 节点颜色映射（统一入口，供 SpawnNodeByDef / LoadEditorData / InspectorPanel 共用）
+ImColor GetNodeColor(const RTNodeDef* def)
+{
+    if (!def) return ImColor(100, 100, 120);
+    if (!def->color.empty())
+        return ParseHexColor(def->color);
+
+    const std::string& cat = def->category;
+    auto startsWith = [&cat](const char* prefix) {
+        return cat.find(prefix) == 0;
+    };
+    if      (startsWith("Flow"))             return ImColor(50,  100, 220);
+    else if (startsWith("Math"))             return ImColor(60,  180, 80);
+    else if (startsWith("String"))           return ImColor(180, 80,  200);
+    else if (startsWith("Debug"))            return ImColor(200, 60,  60);
+    else if (startsWith("Action") ||
+             startsWith("Event"))            return ImColor(220, 100, 40);
+    else if (startsWith("Conversion"))       return ImColor(80,  160, 220);
+    else if (startsWith("Array"))            return ImColor(200, 150, 30);
+    else if (startsWith("Misc/Map") ||
+             startsWith("Map"))              return ImColor(40,  180, 200);
+    else if (startsWith("FunctionLibrary"))  return ImColor(140, 60,  200);
+    else if (startsWith("Custom"))           return ImColor(60,  180, 130);
+    else                                     return ImColor(100, 100, 120);
+}
+
 // ============================================================================
 // 节点创建
 // ============================================================================
@@ -434,31 +460,8 @@ Node* BlueprintEditor::SpawnNodeByDef(const std::string& defId)
     if (!def) return nullptr;
 
     // Determine color & node type from definition
-    ImColor color = ImColor(255, 255, 255);
+    ImColor color = GetNodeColor(def);
     NodeType ntype = NodeType::Blueprint;
-    if (!def->color.empty())
-        color = ParseHexColor(def->color);
-    else
-    {
-        // 按分类映射默认颜色（category 前缀匹配）
-        const std::string& cat = def->category;
-        auto startsWith = [&cat](const char* prefix) {
-            return cat.find(prefix) == 0;
-        };
-        if      (startsWith("Flow"))             color = ImColor(50,  100, 220);
-        else if (startsWith("Math"))             color = ImColor(60,  180, 80);
-        else if (startsWith("String"))           color = ImColor(180, 80,  200);
-        else if (startsWith("Debug"))            color = ImColor(200, 60,  60);
-        else if (startsWith("Action") ||
-                 startsWith("Event"))            color = ImColor(220, 100, 40);
-        else if (startsWith("Conversion"))       color = ImColor(80,  160, 220);
-        else if (startsWith("Array"))            color = ImColor(200, 150, 30);
-        else if (startsWith("Misc/Map") ||
-                 startsWith("Map"))              color = ImColor(40,  180, 200);
-        else if (startsWith("FunctionLibrary"))  color = ImColor(140, 60,  200);
-        else if (startsWith("Custom"))           color = ImColor(60,  180, 130);
-        else                                     color = ImColor(100, 100, 120);
-    }
 
     auto it = def->customProperties.find("editorType");
     if (it != def->customProperties.end())

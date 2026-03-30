@@ -457,55 +457,9 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
         if (def)
         {
             // 使用定义创建节点
-            ImColor color(255, 255, 255);
+            ImColor color = GetNodeColor(def);
             NodeType ntype = NodeType::Blueprint;
 
-            // 颜色解析辅助 lambda（与 SpawnNodeByDef 的 ParseHexColor 等价）
-            auto parseHex = [](const std::string& hex) -> ImColor {
-                std::string s = hex;
-                if (!s.empty() && s[0] == '#') s = s.substr(1);
-                if (s.size() == 6) {
-                    unsigned int r = 0, g = 0, b = 0;
-                    for (int i = 0; i < 6; ++i) {
-                        char c = s[i];
-                        unsigned int v = (c >= '0' && c <= '9') ? (c - '0') :
-                                         (c >= 'a' && c <= 'f') ? (10 + c - 'a') :
-                                         (c >= 'A' && c <= 'F') ? (10 + c - 'A') : 0;
-                        if (i < 2) r = r * 16 + v;
-                        else if (i < 4) g = g * 16 + v;
-                        else b = b * 16 + v;
-                    }
-                    return ImColor((int)r, (int)g, (int)b);
-                }
-                return ImColor(255, 255, 255);
-            };
-
-            if (!def->color.empty())
-            {
-                color = parseHex(def->color);
-            }
-            else
-            {
-                // 与 SpawnNodeByDef 保持一致：按分类映射默认颜色
-                const std::string& cat = def->category;
-                auto startsWith = [&cat](const char* prefix) {
-                    return cat.find(prefix) == 0;
-                };
-                if      (startsWith("Flow"))             color = ImColor(50,  100, 220);
-                else if (startsWith("Math"))             color = ImColor(60,  180, 80);
-                else if (startsWith("String"))           color = ImColor(180, 80,  200);
-                else if (startsWith("Debug"))            color = ImColor(200, 60,  60);
-                else if (startsWith("Action") ||
-                         startsWith("Event"))            color = ImColor(220, 100, 40);
-                else if (startsWith("Conversion"))       color = ImColor(80,  160, 220);
-                else if (startsWith("Array"))            color = ImColor(200, 150, 30);
-                else if (startsWith("Misc/Map") ||
-                         startsWith("Map"))              color = ImColor(40,  180, 200);
-                else if (startsWith("FunctionLibrary"))  color = ImColor(140, 60,  200);
-                else if (startsWith("Custom"))           color = ImColor(60,  180, 130);
-                else                                     color = ImColor(100, 100, 120);
-            }
-            
             auto it = def->customProperties.find("editorType");
             if (it != def->customProperties.end())
             {
