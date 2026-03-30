@@ -708,6 +708,8 @@ private:
     size_t                                              m_stepTopoIndex = 0;
     // 断点命中时暂存的节点 id（由 executeDownstreamFromPin 设置，Execute 用于定位 stepTopoIndex）
     NodeId                                              m_pausedAtNodeId = 0;
+    // Step 模式标志：为 true 时 executeNodeInternal 跳过断点检测，让节点实际执行
+    bool                                                m_bypassBreakpoint = false;
 
     // 缓存：拓扑排序结果
     mutable std::vector<NodeId>                         m_topoCache;

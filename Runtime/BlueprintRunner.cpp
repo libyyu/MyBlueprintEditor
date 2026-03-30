@@ -338,7 +338,8 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
     if (!node.isEnabled) return true; // 跳过禁用的节点
 
     // ── 断点检测 ────────────────────────────────────────────────────────────
-    if (m_nodePreExecuteCb && m_nodePreExecuteCb(node.id))
+    // m_bypassBreakpoint 为 true 时（Step 模式）跳过断点，让节点实际执行
+    if (!m_bypassBreakpoint && m_nodePreExecuteCb && m_nodePreExecuteCb(node.id))
     {
         // 命中断点：先暂停 runner，然后跳过本节点执行（下一次 StepNextNode 才执行）
         // 注意：m_stepTopoIndex 已在 Execute() 主循环设置为 i，不需要重复调整
@@ -1259,9 +1260,12 @@ bool BlueprintRunner::StepNextNode()
             m_logCallback(LogLevel::Verbose, "[Step] Node '" + node->name +
                 "' (id=" + std::to_string(node->id) + ", def=" + node->definitionId + ")");
 
+        // 临时绕过断点检测：Step 模式下节点需要实际执行，而不是再次触发断点
+        m_bypassBreakpoint = true;
         executeNodeInternal(*node);
+        m_bypassBreakpoint = false;
 
-        // 执行完一个节点后保持 Paused
+        // 执行完一个节点后保持 Paused（除非节点内部触发了新的断点/暂停）
         if (m_runState.load() != RunState::Paused)
             m_runState.store(RunState::Paused);
 
