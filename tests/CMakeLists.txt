@@ -10,18 +10,25 @@
 cmake_minimum_required(VERSION 3.14)
 
 # ---------------------------------------------------------------------------
-# Google Test（FetchContent 自动下载，仅在测试目标被构建时触发）
+# Google Test：优先使用系统安装版，fallback 到 FetchContent
 # ---------------------------------------------------------------------------
-include(FetchContent)
-FetchContent_Declare(
-    googletest
-    URL      https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
-    DOWNLOAD_EXTRACT_TIMESTAMP ON
-)
-# 禁止 gtest 安装到系统目录
-set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+find_package(GTest QUIET)
+
+if(NOT GTest_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        URL      https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+        DOWNLOAD_EXTRACT_TIMESTAMP ON
+    )
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+    # FetchContent 版本的 target 名与 find_package 一致
+    if(NOT TARGET GTest::gtest_main)
+        add_library(GTest::gtest_main ALIAS gtest_main)
+    endif()
+endif()
 
 # ---------------------------------------------------------------------------
 # 测试可执行文件
