@@ -229,9 +229,9 @@ if %ERRORLEVEL% neq 0 (
 echo.
 echo ============================================
 echo  Build succeeded! (%PLATFORM% / %BUILD_TYPE%)
-echo  Output: %BUILD_DIR%\bin
+echo  Output: %BUILD_DIR%\bin\%BUILD_TYPE%
 if /i "%BUILD_SHARED%"=="ON" (
-    echo  DLL:     %BUILD_DIR%\bin\BlueprintRuntime.dll
+    echo  DLL:     %BUILD_DIR%\bin\%BUILD_TYPE%\BlueprintRuntime.dll
     echo  Import:  %BUILD_DIR%\Runtime\%BUILD_TYPE%\BlueprintRuntime.lib
 )
 if /i "%PLATFORM%"=="dll" (
