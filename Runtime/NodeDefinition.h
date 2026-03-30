@@ -119,7 +119,7 @@ public:
 // 默认节点注册表实现（方法实现在 NodeDefinition.cpp）
 // ============================================================================
 
-class DefaultNodeRegistry : public INodeRegistry
+class BLUEPRINT_API DefaultNodeRegistry : public INodeRegistry
 {
 public:
     bool registerNode(const NodeDefinition& definition) override;
