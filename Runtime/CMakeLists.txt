@@ -340,13 +340,12 @@ elseif(MSVC)
 
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
     target_compile_options(BlueprintRuntime PRIVATE
-        -Wall -Wextra -Wpedantic
+        -Wall -Wextra
     )
     if(_RUNTIME_LIB_TYPE STREQUAL "SHARED")
         # Hide symbols by default; only BLUEPRINT_API ones are exported
         target_compile_options(BlueprintRuntime PRIVATE
             -fvisibility=hidden
-            -fvisibility-inlines-hidden
         )
     endif()
 endif()
