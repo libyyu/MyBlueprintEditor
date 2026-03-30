@@ -13,7 +13,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED YES)
 # 包含目录已通过 target_link_libraries → Application → ImGuiNodeEditor 传播，
 # 无需额外 include_directories()。
 
-# 输出目录（与 BlueprintEditor 共用）
+# 输出目录（与 BlueprintEditor 共用，按配置分目录）
 set(EXAMPLE_OUTPUT_DIR ${CMAKE_BINARY_DIR}/bin)
 
 # ============================================================================
@@ -50,9 +50,9 @@ macro(add_simple_example NAME)
 
     set_target_properties(${NAME} PROPERTIES
         FOLDER "Examples"
-        RUNTIME_OUTPUT_DIRECTORY "${EXAMPLE_OUTPUT_DIR}"
-        RUNTIME_OUTPUT_DIRECTORY_DEBUG "${EXAMPLE_OUTPUT_DIR}"
-        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${EXAMPLE_OUTPUT_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY           "${EXAMPLE_OUTPUT_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG     "${EXAMPLE_OUTPUT_DIR}/Debug"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE   "${EXAMPLE_OUTPUT_DIR}/Release"
     )
 
     add_dependencies(${NAME} copy_resources)
@@ -87,9 +87,9 @@ if(NOT TARGET runtime-example)
         FOLDER "Examples"
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
-        RUNTIME_OUTPUT_DIRECTORY "${EXAMPLE_OUTPUT_DIR}"
-        RUNTIME_OUTPUT_DIRECTORY_DEBUG "${EXAMPLE_OUTPUT_DIR}"
-        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${EXAMPLE_OUTPUT_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY           "${EXAMPLE_OUTPUT_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG     "${EXAMPLE_OUTPUT_DIR}/Debug"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE   "${EXAMPLE_OUTPUT_DIR}/Release"
     )
 endif()
 
