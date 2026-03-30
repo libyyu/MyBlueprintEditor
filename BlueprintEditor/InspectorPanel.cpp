@@ -7,7 +7,7 @@
 // DrawNodeListPanel — 右侧面板主入口（Tab Bar：Nodes / Variables / Functions / Events / Details）
 // ============================================================================
 
-void BlueprintEditor::DrawNodeListPanel()
+void BlueprintEditor::DrawNodeListPanel(int panelIdx)
 {
     // 无文档时不渲染（避免 ActiveDoc() 为 nullptr 崩溃）
     if (!ActiveDoc())
@@ -21,47 +21,52 @@ void BlueprintEditor::DrawNodeListPanel()
 
     ImGui::Spacing();
 
-    // 工具栏按钮（紧凑行）
+    // 工具栏按钮（仅 Nodes 面板显示）
     static bool showStyleEditor = false;
-    ImGui::BeginHorizontal("Style Editor", ImVec2(paneWidth, 0));
-    ImGui::Spring(0.0f, 0.0f);
-    if (ImGui::Button(ICON_FA_EXPAND " Zoom"))
-        ed::NavigateToContent();
-    ImGui::Spring(0.0f);
-    if (ImGui::Button(ICON_FA_BOLT " Flow"))
+    if (panelIdx == 0)
     {
-        for (auto& link : ActiveDoc()->links)
-            ed::Flow(link.ID);
-    }
-    ImGui::Spring(0.0f);
-    {
-        bool libActive = m_ShowLibraryWindow;
-        if (libActive)
+        ImGui::BeginHorizontal("Style Editor", ImVec2(paneWidth, 0));
+        ImGui::Spring(0.0f, 0.0f);
+        if (ImGui::Button(ICON_FA_EXPAND " Zoom"))
+            ed::NavigateToContent();
+        ImGui::Spring(0.0f);
+        if (ImGui::Button(ICON_FA_BOLT " Flow"))
         {
-            ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(0, 122, 204, 80));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(0, 122, 204, 120));
+            for (auto& link : ActiveDoc()->links)
+                ed::Flow(link.ID);
         }
-        if (ImGui::Button(ICON_FA_LAYER_GROUP " Library"))
-            m_ShowLibraryWindow = !m_ShowLibraryWindow;
-        if (libActive) ImGui::PopStyleColor(2);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Toggle Node Library panel");
+        ImGui::Spring(0.0f);
+        {
+            bool libActive = m_ShowLibraryWindow;
+            if (libActive)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(0, 122, 204, 80));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(0, 122, 204, 120));
+            }
+            if (ImGui::Button(ICON_FA_LAYER_GROUP " Library"))
+                m_ShowLibraryWindow = !m_ShowLibraryWindow;
+            if (libActive) ImGui::PopStyleColor(2);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Toggle Node Library panel");
+        }
+        ImGui::Spring();
+        if (ImGui::Button(ICON_FA_PALETTE " Style"))
+            showStyleEditor = true;
+        ImGui::EndHorizontal();
+        ImGui::Checkbox(ICON_FA_TABLE_CELLS " Ordinals", &m_ShowOrdinals);
     }
-    ImGui::Spring();
-    if (ImGui::Button(ICON_FA_PALETTE " Style"))
-        showStyleEditor = true;
-    ImGui::EndHorizontal();
-    ImGui::Checkbox(ICON_FA_TABLE_CELLS " Ordinals", &m_ShowOrdinals);
 
     if (showStyleEditor)
         ShowStyleEditor(&showStyleEditor);
 
-    // ── Tab Bar：Nodes / Variables ──────────────────────────────────────────
-    if (ImGui::BeginTabBar("##InspectorTabs"))
+    // ── 根据外层侧边栏传入的 panelIdx 直接渲染对应内容 ─────────────────────
+    // 0=Nodes, 1=Variables, 2=Functions, 3=Events, 4=Details
+    bool isLibrary = ActiveDoc() && ActiveDoc()->blueprintClass == RTBlueprintClass::FunctionLibrary;
+
+    switch (panelIdx)
     {
-        // ── Nodes Tab ───────────────────────────────────────────────────────
-        if (ImGui::BeginTabItem(ICON_FA_CUBES " Nodes"))
-        {
-            // 节点过滤器
+    case 0:  // ── Nodes ───────────────────────────────────────────────────────
+    {
+        // 节点过滤器
             char* nodeFilterBuf = ActiveDoc()->nodeFilterBuf;
             ImGui::SetNextItemWidth(paneWidth);
             ImGui::InputTextWithHint("##NodeFilter", ICON_FA_MAGNIFYING_GLASS " Filter nodes...", nodeFilterBuf, 128);
@@ -318,26 +323,32 @@ void BlueprintEditor::DrawNodeListPanel()
                 for (auto& link : ActiveDoc()->links)
                     ed::Flow(link.ID);
 
+
             if (ed::HasSelectionChanged())
                 ++changeCount;
 
-            ImGui::EndTabItem();
-        }
+        break;  // case 0: Nodes
+    }
 
-        // ── Variables Tab（FunctionLibrary 蓝图不显示，函数库无实例状态）──────
-        bool isLibrary = ActiveDoc() && ActiveDoc()->blueprintClass == RTBlueprintClass::FunctionLibrary;
-        if (!isLibrary && ImGui::BeginTabItem(ICON_FA_LAYER_GROUP " Variables"))
+    case 1:  // ── Variables ───────────────────────────────────────────────────
+        if (!isLibrary)
         {
             DrawVariablePanel();
-            ImGui::EndTabItem();
         }
-
-        // ── Functions Tab ───────────────────────────────────────────────────
-        if (ImGui::BeginTabItem(ICON_FA_CODE_BRANCH " Functions"))
+        else
         {
-            auto* doc = ActiveDoc();
-            if (doc)
-            {
+            ImGui::TextDisabled("Variables are not available for Function Libraries.");
+        }
+        break;
+
+
+
+
+    case 2:  // ── Functions ───────────────────────────────────────────────────
+    {
+        auto* doc = ActiveDoc();
+        if (doc)
+        {
                 // --- Add Function 按钮 ---
                 if (ImGui::Button(ICON_FA_PLUS " Add Function"))
                 {
@@ -582,11 +593,11 @@ void BlueprintEditor::DrawNodeListPanel()
                     DrawFunctionDetailsPanel(doc->functions[doc->selectedFuncIdx]);
                 }
             }
-            ImGui::EndTabItem();
-        }
+        break;  // case 2: Functions
+    }
 
-        // ── Events Tab（FunctionLibrary 蓝图不显示，函数库无事件驱动）──────────
-        if (!isLibrary && ImGui::BeginTabItem(ICON_FA_BOLT " Events"))
+    case 3:  // ── Events ──────────────────────────────────────────────────────
+        if (!isLibrary)
         {
             auto events = RTEventBus::Get().GetRegisteredEvents();
             if (events.empty())
@@ -636,21 +647,20 @@ void BlueprintEditor::DrawNodeListPanel()
                     ImGui::EndPopup();
                 }
             }
-
-            ImGui::EndTabItem();
         }
-
-        // Library 已移至右侧浮动窗口，通过工具栏按钮切换显示
-
-        // ── Details Tab ─────────────────────────────────────────────────────
-        if (ImGui::BeginTabItem(ICON_FA_CIRCLE_INFO " Details"))
+        else
         {
-            DrawDetailsPanel();
-            ImGui::EndTabItem();
+            ImGui::TextDisabled("Events are not available for Function Libraries.");
         }
+        break;  // case 3: Events
 
-        ImGui::EndTabBar();
-    }
+    case 4:  // ── Details ─────────────────────────────────────────────────────
+        DrawDetailsPanel();
+        break;
+
+    default:
+        break;
+    }  // end switch(panelIdx)
 }
 
 // ============================================================================

@@ -707,7 +707,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         Splitter("##HorizontalSplitter", true, splitterThickness, &m_LeftPanelWidth, &rightWidth, 150.0f, 200.0f, totalHeight);
 
         // 绘制左侧面板（VS-style 垂直侧边栏按钮 + 内容区域）
-        static int leftTabIndex = 0;  // 0=Project, 1=Nodes
+        static int leftTabIndex = 0;  // 0=Project, 1=Nodes, 2=Vars, 3=Funcs, 4=Events, 5=Details
         // DPI 自适应：侧边栏宽度 = 图标宽度 + padding，避免高 DPI 下图标被截断
         const float sidebarBtnW = ImGui::GetTextLineHeight() + ImGui::GetStyle().FramePadding.x * 2.0f + 8.0f;
         float contentW = m_LeftPanelWidth - sidebarBtnW - 2.0f;
@@ -748,10 +748,31 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 }
             };
 
+            // ── 组一：Project ──────────────────────────────────────────────
             drawSidebarBtn(0, ICON_FA_DIAGRAM_PROJECT, "Project");
-            ImGui::Spacing();
-            if (ActiveDoc())  // 无文档时隐藏 Nodes 按钮
-                drawSidebarBtn(1, ICON_FA_CUBES, "Nodes");
+
+            // ── 分隔线 ─────────────────────────────────────────────────────
+            if (ActiveDoc())
+            {
+                ImGui::Spacing();
+                {
+                    auto* dl = ImGui::GetWindowDrawList();
+                    ImVec2 p  = ImGui::GetCursorScreenPos();
+                    float cx  = p.x + sidebarBtnW * 0.5f - 1.0f;
+                    dl->AddLine(ImVec2(cx - sidebarBtnW * 0.3f, p.y),
+                                ImVec2(cx + sidebarBtnW * 0.3f, p.y),
+                                IM_COL32(80, 80, 90, 160), 1.0f);
+                }
+                ImGui::Dummy(ImVec2(sidebarBtnW - 2.0f, 3.0f));
+                ImGui::Spacing();
+
+                // ── 组二：Blueprint 内容面板 ──────────────────────────────
+                drawSidebarBtn(1, ICON_FA_CUBES,        "Nodes");
+                drawSidebarBtn(2, ICON_FA_LAYER_GROUP,  "Variables");
+                drawSidebarBtn(3, ICON_FA_CODE_BRANCH,  "Functions");
+                drawSidebarBtn(4, ICON_FA_BOLT,         "Events");
+                drawSidebarBtn(5, ICON_FA_CIRCLE_INFO,  "Details");
+            }
         }
         ImGui::EndChild();
 
@@ -764,9 +785,10 @@ void BlueprintEditor::OnFrame(float deltaTime)
             {
                 DrawProjectPanel();
             }
-            else if (leftTabIndex == 1 && ActiveDoc())
+            else if (ActiveDoc())
             {
-                DrawNodeListPanel();
+                // panelIdx: leftTabIndex 1→0(Nodes), 2→1(Vars), 3→2(Funcs), 4→3(Events), 5→4(Details)
+                DrawNodeListPanel(leftTabIndex - 1);
             }
         }
         ImGui::EndChild();

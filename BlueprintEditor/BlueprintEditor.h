@@ -585,7 +585,7 @@ struct BlueprintEditor : public Application
                                         Pin* endPin, ed::PinId endPinId);  // 创建链接 + UE4 Flow 自动重连
     void    ShowStyleEditor(bool* show = nullptr);
     void    ShowLeftPane(float paneWidth);             // 旧版左侧面板（已不使用）
-    void    DrawNodeListPanel();                       // 右侧节点列表/变量面板（嵌入式）
+    void    DrawNodeListPanel(int panelIdx = 0);       // 检视器面板（0=Nodes,1=Vars,2=Funcs,3=Events,4=Details）
     void    DrawVariablePanel();                       // 变量面板（在 DrawNodeListPanel TabBar 内调用）
     void    DrawNodeLibraryPanel();                    // 节点库面板（可折叠分类 + 拖拽）
     void    DrawDetailsPanel();                        // Details 面板（选中节点的属性检查器）
