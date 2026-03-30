@@ -352,11 +352,6 @@ if(NOT BUILD_RUNTIME_ONLY)
 
     target_link_libraries(BlueprintEditor PRIVATE Application)
 
-    # 临时：生成 .map 文件用于崩溃分析
-    if(MSVC)
-        target_link_options(BlueprintEditor PRIVATE /MAP)
-    endif()
-
     set_target_properties(BlueprintEditor PROPERTIES
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON

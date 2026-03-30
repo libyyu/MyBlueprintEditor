@@ -243,7 +243,10 @@ public:
     // 调用 rebuildEditorIndices() 重建；数据变更后调用 invalidateEditorIndices()
     mutable std::unordered_map<uint64_t, size_t>      nodeIdIndex;    // NodeId → nodes[] 下标
     mutable std::unordered_map<uint64_t, size_t>      linkIdIndex;    // LinkId → links[] 下标
-    mutable std::unordered_map<uint64_t, const Pin*>  pinIdIndex;     // PinId → Pin* (const, no cast needed)
+
+    // PinId → {nodeIdx, pinIdx, isOutput}，间接寻址避免 deque realloc 后裸指针失效
+    struct PinLocation { size_t nodeIdx; size_t pinIdx; bool isOutput; };
+    mutable std::unordered_map<uint64_t, PinLocation>  pinIdIndex;     // PinId → PinLocation
     mutable std::unordered_map<uint64_t, bool>         pinLinkedCache; // PinId → 是否有链接
     mutable bool editorIndexDirty = true;
 
@@ -260,15 +263,15 @@ public:
         {
             uint64_t nid = reinterpret_cast<uintptr_t>(nodes[i].ID.AsPointer());
             nodeIdIndex[nid] = i;
-            for (const auto& pin : nodes[i].Inputs)
+            for (size_t j = 0; j < nodes[i].Inputs.size(); ++j)
             {
-                uint64_t pid = reinterpret_cast<uintptr_t>(pin.ID.AsPointer());
-                pinIdIndex[pid] = &pin;
+                uint64_t pid = reinterpret_cast<uintptr_t>(nodes[i].Inputs[j].ID.AsPointer());
+                pinIdIndex[pid] = { i, j, false };
             }
-            for (const auto& pin : nodes[i].Outputs)
+            for (size_t j = 0; j < nodes[i].Outputs.size(); ++j)
             {
-                uint64_t pid = reinterpret_cast<uintptr_t>(pin.ID.AsPointer());
-                pinIdIndex[pid] = &pin;
+                uint64_t pid = reinterpret_cast<uintptr_t>(nodes[i].Outputs[j].ID.AsPointer());
+                pinIdIndex[pid] = { i, j, true };
             }
         }
 
