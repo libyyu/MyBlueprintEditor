@@ -34,7 +34,7 @@ TEST(TopologyTest, LinearChainExecutionOrder)
     {
         NodeInstance n; n.id = 1; n.definitionId = "SetVariable";
         n.pins.push_back(makePin(10, PinKind::Input,  true));   // exec in
-        n.pins.push_back(makePin(11, PinKind::Input,  false, PinDataType::String, "VariableName"));
+        n.pins.push_back(makePin(11, PinKind::Input,  false, PinDataType::String, "Name"));
         n.pins.push_back(makePin(12, PinKind::Input,  false, PinDataType::Any,    "Value"));
         n.pins.push_back(makePin(13, PinKind::Output, true));   // exec out
         n.pins[1].defaultValue = Variant(std::string("a"));
@@ -45,7 +45,7 @@ TEST(TopologyTest, LinearChainExecutionOrder)
     {
         NodeInstance n; n.id = 2; n.definitionId = "SetVariable";
         n.pins.push_back(makePin(20, PinKind::Input,  true));
-        n.pins.push_back(makePin(21, PinKind::Input,  false, PinDataType::String, "VariableName"));
+        n.pins.push_back(makePin(21, PinKind::Input,  false, PinDataType::String, "Name"));
         n.pins.push_back(makePin(22, PinKind::Input,  false, PinDataType::Any,    "Value"));
         n.pins.push_back(makePin(23, PinKind::Output, true));
         n.pins[1].defaultValue = Variant(std::string("a"));
@@ -82,7 +82,7 @@ TEST(TopologyTest, AcyclicGraphExecutes)
     // 单个 PrintString 节点
     NodeInstance n; n.id = 1; n.definitionId = "PrintString";
     n.pins.push_back(makePin(10, PinKind::Input, true));
-    n.pins.push_back(makePin(11, PinKind::Input, false, PinDataType::String, "String"));
+    n.pins.push_back(makePin(11, PinKind::Input, false, PinDataType::String, "In String"));
     n.pins[1].defaultValue = Variant(std::string("topology_test"));
     bp.nodes.push_back(n);
     bp.rebuildIndices();
@@ -108,7 +108,7 @@ TEST(TopologyTest, IsolatedNodeExecutes)
 
     NodeInstance n; n.id = 1; n.definitionId = "PrintString";
     n.pins.push_back(makePin(10, PinKind::Input, true));
-    n.pins.push_back(makePin(11, PinKind::Input, false, PinDataType::String, "String"));
+    n.pins.push_back(makePin(11, PinKind::Input, false, PinDataType::String, "In String"));
     n.pins[1].defaultValue = Variant(std::string("isolated"));
     bp.nodes.push_back(n);
     bp.rebuildIndices();

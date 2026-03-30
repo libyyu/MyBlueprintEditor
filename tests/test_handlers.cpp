@@ -16,6 +16,7 @@ protected:
     {
         RegisterBuiltinHandlers(runner, ".");
         runner.SetLogCallback([this](LogLevel, const std::string& m){ logs.push_back(m); });
+        runner.SetPrintCallback([this](LogLevel, const std::string& m){ logs.push_back(m); });
     }
 
     // 构建并执行单节点蓝图（inline）
@@ -158,7 +159,7 @@ TEST_F(HandlersTest, PrintStringProducesLog)
     print.id = 1; print.definitionId = "PrintString";
     PinInfo execIn; execIn.id = 10; execIn.kind = PinKind::Input; execIn.isExec = true;
     PinInfo strIn;  strIn.id  = 11; strIn.kind  = PinKind::Input; strIn.dataType = PinDataType::String;
-    strIn.name = "String"; strIn.defaultValue = Variant(std::string("HELLO_TEST"));
+    strIn.name = "In String"; strIn.defaultValue = Variant(std::string("HELLO_TEST"));
     print.pins.push_back(execIn);
     print.pins.push_back(strIn);
     bp.nodes.push_back(print);
