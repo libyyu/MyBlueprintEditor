@@ -87,10 +87,17 @@ add_subdirectory(Utils/Json)
 add_subdirectory(Runtime)
 
 # ---------------------------------------------------------------------------
-# runtime-example — built unconditionally (runtime-only AND full builds)
+# runtime-example — built only on desktop platforms (not iOS/Android/Emscripten)
 #   Use:  runtime-example --test [flow_test.json]
 # ---------------------------------------------------------------------------
-if(BUILD_EXAMPLES OR BUILD_RUNTIME_ONLY)
+set(_IS_MOBILE_PLATFORM FALSE)
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR
+   CMAKE_SYSTEM_NAME STREQUAL "Android" OR
+   EMSCRIPTEN)
+    set(_IS_MOBILE_PLATFORM TRUE)
+endif()
+
+if((BUILD_EXAMPLES OR BUILD_RUNTIME_ONLY) AND NOT _IS_MOBILE_PLATFORM)
     set(_RE_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/runtime-example/runtime-example.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/runtime-example/test_new_features.cpp
@@ -421,7 +428,9 @@ endif() # NOT BUILD_RUNTIME_ONLY
 # Unit tests (always available when not cross-compiling)
 # ---------------------------------------------------------------------------
 option(BUILD_TESTS "Build unit tests" ON)
-if(BUILD_TESTS AND NOT EMSCRIPTEN AND NOT CMAKE_CROSSCOMPILING)
+if(BUILD_TESTS AND NOT EMSCRIPTEN AND NOT CMAKE_CROSSCOMPILING
+   AND NOT (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+   AND NOT (CMAKE_SYSTEM_NAME STREQUAL "Android"))
     enable_testing()
     add_subdirectory(tests)
     message(STATUS "[Tests] Unit tests enabled (run: ctest --test-dir ${CMAKE_BINARY_DIR})")
