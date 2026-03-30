@@ -352,37 +352,46 @@ if(NOT BUILD_RUNTIME_ONLY)
 
     target_link_libraries(BlueprintEditor PRIVATE Application)
 
+    # 临时：生成 .map 文件用于崩溃分析
+    if(MSVC)
+        target_link_options(BlueprintEditor PRIVATE /MAP)
+    endif()
+
     set_target_properties(BlueprintEditor PROPERTIES
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
         RUNTIME_OUTPUT_DIRECTORY           "${OUTPUT_DIR}"
-        RUNTIME_OUTPUT_DIRECTORY_DEBUG     "${OUTPUT_DIR}"
-        RUNTIME_OUTPUT_DIRECTORY_RELEASE   "${OUTPUT_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG     "${OUTPUT_DIR}/Debug"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE   "${OUTPUT_DIR}/Release"
         VS_DEBUGGER_WORKING_DIRECTORY      "${CMAKE_CURRENT_SOURCE_DIR}"
     )
 
     # ------------------------------------------------------------------
     # Resource copy
     # ------------------------------------------------------------------
-    set(_COPY_RESOURCE_COMMANDS
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_DIR}/data
-    )
+    # 按配置分别复制到 bin/Debug/ 和 bin/Release/
+    foreach(_CFG Debug Release)
+        set(_COPY_RESOURCE_COMMANDS_${_CFG}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_DIR}/${_CFG}/data
+        )
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/data")
+            file(GLOB _DATA_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/data/*")
+            foreach(RES ${_DATA_RESOURCES})
+                list(APPEND _COPY_RESOURCE_COMMANDS_${_CFG}
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RES} ${OUTPUT_DIR}/${_CFG}/data/
+                )
+            endforeach()
+        endif()
+        add_custom_target(copy_resources_${_CFG} ALL
+            ${_COPY_RESOURCE_COMMANDS_${_CFG}}
+            COMMENT "Copying resources to ${_CFG} output"
+        )
+    endforeach()
 
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/data")
-        file(GLOB _DATA_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/data/*")
-        foreach(RES ${_DATA_RESOURCES})
-            list(APPEND _COPY_RESOURCE_COMMANDS
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RES} ${OUTPUT_DIR}/data/
-            )
-        endforeach()
-    endif()
+    add_dependencies(BlueprintEditor copy_resources_Debug copy_resources_Release)
 
-    add_custom_target(copy_resources ALL
-        ${_COPY_RESOURCE_COMMANDS}
-        COMMENT "Copying resources to output directory"
-    )
-
-    add_dependencies(BlueprintEditor copy_resources)
+    # 兼容别名：examples/CMakeLists.txt 引用 copy_resources
+    add_custom_target(copy_resources DEPENDS copy_resources_Debug copy_resources_Release)
 
     # ------------------------------------------------------------------
     # Install – Editor targets

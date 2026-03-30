@@ -180,11 +180,11 @@ if(BLUEPRINT_LUA)
                 # Output the Lua shared library alongside BlueprintRuntime / executables
                 set_target_properties(${_LUA_TARGET_NAME} PROPERTIES
                     RUNTIME_OUTPUT_DIRECTORY           "${CMAKE_BINARY_DIR}/bin"
-                    RUNTIME_OUTPUT_DIRECTORY_DEBUG     "${CMAKE_BINARY_DIR}/bin"
-                    RUNTIME_OUTPUT_DIRECTORY_RELEASE   "${CMAKE_BINARY_DIR}/bin"
+                    RUNTIME_OUTPUT_DIRECTORY_DEBUG     "${CMAKE_BINARY_DIR}/bin/Debug"
+                    RUNTIME_OUTPUT_DIRECTORY_RELEASE   "${CMAKE_BINARY_DIR}/bin/Release"
                     LIBRARY_OUTPUT_DIRECTORY           "${CMAKE_BINARY_DIR}/bin"
-                    LIBRARY_OUTPUT_DIRECTORY_DEBUG     "${CMAKE_BINARY_DIR}/bin"
-                    LIBRARY_OUTPUT_DIRECTORY_RELEASE   "${CMAKE_BINARY_DIR}/bin"
+                    LIBRARY_OUTPUT_DIRECTORY_DEBUG     "${CMAKE_BINARY_DIR}/bin/Debug"
+                    LIBRARY_OUTPUT_DIRECTORY_RELEASE   "${CMAKE_BINARY_DIR}/bin/Release"
                 )
 
                 # macOS: set install name
@@ -300,11 +300,11 @@ set_target_properties(BlueprintRuntime PROPERTIES
 if(_RUNTIME_LIB_TYPE STREQUAL "SHARED")
     set_target_properties(BlueprintRuntime PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY           "${CMAKE_BINARY_DIR}/bin"
-        RUNTIME_OUTPUT_DIRECTORY_DEBUG     "${CMAKE_BINARY_DIR}/bin"
-        RUNTIME_OUTPUT_DIRECTORY_RELEASE   "${CMAKE_BINARY_DIR}/bin"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG     "${CMAKE_BINARY_DIR}/bin/Debug"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE   "${CMAKE_BINARY_DIR}/bin/Release"
         LIBRARY_OUTPUT_DIRECTORY           "${CMAKE_BINARY_DIR}/bin"
-        LIBRARY_OUTPUT_DIRECTORY_DEBUG     "${CMAKE_BINARY_DIR}/bin"
-        LIBRARY_OUTPUT_DIRECTORY_RELEASE   "${CMAKE_BINARY_DIR}/bin"
+        LIBRARY_OUTPUT_DIRECTORY_DEBUG     "${CMAKE_BINARY_DIR}/bin/Debug"
+        LIBRARY_OUTPUT_DIRECTORY_RELEASE   "${CMAKE_BINARY_DIR}/bin/Release"
     )
 endif()
 
