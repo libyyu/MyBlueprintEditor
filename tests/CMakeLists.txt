@@ -57,9 +57,31 @@ set_target_properties(blueprint_tests PROPERTIES
 # CTest 集成
 # ---------------------------------------------------------------------------
 include(GoogleTest)
-gtest_discover_tests(blueprint_tests
-    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-)
+
+# 动态库构建时，测试运行需要能找到 BlueprintRuntime.dll/.so
+# 通过 DISCOVERY_MODE PRE_TEST 推迟发现（避免 configure 时运行 exe）
+# 通过 ENVIRONMENT 传入库路径
+if(BUILD_SHARED_LIBS)
+    set(_lib_dir "$<TARGET_FILE_DIR:BlueprintRuntime>")
+    if(WIN32)
+        gtest_discover_tests(blueprint_tests
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            PROPERTIES ENVIRONMENT "PATH=${_lib_dir};$ENV{PATH}"
+            DISCOVERY_MODE PRE_TEST
+        )
+    else()
+        gtest_discover_tests(blueprint_tests
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            PROPERTIES ENVIRONMENT "LD_LIBRARY_PATH=${_lib_dir}:$ENV{LD_LIBRARY_PATH}"
+            DISCOVERY_MODE PRE_TEST
+        )
+    endif()
+else()
+    gtest_discover_tests(blueprint_tests
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        DISCOVERY_MODE PRE_TEST
+    )
+endif()
 
 # 便捷目标：cmake --build ... --target run_tests
 add_custom_target(run_tests
