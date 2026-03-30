@@ -672,9 +672,11 @@ void BlueprintEditor::DrawVariablePanel()
     char* newVarName   = doc->varNewName;
     int&  newVarTypeIdx = doc->varNewTypeIdx;
 
+    constexpr size_t kVarNameBufSize = sizeof(BlueprintDocument::varNewName);  // 64
+
     if (ImGui::Button(ICON_FA_PLUS " Add Variable"))
     {
-        memset(newVarName, 0, sizeof(newVarName));
+        memset(newVarName, 0, kVarNameBufSize);
         newVarTypeIdx = 1;
         showAddPopup = true;
         ImGui::OpenPopup("##AddVariable");
@@ -687,7 +689,7 @@ void BlueprintEditor::DrawVariablePanel()
         ImGui::Separator();
 
         ImGui::SetNextItemWidth(160.0f);
-        ImGui::InputTextWithHint("##VarName", "Variable name...", newVarName, sizeof(newVarName));
+        ImGui::InputTextWithHint("##VarName", "Variable name...", newVarName, kVarNameBufSize);
 
         const char* typeNames[] = { "Unknown", "Boolean", "Integer", "Float", "String", "Object", "Array", "Map", "Any" };
         const RTPinDataType typeValues[] = {
