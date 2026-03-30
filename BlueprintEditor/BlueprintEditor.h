@@ -159,6 +159,9 @@ public:
     ImRect               pendingContentBounds;             // 从加载数据计算的节点包围盒
     RTBlueprintData      pendingLoadData;                  // 待设置位置的加载数据
 
+    // 依赖关系（从 JSON 加载时读入，保存时写回）
+    std::vector<std::string> dependencies;
+
     // 运行时执行状态
     std::vector<std::string>    executionLog;
     std::string                 executionLogText;          // 合并后的日志文本
@@ -501,6 +504,7 @@ struct BlueprintEditor : public Application
     void        CloseProject();                      // 关闭工程
     void        AddCurrentDocToProject();            // 将当前文档加入工程列表
     void        SyncProjectLibrariesToRegistry();    // 按工程 libraries 刷新节点定义注册表
+    void        UpdateBlueprintReferences(const std::string& oldAbsPath, const std::string& newAbsPath);  // 重命名/移动后更新所有引用
     void        DrawProjectPanel();                  // 工程面板（左侧栏）
 
     BlueprintDocument* ActiveDoc()

@@ -155,6 +155,186 @@ void BlueprintEditor::AddCurrentDocToProject()
 // 按工程 libraries 刷新节点注册表
 // ============================================================================
 
+// ============================================================================
+// 重命名/移动后更新工程内所有蓝图文件的引用
+// ============================================================================
+
+void BlueprintEditor::UpdateBlueprintReferences(const std::string& oldAbsPath,
+                                                 const std::string& newAbsPath)
+{
+    if (!m_Project.IsOpen()) return;
+
+    // 计算旧/新的 stem（不含 .json / .editor.json 扩展名的纯文件名）
+    // 用于替换 FuncLib.<stem>.funcId 这类 definitionId
+    std::string oldStem = fs::path(oldAbsPath).stem().string();
+    // stem 可能是 "Foo.editor"（如果文件是 .editor.json），去掉再去一层
+    if (oldStem.size() > 7 && oldStem.substr(oldStem.size() - 7) == ".editor")
+        oldStem = oldStem.substr(0, oldStem.size() - 7);
+    std::string newStem = fs::path(newAbsPath).stem().string();
+    if (newStem.size() > 7 && newStem.substr(newStem.size() - 7) == ".editor")
+        newStem = newStem.substr(0, newStem.size() - 7);
+
+    // 旧/新相对路径（相对于工程目录，用于 dependencies 数组替换）
+    std::string oldRel = m_Project.RelPath(oldAbsPath);
+    std::string newRel = m_Project.RelPath(newAbsPath);
+    // 统一路径分隔符
+    for (char& c : oldRel) if (c == '\\') c = '/';
+    for (char& c : newRel) if (c == '\\') c = '/';
+
+    // 收集工程内所有蓝图 JSON 文件（排除被重命名的那个）
+    std::vector<std::string> allFiles;
+    for (const auto& e : m_Project.blueprints)
+    {
+        std::string abs = m_Project.AbsPath(e.relativePath);
+        if (!abs.empty() && fs::exists(abs))
+            allFiles.push_back(abs);
+    }
+    for (const auto& e : m_Project.libraries)
+    {
+        std::string abs = m_Project.AbsPath(e.relativePath);
+        if (!abs.empty() && fs::exists(abs))
+            allFiles.push_back(abs);
+    }
+
+    int updatedFiles = 0;
+    ::NodeEditor::Runtime::JsonBlueprintExporter exporter;
+
+    for (const auto& filePath : allFiles)
+    {
+        // 跳过刚改名的文件本身
+        if (fs::path(filePath).lexically_normal() ==
+            fs::path(newAbsPath).lexically_normal()) continue;
+
+        auto result = exporter.importRuntimeFromFile(filePath);
+        if (!result.success) continue;
+
+        bool modified = false;
+        auto& data = result.data;
+
+        // 1. 更新 metadata.dependencies
+        for (auto& dep : data.metadata.dependencies)
+        {
+            // 规范化比较（去掉 ./ 等）
+            std::string normDep = dep;
+            for (char& c : normDep) if (c == '\\') c = '/';
+            if (normDep == oldRel ||
+                fs::path(m_Project.AbsPath(dep)).lexically_normal() ==
+                fs::path(oldAbsPath).lexically_normal())
+            {
+                dep = newRel;
+                modified = true;
+            }
+        }
+
+        // 2. 更新 ExecuteBlueprint 节点的 File 引脚值
+        for (auto& node : data.nodes)
+        {
+            if (node.definitionId != "ExecuteBlueprint") continue;
+            for (auto& pin : node.pins)
+            {
+                if (pin.name != "File") continue;
+                std::string val = pin.defaultValue.asString();
+                if (val.empty()) continue;
+                // 比较文件名 stem（不含扩展名）
+                std::string valStem = fs::path(val).stem().string();
+                if (valStem.size() > 7 && valStem.substr(valStem.size()-7) == ".editor")
+                    valStem = valStem.substr(0, valStem.size()-7);
+                if (valStem == oldStem)
+                {
+                    // 保留目录和扩展名，只替换 stem
+                    std::string dir  = fs::path(val).parent_path().string();
+                    std::string ext  = fs::path(val).extension().string();
+                    // 如果 val 本身有多重扩展名（.bp.json）需要特殊处理
+                    std::string newVal = newStem;
+                    if (!ext.empty())
+                    {
+                        // 找原来的完整扩展名（.json 或 .bp.json）
+                        size_t dotPos = val.find('.');
+                        if (dotPos != std::string::npos)
+                            newVal = newStem + val.substr(dotPos);
+                    }
+                    if (!dir.empty() && dir != ".")
+                        newVal = dir + "/" + newVal;
+                    pin.defaultValue = ::NodeEditor::Runtime::Variant(newVal);
+                    modified = true;
+                }
+            }
+        }
+
+        // 3. 更新 FuncLib.<oldStem>.<funcId> → FuncLib.<newStem>.<funcId>
+        std::string oldPrefix = "FuncLib." + oldStem + ".";
+        std::string newPrefix = "FuncLib." + newStem + ".";
+        for (auto& node : data.nodes)
+        {
+            if (node.definitionId.rfind(oldPrefix, 0) == 0)
+            {
+                node.definitionId = newPrefix + node.definitionId.substr(oldPrefix.size());
+                modified = true;
+            }
+        }
+
+        if (modified)
+        {
+            // 重新序列化保存（保留 editor 数据）
+            std::string editorPath = filePath.substr(0, filePath.rfind('.')) + ".editor.json";
+            bool hasEditor = fs::exists(editorPath);
+
+            if (hasEditor)
+            {
+                // 先加载完整 editor 数据，再保存
+                auto fullResult = exporter.importFromEditorFile(editorPath);
+                if (fullResult.success)
+                {
+                    // 把 runtime 层修改同步到 editor data
+                    fullResult.data.metadata.dependencies = data.metadata.dependencies;
+                    for (size_t i = 0; i < data.nodes.size() && i < fullResult.data.nodes.size(); ++i)
+                    {
+                        fullResult.data.nodes[i].definitionId = data.nodes[i].definitionId;
+                        fullResult.data.nodes[i].pins = data.nodes[i].pins;
+                    }
+                    exporter.exportEditorFiles(fullResult.data, filePath, editorPath);
+                }
+            }
+            else
+            {
+                exporter.exportRuntimeToFile(data, filePath);
+            }
+
+            // 同步内存中已打开的文档
+            for (auto& doc : m_Documents)
+            {
+                if (fs::path(doc->filePath).lexically_normal() ==
+                    fs::path(filePath).lexically_normal())
+                {
+                    // 更新内存中的节点 definitionId
+                    for (auto& node : doc->nodes)
+                    {
+                        if (node.DefinitionId.rfind(oldPrefix, 0) == 0)
+                            node.DefinitionId = newPrefix + node.DefinitionId.substr(oldPrefix.size());
+                    }
+                    // 更新 dependencies
+                    doc->dependencies.clear();
+                    for (const auto& d : data.metadata.dependencies)
+                        doc->dependencies.push_back(d);
+                    doc->isDirty = false;  // 我们已经保存了
+                }
+            }
+
+            ++updatedFiles;
+        }
+    }
+
+    if (updatedFiles > 0)
+    {
+        BPLOG("UpdateBlueprintReferences: updated " + std::to_string(updatedFiles) + " file(s): "
+              + oldStem + " -> " + newStem);
+        // 重新注册库函数（定义ID已改变）
+        SyncProjectLibrariesToRegistry();
+        // 清除节点缓存
+        m_CachedDefCount = 0;
+    }
+}
+
 void BlueprintEditor::SyncProjectLibrariesToRegistry()
 {
     if (!m_Project.IsOpen()) return;
@@ -522,6 +702,9 @@ void BlueprintEditor::DrawProjectPanel()
                                         SetTitle(title.c_str());
                                     }
                                 }
+
+                                // 更新工程内所有蓝图文件的引用
+                                UpdateBlueprintReferences(oldAbs, newAbs);
                             }
                         }
                         ImGui::CloseCurrentPopup();

@@ -126,14 +126,10 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                         if (!node.DefinitionId.empty())
                         {
                             auto* def = m_NodeRegistry.getNodeDefinition(node.DefinitionId);
-                            if (def)
+                            if (def && !def->icon.empty())
                             {
-                                auto iconIt = def->customProperties.find("icon");
-                                if (iconIt != def->customProperties.end() && !iconIt->second.empty())
-                                {
-                                    ImGui::TextUnformatted(iconIt->second.c_str());
-                                    ImGui::Spring(0, 4.0f);
-                                }
+                                ImGui::TextUnformatted(def->icon.c_str());
+                                ImGui::Spring(0, 4.0f);
                             }
                         }
                         // 节点标题：Function.Entry/Return 节点显示前缀避免与函数名歧义

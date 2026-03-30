@@ -32,7 +32,7 @@ static PinDefinition MakeFlowPin(const char* name = "")
 static void RegisterNodeDef(INodeRegistry& registry,
     const char* id, const char* name, const char* category,
     std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
-    const char* color = "", const char* edType = "")
+    const char* color = "", const char* edType = "", const char* icon = "")
 {
     NodeDefinition d;
     d.id = id;
@@ -42,6 +42,7 @@ static void RegisterNodeDef(INodeRegistry& registry,
     d.outputPins = std::move(outputs);
     if (color[0]) d.color = color;
     if (edType[0]) d.customProperties["editorType"] = edType;
+    if (icon[0])  d.icon = icon;
     registry.registerNode(d);
 }
 
@@ -60,18 +61,12 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
         { MakeFlowPin(""), MakePin("Condition", PinDataType::Boolean) },
         { MakeFlowPin("True"), MakeFlowPin("False") },
         "8B3DB8");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("Branch"));
-        if (d) d->customProperties["icon"] = u8"\uf126";
-    }
+    
 
     reg("DoN", "Do N", "Flow",
         { MakeFlowPin("Enter"), MakePin("N", PinDataType::Integer), MakeFlowPin("Reset") },
         { MakeFlowPin("Exit"), MakePin("Counter", PinDataType::Integer) });
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("DoN"));
-        if (d) d->customProperties["icon"] = u8"\uf0b0";
-    }
+    
 
     // ExecuteBlueprint: 完全异步模式（无 Sync 选项）
     {
@@ -92,28 +87,19 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
         { MakeFlowPin("Loop Body"), MakePin("Index", PinDataType::Integer),
           MakeFlowPin("Completed") },
         "2A7FAA");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("ForLoop"));
-        if (d) d->customProperties["icon"] = u8"\uf01e";
-    }
+    
 
     reg("WhileLoop", "While Loop", "Flow",
         { MakeFlowPin(""), MakePin("Condition", PinDataType::Boolean) },
         { MakeFlowPin("Loop Body"), MakeFlowPin("Completed") },
         "2A7FAA");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("WhileLoop"));
-        if (d) d->customProperties["icon"] = u8"\uf021";
-    }
+    
 
     reg("Delay", "Delay", "Flow",
         { MakeFlowPin(""), MakePin("Duration", PinDataType::Float) },
         { MakeFlowPin("Exec"), MakeFlowPin("Completed"), MakePin("TimerHandle", PinDataType::Integer) },
         "6A4AAA");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("Delay"));
-        if (d) d->customProperties["icon"] = u8"\uf017";
-    }
+    
 
     reg("FlipFlop", "Flip Flop", "Flow",
         { MakeFlowPin("") },
@@ -125,19 +111,13 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
           MakeFlowPin("Toggle") },
         { MakeFlowPin("Exit") },
         "2A7FAA");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("Gate"));
-        if (d) d->customProperties["icon"] = u8"\uf0b0";
-    }
+    
 
     reg("DoOnce", "Do Once", "Flow",
         { MakeFlowPin(""), MakeFlowPin("Reset") },
         { MakeFlowPin("Completed") },
         "2A7FAA");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("DoOnce"));
-        if (d) d->customProperties["icon"] = u8"\uf0b0";
-    }
+    
 
     // Sequence (Flow) — 按顺序执行多个 exec 输出
     {
@@ -185,10 +165,7 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
         { MakeFlowPin("Loop Body"), MakePin("Index", PinDataType::Integer),
           MakeFlowPin("Completed") },
         "2A7FAA");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("ForLoopWithBreak"));
-        if (d) d->customProperties["icon"] = u8"\uf01e";
-    }
+    
 
     // Switch on Bool — 根据 Bool 值二选一
     reg("SwitchOnBool", "Switch on Bool", "Flow",
@@ -639,19 +616,13 @@ static void RegisterNodeDefs_Debug(INodeRegistry& registry)
         { MakeFlowPin(""), MakePin("In String", PinDataType::String) },
         { MakeFlowPin("") },
         "3D8B45");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("PrintString"));
-        if (d) d->customProperties["icon"] = u8"\uf188";
-    }
+    
 
     reg("Log", "Log", "Debug",
         { MakeFlowPin(""), MakePin("Message", PinDataType::String) },
         { MakeFlowPin("") },
         "3D8B45");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("Log"));
-        if (d) d->customProperties["icon"] = u8"\uf188";
-    }
+    
 
     // Assert — 断言条件为真，否则输出错误
     reg("Assert", "Assert", "Debug",
@@ -969,55 +940,37 @@ static void RegisterNodeDefs_Map(INodeRegistry& registry)
           MakePin("Key 1", PinDataType::String), MakePin("Value 1", PinDataType::Any) },
         { MakePin("Result", PinDataType::Map) },
         "20CCDD", "Simple");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("MapMake"));
-        if (d) d->customProperties["icon"] = u8"\uf0ce";
-    }
+    
 
     reg("MapGet", "Map Get", "Misc/Map",
         { MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::String) },
         { MakePin("Value", PinDataType::Any), MakePin("Found", PinDataType::Boolean) },
         "20CCDD", "Simple");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("MapGet"));
-        if (d) d->customProperties["icon"] = u8"\uf0ce";
-    }
+    
 
     reg("MapSet", "Map Set", "Misc/Map",
         { MakeFlowPin(""), MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::String), MakePin("Value", PinDataType::Any) },
         { MakeFlowPin(""), MakePin("Result", PinDataType::Map) },
         "20CCDD");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("MapSet"));
-        if (d) d->customProperties["icon"] = u8"\uf0ce";
-    }
+    
 
     reg("MapRemove", "Map Remove", "Misc/Map",
         { MakeFlowPin(""), MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::String) },
         { MakeFlowPin(""), MakePin("Result", PinDataType::Map) },
         "20CCDD");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("MapRemove"));
-        if (d) d->customProperties["icon"] = u8"\uf0ce";
-    }
+    
 
     reg("MapHasKey", "Map Has Key", "Misc/Map",
         { MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::String) },
         { MakePin("Result", PinDataType::Boolean) },
         "20CCDD", "Simple");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("MapHasKey"));
-        if (d) d->customProperties["icon"] = u8"\uf0ce";
-    }
+    
 
     reg("MapLength", "Map Length", "Misc/Map",
         { MakePin("Map", PinDataType::Map) },
         { MakePin("Length", PinDataType::Integer) },
         "20CCDD", "Simple");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("MapLength"));
-        if (d) d->customProperties["icon"] = u8"\uf0ce";
-    }
+    
 
     // Keep legacy MapSize for backward compatibility
     reg("MapSize", "Map Size", "Misc/Map",
@@ -1029,28 +982,19 @@ static void RegisterNodeDefs_Map(INodeRegistry& registry)
         { MakePin("Map", PinDataType::Map) },
         { MakePin("Keys", PinDataType::Array) },
         "20CCDD", "Simple");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("MapKeys"));
-        if (d) d->customProperties["icon"] = u8"\uf0ce";
-    }
+    
 
     reg("MapValues", "Map Values", "Misc/Map",
         { MakePin("Map", PinDataType::Map) },
         { MakePin("Values", PinDataType::Array) },
         "20CCDD", "Simple");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("MapValues"));
-        if (d) d->customProperties["icon"] = u8"\uf0ce";
-    }
+    
 
     reg("MapClear", "Map Clear", "Misc/Map",
         { MakeFlowPin(""), MakePin("Map", PinDataType::Map) },
         { MakeFlowPin(""), MakePin("Result", PinDataType::Map) },
         "20CCDD");
-    {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("MapClear"));
-        if (d) d->customProperties["icon"] = u8"\uf0ce";
-    }
+    
 
     reg("MapMerge", "Map Merge", "Misc/Map",
         { MakeFlowPin(""), MakePin("Map A", PinDataType::Map), MakePin("Map B", PinDataType::Map) },
@@ -1274,55 +1218,55 @@ static void RegisterNodeDefs_Conversion(INodeRegistry& registry)
         { MakePin("Value", PinDataType::Integer) },
         { MakePin("Result", PinDataType::Float) },
         "80C3F8", "Simple");
-    { auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("IntToFloat")); if (d) d->customProperties["icon"] = u8"\uf0ec"; }
+    
 
     reg("FloatToInt", "Float To Int", "Conversion",
         { MakePin("Value", PinDataType::Float) },
         { MakePin("Result", PinDataType::Integer) },
         "80C3F8", "Simple");
-    { auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("FloatToInt")); if (d) d->customProperties["icon"] = u8"\uf0ec"; }
+    
 
     reg("IntToString", "Int To String", "Conversion",
         { MakePin("Value", PinDataType::Integer) },
         { MakePin("Result", PinDataType::String) },
         "C880F8", "Simple");
-    { auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("IntToString")); if (d) d->customProperties["icon"] = u8"\uf0ec"; }
+    
 
     reg("FloatToString", "Float To String", "Conversion",
         { MakePin("Value", PinDataType::Float) },
         { MakePin("Result", PinDataType::String) },
         "C880F8", "Simple");
-    { auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("FloatToString")); if (d) d->customProperties["icon"] = u8"\uf0ec"; }
+    
 
     reg("StringToInt", "String To Int", "Conversion",
         { MakePin("Value", PinDataType::String) },
         { MakePin("Result", PinDataType::Integer) },
         "F8A030", "Simple");
-    { auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("StringToInt")); if (d) d->customProperties["icon"] = u8"\uf0ec"; }
+    
 
     reg("StringToFloat", "String To Float", "Conversion",
         { MakePin("Value", PinDataType::String) },
         { MakePin("Result", PinDataType::Float) },
         "F8A030", "Simple");
-    { auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("StringToFloat")); if (d) d->customProperties["icon"] = u8"\uf0ec"; }
+    
 
     reg("BoolToInt", "Bool To Int", "Conversion",
         { MakePin("Value", PinDataType::Boolean) },
         { MakePin("Result", PinDataType::Integer) },
         "", "Simple");
-    { auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("BoolToInt")); if (d) d->customProperties["icon"] = u8"\uf0ec"; }
+    
 
     reg("IntToBool", "Int To Bool", "Conversion",
         { MakePin("Value", PinDataType::Integer) },
         { MakePin("Result", PinDataType::Boolean) },
         "", "Simple");
-    { auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("IntToBool")); if (d) d->customProperties["icon"] = u8"\uf0ec"; }
+    
 
     reg("ToString", "To String", "Conversion",
         { MakePin("Value", PinDataType::Any) },
         { MakePin("Result", PinDataType::String) },
         "C880F8", "Simple");
-    { auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("ToString")); if (d) d->customProperties["icon"] = u8"\uf0ec"; }
+    
 }
 
 // Event 节点
@@ -1337,19 +1281,19 @@ static void RegisterNodeDefs_Event(INodeRegistry& registry)
         {},
         { MakeFlowPin("") },
         "FF6060");
-    { auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("OnBeginPlay")); if (d) d->customProperties["icon"] = u8"\uf0e7"; }
+    
 
     reg("OnTick", "On Tick", "Event",
         {},
         { MakeFlowPin(""), MakePin("DeltaTime", PinDataType::Float) },
         "FF6060");
-    { auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("OnTick")); if (d) d->customProperties["icon"] = u8"\uf0e7"; }
+    
 
     reg("CustomEventNode", "Custom Event", "Event",
         {},
         { MakeFlowPin(""), MakePin("EventName", PinDataType::String) },
         "FF8040");
-    { auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("CustomEventNode")); if (d) d->customProperties["icon"] = u8"\uf0e7"; }
+    
 }
 
 static void RegisterNodeDefs_Function(INodeRegistry& registry)

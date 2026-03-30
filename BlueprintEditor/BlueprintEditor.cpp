@@ -916,6 +916,9 @@ RTBlueprintData BlueprintEditor::BuildRuntimeData()
     // 转换函数定义
     bp.functions = ActiveDoc()->functions;
 
+    // 保留 dependencies（加载时读入，保存时写回，避免手动管理的引用丢失）
+    bp.metadata.dependencies = ActiveDoc()->dependencies;
+
     return bp;
 }
 

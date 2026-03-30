@@ -48,32 +48,25 @@ struct NodeCategory
 
 struct NodeDefinition
 {
+    // ── Runtime 字段（BlueprintRunner 执行时使用）────────────────────────────
     std::string                     id;              // 节点类型ID（唯一）
     std::string                     name;            // 显示名称
     std::string                     category;        // 所属类别
     NodeType                        type = NodeType::Blueprint;
     int                             version = 1;     // 节点定义版本号（引脚变化时递增）
-    
-    // 引脚定义
     std::vector<PinDefinition>      inputPins;
     std::vector<PinDefinition>      outputPins;
-    
-    // 节点属性
-    std::string                     description;     // 节点描述
-    std::string                     icon;            // 图标（可选）
-    std::string                     color;           // 颜色（十六进制）
-    
-    // 节点位置（用于预览）
-    NodeSize                        defaultSize;     // 默认尺寸
-    
-    // 自定义属性
-    std::unordered_map<std::string, std::string> customProperties;
-    
-    // 是否可实例化
     bool                            isAbstract = false;
-    
-    // 是否是纯函数节点（无副作用）
     bool                            isPure = true;
+
+    // ── Editor-only 字段（Runtime 层不消费，仅编辑器渲染使用）───────────────
+    std::string                     description;     // 节点描述（Tooltip）
+    std::string                     icon;            // 图标 Unicode（FontAwesome）
+    std::string                     color;           // 标题栏颜色（十六进制 RRGGBB）
+    NodeSize                        defaultSize;     // 默认尺寸（Comment 节点）
+
+    // ── 扩展属性（新字段先放这里，稳定后提升为顶层）────────────────────────
+    std::unordered_map<std::string, std::string> customProperties;
 };
 
 // ============================================================================

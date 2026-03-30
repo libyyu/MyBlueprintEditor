@@ -424,6 +424,9 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
     // 恢复蓝图类型（旧文件缺失时默认 Actor，向后兼容）
     ActiveDoc()->blueprintClass = data.metadata.blueprintClass;
 
+    // 保存 dependencies（加载时读入，之后 BuildRuntimeData 保存时写回）
+    ActiveDoc()->dependencies = data.metadata.dependencies;
+
     // 映射旧 ID -> 新 ID
     std::unordered_map<uint64_t, int> nodeIdMap;  // old nodeId -> new nodeId
     std::unordered_map<uint64_t, int> pinIdMap;   // old pinId -> new pinId
