@@ -416,3 +416,13 @@ if(NOT BUILD_RUNTIME_ONLY)
     endif()
 
 endif() # NOT BUILD_RUNTIME_ONLY
+
+# ---------------------------------------------------------------------------
+# Unit tests (always available when not cross-compiling)
+# ---------------------------------------------------------------------------
+option(BUILD_TESTS "Build unit tests" ON)
+if(BUILD_TESTS AND NOT EMSCRIPTEN AND NOT CMAKE_CROSSCOMPILING)
+    enable_testing()
+    add_subdirectory(tests)
+    message(STATUS "[Tests] Unit tests enabled (run: ctest --test-dir ${CMAKE_BINARY_DIR})")
+endif()

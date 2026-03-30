@@ -1,0 +1,117 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  # ── Windows / MSVC ──────────────────────────────────────────────────────────
+  windows:
+    name: Windows (MSVC x64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (shared runtime + editor)
+        run: cmake -B build -A x64 -DBUILD_SHARED_LIBS=ON -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON
+
+      - name: Build Release
+        run: cmake --build build --config Release --parallel
+
+      - name: Run tests
+        working-directory: tests
+        run: ctest --test-dir ../build -C Release --output-on-failure
+
+  # ── Windows / static ────────────────────────────────────────────────────────
+  windows-static:
+    name: Windows (MSVC x64 static)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (static runtime)
+        run: cmake -B build -A x64 -DBUILD_SHARED_LIBS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=ON
+
+      - name: Build Release
+        run: cmake --build build --config Release --parallel
+
+      - name: Run tests
+        working-directory: tests
+        run: ctest --test-dir ../build -C Release --output-on-failure
+
+  # ── Linux / GCC ─────────────────────────────────────────────────────────────
+  linux:
+    name: Linux (GCC, shared)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libglfw3-dev libgl1-mesa-dev
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DBUILD_EXAMPLES=ON \
+            -DBUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run tests
+        working-directory: tests
+        run: ctest --test-dir ../build --output-on-failure
+
+  # ── Linux / GCC static (runtime-only) ───────────────────────────────────────
+  linux-runtime-only:
+    name: Linux (GCC, runtime-only static)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_RUNTIME_ONLY=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run tests
+        working-directory: tests
+        run: ctest --test-dir ../build --output-on-failure
+
+  # ── WebGL / Emscripten ──────────────────────────────────────────────────────
+  wasm:
+    name: WebGL (Emscripten)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.50
+
+      - name: Configure
+        run: |
+          emcmake cmake -B build-wasm \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_RUNTIME_ONLY=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_TESTS=OFF
+
+      - name: Build
+        run: cmake --build build-wasm --parallel
+
+      - name: Check output
+        run: |
+          ls build-wasm/Runtime/ || ls build-wasm/
+          echo "WASM build succeeded"

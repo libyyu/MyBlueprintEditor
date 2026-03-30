@@ -116,123 +116,28 @@ public:
 };
 
 // ============================================================================
-// 默认节点注册表实现
+// 默认节点注册表实现（方法实现在 NodeDefinition.cpp）
 // ============================================================================
 
 class DefaultNodeRegistry : public INodeRegistry
 {
 public:
-    bool registerNode(const NodeDefinition& definition) override
-    {
-        if (definition.id.empty()) return false;
-        
-        m_nodeDefinitions[definition.id] = definition;
-        
-        // 统一重建缓存：unordered_map 在 insert/rehash 时会使所有迭代器和指针失效，
-        // 因此无论新增还是更新都必须重建，避免缓存中残留野指针。
-        rebuildAllDefsCache();
-        
-        return true;
-    }
-    
-    bool unregisterNode(const std::string& nodeId) override
-    {
-        auto it = m_nodeDefinitions.find(nodeId);
-        if (it == m_nodeDefinitions.end()) return false;
-        
-        m_nodeDefinitions.erase(it);
-        rebuildAllDefsCache();
-        return true;
-    }
-    
-    const NodeDefinition* getNodeDefinition(const std::string& nodeId) const override
-    {
-        auto it = m_nodeDefinitions.find(nodeId);
-        return (it != m_nodeDefinitions.end()) ? &it->second : nullptr;
-    }
-    
-    const std::vector<const NodeDefinition*>& getAllNodeDefinitions() const override
-    {
-        return m_allDefsCache;
-    }
-    
-    std::vector<NodeDefinition> getNodesByCategory(const std::string& categoryId) const override
-    {
-        std::vector<NodeDefinition> result;
-        for (const auto& pair : m_nodeDefinitions)
-        {
-            if (pair.second.category == categoryId)
-            {
-                result.push_back(pair.second);
-            }
-        }
-        return result;
-    }
-    
-    std::vector<NodeDefinition> getNodesByCategoryPrefix(const std::string& prefix) const override
-    {
-        std::vector<NodeDefinition> result;
-        for (const auto& pair : m_nodeDefinitions)
-        {
-            const auto& cat = pair.second.category;
-            // 精确匹配 或 前缀+/ 匹配
-            if (cat == prefix || 
-                (cat.size() > prefix.size() && 
-                 cat.compare(0, prefix.size(), prefix) == 0 && 
-                 cat[prefix.size()] == '/'))
-            {
-                result.push_back(pair.second);
-            }
-        }
-        return result;
-    }
-    
-    bool registerCategory(const NodeCategory& category) override
-    {
-        if (category.id.empty()) return false;
-        
-        m_categories[category.id] = category;
-        return true;
-    }
-    
-    std::vector<NodeCategory> getAllCategories() const override
-    {
-        std::vector<NodeCategory> result;
-        for (const auto& pair : m_categories)
-        {
-            result.push_back(pair.second);
-        }
-        return result;
-    }
-    
-    std::vector<std::string> getAllCategoryPaths() const override
-    {
-        std::vector<std::string> result;
-        std::unordered_map<std::string, bool> seen;
-        for (const auto& pair : m_nodeDefinitions)
-        {
-            const auto& cat = pair.second.category;
-            if (!cat.empty() && seen.find(cat) == seen.end())
-            {
-                seen[cat] = true;
-                result.push_back(cat);
-            }
-        }
-        return result;
-    }
-    
+    bool registerNode(const NodeDefinition& definition) override;
+    bool unregisterNode(const std::string& nodeId) override;
+    const NodeDefinition* getNodeDefinition(const std::string& nodeId) const override;
+    const std::vector<const NodeDefinition*>& getAllNodeDefinitions() const override;
+    std::vector<NodeDefinition> getNodesByCategory(const std::string& categoryId) const override;
+    std::vector<NodeDefinition> getNodesByCategoryPrefix(const std::string& prefix) const override;
+    bool registerCategory(const NodeCategory& category) override;
+    std::vector<NodeCategory> getAllCategories() const override;
+    std::vector<std::string> getAllCategoryPaths() const override;
+
 private:
-    void rebuildAllDefsCache() const
-    {
-        m_allDefsCache.clear();
-        m_allDefsCache.reserve(m_nodeDefinitions.size());
-        for (const auto& pair : m_nodeDefinitions)
-            m_allDefsCache.push_back(&pair.second);
-    }
+    void rebuildAllDefsCache() const;
 
     std::unordered_map<std::string, NodeDefinition>   m_nodeDefinitions;
     std::unordered_map<std::string, NodeCategory>     m_categories;
-    mutable std::vector<const NodeDefinition*>        m_allDefsCache;  // 缓存，避免每次调用时拷贝
+    mutable std::vector<const NodeDefinition*>        m_allDefsCache;
 };
 
 } // namespace Runtime
