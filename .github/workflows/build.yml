@@ -117,6 +117,94 @@ jobs:
       - name: Run tests
         run: ctest --test-dir build --output-on-failure
 
+  # ── macOS / Clang ───────────────────────────────────────────────────────────
+  macos:
+    name: macOS (Clang, runtime-only static)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install googletest
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_RUNTIME_ONLY=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
+
+  # ── iOS / Xcode (build-only, no tests) ──────────────────────────────────────
+  ios:
+    name: iOS (Clang, runtime-only static, build-only)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: |
+          cmake -B build-ios \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_RUNTIME_ONLY=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_EXAMPLES=OFF
+
+      - name: Build
+        run: cmake --build build-ios --parallel -- -sdk iphoneos
+
+      - name: Check output
+        run: |
+          find build-ios -name "*.a" | head -5
+          echo "iOS static lib build succeeded"
+
+  # ── Android / NDK (build-only, no tests) ────────────────────────────────────
+  android:
+    name: Android (arm64-v8a, runtime-only static, build-only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Android NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Find NDK path
+        id: ndk
+        run: |
+          NDK_PATH=$(ls -d $ANDROID_SDK_ROOT/ndk/* 2>/dev/null | sort -V | tail -1)
+          echo "path=$NDK_PATH" >> $GITHUB_OUTPUT
+          echo "NDK: $NDK_PATH"
+
+      - name: Configure
+        run: |
+          cmake -B build-android \
+            -DCMAKE_TOOLCHAIN_FILE=${{ steps.ndk.outputs.path }}/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-21 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_RUNTIME_ONLY=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_EXAMPLES=OFF
+
+      - name: Build
+        run: cmake --build build-android --parallel
+
+      - name: Check output
+        run: |
+          find build-android -name "*.a" | head -5
+          echo "Android static lib build succeeded"
+
   # ── WebGL / Emscripten ──────────────────────────────────────────────────────
   wasm:
     name: WebGL (Emscripten)
