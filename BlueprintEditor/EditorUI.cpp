@@ -4,6 +4,8 @@
 #include "FileDialogs.h"
 #include <filesystem>
 
+namespace fs = std::filesystem;
+
 // ============================================================================
 // 引脚图标颜色
 // ============================================================================
@@ -1214,54 +1216,165 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     }
                 }
 
+                // 补全扩展名：File 引脚通常只存文件名（无扩展名 或 .json）
                 if (!filePath.empty())
                 {
-                    // 如果是相对路径，基于当前文档所在目录解析
-                    bool isAbsolute = false;
-#ifdef _WIN32
-                    isAbsolute = (filePath.size() >= 2 && filePath[1] == ':') ||
-                                 (filePath.size() >= 2 && filePath[0] == '\\' && filePath[1] == '\\');
-#else
-                    isAbsolute = (!filePath.empty() && filePath[0] == '/');
-#endif
-                    if (!isAbsolute && !ActiveDoc()->filePath.empty())
-                    {
-                        std::string dir = ActiveDoc()->filePath;
-                        size_t lastSlash = dir.find_last_of("/\\");
-                        if (lastSlash != std::string::npos)
-                            dir = dir.substr(0, lastSlash + 1);
-                        else
-                            dir.clear();
-                        filePath = dir + filePath;
-                    }
+                    // 去掉末尾空格
+                    while (!filePath.empty() && filePath.back() == ' ') filePath.pop_back();
 
-                    // 检查文件是否已在某个标签页中打开
-                    bool alreadyOpen = false;
-                    for (int i = 0; i < (int)m_Documents.size(); ++i)
+                    // 如果没有 .json / .bp.json 扩展名，补 .bp.json
+                    auto hasSuffix = [](const std::string& s, const std::string& suf) {
+                        return s.size() >= suf.size() &&
+                               s.compare(s.size() - suf.size(), suf.size(), suf) == 0;
+                    };
+                    if (!hasSuffix(filePath, ".json"))
+                        filePath += ".bp.json";
+                }
+
+                if (!filePath.empty())
+                {
+                    // 优先通过工程路径解析
+                    std::string resolvedPath;
+                    if (m_Project.IsOpen())
                     {
-                        if (m_Documents[i]->filePath == filePath)
+                        // 在工程 blueprints 和 libraries 里按文件名匹配
+                        auto stem = fs::path(filePath).stem().string();
+                        // stem 可能是 "Foo.bp"，再去一层
+                        if (stem.size() > 3 && stem.substr(stem.size()-3) == ".bp")
+                            stem = stem.substr(0, stem.size()-3);
+
+                        for (const auto& e : m_Project.blueprints)
                         {
-                            // 延迟切换到已有标签页
-                            m_PendingSwitchTabIndex = i;
-                            alreadyOpen = true;
-                            break;
+                            std::string abs = m_Project.AbsPath(e.relativePath);
+                            std::string es  = fs::path(e.relativePath).stem().string();
+                            if (es.size() > 3 && es.substr(es.size()-3) == ".bp")
+                                es = es.substr(0, es.size()-3);
+                            if (es == stem && fs::exists(abs))
+                            { resolvedPath = abs; break; }
+                        }
+                        if (resolvedPath.empty())
+                        {
+                            for (const auto& e : m_Project.libraries)
+                            {
+                                std::string abs = m_Project.AbsPath(e.relativePath);
+                                std::string es  = fs::path(e.relativePath).stem().string();
+                                if (es.size() > 3 && es.substr(es.size()-3) == ".bp")
+                                    es = es.substr(0, es.size()-3);
+                                if (es == stem && fs::exists(abs))
+                                { resolvedPath = abs; break; }
+                            }
                         }
                     }
 
-                    if (!alreadyOpen)
+                    // 回退：基于当前文档目录的相对路径解析
+                    if (resolvedPath.empty())
                     {
-                        // 延迟打开文件（在 ed::End() 之后执行）
-                        m_PendingOpenFilePath = filePath;
+                        bool isAbsolute = false;
+#ifdef _WIN32
+                        isAbsolute = (filePath.size() >= 2 && filePath[1] == ':') ||
+                                     (filePath.size() >= 2 && filePath[0] == '\\' && filePath[1] == '\\');
+#else
+                        isAbsolute = (!filePath.empty() && filePath[0] == '/');
+#endif
+                        if (!isAbsolute && !ActiveDoc()->filePath.empty())
+                        {
+                            std::string dir = ActiveDoc()->filePath;
+                            size_t lastSlash = dir.find_last_of("/\\");
+                            if (lastSlash != std::string::npos)
+                                dir = dir.substr(0, lastSlash + 1);
+                            else
+                                dir.clear();
+                            resolvedPath = dir + filePath;
+                        }
+                        else
+                        {
+                            resolvedPath = filePath;
+                        }
+                    }
+
+                    if (!resolvedPath.empty() && fs::exists(resolvedPath))
+                    {
+                        std::string normResolved = fs::path(resolvedPath).lexically_normal().string();
+                        bool alreadyOpen = false;
+                        for (int i = 0; i < (int)m_Documents.size(); ++i)
+                        {
+                            if (fs::path(m_Documents[i]->filePath).lexically_normal().string() == normResolved)
+                            {
+                                m_PendingSwitchTabIndex = i;
+                                alreadyOpen = true;
+                                break;
+                            }
+                        }
+                        if (!alreadyOpen)
+                            m_PendingOpenFilePath = resolvedPath;
+                    }
+                    else
+                    {
+                        ActiveDoc()->executionLog.push_back("[INFO] ExecuteBlueprint: cannot find file: " + filePath);
+                        ActiveDoc()->executionLogDirty = true;
                     }
                 }
                 else
                 {
-                    // File 引脚为空，在执行日志中提示
-                    if (ActiveDoc())
+                    ActiveDoc()->executionLog.push_back("[INFO] Double-clicked Execute Blueprint node, but File pin is empty.");
+                    ActiveDoc()->executionLogDirty = true;
+                }
+            }
+            else if (node && node->DefinitionId.rfind("FuncLib.", 0) == 0)
+            {
+                // FuncLib.<libStem>.<funcId> → 在工程 libraries 里找对应的库文件并打开定位
+                // 提取 libStem：FuncLib.<libStem>.<funcId>，libStem 可能含多个 '.'
+                const std::string& defId = node->DefinitionId;
+                // 去掉 "FuncLib." 前缀，再从右侧剥离最后一段（funcId）
+                std::string withoutPrefix = defId.substr(8);  // 去掉 "FuncLib."
+                size_t lastDot = withoutPrefix.rfind('.');
+                std::string libStem = (lastDot != std::string::npos)
+                                      ? withoutPrefix.substr(0, lastDot)
+                                      : withoutPrefix;
+                std::string funcId  = (lastDot != std::string::npos)
+                                      ? withoutPrefix.substr(lastDot + 1)
+                                      : "";
+
+                // 在工程 libraries 中找文件名 stem 匹配的库
+                std::string libAbsPath;
+                if (m_Project.IsOpen())
+                {
+                    for (const auto& e : m_Project.libraries)
                     {
-                        ActiveDoc()->executionLog.push_back("[INFO] Double-clicked Execute Blueprint node, but File pin is empty.");
-                        ActiveDoc()->executionLogDirty = true;
+                        std::string abs = m_Project.AbsPath(e.relativePath);
+                        std::string es  = fs::path(e.relativePath).stem().string();
+                        // 去掉 .bp 后缀（文件名 Foo.bp.json → stem = Foo.bp → 再去 = Foo）
+                        if (es.size() > 3 && es.substr(es.size()-3) == ".bp")
+                            es = es.substr(0, es.size()-3);
+                        if (es == libStem && fs::exists(abs))
+                        { libAbsPath = abs; break; }
                     }
+                }
+
+                if (!libAbsPath.empty())
+                {
+                    std::string normLib = fs::path(libAbsPath).lexically_normal().string();
+                    bool alreadyOpen = false;
+                    for (int i = 0; i < (int)m_Documents.size(); ++i)
+                    {
+                        if (fs::path(m_Documents[i]->filePath).lexically_normal().string() == normLib)
+                        {
+                            m_PendingSwitchTabIndex = i;
+                            m_PendingNavigateToFunc = funcId;
+                            alreadyOpen = true;
+                            break;
+                        }
+                    }
+                    if (!alreadyOpen)
+                    {
+                        m_PendingOpenFilePath   = libAbsPath;
+                        m_PendingNavigateToFunc = funcId;
+                    }
+                }
+                else
+                {
+                    ActiveDoc()->executionLog.push_back("[INFO] FuncLib node: cannot find library for: " + defId);
+                    ActiveDoc()->executionLogDirty = true;
                 }
             }
         }
@@ -1450,14 +1563,48 @@ void BlueprintEditor::OnFrame(float deltaTime)
     {
         m_ActiveDocIndex = m_PendingSwitchTabIndex;
         ed::SetCurrentEditor(ActiveDoc()->editorContext);
-        ActiveDoc()->needNavigateToContent = 1;
         m_PendingSwitchTabIndex = -1;
+        if (!m_PendingNavigateToFunc.empty())
+        {
+            // 在 Functions 面板中定位并展开对应函数
+            auto* doc = ActiveDoc();
+            for (int fi = 0; fi < (int)doc->functions.size(); ++fi)
+            {
+                if (doc->functions[fi].id == m_PendingNavigateToFunc)
+                {
+                    doc->selectedFuncIdx = fi;
+                    doc->needNavigateToContent = 2;
+                    break;
+                }
+            }
+            m_PendingNavigateToFunc.clear();
+        }
+        else
+        {
+            ActiveDoc()->needNavigateToContent = 1;
+        }
     }
     else if (!m_PendingOpenFilePath.empty())
     {
         std::string pathToOpen = m_PendingOpenFilePath;
+        std::string funcToNav  = m_PendingNavigateToFunc;
         m_PendingOpenFilePath.clear();
+        m_PendingNavigateToFunc.clear();
         DoOpenFile(pathToOpen);
+        // 文件打开后定位函数
+        if (!funcToNav.empty() && ActiveDoc())
+        {
+            auto* doc = ActiveDoc();
+            for (int fi = 0; fi < (int)doc->functions.size(); ++fi)
+            {
+                if (doc->functions[fi].id == funcToNav)
+                {
+                    doc->selectedFuncIdx = fi;
+                    doc->needNavigateToContent = 2;
+                    break;
+                }
+            }
+        }
     }
 
     editorMin = ImGui::GetItemRectMin();

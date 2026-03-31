@@ -169,17 +169,7 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
     drawList->AddRectFilled(viewTL_map, viewBR_map, IM_COL32(75, 140, 190, 22));
     drawList->AddRect(viewTL_map, viewBR_map, IM_COL32(90, 155, 220, 150), 0.0f, 0, 1.5f);
 
-    // 小地图标题（VS 2022 扁平色带）
-    float titleH = 16.0f;
-    drawList->AddRectFilled(
-        mapMin, ImVec2(mapMax.x, mapMin.y + titleH),
-        IM_COL32(30, 30, 38, 230), 6.0f);
-    drawList->AddLine(
-        ImVec2(mapMin.x, mapMin.y + titleH - 1.0f),
-        ImVec2(mapMax.x, mapMin.y + titleH - 1.0f),
-        IM_COL32(0, 122, 204, 80));
-    drawList->AddText(ImVec2(mapMin.x + 6, mapMin.y + 1),
-                      IM_COL32(200, 200, 210, 220), "Minimap");
+    // 标题栏已移除，鼠标悬停时在角落显示 Tooltip
 
     // 点击/拖拽小地图导航到对应画布位置
     ImVec2 mousePos = ImGui::GetMousePos();
@@ -204,7 +194,8 @@ void BlueprintEditor::DrawMinimap(ImVec2 editorMin, ImVec2 editorMax)
             ed::NavigateToRect(navMin, navMax, false, 0.15f);
         }
 
-        // 鼠标悬停时改变光标样式提示可交互
+        // 鼠标悬停时改变光标样式，并显示 Tooltip
         ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        ImGui::SetTooltip("Minimap  (click/drag to navigate)");
     }
 }

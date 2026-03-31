@@ -693,11 +693,47 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                 }
             }
 
-            // ---- 执行可视化：绿色发光边框高亮已执行节点（脉冲动画）----
+            // ---- 执行可视化：断点命中持续橙色高亮 + 执行后绿色脉冲 ----
             {
                 uint64_t nid = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(node.ID.AsPointer()));
+
+                // 断点暂停：无论 executedNodeHighlight 是否存在，持续渲染橙色高亮
+                bool isPausedAtThis = false;
+                if (ActiveDoc()->persistentRunner.IsPaused())
+                {
+                    const auto& topo = ActiveDoc()->persistentRunner.GetTopoCache();
+                    size_t stepIdx   = ActiveDoc()->persistentRunner.GetStepTopoIndex();
+                    if (stepIdx < topo.size())
+                        isPausedAtThis = (static_cast<uint64_t>(topo[stepIdx]) == nid);
+                }
+
+                if (isPausedAtThis)
+                {
+                    // 橙色持续脉冲（用 sin(time) 驱动，暂停期间不会消失）
+                    float pulse = 0.5f + 0.5f * sinf((float)ImGui::GetTime() * 4.0f);
+                    int   a     = 120 + static_cast<int>(pulse * 120);
+
+                    auto dl2 = ed::GetNodeBackgroundDrawList(node.ID);
+                    auto np2 = ed::GetNodePosition(node.ID);
+                    auto ns2 = ed::GetNodeSize(node.ID);
+                    ImVec2 rMin(np2.x, np2.y);
+                    ImVec2 rMax(np2.x + ns2.x, np2.y + ns2.y);
+
+                    // 半透明橙色背景填充，视觉更明显
+                    dl2->AddRectFilled(rMin - ImVec2(4,4), rMax + ImVec2(4,4),
+                        IM_COL32(255, 160, 30, 25 + static_cast<int>(pulse * 20)), 10.0f);
+                    // 内层粗边框
+                    dl2->AddRect(rMin - ImVec2(4,4), rMax + ImVec2(4,4),
+                        IM_COL32(255, 190, 50, a), 10.0f, 0, 3.5f);
+                    // 外层光晕
+                    dl2->AddRect(rMin - ImVec2(9,9), rMax + ImVec2(9,9),
+                        IM_COL32(255, 140, 20, a / 3), 13.0f, 0, 2.0f);
+                }
+
+                // 执行后绿色脉冲（计时器驱动，暂停命中节点时跳过避免叠加）
                 auto hlIt = ActiveDoc()->executedNodeHighlight.find(nid);
-                if (hlIt != ActiveDoc()->executedNodeHighlight.end() && hlIt->second > 0.0f)
+                if (!isPausedAtThis &&
+                    hlIt != ActiveDoc()->executedNodeHighlight.end() && hlIt->second > 0.0f)
                 {
                     float t       = hlIt->second / 3.0f;
                     if (t > 1.0f) t = 1.0f;
@@ -707,50 +743,16 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                     else                pulse = 1.0f - (elapsed - 0.3f) / 0.7f;
                     int a = static_cast<int>(pulse * 200);
 
-                    auto drawList = ed::GetNodeBackgroundDrawList(node.ID);
-                    auto nodePos  = ed::GetNodePosition(node.ID);
-                    auto nodeSize = ed::GetNodeSize(node.ID);
-                    ImVec2 rectMin = nodePos;
-                    ImVec2 rectMax = ImVec2(nodePos.x + nodeSize.x, nodePos.y + nodeSize.y);
+                    auto dl = ed::GetNodeBackgroundDrawList(node.ID);
+                    auto np = ed::GetNodePosition(node.ID);
+                    auto ns = ed::GetNodeSize(node.ID);
+                    ImVec2 rMin(np.x, np.y);
+                    ImVec2 rMax(np.x + ns.x, np.y + ns.y);
 
-                    // Paused 时断点节点：橙色边框（区别于执行后的绿色）
-                    // 判断：Runner 处于 Paused 且当前节点是下一步将执行的节点
-                    bool isPausedAtThis = false;
-                    if (ActiveDoc()->persistentRunner.IsPaused())
-                    {
-                        const auto& topo = ActiveDoc()->persistentRunner.GetTopoCache();
-                        size_t stepIdx   = ActiveDoc()->persistentRunner.GetStepTopoIndex();
-                        if (stepIdx < topo.size())
-                        {
-                            uint64_t bpNid = static_cast<uint64_t>(topo[stepIdx]);
-                            isPausedAtThis = (bpNid == nid);
-                        }
-                    }
-
-                    if (isPausedAtThis)
-                    {
-                        // 橙色脉冲：断点暂停在此节点
-                        drawList->AddRect(
-                            rectMin - ImVec2(3, 3),
-                            rectMax + ImVec2(3, 3),
-                            IM_COL32(255, 160, 30, a), 8.0f, 0, 3.0f);
-                        drawList->AddRect(
-                            rectMin - ImVec2(6, 6),
-                            rectMax + ImVec2(6, 6),
-                            IM_COL32(255, 160, 30, a / 3), 10.0f, 0, 2.0f);
-                    }
-                    else
-                    {
-                        // 绿色脉冲：节点已执行
-                        drawList->AddRect(
-                            rectMin - ImVec2(3, 3),
-                            rectMax + ImVec2(3, 3),
-                            IM_COL32(50, 255, 100, a), 8.0f, 0, 3.0f);
-                        drawList->AddRect(
-                            rectMin - ImVec2(6, 6),
-                            rectMax + ImVec2(6, 6),
-                            IM_COL32(50, 255, 100, a / 3), 10.0f, 0, 2.0f);
-                    }
+                    dl->AddRect(rMin - ImVec2(3,3), rMax + ImVec2(3,3),
+                        IM_COL32(50, 255, 100, a), 8.0f, 0, 3.0f);
+                    dl->AddRect(rMin - ImVec2(6,6), rMax + ImVec2(6,6),
+                        IM_COL32(50, 255, 100, a / 3), 10.0f, 0, 2.0f);
                 }
 
                 // ---- 断点标记：红色圆圈显示在节点左上角 ----
