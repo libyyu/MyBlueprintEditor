@@ -1216,21 +1216,21 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     }
                 }
 
-                // 补全扩展名：没有 .json 后缀时自动补 .json
+                // 补全扩展名：没有 .bjson 后缀时自动补 .bjson
                 if (!filePath.empty())
                 {
                     // 去掉末尾空格
                     while (!filePath.empty() && filePath.back() == ' ') filePath.pop_back();
 
-                    // 不区分大小写检查是否已有 .json 后缀
+                    // 不区分大小写检查是否已有 .bjson 后缀
                     auto hasSuffix = [](const std::string& s, const std::string& suf) {
                         if (s.size() < suf.size()) return false;
                         std::string tail = s.substr(s.size() - suf.size());
                         for (auto& c : tail) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
                         return tail == suf;
                     };
-                    if (!hasSuffix(filePath, ".json"))
-                        filePath += ".json";
+                    if (!hasSuffix(filePath, ".bjson") && !hasSuffix(filePath, ".json"))
+                        filePath += ".bjson";
                 }
 
                 if (!filePath.empty())

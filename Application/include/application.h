@@ -36,6 +36,7 @@ struct Application
     virtual void OnStart() {}
     virtual void OnStop() {}
     virtual void OnFrame(float deltaTime) {}
+    virtual void OnDropFile(const std::string& /*filePath*/) {}  // 文件拖入窗口时回调
 
     virtual ImGuiWindowFlags GetWindowFlags() const;
 

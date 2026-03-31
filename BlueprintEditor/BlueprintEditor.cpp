@@ -1038,6 +1038,42 @@ void BlueprintEditor::OnStart()
     // 设置初始标题
     SetTitle("Blueprint Editor - [No Project]");
     BPLOG("BlueprintEditor started");
+
+    // 命令行参数：支持 BlueprintEditor.exe file.bjson 或 file.bproj（系统右键"打开方式"）
+    if (m_Argc >= 2)
+    {
+        for (int i = 1; i < m_Argc; ++i)
+        {
+            if (!m_Argv || !m_Argv[i]) continue;
+            std::string arg(m_Argv[i]);
+            if (arg.empty() || arg[0] == '-') continue;  // 跳过选项
+
+            // 根据扩展名分发
+            auto hasSuffix = [](const std::string& s, const std::string& suf) {
+                if (s.size() < suf.size()) return false;
+                std::string t = s.substr(s.size() - suf.size());
+                for (auto& c : t) c = static_cast<char>(::tolower((unsigned char)c));
+                return t == suf;
+            };
+
+            if (hasSuffix(arg, ".bproj"))
+            {
+                BpProject proj;
+                if (LoadBpProject(proj, arg))
+                {
+                    m_Project = std::move(proj);
+                    SyncProjectLibrariesToRegistry();
+                    SetTitle(("Blueprint Editor - [" + m_Project.name + "]").c_str());
+                    AddRecentProject(m_Project.filePath);
+                }
+            }
+            else if (hasSuffix(arg, ".bjson") || hasSuffix(arg, ".bjson.editor") ||
+                     hasSuffix(arg, ".json"))
+            {
+                DoOpenFile(arg);
+            }
+        }
+    }
 }
 
 void BlueprintEditor::OnStop()

@@ -647,11 +647,14 @@ struct BlueprintEditor : public Application
     void OnStart() override;
     void OnStop() override;
     void OnFrame(float deltaTime) override;
+    void OnDropFile(const std::string& filePath) override;  // 文件拖拽打开
     ImGuiWindowFlags GetWindowFlags() const override;
 
     // ------------------------------------------------------------------
     // 成员变量（全局共享，不随文档变化）
     // ------------------------------------------------------------------
+    int                  m_Argc = 0;
+    char**               m_Argv = nullptr;
     const int            m_PinIconSize = 24;
     ImTextureID          m_HeaderBackground = ImTextureID_Invalid;
     ImTextureID          m_SaveIcon = ImTextureID_Invalid;

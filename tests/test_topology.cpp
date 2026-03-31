@@ -127,13 +127,14 @@ TEST(TopologyTest, ForLoopExecution)
     BlueprintRunner runner;
     RegisterBuiltinHandlers(runner, ".");
 
-    bool loaded = runner.LoadFromFile("TestBP.01.json");
+    bool loaded = runner.LoadFromFile("TestBP.01.bjson");
     if (!loaded)
     {
-        GTEST_SKIP() << "TestBP.01.json not found in working directory";
+        GTEST_SKIP() << "TestBP.01.bjson not found in working directory";
         return;
     }
     auto result = runner.Execute();
     EXPECT_TRUE(result.success) << runner.GetLastError();
     EXPECT_GT(result.nodesExecuted, 0u);
 }
+

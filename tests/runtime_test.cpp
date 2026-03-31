@@ -129,14 +129,14 @@ static void test_variant_map()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 测试 4：BlueprintRunner 执行 flow_test.json
+// 测试 4：BlueprintRunner 执行 flow_test.bjson
 //   拓扑：SetVariable(counter=0) → ForLoop(0..4) → AddIndex+GetVariable →
 //         SetVariable(counter+=index) → PrintString →
 //         [完成后] Branch(counter>=10) → PrintTrue/PrintFalse
 // ─────────────────────────────────────────────────────────────────────────────
 static void test_flow_blueprint()
 {
-    std::cout << "\n[Test 4] BlueprintRunner – flow_test.json 执行\n";
+    std::cout << "\n[Test 4] BlueprintRunner – flow_test.bjson 执行\n";
 
     // 注册内置节点
     BlueprintRunner runner;
@@ -152,8 +152,8 @@ static void test_flow_blueprint()
     });
 
     // 加载蓝图
-    bool loaded = runner.LoadFromFile("flow_test.json");
-    CHECK(loaded, "flow_test.json 加载成功");
+    bool loaded = runner.LoadFromFile("flow_test.bjson");
+    CHECK(loaded, "flow_test.bjson 加载成功");
     if (!loaded)
     {
         std::cout << "    Error: " << runner.GetLastError() << "\n";
@@ -337,3 +337,4 @@ int main()
     std::cout << "PASS: " << g_pass << "  FAIL: " << g_fail << "\n";
     return (g_fail == 0) ? 0 : 1;
 }
+

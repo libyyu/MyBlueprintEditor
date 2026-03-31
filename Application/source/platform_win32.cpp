@@ -9,8 +9,10 @@
 # define NOMINMAX
 # define WIN32_LEAN_AND_MEAN
 # include <windows.h>
+# include <shellapi.h>   // DragAcceptFiles / DragQueryFile / DragFinish
 # include <tchar.h>
 # include <string>
+# include <functional>
 
 # include <imgui.h>
 # include "imgui_impl_win32.h"
@@ -64,6 +66,9 @@ struct PlatformWin32 final
     bool            m_WasMinimized = false;
     bool            m_CanCloseResult = false;
     Renderer*       m_Renderer = nullptr;
+
+    // 拖拽文件回调（由 Application 层注册）
+    std::function<void(const std::string&)> m_OnDropFile;
 };
 
 std::unique_ptr<Platform> CreatePlatform(Application& application)
@@ -135,7 +140,8 @@ bool PlatformWin32::OpenMainWindow(const char* title, int width, int height)
     if (m_MainWindowHandle)
         return false;
 
-    m_MainWindowHandle = CreateWindow(
+    m_MainWindowHandle = CreateWindowEx(
+        WS_EX_ACCEPTFILES,           // 接受拖拽文件
         m_WindowClass.lpszClassName,
         Utf8ToNative(title).c_str(),
         WS_OVERLAPPEDWINDOW,
@@ -153,6 +159,11 @@ bool PlatformWin32::OpenMainWindow(const char* title, int width, int height)
         m_MainWindowHandle = nullptr;
         return false;
     }
+
+    // 注册拖拽文件回调
+    m_OnDropFile = [this](const std::string& path) {
+        m_Application.OnDropFile(path);
+    };
 
     SetDpiScale(ImGui_ImplWin32_GetDpiScaleForHwnd(m_MainWindowHandle));
 
@@ -269,6 +280,21 @@ LRESULT PlatformWin32::WinProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 
     switch (msg)
     {
+        case WM_DROPFILES:
+        {
+            HDROP hDrop = reinterpret_cast<HDROP>(wParam);
+            UINT fileCount = DragQueryFileA(hDrop, 0xFFFFFFFF, nullptr, 0);
+            for (UINT i = 0; i < fileCount; ++i)
+            {
+                char path[MAX_PATH] = {};
+                DragQueryFileA(hDrop, i, path, MAX_PATH);
+                if (m_OnDropFile)
+                    m_OnDropFile(std::string(path));
+            }
+            DragFinish(hDrop);
+            return 0;
+        }
+
         case WM_CLOSE:
             m_CanCloseResult = m_Application.CanClose();
             if (m_CanCloseResult)

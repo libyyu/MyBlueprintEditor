@@ -164,15 +164,24 @@ void BlueprintEditor::UpdateBlueprintReferences(const std::string& oldAbsPath,
 {
     if (!m_Project.IsOpen()) return;
 
-    // 计算旧/新的 stem（不含 .json / .editor.json 扩展名的纯文件名）
+    // 计算旧/新的 stem（不含扩展名的纯文件名）
     // 用于替换 FuncLib.<stem>.funcId 这类 definitionId
-    std::string oldStem = fs::path(oldAbsPath).stem().string();
-    // stem 可能是 "Foo.editor"（如果文件是 .editor.json），去掉再去一层
-    if (oldStem.size() > 7 && oldStem.substr(oldStem.size() - 7) == ".editor")
-        oldStem = oldStem.substr(0, oldStem.size() - 7);
-    std::string newStem = fs::path(newAbsPath).stem().string();
-    if (newStem.size() > 7 && newStem.substr(newStem.size() - 7) == ".editor")
-        newStem = newStem.substr(0, newStem.size() - 7);
+    // Foo.bjson → stem = Foo;  Foo.bjson.editor → stem = Foo
+    auto extractStem = [](const std::string& absPath) -> std::string {
+        std::string s = fs::path(absPath).filename().string();
+        // 去掉 .editor 后缀
+        if (s.size() > 7 && s.substr(s.size()-7) == ".editor")
+            s = s.substr(0, s.size()-7);
+        // 去掉 .bjson
+        if (s.size() > 6 && s.substr(s.size()-6) == ".bjson")
+            s = s.substr(0, s.size()-6);
+        // 兼容旧 .json
+        if (s.size() > 5 && s.substr(s.size()-5) == ".json")
+            s = s.substr(0, s.size()-5);
+        return s;
+    };
+    std::string oldStem = extractStem(oldAbsPath);
+    std::string newStem = extractStem(newAbsPath);
 
     // 旧/新相对路径（相对于工程目录，用于 dependencies 数组替换）
     std::string oldRel = m_Project.RelPath(oldAbsPath);
@@ -276,7 +285,7 @@ void BlueprintEditor::UpdateBlueprintReferences(const std::string& oldAbsPath,
         if (modified)
         {
             // 重新序列化保存（保留 editor 数据）
-            std::string editorPath = filePath.substr(0, filePath.rfind('.')) + ".editor.json";
+            std::string editorPath = filePath + ".editor";
             bool hasEditor = fs::exists(editorPath);
 
             if (hasEditor)
@@ -679,9 +688,9 @@ void BlueprintEditor::DrawProjectPanel()
                             fs::rename(oldAbs, newAbs, ec);
                             if (!ec)
                             {
-                                // 同步 editor 文件（.editor.json）
-                                std::string oldEditor = oldAbs.substr(0, oldAbs.rfind('.')) + ".editor.json";
-                                std::string newEditor = newAbs.substr(0, newAbs.rfind('.')) + ".editor.json";
+                                // 同步 editor 文件（.bjson.editor）
+                                std::string oldEditor = oldAbs + ".editor";
+                                std::string newEditor = newAbs + ".editor";
                                 if (fs::exists(oldEditor))
                                     fs::rename(oldEditor, newEditor, ec);
 

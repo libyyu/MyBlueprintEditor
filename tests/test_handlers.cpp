@@ -132,10 +132,10 @@ TEST_F(HandlersTest, SetGetVariable)
 TEST_F(HandlersTest, ForLoopAccumulation)
 {
     // 若测试 JSON 文件存在则执行端到端测试
-    bool loaded = runner.LoadFromFile("TestBP.01.json");
+    bool loaded = runner.LoadFromFile("TestBP.01.bjson");
     if (!loaded)
     {
-        GTEST_SKIP() << "TestBP.01.json not found in working directory";
+        GTEST_SKIP() << "TestBP.01.bjson not found in working directory";
         return;
     }
 
@@ -174,3 +174,4 @@ TEST_F(HandlersTest, PrintStringProducesLog)
         if (l.find("HELLO_TEST") != std::string::npos) { found = true; break; }
     EXPECT_TRUE(found) << "PrintString should produce a log containing 'HELLO_TEST'";
 }
+

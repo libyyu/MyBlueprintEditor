@@ -8,6 +8,8 @@ int Main(int argc, char** argv)
     CrashHandler::Install();
 
     BlueprintEditor editor("Blueprint Editor", argc, argv);
+    editor.m_Argc = argc;
+    editor.m_Argv = argv;
 
     if (editor.Create())
         return editor.Run();

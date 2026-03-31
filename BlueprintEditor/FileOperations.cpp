@@ -79,14 +79,11 @@ std::string GetFileBaseName(const std::string& path)
     return name;
 }
 
-// 获取 editor.json 路径
+// 获取 editor 路径
 std::string GetEditorFilePath(const std::string& runtimePath)
 {
-    // blueprint.json -> blueprint.editor.json
-    size_t lastDot = runtimePath.find_last_of('.');
-    if (lastDot != std::string::npos)
-        return runtimePath.substr(0, lastDot) + ".editor.json";
-    return runtimePath + ".editor.json";
+    // Foo.bjson -> Foo.bjson.editor
+    return runtimePath + ".editor";
 }
 
 } // anonymous namespace
@@ -180,7 +177,7 @@ void BlueprintEditor::NewFile(RTBlueprintClass bpClass)
 void BlueprintEditor::OpenFile()
 {
     std::string path = OpenFileDialog(
-        "Blueprint Files (*.json)\0*.json\0Editor Files (*.editor.json)\0*.editor.json\0All Files (*.*)\0*.*\0",
+        "Blueprint Files (*.bjson)\0*.bjson\0Editor Files (*.bjson.editor)\0*.bjson.editor\0All Files (*.*)\0*.*\0",
         "Open Blueprint"
     );
     
@@ -195,12 +192,12 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
     ::NodeEditor::Runtime::JsonBlueprintExporter exporter;
     ::NodeEditor::Runtime::ImportResult result;
     
-    // 判断用户选择的是 .editor.json 还是 .json
-    bool isEditorFile = (path.size() > 12 && path.substr(path.size() - 12) == ".editor.json");
+    // 判断用户选择的是 .bjson.editor 还是 .bjson
+    bool isEditorFile = (path.size() > 7 && path.substr(path.size() - 7) == ".editor");
     
     if (isEditorFile)
     {
-        // 直接从 .editor.json 加载（包含嵌入的 runtime 数据）
+        // 直接从 .bjson.editor 加载（包含嵌入的 runtime 数据）
         result = exporter.importFromEditorFile(path);
         
         if (!result.success)
@@ -220,8 +217,8 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
         // 加载数据到编辑器
         LoadEditorData(result.data);
         
-        // 保存对应的 runtime 文件路径（去掉 .editor 部分）
-        std::string runtimePath = path.substr(0, path.size() - 12) + ".json";
+        // 保存对应的 runtime 文件路径（去掉 .editor 后缀）
+        std::string runtimePath = path.substr(0, path.size() - 7);  // 去掉 ".editor"
         ActiveDoc()->filePath = runtimePath;
     }
     else
@@ -326,9 +323,9 @@ void BlueprintEditor::SaveFileAs()
 
     // 无工程：原有系统 Dialog
     std::string path = SaveFileDialog(
-        "Blueprint Files (*.json)\0*.json\0All Files (*.*)\0*.*\0",
+        "Blueprint Files (*.bjson)\0*.bjson\0All Files (*.*)\0*.*\0",
         "Save Blueprint As",
-        "json"
+        "bjson"
     );
 
     if (!path.empty())
@@ -916,11 +913,12 @@ static std::string NormalizePath(const std::string& path)
 // .editor.json 和 .json 视为同一文件
 static std::string GetCanonicalPath(const std::string& normalizedPath)
 {
-    const std::string editorSuffix = ".editor.json";
+    // .bjson.editor 和 .bjson 视为同一文件
+    const std::string editorSuffix = ".editor";
     if (normalizedPath.size() > editorSuffix.size() &&
         normalizedPath.substr(normalizedPath.size() - editorSuffix.size()) == editorSuffix)
     {
-        return normalizedPath.substr(0, normalizedPath.size() - editorSuffix.size()) + ".json";
+        return normalizedPath.substr(0, normalizedPath.size() - editorSuffix.size());
     }
     return normalizedPath;
 }
@@ -1176,12 +1174,12 @@ void BlueprintEditor::OpenSaveNameDialog(bool isNew, RTBlueprintClass bpClass)
     {
         std::string assetsDir = (fs::path(m_Project.projectDir) / "assets").string();
         fs::path fp(ActiveDoc()->filePath);
-        // 去掉所有已知扩展名（.editor.json / .json）
+        // 去掉所有已知扩展名（.bjson.editor / .bjson）
         std::string stem = fp.filename().string();
-        if (stem.size() > 12 && stem.substr(stem.size() - 12) == ".editor.json")
-            stem = stem.substr(0, stem.size() - 12);
-        else if (stem.size() > 5 && stem.substr(stem.size() - 5) == ".json")
-            stem = stem.substr(0, stem.size() - 5);
+        if (stem.size() > 13 && stem.substr(stem.size() - 13) == ".bjson.editor")
+            stem = stem.substr(0, stem.size() - 13);
+        else if (stem.size() > 6 && stem.substr(stem.size() - 6) == ".bjson")
+            stem = stem.substr(0, stem.size() - 6);
 
         // 若当前文件已在 assets 下，计算子目录路径
         try {
@@ -1217,14 +1215,52 @@ std::string BlueprintEditor::ResolveSaveDialogPath() const
     fs::path assetsDir = fs::path(m_Project.projectDir) / "assets";
     fs::path full      = assetsDir / raw;
 
-    // 追加扩展名（去掉用户自己加的，统一加 .json）
+    // 追加扩展名（去掉用户自己加的，统一加 .bjson）
     std::string fullStr = full.string();
-    // 剥掉 .editor.json / .json
-    if (fullStr.size() > 12 && fullStr.substr(fullStr.size() - 12) == ".editor.json")
-        fullStr = fullStr.substr(0, fullStr.size() - 12);
-    else if (fullStr.size() > 5 && fullStr.substr(fullStr.size() - 5) == ".json")
-        fullStr = fullStr.substr(0, fullStr.size() - 5);
+    // 剥掉 .bjson.editor / .bjson
+    if (fullStr.size() > 13 && fullStr.substr(fullStr.size() - 13) == ".bjson.editor")
+        fullStr = fullStr.substr(0, fullStr.size() - 13);
+    else if (fullStr.size() > 6 && fullStr.substr(fullStr.size() - 6) == ".bjson")
+        fullStr = fullStr.substr(0, fullStr.size() - 6);
 
-    fullStr += ".json";
+
+    fullStr += ".bjson";
     return fullStr;
+}
+
+// ============================================================================
+// 文件拖拽打开（WM_DROPFILES 回调）
+// ============================================================================
+
+void BlueprintEditor::OnDropFile(const std::string& filePath)
+{
+    if (filePath.empty()) return;
+
+    auto hasSuffix = [](const std::string& s, const std::string& suf) {
+        if (s.size() < suf.size()) return false;
+        std::string t = s.substr(s.size() - suf.size());
+        for (auto& c : t) c = static_cast<char>(::tolower((unsigned char)c));
+        return t == suf;
+    };
+
+    if (hasSuffix(filePath, ".bproj"))
+    {
+        // 拖拽工程文件：打开工程
+        BpProject proj;
+        if (LoadBpProject(proj, filePath))
+        {
+            CloseProject();
+            m_Project = std::move(proj);
+            SyncProjectLibrariesToRegistry();
+            SetTitle(("Blueprint Editor - [" + m_Project.name + "]").c_str());
+            AddRecentProject(m_Project.filePath);
+        }
+    }
+    else if (hasSuffix(filePath, ".bjson") || hasSuffix(filePath, ".bjson.editor") ||
+             hasSuffix(filePath, ".json")  || hasSuffix(filePath, ".editor.json"))
+    {
+        // 拖拽蓝图文件：打开
+        DoOpenFile(filePath);
+    }
+    // 其他格式静默忽略
 }
