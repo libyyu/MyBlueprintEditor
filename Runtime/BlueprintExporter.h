@@ -128,8 +128,7 @@ public:
     // ---- 单文件导出（runtime + editor 合并）----
 
     // 导出完整数据到单 .bjson 文件：{ "runtime": {...}, "editor": {...} }
-    // editorFilePath 参数已废弃，保留只为兼容旧调用签名，实际写入 runtimeFilePath
-    virtual EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& runtimeFilePath, const std::string& editorFilePath = "", const ExportOptions& options = ExportOptions()) const = 0;
+    virtual EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const = 0;
 
     // ---- 通用 ----
 
@@ -165,7 +164,9 @@ public:
     ImportResult importRuntimeFromFile(const std::string& filePath, const ImportOptions& options = ImportOptions()) const override;
 
     // 单文件导出（runtime + editor 合并）
-    EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& runtimeFilePath, const std::string& editorFilePath = "", const ExportOptions& options = ExportOptions()) const override;
+    EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const override;
+
+
 
     // 通用
     bool validate(const BlueprintData& data, std::vector<std::string>& errors) const override;
@@ -194,7 +195,9 @@ public:
     ImportResult importRuntimeFromString(const std::string& content, const ImportOptions& options = ImportOptions()) const override;
     ImportResult importRuntimeFromFile(const std::string& filePath, const ImportOptions& options = ImportOptions()) const override;
 
-    EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& runtimeFilePath, const std::string& editorFilePath = "", const ExportOptions& options = ExportOptions()) const override;
+    EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const override;
+
+
 
     bool validate(const BlueprintData& data, std::vector<std::string>& errors) const override;
     std::vector<ExportFormat> getSupportedFormats() const override;

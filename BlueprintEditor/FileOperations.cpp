@@ -184,10 +184,6 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
 {
     ::NodeEditor::Runtime::JsonBlueprintExporter exporter;
     ::NodeEditor::Runtime::ImportResult result;
-
-    // 单文件格式：importRuntimeFromFile 自动检测
-    // - 顶层有 "runtime" 字段 → 新格式，同时加载 editor 数据
-    // - 否则 → 纯 runtime 旧格式
     result = exporter.importRuntimeFromFile(path);
 
     if (!result.success)
@@ -361,45 +357,22 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
             ". Some features may not load correctly.");
     }
 
-    // 恢复蓝图类型（旧文件缺失时默认 Actor，向后兼容）
     ActiveDoc()->blueprintClass = data.metadata.blueprintClass;
-
-    // 保存 dependencies（加载时读入，之后 BuildRuntimeData 保存时写回）
     ActiveDoc()->dependencies = data.metadata.dependencies;
 
-    // 映射旧 ID -> 新 ID
-    std::unordered_map<uint64_t, int> nodeIdMap;  // old nodeId -> new nodeId
-    std::unordered_map<uint64_t, int> pinIdMap;   // old pinId -> new pinId
+    std::unordered_map<uint64_t, int> nodeIdMap;
+    std::unordered_map<uint64_t, int> pinIdMap;
     
-    // 创建节点
     for (const auto& rtNode : data.nodes)
     {
-        // 尝试通过 definitionId 创建节点
         auto* def = m_NodeRegistry.getNodeDefinition(rtNode.definitionId);
-        
-        // 如果 definitionId 找不到，可能是旧文件用了显示名（如 "For Loop" 而非 "ForLoop"）
-        // 尝试按 name 在注册表中反查
         std::string resolvedDefId = rtNode.definitionId;
-        if (!def)
-        {
-            auto& allDefs = m_NodeRegistry.getAllNodeDefinitions();
-            for (const auto* d : allDefs)
-            {
-                if (d->name == rtNode.definitionId || d->name == rtNode.name)
-                {
-                    def = m_NodeRegistry.getNodeDefinition(d->id);
-                    resolvedDefId = d->id;
-                    break;
-                }
-            }
-        }
         
         int newNodeId = GetNextId();
         nodeIdMap[rtNode.id] = newNodeId;
         
         if (def)
         {
-            // 使用定义创建节点
             ImColor color = GetNodeColor(def);
             NodeType ntype = NodeType::Blueprint;
 
@@ -422,28 +395,18 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
         }
         else
         {
-            // 定义未找到 → 标记为错误节点（UE4 风格）
             ActiveDoc()->nodes.emplace_back(newNodeId, rtNode.name.c_str());
             auto& node = ActiveDoc()->nodes.back();
             node.DefinitionId = rtNode.definitionId;
             node.HasError = true;
             node.ErrorMessage = "Node definition '" + rtNode.definitionId + "' not found";
-            node.Color = ImColor(180, 0, 0); // 深红色表示错误
+            node.Color = ImColor(180, 0, 0);
         }
         
         auto& node = ActiveDoc()->nodes.back();
 
-        // 恢复折叠状态：v2+ 读顶层 isCollapsed；v1 兼容读 customProperties["__collapsed"]
-        // （schema 迁移通常在 importRuntimeFromString 里已处理，此处 fallback 仅防御性保留）
-        {
-            node.isCollapsed = rtNode.isCollapsed;
-            if (!node.isCollapsed)
-            {
-                auto it = rtNode.customProperties.find("__collapsed");
-                if (it != rtNode.customProperties.end() && it->second == "1")
-                    node.isCollapsed = true;
-            }
-        }
+        // 恢复折叠状态
+        node.isCollapsed = rtNode.isCollapsed;
 
         // 恢复 Comment 节点颜色
         if (node.Type == NodeType::Comment)
@@ -1186,9 +1149,8 @@ void BlueprintEditor::OnDropFile(const std::string& filePath)
             AddRecentProject(m_Project.filePath);
         }
     }
-    else if (hasSuffix(filePath, ".bjson") || hasSuffix(filePath, ".json"))
+    else if (hasSuffix(filePath, ".bjson"))
     {
-        // 蓝图文件：打开
         DoOpenFile(filePath);
     }
     // 其他格式静默忽略

@@ -868,7 +868,6 @@ std::string JsonBlueprintExporter::exportEditorToString(const BlueprintData& dat
 
 EditorExportResult JsonBlueprintExporter::exportEditorFiles(const BlueprintData& data,
     const std::string& runtimeFilePath,
-    const std::string& /*editorFilePath*/,   // 已弃用，保留兼容签名
     const ExportOptions& options) const
 {
     EditorExportResult result;
@@ -877,33 +876,22 @@ EditorExportResult JsonBlueprintExporter::exportEditorFiles(const BlueprintData&
     try
     {
 #endif
-        // ── 生成 runtime JSON 字符串 ──────────────────────────────────────
         std::string runtimeJson = exportRuntimeToString(data, options);
+        std::string editorJson  = exportEditorToString(data, options);
 
-        // ── 生成 editor JSON 字符串 ───────────────────────────────────────
-        std::string editorJson = exportEditorToString(data, options);
-
-        // ── 合并为单文件：{ "runtime": {...}, "editor": {...} } ─────────
-        // 去掉两段 JSON 的首尾花括号，拼成顶层对象
-        // 更健壮的做法：重新解析后用 crude_json 组装，但为了性能直接字符串拼接
-        // runtimeJson 格式：{ ... }
-        // editorJson  格式：{ ... }
-
+        // 单文件格式：{ "runtime": {...}, "editor": {...} }
         std::ostringstream merged;
         bool pretty = options.prettyPrint;
         const std::string nl  = pretty ? "\n" : "";
         const std::string ind = pretty ? "    " : "";
 
         merged << "{" << nl;
-        // "runtime" 段：把 runtimeJson 整体嵌入
         merged << ind << "\"runtime\": " << runtimeJson << "," << nl;
-        // "editor" 段：把 editorJson 整体嵌入
         merged << ind << "\"editor\": "  << editorJson  << nl;
         merged << "}" << nl;
 
         std::string mergedStr = merged.str();
 
-        // ── 写入单文件 ────────────────────────────────────────────────────
         std::string errorMsg;
         if (!m_fileSystem->WriteFile(runtimeFilePath, mergedStr, errorMsg))
         {
@@ -911,26 +899,12 @@ EditorExportResult JsonBlueprintExporter::exportEditorFiles(const BlueprintData&
             return result;
         }
 
-        // ── 删除遗留的 .bjson.editor 文件（如存在） ──────────────────────
-        std::string legacyEditorPath = runtimeFilePath + ".editor";
-        {
-            std::string dummy;
-            // 用 ReadFile 探测文件是否存在；存在则写空文件再删（WriteFile 无 delete API）
-            // 改用 IFileSystem::DeleteFile 如有；否则用 platform-specific 方式
-#ifdef _MSC_VER
-            // Windows：直接 DeleteFileA
-            ::DeleteFileA(legacyEditorPath.c_str());
-#else
-            ::remove(legacyEditorPath.c_str());
-#endif
-        }
-
         result.success      = true;
         result.filePath     = runtimeFilePath;
         result.runtimePath  = runtimeFilePath;
-        result.editorPath   = runtimeFilePath;   // 单文件，两个路径相同
+        result.editorPath   = runtimeFilePath;
         result.runtimeBytes = mergedStr.size();
-        result.editorBytes  = 0;  // 合并后无独立 editor 文件
+        result.editorBytes  = 0;
 
 #ifndef __EMSCRIPTEN__
     }
@@ -1004,13 +978,11 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
     {
         auto& meta = rootObj["metadata"];
         result.data.metadata.schemaVersion = static_cast<int>(getNumber(meta, "schemaVersion", 0));
-        // blueprintClass：整数枚举，默认 0（Actor），旧文件缺失时向后兼容
         result.data.metadata.blueprintClass = static_cast<BlueprintClass>(
             static_cast<int>(getNumber(meta, "blueprintClass", 0)));
         result.data.metadata.name        = getString(meta, "name");
         result.data.metadata.description  = getString(meta, "description");
         result.data.metadata.version      = getString(meta, "version");
-        // Runtime 文件中可能不包含 author/timestamps，但仍兼容读取
         result.data.metadata.author       = getString(meta, "author");
         result.data.metadata.createdAt    = getString(meta, "createdAt");
         result.data.metadata.updatedAt    = getString(meta, "updatedAt");
@@ -1789,7 +1761,7 @@ ImportResult BinaryBlueprintExporter::importRuntimeFromFile(const std::string& /
     return result;
 }
 
-EditorExportResult BinaryBlueprintExporter::exportEditorFiles(const BlueprintData& /*data*/, const std::string& /*runtimeFilePath*/, const std::string& /*editorFilePath*/, const ExportOptions& /*options*/) const
+EditorExportResult BinaryBlueprintExporter::exportEditorFiles(const BlueprintData& /*data*/, const std::string& /*filePath*/, const ExportOptions& /*options*/) const
 {
     EditorExportResult result;
     result.errorMessage = "Binary editor export not yet implemented";

@@ -619,7 +619,7 @@ int main(int argc, char* argv[])
 
     // Step 1: 导出为两个文件 (Runtime + Editor)
     std::cout << "--- Step 1: Export to single .bjson file (runtime + editor) ---" << std::endl;
-    auto exportResult = exporter.exportEditorFiles(blueprint, "blueprint.bjson", "", opts);
+    auto exportResult = exporter.exportEditorFiles(blueprint, "blueprint.bjson", opts);
     if (!exportResult.success)
     {
 

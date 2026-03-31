@@ -75,7 +75,7 @@ void RegisterHandlers_Flow(
             return true;
         }
 
-        // 自动补全扩展名：没有已知后缀时补 .bjson
+        // 自动补全扩展名：没有 .bjson 后缀时补全
         {
             auto hasExt = [](const std::string& s, const std::string& ext) {
                 if (s.size() < ext.size()) return false;
@@ -83,7 +83,7 @@ void RegisterHandlers_Flow(
                 for (auto& c : tail) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
                 return tail == ext;
             };
-            if (!hasExt(filePath, ".bjson") && !hasExt(filePath, ".json"))
+            if (!hasExt(filePath, ".bjson"))
                 filePath += ".bjson";
         }
 

@@ -168,12 +168,8 @@ void BlueprintEditor::UpdateBlueprintReferences(const std::string& oldAbsPath,
     // 用于替换 FuncLib.<stem>.funcId 这类 definitionId
     auto extractStem = [](const std::string& absPath) -> std::string {
         std::string s = fs::path(absPath).filename().string();
-        // 去掉 .bjson
         if (s.size() > 6 && s.substr(s.size()-6) == ".bjson")
             s = s.substr(0, s.size()-6);
-        // 兼容旧 .json
-        if (s.size() > 5 && s.substr(s.size()-5) == ".json")
-            s = s.substr(0, s.size()-5);
         return s;
     };
     std::string oldStem = extractStem(oldAbsPath);
@@ -285,7 +281,6 @@ void BlueprintEditor::UpdateBlueprintReferences(const std::string& oldAbsPath,
             auto fullResult = exporter.importRuntimeFromFile(filePath);
             if (fullResult.success)
             {
-                // 把 runtime 层修改同步到完整数据
                 fullResult.data.metadata.dependencies = data.metadata.dependencies;
                 for (size_t i = 0; i < data.nodes.size() && i < fullResult.data.nodes.size(); ++i)
                 {
@@ -293,11 +288,6 @@ void BlueprintEditor::UpdateBlueprintReferences(const std::string& oldAbsPath,
                     fullResult.data.nodes[i].pins         = data.nodes[i].pins;
                 }
                 exporter.exportEditorFiles(fullResult.data, filePath);
-            }
-            else
-            {
-                // 文件不含 editor 数据（旧格式纯 runtime），直接保存 runtime
-                exporter.exportRuntimeToFile(data, filePath);
             }
 
             // 同步内存中已打开的文档

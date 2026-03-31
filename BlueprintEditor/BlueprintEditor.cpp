@@ -1067,7 +1067,7 @@ void BlueprintEditor::OnStart()
                     AddRecentProject(m_Project.filePath);
                 }
             }
-            else if (hasSuffix(arg, ".bjson") || hasSuffix(arg, ".json"))
+            else if (hasSuffix(arg, ".bjson"))
             {
                 DoOpenFile(arg);
             }
