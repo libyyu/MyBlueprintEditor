@@ -284,28 +284,23 @@ void BlueprintEditor::UpdateBlueprintReferences(const std::string& oldAbsPath,
 
         if (modified)
         {
-            // 重新序列化保存（保留 editor 数据）
-            std::string editorPath = filePath + ".editor";
-            bool hasEditor = fs::exists(editorPath);
-
-            if (hasEditor)
+            // 单文件模式：重新加载完整数据（runtime+editor），再保存
+            // importRuntimeFromFile 自动检测新格式，同时加载 editor 数据
+            auto fullResult = exporter.importRuntimeFromFile(filePath);
+            if (fullResult.success)
             {
-                // 先加载完整 editor 数据，再保存
-                auto fullResult = exporter.importFromEditorFile(editorPath);
-                if (fullResult.success)
+                // 把 runtime 层修改同步到完整数据
+                fullResult.data.metadata.dependencies = data.metadata.dependencies;
+                for (size_t i = 0; i < data.nodes.size() && i < fullResult.data.nodes.size(); ++i)
                 {
-                    // 把 runtime 层修改同步到 editor data
-                    fullResult.data.metadata.dependencies = data.metadata.dependencies;
-                    for (size_t i = 0; i < data.nodes.size() && i < fullResult.data.nodes.size(); ++i)
-                    {
-                        fullResult.data.nodes[i].definitionId = data.nodes[i].definitionId;
-                        fullResult.data.nodes[i].pins = data.nodes[i].pins;
-                    }
-                    exporter.exportEditorFiles(fullResult.data, filePath, editorPath);
+                    fullResult.data.nodes[i].definitionId = data.nodes[i].definitionId;
+                    fullResult.data.nodes[i].pins         = data.nodes[i].pins;
                 }
+                exporter.exportEditorFiles(fullResult.data, filePath);
             }
             else
             {
+                // 文件不含 editor 数据（旧格式纯 runtime），直接保存 runtime
                 exporter.exportRuntimeToFile(data, filePath);
             }
 

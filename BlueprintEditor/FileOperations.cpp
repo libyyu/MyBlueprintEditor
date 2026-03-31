@@ -192,14 +192,13 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
     ::NodeEditor::Runtime::JsonBlueprintExporter exporter;
     ::NodeEditor::Runtime::ImportResult result;
     
-    // 判断用户选择的是 .bjson.editor 还是 .bjson
-    bool isEditorFile = (path.size() > 7 && path.substr(path.size() - 7) == ".editor");
+    // 判断是否是遗留的 .bjson.editor 文件（旧格式兼容）
+    bool isLegacyEditorFile = (path.size() > 7 && path.substr(path.size() - 7) == ".editor");
     
-    if (isEditorFile)
+    if (isLegacyEditorFile)
     {
-        // 直接从 .bjson.editor 加载（包含嵌入的 runtime 数据）
+        // 遗留旧格式：从 .bjson.editor 加载
         result = exporter.importFromEditorFile(path);
-        
         if (!result.success)
         {
             if (ActiveDoc())
@@ -209,36 +208,18 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
             }
             return;
         }
-        
-        // 创建新标签页
         CreateNewDocument();
         ed::SetCurrentEditor(ActiveDoc()->editorContext);
-        
-        // 加载数据到编辑器
         LoadEditorData(result.data);
-        
-        // 保存对应的 runtime 文件路径（去掉 .editor 后缀）
-        std::string runtimePath = path.substr(0, path.size() - 7);  // 去掉 ".editor"
-        ActiveDoc()->filePath = runtimePath;
+        // 对应的 runtime 文件路径（去掉 .editor 后缀）
+        ActiveDoc()->filePath = path.substr(0, path.size() - 7);
     }
     else
     {
-        // 传统逻辑：从 .json 加载，可选合并 .editor.json
-        std::string editorPath = GetEditorFilePath(path);
-        
-        // 检查 editor 文件是否存在
-        auto fs = ::NodeEditor::Runtime::GetDefaultFileSystem();
-        bool hasEditorFile = fs->FileExists(editorPath);
-        
-        if (hasEditorFile)
-        {
-            result = exporter.importEditorFromFiles(path, editorPath);
-        }
-        else
-        {
-            // 只有 Runtime 文件
-            result = exporter.importRuntimeFromFile(path);
-        }
+        // 新格式（单文件）或纯 runtime 文件：importRuntimeFromFile 自动检测
+        // - 若文件顶层有 "runtime" 字段 → 单文件新格式，同时加载 editor 数据
+        // - 否则 → 纯 runtime 旧格式
+        result = exporter.importRuntimeFromFile(path);
         
         if (!result.success)
         {
@@ -250,13 +231,9 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
             return;
         }
         
-        // 创建新标签页
         CreateNewDocument();
         ed::SetCurrentEditor(ActiveDoc()->editorContext);
-        
-        // 加载数据到编辑器
         LoadEditorData(result.data);
-        
         ActiveDoc()->filePath = path;
     }
     
@@ -341,9 +318,8 @@ void BlueprintEditor::DoSaveFile(const std::string& path)
     RTBlueprintData data = BuildFullEditorData();
     
     ::NodeEditor::Runtime::JsonBlueprintExporter exporter;
-    std::string editorPath = GetEditorFilePath(path);
-    
-    auto result = exporter.exportEditorFiles(data, path, editorPath);
+    // 单文件模式：runtime + editor 合并写入同一个 .bjson 文件
+    auto result = exporter.exportEditorFiles(data, path);
     
     if (result.success)
     {
@@ -357,9 +333,8 @@ void BlueprintEditor::DoSaveFile(const std::string& path)
         // 自动将文档加入当前工程（去重由 AddCurrentDocToProject 处理）
         AddCurrentDocToProject();
         
-        ActiveDoc()->executionLog.push_back("[INFO] Saved: " + path + " (" + 
-            std::to_string(result.runtimeBytes) + " + " + 
-            std::to_string(result.editorBytes) + " bytes)");
+        ActiveDoc()->executionLog.push_back("[INFO] Saved: " + path + " ("
+            + std::to_string(result.runtimeBytes) + " bytes)");
     }
     else
     {

@@ -9,11 +9,18 @@
 #include <sstream>
 #include <iomanip>
 #include <ctime>
-#include <cstdio>   // std::snprintf — explicit for MSVC
+#include <cstdio>   // std::snprintf / ::remove
 #include <iostream>
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
+#ifdef _WIN32
+#  define WIN32_LEAN_AND_MEAN
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  include <windows.h>   // DeleteFileA
+#endif
 namespace NodeEditor {
 namespace Runtime {
 
@@ -902,65 +909,84 @@ ExportResult JsonBlueprintExporter::exportEditorToFile(const BlueprintData& data
 // JsonBlueprintExporter — 编辑器双文件导出
 // ============================================================================
 
-EditorExportResult JsonBlueprintExporter::exportEditorFiles(const BlueprintData& data, const std::string& runtimeFilePath, const std::string& editorFilePath, const ExportOptions& options) const
+// ============================================================================
+// JsonBlueprintExporter — 编辑器单文件导出
+// ============================================================================
+
+EditorExportResult JsonBlueprintExporter::exportEditorFiles(const BlueprintData& data,
+    const std::string& runtimeFilePath,
+    const std::string& /*editorFilePath*/,   // 已弃用，保留兼容签名
+    const ExportOptions& options) const
 {
     EditorExportResult result;
-    
+
 #ifndef __EMSCRIPTEN__
     try
     {
-        // 导出 Runtime 文件
-        auto runtimeResult = exportRuntimeToFile(data, runtimeFilePath, options);
-        if (!runtimeResult.success)
+#endif
+        // ── 生成 runtime JSON 字符串 ──────────────────────────────────────
+        std::string runtimeJson = exportRuntimeToString(data, options);
+
+        // ── 生成 editor JSON 字符串 ───────────────────────────────────────
+        std::string editorJson = exportEditorToString(data, options);
+
+        // ── 合并为单文件：{ "runtime": {...}, "editor": {...} } ─────────
+        // 去掉两段 JSON 的首尾花括号，拼成顶层对象
+        // 更健壮的做法：重新解析后用 crude_json 组装，但为了性能直接字符串拼接
+        // runtimeJson 格式：{ ... }
+        // editorJson  格式：{ ... }
+
+        std::ostringstream merged;
+        bool pretty = options.prettyPrint;
+        const std::string nl  = pretty ? "\n" : "";
+        const std::string ind = pretty ? "    " : "";
+
+        merged << "{" << nl;
+        // "runtime" 段：把 runtimeJson 整体嵌入
+        merged << ind << "\"runtime\": " << runtimeJson << "," << nl;
+        // "editor" 段：把 editorJson 整体嵌入
+        merged << ind << "\"editor\": "  << editorJson  << nl;
+        merged << "}" << nl;
+
+        std::string mergedStr = merged.str();
+
+        // ── 写入单文件 ────────────────────────────────────────────────────
+        std::string errorMsg;
+        if (!m_fileSystem->WriteFile(runtimeFilePath, mergedStr, errorMsg))
         {
-            result.errorMessage = "Runtime export failed: " + runtimeResult.errorMessage;
+            result.errorMessage = "Write failed: " + errorMsg;
             return result;
         }
-        
-        // 导出 Editor 附加文件
-        auto editorResult = exportEditorToFile(data, editorFilePath, options);
-        if (!editorResult.success)
+
+        // ── 删除遗留的 .bjson.editor 文件（如存在） ──────────────────────
+        std::string legacyEditorPath = runtimeFilePath + ".editor";
         {
-            result.errorMessage = "Editor export failed: " + editorResult.errorMessage;
-            return result;
+            std::string dummy;
+            // 用 ReadFile 探测文件是否存在；存在则写空文件再删（WriteFile 无 delete API）
+            // 改用 IFileSystem::DeleteFile 如有；否则用 platform-specific 方式
+#ifdef _MSC_VER
+            // Windows：直接 DeleteFileA
+            ::DeleteFileA(legacyEditorPath.c_str());
+#else
+            ::remove(legacyEditorPath.c_str());
+#endif
         }
-        
-        result.success = true;
-        result.runtimePath = runtimeFilePath;
-        result.editorPath = editorFilePath;
-        result.runtimeBytes = runtimeResult.bytesWritten;
-        result.editorBytes = editorResult.bytesWritten;
+
+        result.success      = true;
+        result.filePath     = runtimeFilePath;
+        result.runtimePath  = runtimeFilePath;
+        result.editorPath   = runtimeFilePath;   // 单文件，两个路径相同
+        result.runtimeBytes = mergedStr.size();
+        result.editorBytes  = 0;  // 合并后无独立 editor 文件
+
+#ifndef __EMSCRIPTEN__
     }
     catch (const std::exception& e)
     {
         result.errorMessage = std::string("Exception: ") + e.what();
     }
-#else
-    {
-        // 导出 Runtime 文件
-        auto runtimeResult = exportRuntimeToFile(data, runtimeFilePath, options);
-        if (!runtimeResult.success)
-        {
-            result.errorMessage = "Runtime export failed: " + runtimeResult.errorMessage;
-            return result;
-        }
-        
-        // 导出 Editor 附加文件
-        auto editorResult = exportEditorToFile(data, editorFilePath, options);
-        if (!editorResult.success)
-        {
-            result.errorMessage = "Editor export failed: " + editorResult.errorMessage;
-            return result;
-        }
-        
-        result.success = true;
-        result.runtimePath = runtimeFilePath;
-        result.editorPath = editorFilePath;
-        result.runtimeBytes = runtimeResult.bytesWritten;
-        result.editorBytes = editorResult.bytesWritten;
-    }
 #endif
-    
+
     return result;
 }
 
@@ -989,14 +1015,29 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
 
     auto& rootObj = root;
 
-    // 自动检测 .editor.json 格式：如果包含 "runtime" 子对象，
-    // 说明这是 editor 文件，真正的 runtime 数据嵌套在 "runtime" 字段中。
-    // 递归调用自身来解析内嵌的 runtime 数据。
+    // 自动检测单文件新格式：顶层包含 "runtime" 子对象
     if (rootObj.contains("runtime") && rootObj["runtime"].type() == crude_json::type_t::object)
     {
         std::string runtimeJson = rootObj["runtime"].dump();
+        // 先加载 runtime 数据
         result = importRuntimeFromString(runtimeJson, options);
         result.bytesRead = content.size();
+        if (!result.success)
+            return result;
+
+        // 若顶层还有 "editor" 字段，合并编辑器附加数据（节点位置等）
+        if (rootObj.contains("editor") && rootObj["editor"].type() == crude_json::type_t::object)
+        {
+            std::string editorJson = rootObj["editor"].dump();
+            ImportResult merged = importEditorFromStrings(runtimeJson, editorJson, options);
+            if (merged.success)
+            {
+                merged.bytesRead = content.size();
+                return merged;
+            }
+            // 合并失败时仍返回 runtime 数据（editor 数据丢失但不致命）
+            result.warnings.push_back("Editor data merge failed: " + merged.errorMessage);
+        }
         return result;
     }
 

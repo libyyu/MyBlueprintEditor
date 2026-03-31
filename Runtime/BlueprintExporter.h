@@ -1,11 +1,12 @@
 // Runtime/BlueprintExporter.h - 蓝图数据导出接口
 // 该文件定义了蓝图数据的导入导出接口，支持多种格式
 //
-// 导出设计:
-//   - Runtime 文件 (.json)        — 只包含执行所需的最小数据集
-//   - Editor 附加文件 (.editor.json) — 只包含编辑器独有数据（位置、尺寸、注释、视图等）
-//   - Editor 完整数据 = Runtime 文件 + Editor 附加文件
-//   - 运行时只需要加载 Runtime 文件即可执行
+// 导出设计（单文件模式）:
+//   - 蓝图文件 (.bjson) 内部结构：
+//       { "runtime": { ... }, "editor": { ... } }
+//   - 运行时只读取 "runtime" 字段，"editor" 字段被忽略（零开销）
+//   - 编辑器读写完整文件
+//   - 向后兼容：无 "runtime" 根节点的旧格式视为纯 runtime 数据
 
 #pragma once
 #include "BlueprintExport.h"
@@ -79,15 +80,16 @@ struct ExportResult
     size_t              bytesWritten = 0;         // 写入的字节数
 };
 
-// 编辑器双文件导出结果
+// 编辑器导出结果（单文件模式：runtimePath == editorPath == filePath）
 struct EditorExportResult
 {
     bool                success = false;
     std::string         errorMessage;
-    std::string         runtimePath;              // Runtime 文件路径
-    std::string         editorPath;               // Editor 附加文件路径
-    size_t              runtimeBytes = 0;         // Runtime 文件字节数
-    size_t              editorBytes = 0;          // Editor 附加文件字节数
+    std::string         filePath;                 // 单文件路径
+    std::string         runtimePath;              // 兼容旧字段（同 filePath）
+    std::string         editorPath;               // 兼容旧字段（同 filePath）
+    size_t              runtimeBytes = 0;
+    size_t              editorBytes = 0;
     size_t              totalBytes() const { return runtimeBytes + editorBytes; }
 };
 
@@ -131,12 +133,12 @@ public:
     // 导出 Editor 附加数据到文件
     virtual ExportResult exportEditorToFile(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const = 0;
     
-    // ---- 编辑器双文件导出（一次生成 Runtime + Editor 两个文件） ----
+    // ---- 编辑器单文件导出（合并 runtime + editor 到一个文件） ----
     
-    // 导出编辑器完整数据到两个文件
-    // runtimeFilePath: Runtime 文件路径 (e.g. "blueprint.json")
-    // editorFilePath:  Editor 附加文件路径 (e.g. "blueprint.editor.json")
-    virtual EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& runtimeFilePath, const std::string& editorFilePath, const ExportOptions& options = ExportOptions()) const = 0;
+    // 导出蓝图完整数据到单文件（filePath 即 .bjson 文件）
+    // 文件结构: { "runtime": {...}, "editor": {...} }
+    // editorFilePath 参数保留兼容旧接口，实际写入 runtimeFilePath
+    virtual EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& runtimeFilePath, const std::string& editorFilePath = "", const ExportOptions& options = ExportOptions()) const = 0;
     
     // ---- 编辑器合并加载 ----
     
@@ -183,8 +185,8 @@ public:
     std::string exportEditorToString(const BlueprintData& data, const ExportOptions& options = ExportOptions()) const override;
     ExportResult exportEditorToFile(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const override;
     
-    // 编辑器双文件导出
-    EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& runtimeFilePath, const std::string& editorFilePath, const ExportOptions& options = ExportOptions()) const override;
+    // 编辑器单文件导出（合并 runtime + editor 到 runtimeFilePath）
+    EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& runtimeFilePath, const std::string& editorFilePath = "", const ExportOptions& options = ExportOptions()) const override;
     
     // 编辑器合并加载
     ImportResult importEditorFromStrings(const std::string& runtimeContent, const std::string& editorContent, const ImportOptions& options = ImportOptions()) const override;
@@ -221,7 +223,7 @@ public:
     std::string exportEditorToString(const BlueprintData& data, const ExportOptions& options = ExportOptions()) const override;
     ExportResult exportEditorToFile(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const override;
     
-    EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& runtimeFilePath, const std::string& editorFilePath, const ExportOptions& options = ExportOptions()) const override;
+    EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& runtimeFilePath, const std::string& editorFilePath = "", const ExportOptions& options = ExportOptions()) const override;
     
     ImportResult importEditorFromStrings(const std::string& runtimeContent, const std::string& editorContent, const ImportOptions& options = ImportOptions()) const override;
     ImportResult importEditorFromFiles(const std::string& runtimeFilePath, const std::string& editorFilePath, const ImportOptions& options = ImportOptions()) const override;
