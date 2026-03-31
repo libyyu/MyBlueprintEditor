@@ -124,6 +124,15 @@ bool PlatformGLFW::OpenMainWindow(const char* title, int width, int height)
             self->CloseMainWindow();
     });
 
+    // 拖拽文件回调（Windows/macOS/Linux 均支持）
+    glfwSetDropCallback(m_Window, [](GLFWwindow* window, int count, const char** paths)
+    {
+        auto self = reinterpret_cast<PlatformGLFW*>(glfwGetWindowUserPointer(window));
+        for (int i = 0; i < count; ++i)
+            if (paths[i])
+                self->m_Application.OnDropFile(std::string(paths[i]));
+    });
+
     glfwSetWindowIconifyCallback(m_Window, [](GLFWwindow* window, int iconified)
     {
         auto self = reinterpret_cast<PlatformGLFW*>(glfwGetWindowUserPointer(window));
