@@ -241,7 +241,11 @@ public:
     // Functions 面板状态
     int  selectedFuncIdx = -1;           // 当前选中的函数索引（-1 = 无选中）
 
-    // ---- Undo / Redo ----
+    // ---- StepIn 调用栈（FuncLib 单步进入）----
+    // 当用户 StepIn 一个 FuncLib 节点时，保存父文档索引，
+    // StepOut / 函数执行完毕后切回父文档继续单步
+    int  stepInParentDocIndex = -1;   // -1 = 不是通过 StepIn 打开的
+    std::string stepInFuncName;       // 进入的函数名（用于标题显示）
     std::deque<UndoState> undoStack;   // 最多 kMaxUndoSteps 步
     std::deque<UndoState> redoStack;
 

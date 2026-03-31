@@ -2,7 +2,10 @@
 #include "BlueprintEditor.h"
 #include "ThemeManager.h"
 #include "FileDialogs.h"
+#include "BuiltinHandlers.h"
 #include <filesystem>
+#include <queue>
+#include <unordered_set>
 
 namespace fs = std::filesystem;
 
@@ -1749,7 +1752,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
             ImGui::SameLine(0, 4);
 
-            // Step
+            // Step (Next)
             if (!isPaused) ImGui::BeginDisabled();
             if (ImGui::Button(ICON_FA_ARROW_RIGHT "##step", ImVec2(iconW, btnH)))
             {
@@ -1763,21 +1766,252 @@ void BlueprintEditor::OnFrame(float deltaTime)
                         uint64_t nid = static_cast<uint64_t>(topo[stepIdx - 1]);
                         BlueprintDocument::NodeHighlight hl;
                         hl.timeLeft = 3.0f;
-                        hl.color    = ImColor(80, 200, 255);  // 单步=蓝色
+                        hl.color    = ImColor(80, 200, 255);
                         ActiveDoc()->executedNodeHighlight[nid] = hl;
                     }
                 }
             }
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Step (next node)");
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Step Next (next node)\nF10");
             if (!isPaused) ImGui::EndDisabled();
 
-            ImGui::SameLine(0, 4);
+            ImGui::SameLine(0, 2);
 
-            // Stop
-            ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(120, 30, 30, 255));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(160, 40, 40, 255));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(190, 50, 50, 255));
-            if (isIdle || isStopped) ImGui::BeginDisabled();
+            // ── StepIn / StepOut 辅助 lambda ────────────────────────────────
+            // 检查当前待执行节点是否是 FuncLib.* 并返回其 funcId
+            auto getNextFuncLibId = [&]() -> std::string
+            {
+                if (!isPaused) return {};
+                const auto& topo2 = runner.GetTopoCache();
+                size_t si = runner.GetStepTopoIndex();
+                for (size_t k = si; k < topo2.size(); ++k)
+                {
+                    const auto* nd = runner.GetBlueprintData().findNode(topo2[k]);
+                    if (!nd) continue;
+                    if (runner.GetBlueprintData().isEventSourceNode(nd->id)) continue;
+                    if (nd->definitionId.rfind("FuncLib.", 0) == 0)
+                    {
+                        size_t lastDot = nd->definitionId.rfind('.');
+                        return (lastDot != std::string::npos) ? nd->definitionId.substr(lastDot + 1) : nd->definitionId;
+                    }
+                    break;
+                }
+                return {};
+            };
+
+            std::string nextFuncLibId = getNextFuncLibId();
+            bool canStepIn = !nextFuncLibId.empty();
+
+            // StepIn 按钮
+            if (!canStepIn) ImGui::BeginDisabled();
+            ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(50, 80, 140, 255));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(70, 110, 190, 255));
+            if (ImGui::Button(ICON_FA_ARROW_DOWN " I##stepin", ImVec2(iconW + 6.0f, btnH)))
+            {
+                // ---- StepIn 实现 ----
+                std::string libAbsPath2;
+                std::string funcName2;
+                const auto& libs2 = runner.GetExternalLibraries();
+                auto libIt2 = libs2.find(nextFuncLibId);
+                if (libIt2 != libs2.end() && libIt2->second)
+                {
+                    for (const auto& fd : libIt2->second->functions)
+                        if (fd.id == nextFuncLibId) { funcName2 = fd.name; break; }
+
+                    if (m_Project.IsOpen())
+                    {
+                        for (const auto& libEntry : m_Project.libraries)
+                        {
+                            std::string absP = m_Project.AbsPath(libEntry.relativePath);
+                            ::NodeEditor::Runtime::JsonBlueprintExporter ex2;
+                            auto r2 = ex2.importRuntimeFromFile(absP);
+                            if (!r2.success) continue;
+                            for (const auto& fd : r2.data.functions)
+                                if (fd.id == nextFuncLibId) { libAbsPath2 = absP; break; }
+                            if (!libAbsPath2.empty()) break;
+                        }
+                    }
+                }
+
+                if (!libAbsPath2.empty() && !funcName2.empty())
+                {
+                    // 找到或打开库文档
+                    int libDocIdx2 = -1;
+                    namespace fs3 = std::filesystem;
+                    for (int di = 0; di < (int)m_Documents.size(); ++di)
+                    {
+                        if (fs3::path(m_Documents[di]->filePath).lexically_normal().string() ==
+                            fs3::path(libAbsPath2).lexically_normal().string())
+                        { libDocIdx2 = di; break; }
+                    }
+                    if (libDocIdx2 < 0)
+                    {
+                        DoOpenFile(libAbsPath2);
+                        libDocIdx2 = (int)m_Documents.size() - 1;
+                    }
+
+                    if (libDocIdx2 >= 0 && libDocIdx2 < (int)m_Documents.size())
+                    {
+                        auto* libDoc2 = m_Documents[libDocIdx2].get();
+                        const auto& libBP2 = *libs2.at(nextFuncLibId);
+
+                        // 构建函数子图（BFS from Function.Entry）
+                        ::NodeEditor::Runtime::BlueprintData funcSubBP2;
+                        ::NodeEditor::Runtime::NodeId entryId2 = 0;
+                        for (const auto& nd2 : libBP2.nodes)
+                            if (nd2.definitionId == "Function.Entry" && nd2.name == funcName2)
+                            { entryId2 = nd2.id; break; }
+
+                        if (entryId2 != 0)
+                        {
+                            std::unordered_set<::NodeEditor::Runtime::NodeId> vis2;
+                            std::queue<::NodeEditor::Runtime::NodeId> q2;
+                            q2.push(entryId2); vis2.insert(entryId2);
+                            while (!q2.empty())
+                            {
+                                auto cur2 = q2.front(); q2.pop();
+                                for (auto id2 : libBP2.getExecOutputNodes(cur2))
+                                    if (vis2.insert(id2).second) q2.push(id2);
+                                for (auto id2 : libBP2.getDataInputNodes(cur2))
+                                    if (vis2.insert(id2).second) q2.push(id2);
+                            }
+                            for (const auto& nd2 : libBP2.nodes)
+                                if (vis2.count(nd2.id)) funcSubBP2.nodes.push_back(nd2);
+                            for (const auto& lk2 : libBP2.links)
+                            {
+                                const auto* sn2 = libBP2.findNodeByPin(lk2.startPinId);
+                                const auto* en2 = libBP2.findNodeByPin(lk2.endPinId);
+                                if (sn2 && en2 && vis2.count(sn2->id) && vis2.count(en2->id))
+                                    funcSubBP2.links.push_back(lk2);
+                            }
+                            funcSubBP2.metadata = libBP2.metadata;
+                            funcSubBP2.metadata.name = funcName2;
+                        }
+
+                        if (!funcSubBP2.nodes.empty())
+                        {
+                            libDoc2->stepInParentDocIndex = m_ActiveDocIndex;
+                            libDoc2->stepInFuncName       = funcName2;
+
+                            libDoc2->persistentRunner.ResetState();
+                            libDoc2->persistentRunner.m_withEditor = true;
+                            BlueprintDocument* cap2 = libDoc2;
+                            libDoc2->persistentRunner.SetLogCallback(
+                                [cap2](::NodeEditor::Runtime::LogLevel, const std::string& msg) {
+                                    cap2->executionLog.push_back(msg);
+                                    cap2->executionLogDirty = true;
+                                });
+                            libDoc2->persistentRunner.SetPrintCallback(
+                                [cap2](::NodeEditor::Runtime::LogLevel, const std::string& msg) {
+                                    cap2->executionLog.push_back(msg);
+                                    cap2->executionLogDirty = true;
+                                });
+                            libDoc2->persistentRunner.SetNodePreExecuteCallback(
+                                [cap2](::NodeEditor::Runtime::NodeId nid2) -> bool {
+                                    return cap2->breakpoints.count(static_cast<uint64_t>(nid2)) > 0;
+                                });
+
+                            std::string baseDir2;
+                            auto slashPos2 = libAbsPath2.find_last_of("/\\");
+                            if (slashPos2 != std::string::npos)
+                                baseDir2 = libAbsPath2.substr(0, slashPos2);
+                            ::NodeEditor::Runtime::RegisterBuiltinHandlers(
+                                libDoc2->persistentRunner, baseDir2, &m_HandlerRegistry);
+                            libDoc2->persistentRunner.RegisterExternalFunctions(runner.GetExternalFunctions());
+                            libDoc2->persistentRunner.InheritExternalLibraries(runner.GetExternalLibraries());
+
+                            if (libDoc2->persistentRunner.Load(funcSubBP2))
+                            {
+                                // 传递输入参数
+                                const auto& topo3 = runner.GetTopoCache();
+                                size_t si3 = runner.GetStepTopoIndex();
+                                for (size_t k3 = si3; k3 < topo3.size(); ++k3)
+                                {
+                                    const auto* nd3 = runner.GetBlueprintData().findNode(topo3[k3]);
+                                    if (!nd3) continue;
+                                    if (nd3->definitionId.rfind("FuncLib.", 0) == 0)
+                                    {
+                                        for (const auto& pin3 : nd3->pins)
+                                            if (pin3.kind == ::NodeEditor::Runtime::PinKind::Input &&
+                                                pin3.dataType != ::NodeEditor::Runtime::PinDataType::Unknown &&
+                                                !pin3.name.empty())
+                                                libDoc2->persistentRunner.SetVariable(pin3.name, runner.GetPinValue(pin3.id));
+                                    }
+                                    break;
+                                }
+
+                                libDoc2->persistentRunner.Pause();
+                                libDoc2->isExecuting = true;
+                                libDoc2->executionLog.push_back("[StepIn] Entering: " + funcName2);
+                                libDoc2->executionLogDirty = true;
+
+                                // 高亮第一个节点（黄色）— GetTopologicalOrder 会内部确保缓存有效
+                                auto subTopo2 = libDoc2->persistentRunner.GetTopologicalOrder();
+                                if (!subTopo2.empty())
+                                {
+                                    BlueprintDocument::NodeHighlight hl2;
+                                    hl2.timeLeft = 5.0f;
+                                    hl2.color    = ImColor(255, 200, 50);
+                                    libDoc2->executedNodeHighlight[static_cast<uint64_t>(subTopo2[0])] = hl2;
+                                }
+                            }
+
+                            m_ActiveDocIndex = libDocIdx2;
+                            ed::SetCurrentEditor(m_Documents[libDocIdx2]->editorContext);
+                        }
+                    }
+                }
+            }
+            ImGui::PopStyleColor(2);
+            if (!canStepIn) ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip(canStepIn
+                    ? ("Step Into: " + nextFuncLibId).c_str()
+                    : "Step Into (available on FuncLib nodes)\nF11");
+
+            ImGui::SameLine(0, 2);
+
+            // StepOut 按钮
+            bool canStepOut = (ActiveDoc()->stepInParentDocIndex >= 0);
+            if (!canStepOut) ImGui::BeginDisabled();
+            ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(80, 50, 120, 255));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(110, 70, 160, 255));
+            if (ImGui::Button(ICON_FA_ARROW_UP " O##stepout", ImVec2(iconW + 6.0f, btnH)))
+            {
+                int parentIdx2 = ActiveDoc()->stepInParentDocIndex;
+                ActiveDoc()->stepInParentDocIndex = -1;
+                ActiveDoc()->stepInFuncName.clear();
+                ActiveDoc()->persistentRunner.Stop();
+                ActiveDoc()->isExecuting = false;
+
+                if (parentIdx2 >= 0 && parentIdx2 < (int)m_Documents.size())
+                {
+                    m_ActiveDocIndex = parentIdx2;
+                    ed::SetCurrentEditor(m_Documents[parentIdx2]->editorContext);
+                    auto& pr2 = m_Documents[parentIdx2]->persistentRunner;
+                    if (pr2.IsPaused())
+                    {
+                        bool hasMore2 = pr2.StepNextNode();
+                        if (hasMore2)
+                        {
+                            const auto& tp3 = pr2.GetTopoCache();
+                            size_t si4 = pr2.GetStepTopoIndex();
+                            if (si4 > 0 && si4 - 1 < tp3.size())
+                            {
+                                BlueprintDocument::NodeHighlight hl4;
+                                hl4.timeLeft = 3.0f;
+                                hl4.color    = ImColor(80, 200, 255);
+                                m_Documents[parentIdx2]->executedNodeHighlight[static_cast<uint64_t>(tp3[si4 - 1])] = hl4;
+                            }
+                        }
+                    }
+                }
+            }
+            ImGui::PopStyleColor(2);
+            if (!canStepOut) ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("Step Out (return to caller)\nShift+F11");
+
+            ImGui::SameLine(0, 4);
             if (ImGui::Button(ICON_FA_STOP "##stop", ImVec2(iconW, btnH)))
                 runner.Stop();
             if (isIdle || isStopped) ImGui::EndDisabled();
