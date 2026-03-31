@@ -765,11 +765,80 @@ void BlueprintEditor::OnExecuteBlueprint()
 3. handler 覆盖警告（Lua handler 覆盖 C++ handler 时 Log Warning）
 4. 多文件加载顺序保证
 
-### Phase 3：编辑器侧节点定义（可选）
-1. `BlueprintEditor/LuaNodeRegistrar.cpp` — `Blueprint.RegisterNode()` 实现
-2. Lua 脚本定义节点模板 → 自动注册到 `INodeRegistry`
-3. 编辑器右键菜单/搜索面板显示 Lua 定义的节点
-4. 热重载：文件监控 → 重新加载 Lua 脚本 → 刷新 Registry + 重注册 handler
+### Phase 3：编辑器侧节点定义 ✅ **已完成**
+
+#### 新增文件
+
+| 文件 | 职责 |
+|------|------|
+| `BlueprintEditor/LuaNodeRegistrar.h` | `LuaNodeRegistrar` 类声明；无 Lua 时提供空桩保持编译兼容 |
+| `BlueprintEditor/LuaNodeRegistrar.cpp` | `Blueprint.RegisterNode()` 实现；热重载；`UnregisterAll()` |
+
+#### 修改文件
+
+| 文件 | 变更内容 |
+|------|---------|
+| `BlueprintEditor/BpProject.h/cpp` | 添加 `luaExtensions: vector<string>`，序列化/反序列化 `luaExtensions` 数组 |
+| `BlueprintEditor/BlueprintEditor.h` | include `LuaNodeRegistrar.h`；添加 `m_LuaNodeRegistrar` 成员变量 |
+| `BlueprintEditor/BlueprintEditor.cpp` | `OnStart()` 调用 `m_LuaNodeRegistrar.Initialize()` |
+| `BlueprintEditor/ProjectOps.cpp` | `SyncProjectLibrariesToRegistry()` 末尾加载 `luaExtensions`；`CloseProject()` 调用 `UnregisterAll()`；工程面板新增 **LUA SCRIPTS** 折叠 section |
+| `BlueprintEditor/EditorUI.cpp` | `OnFrame()` 每帧调用 `PollFileChanges()` 驱动热重载 |
+| `CMakeLists.txt` | `BLUEPRINT_LUA=ON` 时 `BlueprintEditor` target 也链接 Lua 并定义 `BLUEPRINT_HAS_LUA` |
+
+#### `Blueprint.RegisterNode()` Lua API
+
+```lua
+-- 注册节点定义（同时注册 handler：第二个参数传函数）
+Blueprint.RegisterNode({
+    id          = "MyMath.Lerp",      -- 唯一 definitionId（必填）
+    name        = "Lerp",             -- 显示名称
+    category    = "MyMath",           -- 分类路径（支持 "MyMath/Arithmetic"）
+    description = "线性插值 A→B",
+    color       = "3A8C3A",           -- 标题栏颜色（十六进制 RRGGBB，可选）
+    icon        = "\uF53F",           -- FontAwesome 图标（可选）
+    pure        = true,               -- 是否为纯数据节点（无 exec 流，默认 true）
+    inputs  = {
+        { name="A",     type="float",   default=0.0 },
+        { name="B",     type="float",   default=1.0 },
+        { name="Alpha", type="float",   default=0.5 },
+    },
+    outputs = {
+        { name="Result", type="float" },
+    },
+}, function(ctx)
+    local a = ctx:GetInput("A"):asFloat()
+    local b = ctx:GetInput("B"):asFloat()
+    local t = ctx:GetInput("Alpha"):asFloat()
+    ctx:SetOutput("Result", a + (b - a) * t)
+    return true
+end)
+```
+
+`type` 支持的值：`bool`/`boolean`、`int`/`integer`、`float`/`number`、`string`、`object`、`array`、`map`、`flow`/`exec`
+
+#### 热重载机制
+
+```
+文件写入磁盘
+  ↓ （最多 1 秒内检测到）
+PollFileChanges() 发现 last_write_time 变化
+  ↓
+UnregisterAll()  — 从 INodeRegistry 和 m_HandlerRegistry 移除旧定义
+  ↓
+resetLuaState()  — 关闭旧 lua_State，清除所有函数引用
+  ↓
+重新 LoadScript() 所有文件  — 重新执行脚本，RegisterNode/RegisterHandler 重新注册
+  ↓
+m_CachedDefCount = 0  — 触发右键菜单分类树重建（下一帧生效）
+```
+
+#### 工程面板 LUA SCRIPTS Section
+
+- **折叠/展开** 显示脚本列表（橙黄色图标区分 `.lua` 文件）
+- **[+] 按钮** 打开文件对话框，选择 `.lua` 文件加入工程
+- **右键菜单** 支持「Remove from project」和「Reload this script」
+- **Auto hot-reload 开关** + **Reload All 按钮**
+- 文件不存在时红色提示，编译错误显示在 section 顶部
 
 ### Phase 4：高级功能
 1. Lua 协程支持（异步节点）
