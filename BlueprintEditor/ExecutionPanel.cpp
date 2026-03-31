@@ -282,11 +282,15 @@ void BlueprintEditor::ExecuteBlueprint()
     // 5. 执行可视化 —— 精确高亮已执行的节点 & 触发 Flow 动画
     ActiveDoc()->executedNodeHighlight.clear();
     std::unordered_set<uint64_t> executedNodeSet;
-    for (const auto& runtimeId : result.executedNodeIds)
+    bool execFailed = !result.success && !result.errorMessage.empty() && result.errorMessage != "Paused at breakpoint";
+    for (size_t i = 0; i < result.executedNodeIds.size(); ++i)
     {
-        // runtime NodeId → editor NodeId 映射：通过 definitionId 比对
-        // runtime node id = reinterpret_cast<uintptr_t>(editorNode.ID.AsPointer())
-        ActiveDoc()->executedNodeHighlight[runtimeId] = 3.0f;  // 3 秒高亮
+        uint64_t runtimeId = result.executedNodeIds[i];
+        bool isFailNode = execFailed && (i + 1 == result.executedNodeIds.size());
+        BlueprintDocument::NodeHighlight hl;
+        hl.timeLeft = 3.0f;
+        hl.color    = isFailNode ? ImColor(255, 60, 60) : ImColor(50, 220, 100);
+        ActiveDoc()->executedNodeHighlight[runtimeId] = hl;
         executedNodeSet.insert(runtimeId);
     }
 
@@ -463,7 +467,10 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
                     // 悬停时高亮对应节点
                     if (edId && ImGui::IsItemHovered())
                     {
-                        ActiveDoc()->executedNodeHighlight[rid] = 1.5f;
+                        BlueprintDocument::NodeHighlight hl;
+                        hl.timeLeft = 1.5f;
+                        hl.color    = ImColor(50, 220, 100);
+                        ActiveDoc()->executedNodeHighlight[rid] = hl;
                         if (ImGui::IsItemClicked())
                             ed::SelectNode(edId, false);
                     }
@@ -532,31 +539,19 @@ void BlueprintEditor::DrawWatchPanel(float paneWidth)
     ImGui::BeginChild("##WatchContent", ImVec2(paneWidth, watchH), false);
 
     // ── Section 1: Blueprint Variables ───────────────────────────────────
+    DrawSectionHeader(ICON_FA_LAYER_GROUP " Variables", paneWidth);
+    // 变量数量标签（追加绘制到刚渲染的 header 上）
     {
-        auto* drawList = ImGui::GetWindowDrawList();
-        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-        float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-        drawList->AddRectFilled(
-            cursorPos,
-            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-            IM_COL32(30, 30, 38, 230), 0.0f);
-        drawList->AddLine(
-            ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
-            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
-            IM_COL32(0, 122, 204, 100));
-        drawList->AddText(
-            ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-            IM_COL32(200, 200, 210, 230), ICON_FA_LAYER_GROUP " Variables");
-
-        // 变量数量标签
         char countBuf[32];
         snprintf(countBuf, sizeof(countBuf), "(%d)", static_cast<int>(allVars.size()));
-        float countW = ImGui::CalcTextSize(countBuf).x;
-        drawList->AddText(
-            ImVec2(cursorPos.x + paneWidth - countW - 10.0f, cursorPos.y + 2.0f),
+        auto* dl = ImGui::GetWindowDrawList();
+        // header 刚在上面渲染，光标已前进，需要倒退一行
+        ImVec2 headerPos = ImGui::GetCursorScreenPos();
+        float sectionH   = ImGui::GetTextLineHeight() + 4.0f;
+        float countW     = ImGui::CalcTextSize(countBuf).x;
+        dl->AddText(
+            ImVec2(headerPos.x + paneWidth - countW - 10.0f, headerPos.y - sectionH + 2.0f),
             IM_COL32(100, 140, 150, 180), countBuf);
-
-        ImGui::Dummy(ImVec2(paneWidth, sectionH));
     }
 
     if (allVars.empty())
@@ -602,23 +597,7 @@ void BlueprintEditor::DrawWatchPanel(float paneWidth)
 
     // ── Section 2: Selected Node Pin Values ─────────────────────────────
     ImGui::Spacing();
-    {
-        auto* drawList = ImGui::GetWindowDrawList();
-        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-        float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-        drawList->AddRectFilled(
-            cursorPos,
-            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-            IM_COL32(30, 30, 38, 230), 0.0f);
-        drawList->AddLine(
-            ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
-            ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
-            IM_COL32(0, 122, 204, 100));
-        drawList->AddText(
-            ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-            IM_COL32(200, 200, 210, 230), ICON_FA_CUBE " Selected Node Pins");
-        ImGui::Dummy(ImVec2(paneWidth, sectionH));
-    }
+    DrawSectionHeader(ICON_FA_CUBE " Selected Node Pins", paneWidth);
 
     // 获取选中节点
     std::vector<ed::NodeId> selectedNodes;

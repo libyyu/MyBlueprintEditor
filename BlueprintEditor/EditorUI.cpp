@@ -190,17 +190,17 @@ void BlueprintEditor::DrawPinIcon(const Pin& pin, bool connected, int alpha)
     color.Value.w = alpha / 255.0f;
     switch (displayType)
     {
-        case PinType::Flow:     iconType = IconType::Flow;   break;
-        case PinType::Bool:     iconType = IconType::Circle; break;
-        case PinType::Int:      iconType = IconType::Circle; break;
-        case PinType::Float:    iconType = IconType::Circle; break;
-        case PinType::String:   iconType = IconType::Circle; break;
-        case PinType::Object:   iconType = IconType::Circle; break;
-        case PinType::Function: iconType = IconType::Circle; break;
-        case PinType::Delegate: iconType = IconType::Square; break;
-        case PinType::Array:    iconType = IconType::Grid;   break;
-        case PinType::Map:      iconType = IconType::Grid;   break;
-        case PinType::Any:      iconType = IconType::Diamond; break;
+        case PinType::Flow:     iconType = IconType::Flow;        break;
+        case PinType::Bool:     iconType = IconType::Circle;      break;
+        case PinType::Int:      iconType = IconType::Square;      break;
+        case PinType::Float:    iconType = IconType::Circle;      break;
+        case PinType::String:   iconType = IconType::Diamond;     break;
+        case PinType::Object:   iconType = IconType::RoundSquare; break;
+        case PinType::Function: iconType = IconType::Circle;      break;
+        case PinType::Delegate: iconType = IconType::Square;      break;
+        case PinType::Array:    iconType = IconType::Grid;        break;
+        case PinType::Map:      iconType = IconType::Grid;        break;
+        case PinType::Any:      iconType = IconType::Diamond;     break;
         default:
             return;
     }
@@ -348,8 +348,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
     {
         for (auto it = doc->executedNodeHighlight.begin(); it != doc->executedNodeHighlight.end();)
         {
-            it->second -= deltaTime;
-            if (it->second <= 0.0f)
+            it->second.timeLeft -= deltaTime;
+            if (it->second.timeLeft <= 0.0f)
                 it = doc->executedNodeHighlight.erase(it);
             else
                 ++it;
@@ -1761,7 +1761,10 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     if (stepIdx > 0 && stepIdx - 1 < topo.size())
                     {
                         uint64_t nid = static_cast<uint64_t>(topo[stepIdx - 1]);
-                        ActiveDoc()->executedNodeHighlight[nid] = 3.0f;
+                        BlueprintDocument::NodeHighlight hl;
+                        hl.timeLeft = 3.0f;
+                        hl.color    = ImColor(80, 200, 255);  // 单步=蓝色
+                        ActiveDoc()->executedNodeHighlight[nid] = hl;
                     }
                 }
             }

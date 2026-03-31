@@ -40,9 +40,30 @@ bool Splitter(const char* str_id, bool split_vertically, float thickness, float*
 }
 
 // ============================================================================
+// DrawSectionHeader — 统一的深色 Section 标题条
 // ============================================================================
-// 彩色日志行渲染
-// ============================================================================
+
+void DrawSectionHeader(const char* title, float paneWidth,
+                       ImU32 bgColor, ImU32 lineColor, ImU32 textColor)
+{
+    auto* drawList  = ImGui::GetWindowDrawList();
+    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+    float sectionH  = ImGui::GetTextLineHeight() + 4.0f;
+    drawList->AddRectFilled(
+        cursorPos,
+        ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
+        bgColor, 0.0f);
+    drawList->AddLine(
+        ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
+        ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
+        lineColor);
+    drawList->AddText(
+        ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
+        textColor, title);
+    ImGui::Dummy(ImVec2(paneWidth, sectionH));
+}
+
+
 
 void DrawColoredLogLine(const std::string& line)
 {

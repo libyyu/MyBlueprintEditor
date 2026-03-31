@@ -203,6 +203,10 @@ static void ApplyUndoRedo(BlueprintDocument* doc,
 
     doc->isDirty = true;
     doc->invalidateEditorIndices();
+    // 清空 pin 字符串缓冲区：快照恢复后 StringValue/ObjectValue 已变化，
+    // 缓冲区内容已过期，下一帧渲染时重新从 pin 值初始化
+    doc->pinStringBuffers.clear();
+    doc->pinObjectBuffers.clear();
 }
 
 void BlueprintEditor::Undo()

@@ -158,11 +158,19 @@ void BlueprintEditor::DrawContextMenus(
             // 自定义颜色 ColorEdit3
             ImVec4 col4 = node->Color.Value;
             ImGui::SetNextItemWidth(200.0f);
-            if (ImGui::ColorEdit3("##commentcol", &col4.x,
-                                  ImGuiColorEditFlags_NoInputs |
-                                  ImGuiColorEditFlags_DisplayHex))
+            if (ImGui::IsItemActivated())
+                PushUndoState();  // 拖动开始前保存快照
+            ImGui::ColorEdit3("##commentcol", &col4.x,
+                              ImGuiColorEditFlags_NoInputs |
+                              ImGuiColorEditFlags_DisplayHex);
+            if (ImGui::IsItemDeactivatedAfterEdit())
             {
-                if (ImGui::IsItemActivated()) PushUndoState();
+                // 拖动结束时再次确认快照已保存（防止快速点击未触发 Activated）
+                node->Color = ImColor(col4.x, col4.y, col4.z, 1.0f);
+                ActiveDoc()->isDirty = true;
+            }
+            else if (ImGui::IsItemActive())
+            {
                 node->Color = ImColor(col4.x, col4.y, col4.z, 1.0f);
                 ActiveDoc()->isDirty = true;
             }

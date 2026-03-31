@@ -90,6 +90,12 @@ bool Splitter(const char* str_id, bool split_vertically, float thickness, float*
 // 彩色日志行渲染辅助（实现在 EditorUtils.cpp）
 void DrawColoredLogLine(const std::string& line);
 
+// Section 标题条辅助（实现在 EditorUtils.cpp）
+void DrawSectionHeader(const char* title, float paneWidth,
+                       ImU32 bgColor  = IM_COL32(30, 30, 38, 230),
+                       ImU32 lineColor = IM_COL32(0, 122, 204, 100),
+                       ImU32 textColor = IM_COL32(200, 200, 210, 230));
+
 // 节点颜色映射（统一入口，实现在 EditorUtils.cpp）
 ImColor GetNodeColor(const RTNodeDef* def);
 
@@ -174,7 +180,8 @@ public:
     std::map<ed::NodeId, ImVec2, NodeIdLess> lastNodePositions;
 
     // 执行可视化（高亮已执行的节点）
-    std::unordered_map<uint64_t, float> executedNodeHighlight;  // nodeId -> 剩余高亮时间(秒)
+    struct NodeHighlight { float timeLeft = 0.0f; ImColor color = ImColor(80, 200, 120); };
+    std::unordered_map<uint64_t, NodeHighlight> executedNodeHighlight;  // nodeId -> 高亮状态
 
     // 断点集合（nodeId set）
     std::unordered_set<uint64_t> breakpoints;

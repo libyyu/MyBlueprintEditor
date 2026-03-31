@@ -207,22 +207,28 @@ void RegisterHandlers_Math(std::unordered_map<std::string, NodeHandler>& handler
 
     // --- Misc Math ---
     handlers["Weird"] = [](ExecutionContext& ctx) {
-        auto node = ctx.GetCurrentNode();
-        if (node && node->pins.size() >= 3)
-        {
-            double input = ctx.GetInputValue(node->pins[0].id).asFloat();
-            ctx.SetOutputValue(node->pins[1].id, Variant(input));
-            ctx.SetOutputValue(node->pins[2].id, Variant(input));
-        }
+        double input = ctx.GetInputValue("Input").asFloat();
+        ctx.SetOutputValue("Output1", Variant(input));
+        ctx.SetOutputValue("Output2", Variant(input));
         return true;
     };
 
     // --- More Arithmetic ---
     handlers["Modulo"] = [](ExecutionContext& ctx) {
-        double a = ctx.GetInputValue("A").asFloat();
-        double b = ctx.GetInputValue("B").asFloat();
-        if (b == 0.0) { ctx.Log("  [WARN] Modulo by zero!"); b = 1.0; }
-        ctx.SetOutputValue("Result", Variant(std::fmod(a, b)));
+        Variant va = ctx.GetInputValue("A");
+        Variant vb = ctx.GetInputValue("B");
+        if (va.type == PinDataType::Integer && vb.type == PinDataType::Integer)
+        {
+            int64_t b = vb.asInt();
+            if (b == 0) { ctx.LogWarning("[Modulo] Modulo by zero (integer)! Result = 0."); ctx.SetOutputValue("Result", Variant(static_cast<int64_t>(0))); return true; }
+            ctx.SetOutputValue("Result", Variant(va.asInt() % b));
+        }
+        else
+        {
+            double b = vb.asFloat();
+            if (b == 0.0) { ctx.LogWarning("[Modulo] Modulo by zero (float)! Result = NaN."); }
+            ctx.SetOutputValue("Result", Variant(std::fmod(va.asFloat(), b)));
+        }
         return true;
     };
 
@@ -241,23 +247,36 @@ void RegisterHandlers_Math(std::unordered_map<std::string, NodeHandler>& handler
 
     // --- More Comparison ---
     handlers["NotEqual"] = [](ExecutionContext& ctx) {
-        double a = ctx.GetInputValue("A").asFloat();
-        double b = ctx.GetInputValue("B").asFloat();
-        ctx.SetOutputValue("Result", Variant(a != b));
+        Variant va = ctx.GetInputValue("A");
+        Variant vb = ctx.GetInputValue("B");
+        bool result;
+        if (va.type == PinDataType::Integer && vb.type == PinDataType::Integer)
+            result = (va.asInt() != vb.asInt());
+        else if (va.type == PinDataType::String || vb.type == PinDataType::String)
+            result = (va.asString() != vb.asString());
+        else
+            result = (std::abs(va.asFloat() - vb.asFloat()) >= 1e-9);
+        ctx.SetOutputValue("Result", Variant(result));
         return true;
     };
 
     handlers["LessEqual"] = [](ExecutionContext& ctx) {
-        double a = ctx.GetInputValue("A").asFloat();
-        double b = ctx.GetInputValue("B").asFloat();
-        ctx.SetOutputValue("Result", Variant(a <= b));
+        Variant va = ctx.GetInputValue("A");
+        Variant vb = ctx.GetInputValue("B");
+        if (va.type == PinDataType::Integer && vb.type == PinDataType::Integer)
+            ctx.SetOutputValue("Result", Variant(va.asInt() <= vb.asInt()));
+        else
+            ctx.SetOutputValue("Result", Variant(va.asFloat() <= vb.asFloat()));
         return true;
     };
 
     handlers["GreaterEqual"] = [](ExecutionContext& ctx) {
-        double a = ctx.GetInputValue("A").asFloat();
-        double b = ctx.GetInputValue("B").asFloat();
-        ctx.SetOutputValue("Result", Variant(a >= b));
+        Variant va = ctx.GetInputValue("A");
+        Variant vb = ctx.GetInputValue("B");
+        if (va.type == PinDataType::Integer && vb.type == PinDataType::Integer)
+            ctx.SetOutputValue("Result", Variant(va.asInt() >= vb.asInt()));
+        else
+            ctx.SetOutputValue("Result", Variant(va.asFloat() >= vb.asFloat()));
         return true;
     };
 

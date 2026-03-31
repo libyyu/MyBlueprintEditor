@@ -1065,23 +1065,7 @@ void BlueprintEditor::DrawDetailsPanel()
     if (!node->Inputs.empty())
     {
         ImGui::Spacing();
-        {
-            auto* drawList = ImGui::GetWindowDrawList();
-            ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-            float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-            drawList->AddRectFilled(
-                cursorPos,
-                ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-                IM_COL32(30, 30, 38, 230), 0.0f);
-            drawList->AddLine(
-                ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
-                ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
-                IM_COL32(0, 122, 204, 100));
-            drawList->AddText(
-                ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-                IM_COL32(200, 200, 210, 230), ICON_FA_ARROW_RIGHT " Inputs");
-            ImGui::Dummy(ImVec2(paneWidth, sectionH));
-        }
+        DrawSectionHeader(ICON_FA_ARROW_RIGHT " Inputs", paneWidth);
 
         ImGui::Indent(8.0f);
         for (auto& pin : node->Inputs)
@@ -1203,23 +1187,7 @@ void BlueprintEditor::DrawDetailsPanel()
     if (!node->Outputs.empty())
     {
         ImGui::Spacing();
-        {
-            auto* drawList = ImGui::GetWindowDrawList();
-            ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-            float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-            drawList->AddRectFilled(
-                cursorPos,
-                ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-                IM_COL32(30, 30, 38, 230), 0.0f);
-            drawList->AddLine(
-                ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
-                ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
-                IM_COL32(0, 122, 204, 100));
-            drawList->AddText(
-                ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-                IM_COL32(200, 200, 210, 230), ICON_FA_ARROW_LEFT " Outputs");
-            ImGui::Dummy(ImVec2(paneWidth, sectionH));
-        }
+        DrawSectionHeader(ICON_FA_ARROW_LEFT " Outputs", paneWidth);
 
         ImGui::Indent(8.0f);
         for (const auto& pin : node->Outputs)
@@ -1273,23 +1241,7 @@ void BlueprintEditor::DrawDetailsPanel()
     if (def && !def->customProperties.empty())
     {
         ImGui::Spacing();
-        {
-            auto* drawList = ImGui::GetWindowDrawList();
-            ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-            float sectionH = ImGui::GetTextLineHeight() + 4.0f;
-            drawList->AddRectFilled(
-                cursorPos,
-                ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH),
-                IM_COL32(30, 30, 38, 230), 0.0f);
-            drawList->AddLine(
-                ImVec2(cursorPos.x, cursorPos.y + sectionH - 1.0f),
-                ImVec2(cursorPos.x + paneWidth, cursorPos.y + sectionH - 1.0f),
-                IM_COL32(0, 122, 204, 100));
-            drawList->AddText(
-                ImVec2(cursorPos.x + 8.0f, cursorPos.y + 2.0f),
-                IM_COL32(200, 200, 210, 230), ICON_FA_GEAR " Properties");
-            ImGui::Dummy(ImVec2(paneWidth, sectionH));
-        }
+        DrawSectionHeader(ICON_FA_GEAR " Properties", paneWidth);
 
         ImGui::Indent(8.0f);
         for (const auto& kv : def->customProperties)

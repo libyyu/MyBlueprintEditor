@@ -730,18 +730,23 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                         IM_COL32(255, 140, 20, a / 3), 13.0f, 0, 2.0f);
                 }
 
-                // 执行后绿色脉冲（计时器驱动，暂停命中节点时跳过避免叠加）
+                // 执行后彩色脉冲（计时器驱动，暂停命中节点时跳过避免叠加）
                 auto hlIt = ActiveDoc()->executedNodeHighlight.find(nid);
                 if (!isPausedAtThis &&
-                    hlIt != ActiveDoc()->executedNodeHighlight.end() && hlIt->second > 0.0f)
+                    hlIt != ActiveDoc()->executedNodeHighlight.end() && hlIt->second.timeLeft > 0.0f)
                 {
-                    float t       = hlIt->second / 3.0f;
+                    float t       = hlIt->second.timeLeft / 3.0f;
                     if (t > 1.0f) t = 1.0f;
                     float elapsed = 1.0f - t;
                     float pulse;
                     if (elapsed < 0.3f) pulse = elapsed / 0.3f;
                     else                pulse = 1.0f - (elapsed - 0.3f) / 0.7f;
                     int a = static_cast<int>(pulse * 200);
+
+                    // 从高亮颜色结构读取语义颜色（成功=绿色，失败=红色，单步=蓝色）
+                    ImColor hlColor = hlIt->second.color;
+                    ImU32 borderCol = IM_COL32(hlColor.Value.x*255, hlColor.Value.y*255, hlColor.Value.z*255, a);
+                    ImU32 outerCol  = IM_COL32(hlColor.Value.x*255, hlColor.Value.y*255, hlColor.Value.z*255, a/3);
 
                     auto dl = ed::GetNodeBackgroundDrawList(node.ID);
                     auto np = ed::GetNodePosition(node.ID);
@@ -750,9 +755,9 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                     ImVec2 rMax(np.x + ns.x, np.y + ns.y);
 
                     dl->AddRect(rMin - ImVec2(3,3), rMax + ImVec2(3,3),
-                        IM_COL32(50, 255, 100, a), 8.0f, 0, 3.0f);
+                        borderCol, 8.0f, 0, 3.0f);
                     dl->AddRect(rMin - ImVec2(6,6), rMax + ImVec2(6,6),
-                        IM_COL32(50, 255, 100, a / 3), 10.0f, 0, 2.0f);
+                        outerCol, 10.0f, 0, 2.0f);
                 }
 
                 // ---- 断点标记：红色圆圈显示在节点左上角 ----

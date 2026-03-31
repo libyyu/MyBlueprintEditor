@@ -97,7 +97,7 @@ void BlueprintEditor::DrawTimerPanel()
                 ImGui::Text("%.2fs", t.interval);
 
                 ImGui::TableNextColumn();
-                float pct = t.interval > 0.0f ? (1.0f - t.remaining / t.interval) : 1.0f;
+                float pct = t.interval > 0.0f ? (t.remaining / t.interval) : 0.0f;
                 if (pct < 0.0f) pct = 0.0f;
                 if (pct > 1.0f) pct = 1.0f;
                 char overlay[32];
