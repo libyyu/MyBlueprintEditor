@@ -495,7 +495,7 @@ struct BlueprintEditor : public Application
     void  AlignSelectedNodes(AlignMode mode);
 
     // ------------------------------------------------------------------
-    // 工程系统（*.bp.proj）
+    // 工程系统（*.bproj）
     // ------------------------------------------------------------------
     BpProject   m_Project;                          // 当前工程（filePath 为空 = 无工程）
     void        NewProject();                        // 新建工程（弹框输入名称）

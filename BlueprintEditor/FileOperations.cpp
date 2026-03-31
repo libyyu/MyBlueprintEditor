@@ -1128,9 +1128,9 @@ void BlueprintEditor::DrawRecentProjectsMenu()
         const auto& path = display[i];
         size_t lastSlash = path.find_last_of("/\\");
         std::string name = (lastSlash != std::string::npos) ? path.substr(lastSlash + 1) : path;
-        // 去掉 .bp.proj 后缀，显示更干净
-        if (name.size() > 8 && name.substr(name.size() - 8) == ".bp.proj")
-            name = name.substr(0, name.size() - 8);
+        // 去掉 .bproj 后缀，显示更干净
+        if (name.size() > 6 && name.substr(name.size() - 6) == ".bproj")
+            name = name.substr(0, name.size() - 6);
 
         std::string label = std::to_string(i + 1) + ". " + name;
         if (ImGui::MenuItem(label.c_str()))

@@ -19,7 +19,7 @@
 - **Runtime 与 Editor 完全解耦**：BlueprintRuntime 可单独编译为静态/动态库嵌入任意项目
 - **140+ 内置节点**：Flow、Math、String、Array、Map、Debug、Event 等分类
 - **Lua 脚本扩展**：运行时注册自定义节点处理器（[开发指南](docs/Lua-Extension-Guide.md)）
-- **多文档 + 工程系统**：VSCode 风格多标签页，`.bp.proj` 工程文件
+- **多文档 + 工程系统**：VSCode 风格多标签页，`.bproj` 工程文件
 - **断点调试**：节点级断点、单步执行、执行高亮
 - **跨平台**：Windows (MSVC/DX11)、Linux/macOS (GCC/GLFW+OpenGL3)、WebGL (Emscripten)、Android
 

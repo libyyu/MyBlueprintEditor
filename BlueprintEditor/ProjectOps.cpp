@@ -16,14 +16,14 @@ void BlueprintEditor::NewProject()
 {
     // 直接弹出系统保存对话框（不再先弹 ImGui 输入框）
     std::string path = SaveFileDialog(
-        "Blueprint Project (*.bp.proj)\0*.bp.proj\0",
+        "Blueprint Project (*.bproj)\0*.bproj\0",
         "New Blueprint Project",
-        "NewProject.bp.proj"
+        "NewProject.bproj"
     );
     if (path.empty()) return;
 
-    if (path.size() < 8 || path.substr(path.size() - 8) != ".bp.proj")
-        path += ".bp.proj";
+    if (path.size() < 6 || path.substr(path.size() - 6) != ".bproj")
+        path += ".bproj";
 
     // 从文件名提取工程名
     std::string name;
@@ -52,7 +52,7 @@ void BlueprintEditor::NewProject()
 void BlueprintEditor::OpenProject()
 {
     std::string path = OpenFileDialog(
-        "Blueprint Project (*.bp.proj)\0*.bp.proj\0All Files (*.*)\0*.*\0",
+        "Blueprint Project (*.bproj)\0*.bproj\0All Files (*.*)\0*.*\0",
         "Open Blueprint Project"
     );
     if (path.empty()) return;
@@ -93,15 +93,15 @@ void BlueprintEditor::SaveProject()
 void BlueprintEditor::SaveProjectAs()
 {
     std::string path = SaveFileDialog(
-        "Blueprint Project (*.bp.proj)\0*.bp.proj\0",
+        "Blueprint Project (*.bproj)\0*.bproj\0",
         "Save Blueprint Project",
-        (m_Project.name + ".bp.proj").c_str()
+        (m_Project.name + ".bproj").c_str()
     );
     if (path.empty()) return;
 
     // 确保扩展名
-    if (path.size() < 8 || path.substr(path.size() - 8) != ".bp.proj")
-        path += ".bp.proj";
+    if (path.size() < 6 || path.substr(path.size() - 6) != ".bproj")
+        path += ".bproj";
 
     m_Project.filePath  = fs::absolute(path).string();
     m_Project.projectDir = fs::path(m_Project.filePath).parent_path().string();
