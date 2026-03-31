@@ -298,7 +298,7 @@ void BlueprintEditor::DoSaveFile(const std::string& path)
         AddCurrentDocToProject();
         
         ActiveDoc()->executionLog.push_back("[INFO] Saved: " + path + " ("
-            + std::to_string(result.runtimeBytes) + " bytes)");
+            + std::to_string(result.bytesWritten) + " bytes)");
     }
     else
     {
@@ -827,7 +827,7 @@ void BlueprintEditor::AddRecentFile(const std::string& path)
     std::string normalized = NormalizePath(path);
     std::string canonical = GetCanonicalPath(normalized);
 
-    // 移除同一文件的旧记录（.editor.json 和 .json 视为同一文件）
+    // 移除同一路径的旧记录
     m_RecentFiles.erase(
         std::remove_if(m_RecentFiles.begin(), m_RecentFiles.end(),
             [&canonical](const std::string& existing) {
@@ -886,7 +886,7 @@ void BlueprintEditor::LoadRecentFiles()
         std::string normalized = NormalizePath(line);
         std::string canonical = GetCanonicalPath(normalized);
 
-        // 去重检查（.editor.json 和 .json 视为同一文件）
+        // 去重检查
         bool duplicate = false;
         for (const auto& existing : m_RecentFiles)
         {

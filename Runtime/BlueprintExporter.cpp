@@ -88,39 +88,12 @@ bool getJsonBool(const crude_json::value& obj, const char* key, bool defaultVal 
 } // anonymous namespace
 
 // ============================================================================
-// Schema 迁移
+// Schema 迁移（预留框架，当前无需迁移）
 // ============================================================================
 
-// v1 → v2：
-//   1. customProperties["__collapsed"] == "1"  →  node.isCollapsed = true，删除该 key
-//   2. variables 顶层数组缺失时补空（已由解析逻辑默认处理，此处仅标记版本）
-static void MigrateV1ToV2(BlueprintData& data)
+static void ApplySchemaMigrations(BlueprintData& /*data*/, int /*fromVersion*/)
 {
-    for (auto& node : data.nodes)
-    {
-        auto it = node.customProperties.find("__collapsed");
-        if (it != node.customProperties.end())
-        {
-            if (it->second == "1")
-                node.isCollapsed = true;
-            node.customProperties.erase(it);
-        }
-    }
-    data.metadata.schemaVersion = 2;
-}
-
-// 迁移入口：从 fromVersion 逐步升级到 BLUEPRINT_CURRENT_SCHEMA_VERSION
-// 新增版本时只需在此追加 if (from < N) { MigrateV(N-1)ToVN(data); from = N; }
-static void ApplySchemaMigrations(BlueprintData& data, int fromVersion)
-{
-    int from = (fromVersion == 0) ? 1 : fromVersion; // 0 视为 v1
-
-    if (from < 2) { MigrateV1ToV2(data); from = 2; }
-
-    // 未来版本：
-    // if (from < 3) { MigrateV2ToV3(data); from = 3; }
-
-    (void)from; // 消除末尾未使用警告
+    // 当前 schema 版本为 BLUEPRINT_CURRENT_SCHEMA_VERSION，无历史格式需要迁移
 }
 
 // ============================================================================
@@ -839,19 +812,6 @@ std::string JsonBlueprintExporter::exportEditorToString(const BlueprintData& dat
         oss << "}";
     }
     
-    // ================================================================
-    // 嵌入完整 Runtime 数据（使 .editor.json 成为 .json 的超集）
-    // ================================================================
-    {
-        oss << ","; writeNewline();
-        writeIndent();
-        // 将完整 runtime JSON 嵌入为 "runtime" 字段的字符串值
-        // 这里直接内联 runtime 结构，而非嵌套字符串，以便导入时直接解析
-        std::string runtimeJson = exportRuntimeToString(data, options);
-        // 解析 runtime JSON 为对象，嵌入为 "runtime" 字段
-        oss << "\"runtime\": " << runtimeJson;
-    }
-    
     // 结束根对象
     writeNewline();
     indentLevel--;
@@ -901,10 +861,7 @@ EditorExportResult JsonBlueprintExporter::exportEditorFiles(const BlueprintData&
 
         result.success      = true;
         result.filePath     = runtimeFilePath;
-        result.runtimePath  = runtimeFilePath;
-        result.editorPath   = runtimeFilePath;
-        result.runtimeBytes = mergedStr.size();
-        result.editorBytes  = 0;
+        result.bytesWritten = mergedStr.size();
 
 #ifndef __EMSCRIPTEN__
     }
@@ -1049,7 +1006,7 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
             node.isEnabled         = getBool(nodeJson, "isEnabled", true);
             node.isCollapsed       = getBool(nodeJson, "isCollapsed", false);
 
-            // 位置（Runtime 文件不含，但兼容老格式）
+            // 位置（编辑器数据，单文件格式从 editor 段读取；此处兼容直接在 runtime 段写入的场景）
             if (nodeJson.contains("position") && nodeJson["position"].type() == crude_json::type_t::object)
             {
                 auto& pos = nodeJson["position"];
@@ -1057,7 +1014,7 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
                 node.position.y = static_cast<float>(getNumber(pos, "y"));
             }
 
-            // 尺寸（同上）
+            // 尺寸
             if (nodeJson.contains("size") && nodeJson["size"].type() == crude_json::type_t::object)
             {
                 auto& sz = nodeJson["size"];
@@ -1077,17 +1034,9 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
                     pin.name     = getString(pinJson, "name");  // 缺失时返回空字符串（默认值）
                     pin.dataType = static_cast<PinDataType>(static_cast<int>(getNumber(pinJson, "dataType")));
 
-                    // kind: 兼容新格式(int: 0=Input, 1=Output) 和旧格式(string: "input"/"output")
-                    if (pinJson.contains("kind"))
-                    {
-                        if (pinJson["kind"].type() == crude_json::type_t::number)
-                            pin.kind = (static_cast<int>(pinJson["kind"].get<double>()) == 1) ? PinKind::Output : PinKind::Input;
-                        else
-                        {
-                            std::string kindStr = getString(pinJson, "kind");
-                            pin.kind = (kindStr == "output") ? PinKind::Output : PinKind::Input;
-                        }
-                    }
+                    // kind: int 格式（0=Input, 1=Output）
+                    if (pinJson.contains("kind") && pinJson["kind"].type() == crude_json::type_t::number)
+                        pin.kind = (static_cast<int>(pinJson["kind"].get<double>()) == 1) ? PinKind::Output : PinKind::Input;
 
                     pin.allowMultiple = getBool(pinJson, "allowMultiple", false);
                     pin.isExec        = getBool(pinJson, "isExec", false);

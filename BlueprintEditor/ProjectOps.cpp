@@ -29,9 +29,6 @@ void BlueprintEditor::NewProject()
     std::string name;
     {
         std::string fname = fs::path(path).stem().string();
-        // 去掉 .bp 后缀
-        if (fname.size() > 3 && fname.substr(fname.size() - 3) == ".bp")
-            fname = fname.substr(0, fname.size() - 3);
         name = fname.empty() ? "NewProject" : fname;
     }
 
@@ -238,22 +235,11 @@ void BlueprintEditor::UpdateBlueprintReferences(const std::string& oldAbsPath,
                 if (val.empty()) continue;
                 // 比较文件名 stem（不含扩展名）
                 std::string valStem = fs::path(val).stem().string();
-                if (valStem.size() > 7 && valStem.substr(valStem.size()-7) == ".editor")
-                    valStem = valStem.substr(0, valStem.size()-7);
                 if (valStem == oldStem)
                 {
-                    // 保留目录和扩展名，只替换 stem
-                    std::string dir  = fs::path(val).parent_path().string();
-                    std::string ext  = fs::path(val).extension().string();
-                    // 如果 val 本身有多重扩展名（.bp.json）需要特殊处理
-                    std::string newVal = newStem;
-                    if (!ext.empty())
-                    {
-                        // 找原来的完整扩展名（.json 或 .bp.json）
-                        size_t dotPos = val.find('.');
-                        if (dotPos != std::string::npos)
-                            newVal = newStem + val.substr(dotPos);
-                    }
+                    // 保留目录前缀，只替换文件名 stem，保留 .bjson 扩展名
+                    std::string dir = fs::path(val).parent_path().string();
+                    std::string newVal = newStem + ".bjson";
                     if (!dir.empty() && dir != ".")
                         newVal = dir + "/" + newVal;
                     pin.defaultValue = ::NodeEditor::Runtime::Variant(newVal);

@@ -6,7 +6,6 @@
 //       { "runtime": { ... }, "editor": { ... } }
 //   - 运行时只读取 "runtime" 字段，"editor" 字段被忽略（零开销）
 //   - 编辑器读写完整文件
-//   - 向后兼容：无 "runtime" 根节点的旧格式视为纯 runtime 数据
 
 #pragma once
 #include "BlueprintExport.h"
@@ -80,17 +79,13 @@ struct ExportResult
     size_t              bytesWritten = 0;         // 写入的字节数
 };
 
-// 编辑器导出结果（单文件模式：runtimePath == editorPath == filePath）
+// 编辑器导出结果（单文件模式）
 struct EditorExportResult
 {
     bool                success = false;
     std::string         errorMessage;
     std::string         filePath;                 // 单文件路径
-    std::string         runtimePath;              // 兼容旧字段（同 filePath）
-    std::string         editorPath;               // 兼容旧字段（同 filePath）
-    size_t              runtimeBytes = 0;
-    size_t              editorBytes = 0;
-    size_t              totalBytes() const { return runtimeBytes + editorBytes; }
+    size_t              bytesWritten = 0;
 };
 
 struct ImportResult

@@ -3,18 +3,15 @@
 //
 // 用法:
 //   runtime-example                                — 运行内置示例蓝图
-//   runtime-example <file.json>                    — 加载并执行指定蓝图文件
-//   runtime-example <file.editor.json>             — 加载并执行指定蓝图文件
+//   runtime-example <file.bjson>                   — 加载并执行指定蓝图文件
 //   runtime-example <file> --max-time <secs>       — 设置最大等待异步 timer 的时间（默认 30 秒）
 //   runtime-example <file> --tick-rate <ms>        — 设置帧循环 tick 间隔（默认 16ms ≈ 60fps）
 //   runtime-example --test                         — 运行所有内置单元测试
 //   runtime-example --test flow_test.json          — 运行测试（指定 flow_test.json 路径）
 //
-// 设计理念:
-//   - Runtime 文件 (.json):          只包含执行所需的最小数据集
-//   - Editor 附加文件 (.editor.json): 只包含编辑器独有数据（位置、尺寸、注释、视图等）
-//   - Editor 完整数据 = Runtime 文件 + Editor 附加文件
-//   - 运行时只需加载 Runtime 文件即可执行
+// 文件格式:
+//   - 蓝图文件 (.bjson): 单文件格式，包含 runtime + editor 两个顶层字段
+//   - 运行时只读取 "runtime" 段，"editor" 段忽略
 
 #include <iostream>
 #include <fstream>
@@ -626,8 +623,7 @@ int main(int argc, char* argv[])
         std::cerr << "Export failed: " << exportResult.errorMessage << std::endl;
         return 1;
     }
-    std::cout << "Single file:   blueprint.bjson  (" << exportResult.runtimeBytes << " bytes)" << std::endl;
-    std::cout << "Total:         " << exportResult.totalBytes() << " bytes" << std::endl;
+    std::cout << "Single file:   blueprint.bjson  (" << exportResult.bytesWritten << " bytes)" << std::endl;
     std::cout << std::endl;
 
     std::string runtimeJson = exporter.exportRuntimeToString(blueprint, opts);

@@ -59,9 +59,6 @@ int LoadFunctionLibrary(INodeRegistry& registry, const std::string& dirPath)
 
         // 获取文件名（不含扩展名）
         std::string stem = p.stem().string();
-        // 去掉 .bp 前缀（如果文件名是 xxx.bp.json，stem = xxx.bp）
-        if (stem.size() > 3 && stem.substr(stem.size() - 3) == ".bp")
-            stem = stem.substr(0, stem.size() - 3);
 
         // 注册 isPublic=true 的函数
         for (const auto& funcDef : result.data.functions)
@@ -130,9 +127,6 @@ int RegisterLibraryFunctions(INodeRegistry& registry,
     {
 #ifndef __EMSCRIPTEN__
         std::string s = fs::path(libFilePath).stem().string();
-        // 去掉 .bp（如 MathLib.bp.json → stem = MathLib.bp → MathLib）
-        if (s.size() > 3 && s.substr(s.size() - 3) == ".bp")
-            s = s.substr(0, s.size() - 3);
         if (!s.empty()) stem = s;
 #endif
     }

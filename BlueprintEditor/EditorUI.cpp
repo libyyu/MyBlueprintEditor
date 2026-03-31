@@ -1238,16 +1238,11 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     {
                         // 在工程 blueprints 和 libraries 里按文件名匹配
                         auto stem = fs::path(filePath).stem().string();
-                        // stem 可能是 "Foo.bp"，再去一层
-                        if (stem.size() > 3 && stem.substr(stem.size()-3) == ".bp")
-                            stem = stem.substr(0, stem.size()-3);
 
                         for (const auto& e : m_Project.blueprints)
                         {
                             std::string abs = m_Project.AbsPath(e.relativePath);
                             std::string es  = fs::path(e.relativePath).stem().string();
-                            if (es.size() > 3 && es.substr(es.size()-3) == ".bp")
-                                es = es.substr(0, es.size()-3);
                             if (es == stem && fs::exists(abs))
                             { resolvedPath = abs; break; }
                         }
@@ -1257,8 +1252,6 @@ void BlueprintEditor::OnFrame(float deltaTime)
                             {
                                 std::string abs = m_Project.AbsPath(e.relativePath);
                                 std::string es  = fs::path(e.relativePath).stem().string();
-                                if (es.size() > 3 && es.substr(es.size()-3) == ".bp")
-                                    es = es.substr(0, es.size()-3);
                                 if (es == stem && fs::exists(abs))
                                 { resolvedPath = abs; break; }
                             }
@@ -1342,9 +1335,6 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     {
                         std::string abs = m_Project.AbsPath(e.relativePath);
                         std::string es  = fs::path(e.relativePath).stem().string();
-                        // 去掉 .bp 后缀（文件名 Foo.bp.json → stem = Foo.bp → 再去 = Foo）
-                        if (es.size() > 3 && es.substr(es.size()-3) == ".bp")
-                            es = es.substr(0, es.size()-3);
                         if (es == libStem && fs::exists(abs))
                         { libAbsPath = abs; break; }
                     }
