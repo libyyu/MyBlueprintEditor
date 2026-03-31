@@ -73,7 +73,7 @@ struct NodeDefinition
 // 节点注册表接口
 // ============================================================================
 
-class INodeRegistry
+class BLUEPRINT_API INodeRegistry
 {
 public:
     virtual ~INodeRegistry() = default;
@@ -112,6 +112,11 @@ public:
 // 默认节点注册表实现（方法实现在 NodeDefinition.cpp）
 // ============================================================================
 
+#ifdef _MSC_VER
+#   pragma warning(push)
+#   pragma warning(disable: 4251)  // STL 成员在 DLL 接口中不可见（安全：同一 CRT）
+#endif
+
 class BLUEPRINT_API DefaultNodeRegistry : public INodeRegistry
 {
 public:
@@ -132,6 +137,10 @@ private:
     std::unordered_map<std::string, NodeCategory>     m_categories;
     mutable std::vector<const NodeDefinition*>        m_allDefsCache;
 };
+
+#ifdef _MSC_VER
+#   pragma warning(pop)
+#endif
 
 } // namespace Runtime
 } // namespace NodeEditor
