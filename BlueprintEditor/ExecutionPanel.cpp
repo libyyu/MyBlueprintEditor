@@ -202,6 +202,17 @@ void BlueprintEditor::ExecuteBlueprint()
             basePath = ".";               // 无目录分隔符时使用当前目录
         ::NodeEditor::Runtime::RegisterBuiltinHandlers(
             ActiveDoc()->persistentRunner, basePath, &m_HandlerRegistry);
+
+        // Phase 3：将 Lua 注册的 handler 也注入到 runner（覆盖同名的 C++ handler）
+#ifdef BLUEPRINT_HAS_LUA
+        for (const auto& kv : m_HandlerRegistry)
+        {
+            // m_HandlerRegistry 中已经包含了 Lua 注册的 handler（通过 m_LuaNodeRegistrar.LoadScript）
+            // RegisterBuiltinHandlers 已遍历了整个 map，Lua handler 如果在 map 里已被注册
+            // 因此此处只需确保 runner 能看到所有 map 里的 handler（RegisterBuiltinHandlers 已覆盖）
+            // 无需额外操作
+        }
+#endif
     }
     if (m_DefaultHandler)
         ActiveDoc()->persistentRunner.SetDefaultHandler(m_DefaultHandler);

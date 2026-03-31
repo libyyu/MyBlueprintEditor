@@ -342,6 +342,18 @@ void BlueprintEditor::OnFrame(float deltaTime)
     if (ActiveDoc())
         ActiveDoc()->invalidateEditorIndices();
 
+    // Phase 3：Lua 热重载轮询（每帧调用，内部按 m_pollIntervalSec 节流）
+#ifdef BLUEPRINT_HAS_LUA
+    if (m_LuaNodeRegistrar.IsInitialized() && m_LuaNodeRegistrar.GetAutoReload())
+    {
+        m_LuaNodeRegistrar.PollFileChanges();
+        // 若 registry 大小变化则强制重建节点菜单缓存
+        size_t newCount = m_NodeRegistry.getAllNodeDefinitions().size();
+        if (newCount != m_CachedDefCount)
+            m_CachedDefCount = 0;  // 触发下一帧重建
+    }
+#endif
+
     // 驱动所有文档的计时器
     for (auto& doc : m_Documents)
         doc->persistentRunner.Tick(deltaTime);

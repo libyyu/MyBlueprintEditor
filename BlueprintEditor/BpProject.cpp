@@ -70,6 +70,15 @@ bool SaveBpProject(const BpProject& proj, const std::string& filePath)
     }
     root["libraries"] = libArr;
 
+    // luaExtensions 数组（可选）
+    if (!proj.luaExtensions.empty())
+    {
+        value luaArr = array();
+        for (const auto& p : proj.luaExtensions)
+            luaArr.push_back(value(p));
+        root["luaExtensions"] = luaArr;
+    }
+
     std::string json = root.dump();
 
     std::ofstream ofs(filePath);
@@ -141,6 +150,17 @@ bool LoadBpProject(BpProject& proj, const std::string& filePath)
 
     parseEntries("blueprints", proj.blueprints);
     parseEntries("libraries",  proj.libraries);
+
+    // luaExtensions（字符串数组，可选）
+    if (root.contains("luaExtensions") &&
+        root["luaExtensions"].type() == crude_json::type_t::array)
+    {
+        for (const auto& item : root["luaExtensions"].get<crude_json::array>())
+        {
+            if (item.type() == crude_json::type_t::string)
+                proj.luaExtensions.push_back(item.get<std::string>());
+        }
+    }
 
     // 记录文件路径和目录
     proj.filePath = fs::absolute(filePath).string();

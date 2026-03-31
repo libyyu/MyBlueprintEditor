@@ -21,6 +21,7 @@
 #include "EventBus.h"
 #include "BpProject.h"
 #include "BpLogger.h"
+#include "LuaNodeRegistrar.h"
 
 #include <string>
 #include <vector>
@@ -685,6 +686,9 @@ struct BlueprintEditor : public Application
     // 节点定义注册表 & 处理器注册表（全局共享）
     RTNodeRegistry                                          m_NodeRegistry;
     std::unordered_map<std::string, RTNodeHandler>          m_HandlerRegistry;
+
+    // Lua 节点注册器（Phase 3：编辑器侧 Lua 扩展）
+    LuaNodeRegistrar                                        m_LuaNodeRegistrar;
 
     // Default handler
     RTNodeHandler m_DefaultHandler;

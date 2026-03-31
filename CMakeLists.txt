@@ -359,6 +359,12 @@ if(NOT BUILD_RUNTIME_ONLY)
 
     target_link_libraries(BlueprintEditor PRIVATE Application)
 
+    # Phase 3: 若 Runtime 开启了 Lua，Editor 也需要链接 Lua 库（LuaNodeRegistrar.cpp 使用 lua.hpp）
+    if(BLUEPRINT_LUA)
+        target_compile_definitions(BlueprintEditor PRIVATE BLUEPRINT_HAS_LUA)
+        target_link_libraries(BlueprintEditor PRIVATE lua::lua)
+    endif()
+
     set_target_properties(BlueprintEditor PROPERTIES
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON

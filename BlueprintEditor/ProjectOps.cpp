@@ -115,6 +115,12 @@ void BlueprintEditor::CloseProject()
 {
     if (!m_Project.IsOpen()) return;
     BPLOG("Closing project: " + m_Project.name);
+
+    // 清除 Lua 注册的节点定义
+#ifdef BLUEPRINT_HAS_LUA
+    m_LuaNodeRegistrar.UnregisterAll();
+#endif
+
     m_Project = BpProject{};
     SetTitle("Blueprint Editor - [No Project]");
 }
@@ -342,6 +348,25 @@ void BlueprintEditor::SyncProjectLibrariesToRegistry()
         total += n;
     }
     BPLOG("SyncProjectLibraries: registered " + std::to_string(total) + " functions");
+
+    // Phase 3：加载 Lua 扩展脚本（先清除旧定义再重新加载）
+#ifdef BLUEPRINT_HAS_LUA
+    m_LuaNodeRegistrar.UnregisterAll();
+    m_LuaNodeRegistrar.Initialize(&m_NodeRegistry, &m_HandlerRegistry);
+    int luaTotal = 0;
+    for (const auto& relPath : m_Project.luaExtensions)
+    {
+        std::string absPath = m_Project.AbsPath(relPath);
+        if (absPath.empty() || !fs::exists(absPath)) continue;
+        int n = m_LuaNodeRegistrar.LoadScript(absPath);
+        if (n >= 0)
+            luaTotal += n;
+        else
+            BPLOG("[Lua] Error loading " + relPath + ": " + m_LuaNodeRegistrar.GetLastError());
+    }
+    if (luaTotal > 0)
+        BPLOG("SyncProjectLibraries: registered " + std::to_string(luaTotal) + " Lua nodes");
+#endif
 
     // 节点定义变更，强制重建缓存
     m_CachedDefCount = 0;
@@ -857,6 +882,179 @@ void BlueprintEditor::DrawProjectPanel()
 
     drawSection(m_Project.blueprints, "##sec_bp",  "BLUEPRINTS", ICON_FA_FILE, RTBlueprintClass::Actor);
     drawSection(m_Project.libraries,  "##sec_lib", "LIBRARIES",  ICON_FA_CUBE, RTBlueprintClass::FunctionLibrary);
+
+#ifdef BLUEPRINT_HAS_LUA
+    // ── Lua 脚本 Section ────────────────────────────────────────────────
+    {
+        ImGui::PushID("##sec_lua");
+        ImGuiID stateId = ImGui::GetID("##sec_lua");
+        bool* pOpen = ImGui::GetStateStorage()->GetBoolRef(stateId, false);
+
+        float secH   = lineH + 6.0f;
+        ImVec2 secMin = ImGui::GetCursorScreenPos();
+
+        dl->AddRectFilled(secMin, ImVec2(secMin.x + panelW, secMin.y + secH),
+                          IM_COL32(28, 30, 36, 220));
+        dl->AddLine(ImVec2(secMin.x, secMin.y + secH - 1),
+                    ImVec2(secMin.x + panelW, secMin.y + secH - 1),
+                    IM_COL32(55, 60, 70, 200));
+
+        const char* arrow = *pOpen ? ICON_FA_CARET_DOWN : ICON_FA_CARET_RIGHT;
+        char headerText[80];
+        std::snprintf(headerText, sizeof(headerText), "%s  " ICON_FA_SCROLL "  LUA SCRIPTS  (%d)",
+                      arrow, (int)m_Project.luaExtensions.size());
+        ImVec2 textPos(secMin.x + 6.0f, secMin.y + (secH - lineH) * 0.5f);
+        dl->AddText(textPos, IM_COL32(200, 170, 100, 230), headerText);
+
+        // [+] 按钮（添加 Lua 脚本）
+        float plusW = ImGui::CalcTextSize(ICON_FA_PLUS).x + 8.0f;
+        float plusX = secMin.x + panelW - plusW - 4.0f;
+        float plusY = secMin.y + (secH - lineH) * 0.5f;
+        ImVec2 plusMin(plusX - 2.0f, secMin.y + 1.0f);
+        ImVec2 plusMax(plusX + plusW, secMin.y + secH - 1.0f);
+        bool plusHov  = ImGui::IsMouseHoveringRect(plusMin, plusMax);
+        bool plusClick = plusHov && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+        if (plusHov)
+            dl->AddRectFilled(plusMin, plusMax, IM_COL32(180, 140, 0, 70), 3.0f);
+        dl->AddText(ImVec2(plusX + 2.0f, plusY), IM_COL32(200, 170, 100, 220), ICON_FA_PLUS);
+        if (plusClick)
+        {
+            // 打开文件选择对话框，选择 .lua 文件加入工程
+            std::vector<std::string> filters = {"Lua Script (*.lua)", "*.lua"};
+            std::string startDir = m_Project.projectDir.empty() ? "." : m_Project.projectDir;
+            std::string luaPath = OpenFileDialog(filters, startDir);
+            if (!luaPath.empty())
+            {
+                std::string relPath = m_Project.RelPath(luaPath);
+                // 去重
+                bool exists = false;
+                for (const auto& p : m_Project.luaExtensions)
+                    if (p == relPath) { exists = true; break; }
+                if (!exists)
+                {
+                    m_Project.luaExtensions.push_back(relPath);
+                    SaveProject();
+                    SyncProjectLibrariesToRegistry();
+                }
+            }
+        }
+        if (plusHov && ImGui::BeginTooltip())
+        {
+            ImGui::TextUnformatted("Add Lua Script to project");
+            ImGui::EndTooltip();
+        }
+
+        // Header 点击展开/折叠
+        ImRect headerRect(secMin, ImVec2(plusMin.x - 2.0f, secMin.y + secH));
+        if (ImGui::IsMouseHoveringRect(headerRect.Min, headerRect.Max))
+        {
+            dl->AddRectFilled(secMin, ImVec2(plusMin.x - 2.0f, secMin.y + secH),
+                              IM_COL32(255, 255, 255, 8));
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+                *pOpen = !*pOpen;
+        }
+
+        ImGui::SetCursorScreenPos(ImVec2(secMin.x, secMin.y + secH));
+        ImGui::Dummy(ImVec2(panelW, 0.0f));
+
+        if (*pOpen)
+        {
+            // 热重载状态指示
+            const auto& lastErr = m_LuaNodeRegistrar.GetLastError();
+            if (!lastErr.empty())
+            {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.3f, 1.0f));
+                ImGui::TextWrapped("  %s %s", ICON_FA_TRIANGLE_EXCLAMATION, lastErr.c_str());
+                ImGui::PopStyleColor();
+            }
+
+            // 自动热重载切换
+            bool autoReload = m_LuaNodeRegistrar.GetAutoReload();
+            if (ImGui::Checkbox("  Auto hot-reload##lua", &autoReload))
+                m_LuaNodeRegistrar.SetAutoReload(autoReload);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Reload Lua scripts automatically when files change");
+
+            ImGui::SameLine();
+            if (ImGui::SmallButton(ICON_FA_ARROWS_ROTATE " Reload All##lua"))
+            {
+                int n = m_LuaNodeRegistrar.ReloadAll();
+                m_CachedDefCount = 0;
+                if (n >= 0)
+                    BPLOG("[Lua] Reloaded " + std::to_string(n) + " node definitions");
+                else
+                    BPLOG("[Lua] Reload failed: " + m_LuaNodeRegistrar.GetLastError());
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Force reload all Lua scripts now");
+
+            ImGui::Spacing();
+
+            int removeIdx = -1;
+            for (int i = 0; i < (int)m_Project.luaExtensions.size(); ++i)
+            {
+                ImGui::PushID(i);
+                const auto& relPath = m_Project.luaExtensions[i];
+                std::string fname = fs::path(relPath).filename().string();
+
+                float rowH   = lineH + 4.0f;
+                ImVec2 rowMin = ImGui::GetCursorScreenPos();
+                bool rowHov  = ImGui::IsMouseHoveringRect(rowMin, ImVec2(rowMin.x + panelW, rowMin.y + rowH));
+
+                if (rowHov)
+                    dl->AddRectFilled(rowMin, ImVec2(rowMin.x + panelW, rowMin.y + rowH),
+                                      IM_COL32(255, 255, 255, 12));
+
+                // Lua 文件图标（橙黄色）
+                bool fileExists = fs::exists(m_Project.AbsPath(relPath));
+                ImU32 textCol = fileExists ? IM_COL32(220, 180, 60, 230) : IM_COL32(160, 60, 60, 200);
+                std::string rowText = std::string("    " ICON_FA_SCROLL "  ") + fname;
+                dl->AddText(ImVec2(rowMin.x + 4.0f, rowMin.y + 2.0f), textCol, rowText.c_str());
+
+                // Tooltip：完整路径 + 错误提示
+                if (rowHov && ImGui::BeginTooltip())
+                {
+                    ImGui::TextUnformatted(relPath.c_str());
+                    if (!fileExists)
+                        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "File not found!");
+                    ImGui::EndTooltip();
+                }
+
+                // 右键：移除
+                if (rowHov && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+                    ImGui::OpenPopup("##luaEntryCtx");
+                if (ImGui::BeginPopup("##luaEntryCtx"))
+                {
+                    if (ImGui::MenuItem(ICON_FA_XMARK " Remove from project"))
+                        removeIdx = i;
+                    if (ImGui::MenuItem(ICON_FA_ARROWS_ROTATE " Reload this script"))
+                    {
+                        std::string absPath = m_Project.AbsPath(relPath);
+                        int n = m_LuaNodeRegistrar.ReloadFile(absPath);
+                        m_CachedDefCount = 0;
+                        (void)n;
+                    }
+                    ImGui::EndPopup();
+                }
+
+                ImGui::SetCursorScreenPos(ImVec2(rowMin.x, rowMin.y + rowH));
+                ImGui::Dummy(ImVec2(panelW, 0.0f));
+                ImGui::PopID();
+            }
+
+            if (removeIdx >= 0)
+            {
+                m_Project.luaExtensions.erase(m_Project.luaExtensions.begin() + removeIdx);
+                SaveProject();
+                m_LuaNodeRegistrar.UnregisterAll();
+                SyncProjectLibrariesToRegistry();
+            }
+
+            ImGui::Spacing();
+        }
+        ImGui::PopID();
+    }
+#endif // BLUEPRINT_HAS_LUA
 
     ImGui::PopStyleVar(2);  // FramePadding + ItemSpacing
 }
