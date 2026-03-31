@@ -1085,7 +1085,11 @@ void BlueprintEditor::OpenSaveNameDialog(bool isNew, RTBlueprintClass bpClass)
                 stem = (fs::path(relStr) / stem).string();
         } catch (...) {}
 
-        std::strncpy(d.inputBuf, stem.c_str(), sizeof(d.inputBuf) - 1);
+#ifdef _MSC_VER
+        strncpy_s(d.inputBuf, sizeof(d.inputBuf), stem.c_str(), sizeof(d.inputBuf) - 1);
+#else
+        std::snprintf(d.inputBuf, sizeof(d.inputBuf), "%s", stem.c_str());
+#endif
     }
 }
 
