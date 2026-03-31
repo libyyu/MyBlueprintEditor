@@ -716,8 +716,12 @@ private:
     mutable bool                                        m_topoCacheDirty = true;
     mutable bool                                        m_topoCacheHasCycle = false;
 
+    // 缓存：事件子图集合（随拓扑缓存一起失效）
+    mutable std::unordered_set<NodeId>                  m_eventSubgraphCache;
+    mutable bool                                        m_eventSubgraphDirty = true;
+
     // 标记拓扑缓存失效（图结构变更时调用）
-    void invalidateTopoCache() { m_topoCacheDirty = true; }
+    void invalidateTopoCache() { m_topoCacheDirty = true; m_eventSubgraphDirty = true; }
 
     // 确保拓扑缓存有效，返回是否无环
     bool ensureTopologicalOrder() const;

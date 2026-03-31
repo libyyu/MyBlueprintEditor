@@ -333,9 +333,9 @@ void BlueprintEditor::ShowLeftPane(float /*paneWidth*/)
 
 void BlueprintEditor::OnFrame(float deltaTime)
 {
-    // 使当前活跃文档的编辑器侧索引标记为 dirty（懒重建：首次查找时自动重建）
-    // 目前所有 mutation 发生在同一帧的 ed::Begin/End 区间内，此处每帧标记 dirty 保证安全
-    // TODO: 后续可在每个 mutation 点单独调用 invalidateEditorIndices() 来完全消除此处调用
+    // 每帧标记编辑器侧索引为 dirty，确保 mutation 后的查找（IsPinLinked/FindPin 等）始终使用最新数据。
+    // 已知性能代价：每帧 O(nodes+links) 重建；节点数 < 200 时影响可忽略。
+    // 后续优化：在每个 mutation 点精确调用 invalidateEditorIndices() 后可移除此行。
     if (ActiveDoc())
         ActiveDoc()->invalidateEditorIndices();
 

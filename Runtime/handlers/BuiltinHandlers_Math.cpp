@@ -54,43 +54,56 @@ void RegisterHandlers_Math(std::unordered_map<std::string, NodeHandler>& handler
     };
 
     handlers["Divide"] = [](ExecutionContext& ctx) {
-        double a = ctx.GetInputValue("A").asFloat();
-        double b = ctx.GetInputValue("B").asFloat();
-        if (b == 0.0) { ctx.Log("  [WARN] Division by zero!"); b = 1.0; }
-        ctx.SetOutputValue("Result", Variant(a / b));
+        Variant va = ctx.GetInputValue("A");
+        Variant vb = ctx.GetInputValue("B");
+        if (va.type == PinDataType::Integer && vb.type == PinDataType::Integer)
+        {
+            int64_t b = vb.asInt();
+            if (b == 0) { ctx.LogWarning("[Divide] Division by zero (integer)! Result = 0."); ctx.SetOutputValue("Result", Variant(static_cast<int64_t>(0))); return true; }
+            ctx.SetOutputValue("Result", Variant(va.asInt() / b));
+        }
+        else
+        {
+            double b = vb.asFloat();
+            if (b == 0.0) { ctx.LogWarning("[Divide] Division by zero (float)! Result = NaN."); }
+            ctx.SetOutputValue("Result", Variant(va.asFloat() / b));  // 浮点除以0得 Inf/NaN，符合 IEEE 754
+        }
         return true;
     };
 
     // --- Comparison ---
     handlers["Less"] = [](ExecutionContext& ctx) {
-        auto node = ctx.GetCurrentNode();
-        if (node && node->pins.size() >= 3)
-        {
-            double a = ctx.GetInputValue(node->pins[0].id).asFloat();
-            double b = ctx.GetInputValue(node->pins[1].id).asFloat();
-            double result = (a < b) ? 1.0 : 0.0;
-            ctx.SetOutputValue(node->pins[2].id, Variant(result));
-            ctx.Log("  " + std::to_string(a) + " < " + std::to_string(b) + " = " + std::to_string(result));
-        }
+        Variant va = ctx.GetInputValue("A");
+        Variant vb = ctx.GetInputValue("B");
+        if (va.type == PinDataType::Integer && vb.type == PinDataType::Integer)
+            ctx.SetOutputValue("Result", Variant(va.asInt() < vb.asInt()));
+        else
+            ctx.SetOutputValue("Result", Variant(va.asFloat() < vb.asFloat()));
         return true;
     };
 
     handlers["Greater"] = [](ExecutionContext& ctx) {
-        auto node = ctx.GetCurrentNode();
-        if (node && node->pins.size() >= 3)
-        {
-            double a = ctx.GetInputValue(node->pins[0].id).asFloat();
-            double b = ctx.GetInputValue(node->pins[1].id).asFloat();
-            double result = (a > b) ? 1.0 : 0.0;
-            ctx.SetOutputValue(node->pins[2].id, Variant(result));
-        }
+        Variant va = ctx.GetInputValue("A");
+        Variant vb = ctx.GetInputValue("B");
+        if (va.type == PinDataType::Integer && vb.type == PinDataType::Integer)
+            ctx.SetOutputValue("Result", Variant(va.asInt() > vb.asInt()));
+        else
+            ctx.SetOutputValue("Result", Variant(va.asFloat() > vb.asFloat()));
         return true;
     };
 
     handlers["Equal"] = [](ExecutionContext& ctx) {
-        double a = ctx.GetInputValue("A").asFloat();
-        double b = ctx.GetInputValue("B").asFloat();
-        ctx.SetOutputValue("Result", Variant(a == b));
+        Variant va = ctx.GetInputValue("A");
+        Variant vb = ctx.GetInputValue("B");
+        // 整数精确比较，浮点用 epsilon
+        bool result;
+        if (va.type == PinDataType::Integer && vb.type == PinDataType::Integer)
+            result = (va.asInt() == vb.asInt());
+        else if (va.type == PinDataType::String || vb.type == PinDataType::String)
+            result = (va.asString() == vb.asString());
+        else
+            result = (std::abs(va.asFloat() - vb.asFloat()) < 1e-9);
+        ctx.SetOutputValue("Result", Variant(result));
         return true;
     };
 

@@ -1131,12 +1131,12 @@ void BlueprintEditor::DrawDetailsPanel()
                 }
                 case PinType::Int:
                 {
-                    int ival = static_cast<int>(pin.IntValue);
+                    ImS64 ival = static_cast<ImS64>(pin.IntValue);
                     ImGui::SetNextItemWidth(editWidth);
-                    if (ImGui::DragInt("##val", &ival, 1.0f))
+                    if (ImGui::DragScalar("##val", ImGuiDataType_S64, &ival, 1.0f))
                     {
                         PushUndoState();
-                        pin.IntValue = ival;
+                        pin.IntValue = static_cast<int64_t>(ival);
                         doc->isDirty = true;
                     }
                     break;

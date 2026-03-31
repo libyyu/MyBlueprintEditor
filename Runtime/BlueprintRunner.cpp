@@ -738,9 +738,13 @@ ExecutionResult BlueprintRunner::Execute()
     m_flowExecutedNodes.clear(); // 清空控制流已执行记录
     m_stepTopoIndex = 0;         // 重置单步索引
 
-    // 收集所有事件源节点及其 exec 下游子图（如 CustomEvent → Print String）
-    // 这些节点不在主循环中执行，只在被外部触发（如 Timer 回调）时执行
-    auto eventSubgraph = m_blueprint.collectEventSubgraphs();
+    // 收集所有事件源节点及其 exec 下游子图（缓存，随拓扑缓存一起失效）
+    if (m_eventSubgraphDirty)
+    {
+        m_eventSubgraphCache = m_blueprint.collectEventSubgraphs();
+        m_eventSubgraphDirty = false;
+    }
+    const auto& eventSubgraph = m_eventSubgraphCache;
 
     for (size_t i = 0; i < order.size(); ++i)
     {
@@ -884,6 +888,7 @@ ExecutionResult BlueprintRunner::ExecuteNodes(const std::vector<NodeId>& nodeIds
     }
 
     // 执行
+    m_flowExecutedNodes.clear();  // 确保不受上次 Execute() 结果影响
     for (NodeId id : filteredOrder)
     {
         const NodeInstance* node = m_blueprint.findNode(id);
@@ -1242,7 +1247,12 @@ bool BlueprintRunner::StepNextNode()
         return false;
     const auto& order = m_topoCache;
 
-    auto eventSubgraph = m_blueprint.collectEventSubgraphs();
+    if (m_eventSubgraphDirty)
+    {
+        m_eventSubgraphCache = m_blueprint.collectEventSubgraphs();
+        m_eventSubgraphDirty = false;
+    }
+    const auto& eventSubgraph = m_eventSubgraphCache;
 
     // 从 m_stepTopoIndex 开始找下一个需要执行的节点
     while (m_stepTopoIndex < order.size())
