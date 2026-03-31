@@ -465,30 +465,11 @@ static int runBlueprintFromFile(const std::string& filePath, float maxTimeSec, i
     runner.SetLogCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
     runner.SetPrintCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
 
-    bool isEditorFile = (fileName.size() > 12 && fileName.substr(fileName.size()-12) == ".editor.json");
-
-    if (isEditorFile)
+    // 单文件格式：importRuntimeFromFile 自动检测 runtime+editor 内容
+    if (!runner.LoadFromFileWithDeps(filePath))
     {
-        JsonBlueprintExporter exporter;
-        auto importResult = exporter.importFromEditorFile(filePath);
-        if (!importResult.success)
-        {
-            std::cerr << "ERROR: Failed to load editor file: " << importResult.errorMessage << std::endl;
-            return 1;
-        }
-        if (!runner.Load(importResult.data))
-        {
-            std::cerr << "ERROR: Failed to load blueprint data: " << runner.GetLastError() << std::endl;
-            return 1;
-        }
-    }
-    else
-    {
-        if (!runner.LoadFromFileWithDeps(filePath))
-        {
-            std::cerr << "ERROR: " << runner.GetLastError() << std::endl;
-            return 1;
-        }
+        std::cerr << "ERROR: " << runner.GetLastError() << std::endl;
+        return 1;
     }
 
     const auto& bp = runner.GetBlueprintData();
@@ -637,33 +618,29 @@ int main(int argc, char* argv[])
     opts.prettyPrint = true;
 
     // Step 1: 导出为两个文件 (Runtime + Editor)
-    std::cout << "--- Step 1: Export to dual files (Runtime + Editor) ---" << std::endl;
-    auto exportResult = exporter.exportEditorFiles(blueprint, "blueprint.json", "blueprint.editor.json", opts);
+    std::cout << "--- Step 1: Export to single .bjson file (runtime + editor) ---" << std::endl;
+    auto exportResult = exporter.exportEditorFiles(blueprint, "blueprint.bjson", "", opts);
     if (!exportResult.success)
     {
+
         std::cerr << "Export failed: " << exportResult.errorMessage << std::endl;
         return 1;
     }
-    std::cout << "Runtime file:  blueprint.json         (" << exportResult.runtimeBytes << " bytes)" << std::endl;
-    std::cout << "Editor file:   blueprint.editor.json   (" << exportResult.editorBytes  << " bytes)" << std::endl;
+    std::cout << "Single file:   blueprint.bjson  (" << exportResult.runtimeBytes << " bytes)" << std::endl;
     std::cout << "Total:         " << exportResult.totalBytes() << " bytes" << std::endl;
     std::cout << std::endl;
 
     std::string runtimeJson = exporter.exportRuntimeToString(blueprint, opts);
-    std::cout << "---- Runtime file content (blueprint.json) ----" << std::endl;
+    std::cout << "---- Runtime JSON (embedded in .bjson) ----" << std::endl;
     std::cout << runtimeJson << std::endl;
 
-    std::string editorJson = exporter.exportEditorToString(blueprint, opts);
-    std::cout << "---- Editor file content (blueprint.editor.json) ----" << std::endl;
-    std::cout << editorJson << std::endl;
-
-    // Step 2: 运行时 — 只加载 Runtime 文件
-    std::cout << "--- Step 2: Runtime — load only Runtime file and execute ---" << std::endl;
+    // Step 2: 运行时 — 加载单文件（runtime 段）
+    std::cout << "--- Step 2: Runtime — load single .bjson file ---" << std::endl;
     BlueprintRunner runner;
     runner.SetLogCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
     runner.SetPrintCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
 
-    if (!runner.LoadFromFile("blueprint.json"))
+    if (!runner.LoadFromFile("blueprint.bjson"))
     {
         std::cerr << "ERROR: " << runner.GetLastError() << std::endl;
         return 1;
@@ -675,9 +652,8 @@ int main(int argc, char* argv[])
     const auto* node1 = runner.GetBlueprintData().findNode(1);
     if (node1)
         std::cout << "Node 'Constant A' position: (" << node1->position.x << ", " << node1->position.y
-                  << ") (should be 0,0 — not in Runtime file)" << std::endl;
-    std::cout << "Comments count: " << runner.GetBlueprintData().comments.size()
-              << " (should be 0 — not in Runtime file)" << std::endl;
+                  << ") (restored from editor section)" << std::endl;
+    std::cout << "Comments count: " << runner.GetBlueprintData().comments.size() << std::endl;
     std::cout << std::endl;
 
     runner.RegisterHandler("constant_float", handler_ConstantFloat);
@@ -691,36 +667,36 @@ int main(int argc, char* argv[])
     std::cout << "Elapsed: " << result.elapsedMs << " ms" << std::endl;
     std::cout << std::endl;
 
-    // Step 3: 编辑器 — 加载两个文件合并
-    std::cout << "--- Step 3: Editor — load both files and merge ---" << std::endl;
-    auto mergeResult = exporter.importEditorFromFiles("blueprint.json", "blueprint.editor.json");
+    // Step 3: 编辑器 — 重新加载完整数据（单文件包含 editor 段）
+    std::cout << "--- Step 3: Editor — reload single file with editor data ---" << std::endl;
+    auto mergeResult = exporter.importRuntimeFromFile("blueprint.bjson");
     if (!mergeResult.success)
     {
-        std::cerr << "Merge import failed: " << mergeResult.errorMessage << std::endl;
+        std::cerr << "Load failed: " << mergeResult.errorMessage << std::endl;
         return 1;
     }
-    std::cout << "Merged data loaded OK!" << std::endl;
+    std::cout << "Data loaded OK!" << std::endl;
     std::cout << "  Name: "      << mergeResult.data.metadata.name      << std::endl;
-    std::cout << "  Author: "    << mergeResult.data.metadata.author    << " (from Editor file)" << std::endl;
-    std::cout << "  CreatedAt: " << mergeResult.data.metadata.createdAt << " (from Editor file)" << std::endl;
+    std::cout << "  Author: "    << mergeResult.data.metadata.author    << " (from editor section)" << std::endl;
+    std::cout << "  CreatedAt: " << mergeResult.data.metadata.createdAt << " (from editor section)" << std::endl;
     std::cout << "  Nodes: "     << mergeResult.data.nodes.size()       << std::endl;
 
     const auto* mergedNode1 = mergeResult.data.findNode(1);
     if (mergedNode1)
     {
         std::cout << "  Node 'Constant A' position: (" << mergedNode1->position.x << ", " << mergedNode1->position.y
-                  << ") (restored from Editor file)" << std::endl;
+                  << ") (restored from editor section)" << std::endl;
         std::cout << "  Node 'Constant A' size: (" << mergedNode1->size.width << "x" << mergedNode1->size.height
-                  << ") (restored from Editor file)" << std::endl;
+                  << ") (restored from editor section)" << std::endl;
     }
-    std::cout << "  Comments: " << mergeResult.data.comments.size() << " (restored from Editor file)" << std::endl;
+    std::cout << "  Comments: " << mergeResult.data.comments.size() << " (restored from editor section)" << std::endl;
     if (!mergeResult.data.comments.empty())
         std::cout << "    Comment[0]: \"" << mergeResult.data.comments[0].text << "\"" << std::endl;
     if (!mergeResult.data.variables.empty())
     {
         const auto& var = mergeResult.data.variables[0];
         std::cout << "  Variable '" << var.name << "' category: \"" << var.category
-                  << "\", tooltip: \"" << var.tooltip << "\" (from Editor file)" << std::endl;
+                  << "\", tooltip: \"" << var.tooltip << "\" (from editor section)" << std::endl;
     }
     std::cout << "  Total bytes read: " << mergeResult.bytesRead << std::endl;
     std::cout << std::endl;

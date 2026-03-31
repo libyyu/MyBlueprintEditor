@@ -79,13 +79,6 @@ std::string GetFileBaseName(const std::string& path)
     return name;
 }
 
-// 获取 editor 路径
-std::string GetEditorFilePath(const std::string& runtimePath)
-{
-    // Foo.bjson -> Foo.bjson.editor
-    return runtimePath + ".editor";
-}
-
 } // anonymous namespace
 
 // ============================================================================
@@ -177,7 +170,7 @@ void BlueprintEditor::NewFile(RTBlueprintClass bpClass)
 void BlueprintEditor::OpenFile()
 {
     std::string path = OpenFileDialog(
-        "Blueprint Files (*.bjson)\0*.bjson\0Editor Files (*.bjson.editor)\0*.bjson.editor\0All Files (*.*)\0*.*\0",
+        "Blueprint Files (*.bjson)\0*.bjson\0All Files (*.*)\0*.*\0",
         "Open Blueprint"
     );
     
@@ -191,51 +184,26 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
 {
     ::NodeEditor::Runtime::JsonBlueprintExporter exporter;
     ::NodeEditor::Runtime::ImportResult result;
-    
-    // 判断是否是遗留的 .bjson.editor 文件（旧格式兼容）
-    bool isLegacyEditorFile = (path.size() > 7 && path.substr(path.size() - 7) == ".editor");
-    
-    if (isLegacyEditorFile)
+
+    // 单文件格式：importRuntimeFromFile 自动检测
+    // - 顶层有 "runtime" 字段 → 新格式，同时加载 editor 数据
+    // - 否则 → 纯 runtime 旧格式
+    result = exporter.importRuntimeFromFile(path);
+
+    if (!result.success)
     {
-        // 遗留旧格式：从 .bjson.editor 加载
-        result = exporter.importFromEditorFile(path);
-        if (!result.success)
+        if (ActiveDoc())
         {
-            if (ActiveDoc())
-            {
-                ActiveDoc()->executionLog.push_back("[ERROR] Failed to open editor file: " + result.errorMessage);
-                ActiveDoc()->executionLogDirty = true;
-            }
-            return;
+            ActiveDoc()->executionLog.push_back("[ERROR] Failed to open: " + result.errorMessage);
+            ActiveDoc()->executionLogDirty = true;
         }
-        CreateNewDocument();
-        ed::SetCurrentEditor(ActiveDoc()->editorContext);
-        LoadEditorData(result.data);
-        // 对应的 runtime 文件路径（去掉 .editor 后缀）
-        ActiveDoc()->filePath = path.substr(0, path.size() - 7);
+        return;
     }
-    else
-    {
-        // 新格式（单文件）或纯 runtime 文件：importRuntimeFromFile 自动检测
-        // - 若文件顶层有 "runtime" 字段 → 单文件新格式，同时加载 editor 数据
-        // - 否则 → 纯 runtime 旧格式
-        result = exporter.importRuntimeFromFile(path);
-        
-        if (!result.success)
-        {
-            if (ActiveDoc())
-            {
-                ActiveDoc()->executionLog.push_back("[ERROR] Failed to open: " + result.errorMessage);
-                ActiveDoc()->executionLogDirty = true;
-            }
-            return;
-        }
-        
-        CreateNewDocument();
-        ed::SetCurrentEditor(ActiveDoc()->editorContext);
-        LoadEditorData(result.data);
-        ActiveDoc()->filePath = path;
-    }
+
+    CreateNewDocument();
+    ed::SetCurrentEditor(ActiveDoc()->editorContext);
+    LoadEditorData(result.data);
+    ActiveDoc()->filePath = path;
     
     ActiveDoc()->isDirty = false;
     
@@ -884,17 +852,9 @@ static std::string NormalizePath(const std::string& path)
     return result;
 }
 
-// 辅助函数：获取路径的"基础路径"用于去重比较
-// .editor.json 和 .json 视为同一文件
+// 辅助函数：获取路径的规范形式用于去重比较
 static std::string GetCanonicalPath(const std::string& normalizedPath)
 {
-    // .bjson.editor 和 .bjson 视为同一文件
-    const std::string editorSuffix = ".editor";
-    if (normalizedPath.size() > editorSuffix.size() &&
-        normalizedPath.substr(normalizedPath.size() - editorSuffix.size()) == editorSuffix)
-    {
-        return normalizedPath.substr(0, normalizedPath.size() - editorSuffix.size());
-    }
     return normalizedPath;
 }
 
@@ -1149,11 +1109,9 @@ void BlueprintEditor::OpenSaveNameDialog(bool isNew, RTBlueprintClass bpClass)
     {
         std::string assetsDir = (fs::path(m_Project.projectDir) / "assets").string();
         fs::path fp(ActiveDoc()->filePath);
-        // 去掉所有已知扩展名（.bjson.editor / .bjson）
+        // 去掉 .bjson 扩展名
         std::string stem = fp.filename().string();
-        if (stem.size() > 13 && stem.substr(stem.size() - 13) == ".bjson.editor")
-            stem = stem.substr(0, stem.size() - 13);
-        else if (stem.size() > 6 && stem.substr(stem.size() - 6) == ".bjson")
+        if (stem.size() > 6 && stem.substr(stem.size() - 6) == ".bjson")
             stem = stem.substr(0, stem.size() - 6);
 
         // 若当前文件已在 assets 下，计算子目录路径
@@ -1192,10 +1150,7 @@ std::string BlueprintEditor::ResolveSaveDialogPath() const
 
     // 追加扩展名（去掉用户自己加的，统一加 .bjson）
     std::string fullStr = full.string();
-    // 剥掉 .bjson.editor / .bjson
-    if (fullStr.size() > 13 && fullStr.substr(fullStr.size() - 13) == ".bjson.editor")
-        fullStr = fullStr.substr(0, fullStr.size() - 13);
-    else if (fullStr.size() > 6 && fullStr.substr(fullStr.size() - 6) == ".bjson")
+    if (fullStr.size() > 6 && fullStr.substr(fullStr.size() - 6) == ".bjson")
         fullStr = fullStr.substr(0, fullStr.size() - 6);
 
 
@@ -1231,10 +1186,9 @@ void BlueprintEditor::OnDropFile(const std::string& filePath)
             AddRecentProject(m_Project.filePath);
         }
     }
-    else if (hasSuffix(filePath, ".bjson") || hasSuffix(filePath, ".bjson.editor") ||
-             hasSuffix(filePath, ".json")  || hasSuffix(filePath, ".editor.json"))
+    else if (hasSuffix(filePath, ".bjson") || hasSuffix(filePath, ".json"))
     {
-        // 拖拽蓝图文件：打开
+        // 蓝图文件：打开
         DoOpenFile(filePath);
     }
     // 其他格式静默忽略

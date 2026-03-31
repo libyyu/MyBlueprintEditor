@@ -112,47 +112,30 @@ public:
     virtual ~IBlueprintExporter() = default;
     
     // ---- Runtime 文件导出/导入 ----
-    
-    // 导出 Runtime 数据到字符串（只包含执行所需的最小数据集）
+
+    // 导出 Runtime 数据到字符串（只包含执行所需的最小数据集，内部无 editor 段）
     virtual std::string exportRuntimeToString(const BlueprintData& data, const ExportOptions& options = ExportOptions()) const = 0;
-    
+
     // 导出 Runtime 数据到文件
     virtual ExportResult exportRuntimeToFile(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const = 0;
-    
-    // 从 Runtime 字符串导入
+
+    // 从字符串导入（自动兼容：有 "runtime" 根节点则同时合并 editor 数据）
     virtual ImportResult importRuntimeFromString(const std::string& content, const ImportOptions& options = ImportOptions()) const = 0;
-    
-    // 从 Runtime 文件导入
+
+    // 从文件导入（自动兼容）
     virtual ImportResult importRuntimeFromFile(const std::string& filePath, const ImportOptions& options = ImportOptions()) const = 0;
-    
-    // ---- Editor 附加数据导出/导入 ----
-    
-    // 导出 Editor 附加数据到字符串（位置、尺寸、注释、视图信息等）
-    virtual std::string exportEditorToString(const BlueprintData& data, const ExportOptions& options = ExportOptions()) const = 0;
-    
-    // 导出 Editor 附加数据到文件
-    virtual ExportResult exportEditorToFile(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const = 0;
-    
-    // ---- 编辑器单文件导出（合并 runtime + editor 到一个文件） ----
-    
-    // 导出蓝图完整数据到单文件（filePath 即 .bjson 文件）
-    // 文件结构: { "runtime": {...}, "editor": {...} }
-    // editorFilePath 参数保留兼容旧接口，实际写入 runtimeFilePath
+
+    // ---- 单文件导出（runtime + editor 合并）----
+
+    // 导出完整数据到单 .bjson 文件：{ "runtime": {...}, "editor": {...} }
+    // editorFilePath 参数已废弃，保留只为兼容旧调用签名，实际写入 runtimeFilePath
     virtual EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& runtimeFilePath, const std::string& editorFilePath = "", const ExportOptions& options = ExportOptions()) const = 0;
-    
-    // ---- 编辑器合并加载 ----
-    
-    // 从 Runtime + Editor 两个字符串合并导入（恢复编辑器完整数据）
-    virtual ImportResult importEditorFromStrings(const std::string& runtimeContent, const std::string& editorContent, const ImportOptions& options = ImportOptions()) const = 0;
-    
-    // 从 Runtime + Editor 两个文件合并导入
-    virtual ImportResult importEditorFromFiles(const std::string& runtimeFilePath, const std::string& editorFilePath, const ImportOptions& options = ImportOptions()) const = 0;
-    
+
     // ---- 通用 ----
-    
+
     // 验证数据
     virtual bool validate(const BlueprintData& data, std::vector<std::string>& errors) const = 0;
-    
+
     // 获取支持的格式
     virtual std::vector<ExportFormat> getSupportedFormats() const = 0;
 };
@@ -175,35 +158,26 @@ public:
     std::shared_ptr<IFileSystem> GetFileSystem() const { return m_fileSystem; }
     void SetFileSystem(std::shared_ptr<IFileSystem> fs) { m_fileSystem = fs ? std::move(fs) : GetDefaultFileSystem(); }
 
-    // Runtime 文件
-    std::string exportRuntimeToString(const BlueprintData& data, const ExportOptions& options = ExportOptions()) const override;
+    // Runtime
+    std::string  exportRuntimeToString(const BlueprintData& data, const ExportOptions& options = ExportOptions()) const override;
     ExportResult exportRuntimeToFile(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const override;
     ImportResult importRuntimeFromString(const std::string& content, const ImportOptions& options = ImportOptions()) const override;
     ImportResult importRuntimeFromFile(const std::string& filePath, const ImportOptions& options = ImportOptions()) const override;
-    
-    // Editor 附加文件
-    std::string exportEditorToString(const BlueprintData& data, const ExportOptions& options = ExportOptions()) const override;
-    ExportResult exportEditorToFile(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const override;
-    
-    // 编辑器单文件导出（合并 runtime + editor 到 runtimeFilePath）
+
+    // 单文件导出（runtime + editor 合并）
     EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& runtimeFilePath, const std::string& editorFilePath = "", const ExportOptions& options = ExportOptions()) const override;
-    
-    // 编辑器合并加载
-    ImportResult importEditorFromStrings(const std::string& runtimeContent, const std::string& editorContent, const ImportOptions& options = ImportOptions()) const override;
-    ImportResult importEditorFromFiles(const std::string& runtimeFilePath, const std::string& editorFilePath, const ImportOptions& options = ImportOptions()) const override;
-    
-    // 从单个 .editor.json 文件加载完整数据（包含内嵌的 runtime 数据）
-    ImportResult importFromEditorFile(const std::string& editorFilePath, const ImportOptions& options = ImportOptions()) const;
-    
+
     // 通用
     bool validate(const BlueprintData& data, std::vector<std::string>& errors) const override;
     std::vector<ExportFormat> getSupportedFormats() const override;
-    
+
 private:
-    // 文件系统抽象（用于文件读写）
     std::shared_ptr<IFileSystem> m_fileSystem;
 
-    // JSON 序列化辅助方法
+    // 内部辅助（不对外暴露）
+    std::string exportEditorToString(const BlueprintData& data, const ExportOptions& options = ExportOptions()) const;
+    ImportResult importEditorFromStrings(const std::string& runtimeContent, const std::string& editorContent, const ImportOptions& options = ImportOptions()) const;
+
     std::string variantToJson(const Variant& value) const;
     Variant jsonToVariant(const std::string& json, PinDataType type) const;
 };
@@ -215,19 +189,13 @@ private:
 class BLUEPRINT_API BinaryBlueprintExporter : public IBlueprintExporter
 {
 public:
-    std::string exportRuntimeToString(const BlueprintData& data, const ExportOptions& options = ExportOptions()) const override;
+    std::string  exportRuntimeToString(const BlueprintData& data, const ExportOptions& options = ExportOptions()) const override;
     ExportResult exportRuntimeToFile(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const override;
     ImportResult importRuntimeFromString(const std::string& content, const ImportOptions& options = ImportOptions()) const override;
     ImportResult importRuntimeFromFile(const std::string& filePath, const ImportOptions& options = ImportOptions()) const override;
-    
-    std::string exportEditorToString(const BlueprintData& data, const ExportOptions& options = ExportOptions()) const override;
-    ExportResult exportEditorToFile(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const override;
-    
+
     EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& runtimeFilePath, const std::string& editorFilePath = "", const ExportOptions& options = ExportOptions()) const override;
-    
-    ImportResult importEditorFromStrings(const std::string& runtimeContent, const std::string& editorContent, const ImportOptions& options = ImportOptions()) const override;
-    ImportResult importEditorFromFiles(const std::string& runtimeFilePath, const std::string& editorFilePath, const ImportOptions& options = ImportOptions()) const override;
-    
+
     bool validate(const BlueprintData& data, std::vector<std::string>& errors) const override;
     std::vector<ExportFormat> getSupportedFormats() const override;
 };

@@ -166,12 +166,8 @@ void BlueprintEditor::UpdateBlueprintReferences(const std::string& oldAbsPath,
 
     // 计算旧/新的 stem（不含扩展名的纯文件名）
     // 用于替换 FuncLib.<stem>.funcId 这类 definitionId
-    // Foo.bjson → stem = Foo;  Foo.bjson.editor → stem = Foo
     auto extractStem = [](const std::string& absPath) -> std::string {
         std::string s = fs::path(absPath).filename().string();
-        // 去掉 .editor 后缀
-        if (s.size() > 7 && s.substr(s.size()-7) == ".editor")
-            s = s.substr(0, s.size()-7);
         // 去掉 .bjson
         if (s.size() > 6 && s.substr(s.size()-6) == ".bjson")
             s = s.substr(0, s.size()-6);
@@ -683,11 +679,6 @@ void BlueprintEditor::DrawProjectPanel()
                             fs::rename(oldAbs, newAbs, ec);
                             if (!ec)
                             {
-                                // 同步 editor 文件（.bjson.editor）
-                                std::string oldEditor = oldAbs + ".editor";
-                                std::string newEditor = newAbs + ".editor";
-                                if (fs::exists(oldEditor))
-                                    fs::rename(oldEditor, newEditor, ec);
 
                                 // 更新 project 数据
                                 e.relativePath = newRelPath;

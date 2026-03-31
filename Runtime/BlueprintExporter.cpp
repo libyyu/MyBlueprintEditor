@@ -861,53 +861,6 @@ std::string JsonBlueprintExporter::exportEditorToString(const BlueprintData& dat
     return oss.str();
 }
 
-ExportResult JsonBlueprintExporter::exportEditorToFile(const BlueprintData& data, const std::string& filePath, const ExportOptions& options) const
-{
-    ExportResult result;
-    
-#ifndef __EMSCRIPTEN__
-    try
-    {
-        std::string jsonContent = exportEditorToString(data, options);
-        
-        std::string errorMsg;
-        if (!m_fileSystem->WriteFile(filePath, jsonContent, errorMsg))
-        {
-            result.errorMessage = errorMsg;
-            return result;
-        }
-        
-        result.success = true;
-        result.outputPath = filePath;
-        result.bytesWritten = jsonContent.size();
-    }
-    catch (const std::exception& e)
-    {
-        result.errorMessage = std::string("Exception: ") + e.what();
-    }
-#else
-    {
-        std::string jsonContent = exportEditorToString(data, options);
-        
-        std::string errorMsg;
-        if (!m_fileSystem->WriteFile(filePath, jsonContent, errorMsg))
-        {
-            result.errorMessage = errorMsg;
-            return result;
-        }
-        
-        result.success = true;
-        result.outputPath = filePath;
-        result.bytesWritten = jsonContent.size();
-    }
-#endif
-    
-    return result;
-}
-
-// ============================================================================
-// JsonBlueprintExporter — 编辑器双文件导出
-// ============================================================================
 
 // ============================================================================
 // JsonBlueprintExporter — 编辑器单文件导出
@@ -1624,175 +1577,7 @@ ImportResult JsonBlueprintExporter::importEditorFromStrings(const std::string& r
     return result;
 }
 
-ImportResult JsonBlueprintExporter::importEditorFromFiles(const std::string& runtimeFilePath, const std::string& editorFilePath, const ImportOptions& options) const
-{
-    ImportResult result;
-    
-#ifndef __EMSCRIPTEN__
-    try
-    {
-        std::string errorMsg;
-        
-        std::string runtimeContent;
-        if (!m_fileSystem->ReadFile(runtimeFilePath, runtimeContent, errorMsg))
-        {
-            result.errorMessage = errorMsg;
-            return result;
-        }
-        
-        std::string editorContent;
-        if (!m_fileSystem->ReadFile(editorFilePath, editorContent, errorMsg))
-        {
-            result.errorMessage = errorMsg;
-            return result;
-        }
-        
-        result = importEditorFromStrings(runtimeContent, editorContent, options);
-    }
-    catch (const std::exception& e)
-    {
-        result.errorMessage = std::string("Exception: ") + e.what();
-    }
-#else
-    {
-        std::string errorMsg;
-        
-        std::string runtimeContent;
-        if (!m_fileSystem->ReadFile(runtimeFilePath, runtimeContent, errorMsg))
-        {
-            result.errorMessage = errorMsg;
-            return result;
-        }
-        
-        std::string editorContent;
-        if (!m_fileSystem->ReadFile(editorFilePath, editorContent, errorMsg))
-        {
-            result.errorMessage = errorMsg;
-            return result;
-        }
-        
-        result = importEditorFromStrings(runtimeContent, editorContent, options);
-    }
-#endif
-    
-    return result;
-}
 
-// ============================================================================
-// JsonBlueprintExporter — 从单个 .editor.json 加载完整数据
-// ============================================================================
-
-ImportResult JsonBlueprintExporter::importFromEditorFile(const std::string& editorFilePath, const ImportOptions& options) const
-{
-    ImportResult result;
-    
-#ifndef __EMSCRIPTEN__
-    try
-    {
-        std::string errorMsg;
-        std::string editorContent;
-        if (!m_fileSystem->ReadFile(editorFilePath, editorContent, errorMsg))
-        {
-            result.errorMessage = errorMsg;
-            return result;
-        }
-        
-        result.bytesRead = editorContent.size();
-        
-        // 解析 editor JSON
-        crude_json::value editorRoot = crude_json::value::parse(editorContent);
-        if (editorRoot.is_discarded() || editorRoot.type() != crude_json::type_t::object)
-        {
-            result.errorMessage = "Editor JSON parse error";
-            return result;
-        }
-        
-        // 检查是否包含嵌入的 runtime 数据
-        if (!editorRoot.contains("runtime") || editorRoot["runtime"].type() != crude_json::type_t::object)
-        {
-            result.errorMessage = "Editor file does not contain embedded runtime data. Please open the .json file instead.";
-            return result;
-        }
-        
-        // 从嵌入的 runtime 对象中提取 runtime JSON 字符串
-        // 为了复用 importRuntimeFromString，需要将 runtime 对象序列化回字符串
-        std::string runtimeJson = editorRoot["runtime"].dump();
-        
-        // 先导入 runtime 数据
-        result = importRuntimeFromString(runtimeJson, options);
-        if (!result.success)
-        {
-            result.errorMessage = "Embedded runtime import failed: " + result.errorMessage;
-            return result;
-        }
-        
-        // 然后合并 editor 数据（复用 importEditorFromStrings 的逻辑）
-        // 但因为 editor 数据就在同一个文件中，直接用 editorContent 作为 editor 部分
-        // importEditorFromStrings 会忽略它不认识的字段（如 "runtime"），所以可以直接用
-        ImportResult mergedResult = importEditorFromStrings(runtimeJson, editorContent, options);
-        if (mergedResult.success)
-        {
-            result = mergedResult;
-        }
-        // 即使合并失败，runtime 数据仍然可用
-    }
-    catch (const std::exception& e)
-    {
-        result.errorMessage = std::string("Exception: ") + e.what();
-    }
-#else
-    {
-        std::string errorMsg;
-        std::string editorContent;
-        if (!m_fileSystem->ReadFile(editorFilePath, editorContent, errorMsg))
-        {
-            result.errorMessage = errorMsg;
-            return result;
-        }
-        
-        result.bytesRead = editorContent.size();
-        
-        // 解析 editor JSON
-        crude_json::value editorRoot = crude_json::value::parse(editorContent);
-        if (editorRoot.is_discarded() || editorRoot.type() != crude_json::type_t::object)
-        {
-            result.errorMessage = "Editor JSON parse error";
-            return result;
-        }
-        
-        // 检查是否包含嵌入的 runtime 数据
-        if (!editorRoot.contains("runtime") || editorRoot["runtime"].type() != crude_json::type_t::object)
-        {
-            result.errorMessage = "Editor file does not contain embedded runtime data. Please open the .json file instead.";
-            return result;
-        }
-        
-        // 从嵌入的 runtime 对象中提取 runtime JSON 字符串
-        // 为了复用 importRuntimeFromString，需要将 runtime 对象序列化回字符串
-        std::string runtimeJson = editorRoot["runtime"].dump();
-        
-        // 先导入 runtime 数据
-        result = importRuntimeFromString(runtimeJson, options);
-        if (!result.success)
-        {
-            result.errorMessage = "Embedded runtime import failed: " + result.errorMessage;
-            return result;
-        }
-        
-        // 然后合并 editor 数据（复用 importEditorFromStrings 的逻辑）
-        // 但因为 editor 数据就在同一个文件中，直接用 editorContent 作为 editor 部分
-        // importEditorFromStrings 会忽略它不认识的字段（如 "runtime"），所以可以直接用
-        ImportResult mergedResult = importEditorFromStrings(runtimeJson, editorContent, options);
-        if (mergedResult.success)
-        {
-            result = mergedResult;
-        }
-        // 即使合并失败，runtime 数据仍然可用
-    }
-#endif
-    
-    return result;
-}
 
 // ============================================================================
 // JsonBlueprintExporter — 验证和通用方法
@@ -1973,6 +1758,7 @@ Variant JsonBlueprintExporter::jsonToVariant(const std::string& json, PinDataTyp
     return result;
 }
 
+
 // ============================================================================
 // BinaryBlueprintExporter 实现（占位）
 // ============================================================================
@@ -2003,36 +1789,10 @@ ImportResult BinaryBlueprintExporter::importRuntimeFromFile(const std::string& /
     return result;
 }
 
-std::string BinaryBlueprintExporter::exportEditorToString(const BlueprintData& /*data*/, const ExportOptions& /*options*/) const
-{
-    return "";
-}
-
-ExportResult BinaryBlueprintExporter::exportEditorToFile(const BlueprintData& /*data*/, const std::string& /*filePath*/, const ExportOptions& /*options*/) const
-{
-    ExportResult result;
-    result.errorMessage = "Binary editor export not yet implemented";
-    return result;
-}
-
 EditorExportResult BinaryBlueprintExporter::exportEditorFiles(const BlueprintData& /*data*/, const std::string& /*runtimeFilePath*/, const std::string& /*editorFilePath*/, const ExportOptions& /*options*/) const
 {
     EditorExportResult result;
     result.errorMessage = "Binary editor export not yet implemented";
-    return result;
-}
-
-ImportResult BinaryBlueprintExporter::importEditorFromStrings(const std::string& /*runtimeContent*/, const std::string& /*editorContent*/, const ImportOptions& /*options*/) const
-{
-    ImportResult result;
-    result.errorMessage = "Binary editor import not yet implemented";
-    return result;
-}
-
-ImportResult BinaryBlueprintExporter::importEditorFromFiles(const std::string& /*runtimeFilePath*/, const std::string& /*editorFilePath*/, const ImportOptions& /*options*/) const
-{
-    ImportResult result;
-    result.errorMessage = "Binary editor import not yet implemented";
     return result;
 }
 
