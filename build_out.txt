@@ -2,22 +2,22 @@
 
   Copying resources to Debug output
   Copying resources to Release output
-  crude_json.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Utils\Json\Release\crude_json.lib
   dxerr.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\dxerr.lib
   imgui.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\imgui.lib
-  gtest.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gtest.dll
   gmock.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gmock.dll
+  crude_json.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Utils\Json\Release\crude_json.lib
+  gtest.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gtest.dll
   gmock_main.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gmock_main.dll
   lua54.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\lua54.dll
   gtest_main.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gtest_main.dll
   BlueprintRuntime.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\BlueprintRuntime.dll
+  runtime-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\runtime-example.exe
   ImGuiNodeEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\ImGuiNodeEditor.lib
   blueprint_tests.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\blueprint_tests.exe
-  runtime-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\runtime-example.exe
   Application.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\Application.lib
-  widgets-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\widgets-example.exe
-  basic-interaction-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\basic-interaction-example.exe
   simple-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\simple-example.exe
   canvas-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\canvas-example.exe
+  widgets-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\widgets-example.exe
+  basic-interaction-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\basic-interaction-example.exe
   EditorUI.cpp
   BlueprintEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\BlueprintEditor.exe

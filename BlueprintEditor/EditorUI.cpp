@@ -1307,10 +1307,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
                         {
                             if (fs::path(m_Documents[i]->filePath).lexically_normal().string() == normResolved)
                             {
-                                // 直接切换，不依赖延迟块（延迟块里 GetNodePosition 可能在错误上下文）
-                                m_ActiveDocIndex = i;
-                                ed::SetCurrentEditor(m_Documents[i]->editorContext);
-                                m_Documents[i]->needNavigateToContent = 1;
+                                // 延迟到下帧切换（ed::SetCurrentEditor 不能在 ed::Begin/End 流程外随意调用）
+                                m_PendingSwitchTabIndex = i;
+                                m_Documents[i]->needNavigateToContent = 1;  // 强制下帧 navigate
                                 alreadyOpen = true;
                                 break;
                             }
@@ -1395,12 +1394,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     {
                         if (fs::path(m_Documents[i]->filePath).lexically_normal().string() == normLib)
                         {
-                            // 直接切换 tab + 设置导航目标（下帧在正确的 editor context 里 navigate）
-                            m_ActiveDocIndex = i;
-                            ed::SetCurrentEditor(m_Documents[i]->editorContext);
-                            // 设置函数导航：下帧处理（PendingNavigateToFunc 由延迟块消费）
+                            // 延迟到下帧切换（ed::SetCurrentEditor 不能在 ed::Begin/End 流程外随意调用）
+                            m_PendingSwitchTabIndex = i;
                             m_PendingNavigateToFunc = funcId;
-                            m_PendingSwitchTabIndex = i;  // 触发延迟块做 navigate（复用逻辑）
                             alreadyOpen = true;
                             break;
                         }
@@ -1602,42 +1598,25 @@ void BlueprintEditor::OnFrame(float deltaTime)
     if (m_PendingSwitchTabIndex >= 0)
     {
         m_ActiveDocIndex = m_PendingSwitchTabIndex;
-        ed::SetCurrentEditor(ActiveDoc()->editorContext);
+        // 注意：不在这里调用 ed::SetCurrentEditor，也不调用 ed::GetNodePosition
+        // 因为目标文档本帧没有运行 ed::Begin，节点位置数据未更新
+        // tab 切换由 m_ActiveDocIndex 驱动，下帧 ed::Begin 时自动用正确上下文
         m_PendingSwitchTabIndex = -1;
         if (!m_PendingNavigateToFunc.empty())
         {
-            // 在 Functions 面板中定位并展开对应函数
+            // 设置函数导航：在目标文档上设置，下帧（ed::Begin 之后）才执行 navigate
             auto* doc = ActiveDoc();
-            std::string funcName;
             for (int fi = 0; fi < (int)doc->functions.size(); ++fi)
             {
                 if (doc->functions[fi].id == m_PendingNavigateToFunc)
                 {
                     doc->selectedFuncIdx = fi;
-                    funcName = doc->functions[fi].name;
                     break;
                 }
             }
-            // 找到 Function.Entry 节点并导航到其位置
-            if (!funcName.empty())
-            {
-                for (const auto& node : doc->nodes)
-                {
-                    if (node.DefinitionId == "Function.Entry" && node.Name == funcName)
-                    {
-                        ImVec2 pos = ed::GetNodePosition(node.ID);
-                        ImVec2 sz  = ed::GetNodeSize(node.ID);
-                        float pad  = 200.0f;
-                        doc->pendingContentBounds = ImRect(
-                            ImVec2(pos.x - pad, pos.y - pad),
-                            ImVec2(pos.x + sz.x + pad, pos.y + sz.y + pad));
-                        doc->needNavigateToContent = 2;
-                        break;
-                    }
-                }
-            }
-            if (doc->needNavigateToContent == 0)
-                doc->needNavigateToContent = 1;  // 至少居中
+            // needNavigateToContent = 1 触发下帧 NavigateToContent（全局居中）
+            // 更精确的定位需要下帧才能 GetNodePosition，这里用全局居中兜底
+            doc->needNavigateToContent = 1;
             m_PendingNavigateToFunc.clear();
         }
         else
@@ -1656,39 +1635,13 @@ void BlueprintEditor::OnFrame(float deltaTime)
         if (!funcToNav.empty() && ActiveDoc())
         {
             auto* doc = ActiveDoc();
-            std::string funcName2;
             for (int fi = 0; fi < (int)doc->functions.size(); ++fi)
             {
                 if (doc->functions[fi].id == funcToNav)
                 {
                     doc->selectedFuncIdx = fi;
-                    funcName2 = doc->functions[fi].name;
+                    doc->needNavigateToContent = 2;  // 延迟2帧居中（等节点位置加载完）
                     break;
-                }
-            }
-            // 找 Function.Entry 节点，用 pendingContentBounds 定位
-            if (!funcName2.empty())
-            {
-                for (const auto& node : doc->nodes)
-                {
-                    if (node.DefinitionId == "Function.Entry" && node.Name == funcName2)
-                    {
-                        // 文件刚加载，节点位置在 needSetNodePositions 后才有效，多等一帧
-                        // pendingContentBounds 用节点的记录坐标（来自 pendingLoadData）
-                        for (const auto& rtNode : doc->pendingLoadData.nodes)
-                        {
-                            if (rtNode.definitionId == "Function.Entry" && rtNode.name == funcName2)
-                            {
-                                float pad = 200.0f;
-                                doc->pendingContentBounds = ImRect(
-                                    ImVec2(rtNode.position.x - pad, rtNode.position.y - pad),
-                                    ImVec2(rtNode.position.x + 200 + pad, rtNode.position.y + 100 + pad));
-                                doc->needNavigateToContent = 3;  // 多等一帧（节点位置设置需要一帧）
-                                break;
-                            }
-                        }
-                        break;
-                    }
                 }
             }
             if (doc->needNavigateToContent == 0)
