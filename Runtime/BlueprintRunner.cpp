@@ -1007,16 +1007,28 @@ static bool BuildFuncSubGraph(
 
         for (const auto& pin : nIt->second->pins)
         {
-            if (pin.kind != PinKind::Output) continue;
             for (const auto& lk : libData.links)
             {
                 if (!lk.isEnabled) continue;
-                PinId downstream = 0;
-                if      (lk.startPinId == pin.id) downstream = lk.endPinId;
-                else if (lk.endPinId   == pin.id) downstream = lk.startPinId;
-                if (downstream == 0) continue;
+                PinId checkPin  = 0;
+                PinId otherPin  = 0;
 
-                auto pIt = pinToNode.find(downstream);
+                if (pin.kind == PinKind::Output)
+                {
+                    // 从 Output 向下游遍历（exec + 数据下游）
+                    if (lk.startPinId == pin.id)
+                    { checkPin = lk.startPinId; otherPin = lk.endPinId; }
+                }
+                else // Input
+                {
+                    // 从 Input 向上游追溯数据源节点（收集数据依赖）
+                    if (lk.endPinId == pin.id && !pin.isExec)
+                    { checkPin = lk.endPinId; otherPin = lk.startPinId; }
+                }
+
+                if (checkPin == 0 || otherPin == 0) continue;
+
+                auto pIt = pinToNode.find(otherPin);
                 if (pIt == pinToNode.end()) continue;
                 if (visited.insert(pIt->second).second)
                     bfsQueue.push(pIt->second);

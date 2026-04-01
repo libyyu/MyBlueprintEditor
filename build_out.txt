@@ -1,23 +1,25 @@
 适用于 .NET Framework MSBuild 版本 17.7.2+d6990bcfa
 
-  Copying resources to Debug output
   Copying resources to Release output
-  imgui.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\imgui.lib
-  gmock.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gmock.dll
+  Copying resources to Debug output
   dxerr.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\dxerr.lib
+  crude_json.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Utils\Json\Release\crude_json.lib
   gtest.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gtest.dll
   gmock_main.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gmock_main.dll
-  crude_json.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Utils\Json\Release\crude_json.lib
+  imgui.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\imgui.lib
+  gmock.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gmock.dll
   lua54.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\lua54.dll
   gtest_main.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gtest_main.dll
+  BlueprintRunner.cpp
+    正在创建库 C:/Users/maxweili/MyProjects/MyBlueprintEditor/build/Runtime/Release/BlueprintRuntime.lib 和对象 C:/Users/maxweili/MyProjects/MyBlueprintEditor/build/Runtime/Release/BlueprintRuntime.exp
   BlueprintRuntime.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\BlueprintRuntime.dll
-  runtime-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\runtime-example.exe
-  blueprint_tests.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\blueprint_tests.exe
   ImGuiNodeEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\ImGuiNodeEditor.lib
+  blueprint_tests.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\blueprint_tests.exe
+  runtime-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\runtime-example.exe
   Application.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\Application.lib
   canvas-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\canvas-example.exe
   widgets-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\widgets-example.exe
   simple-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\simple-example.exe
   basic-interaction-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\basic-interaction-example.exe
-  ProjectOps.cpp
+  EditorUI.cpp
   BlueprintEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\BlueprintEditor.exe

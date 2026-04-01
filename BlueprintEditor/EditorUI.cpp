@@ -1610,6 +1610,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     break;
                 }
             }
+            // 即使没找到对应函数，也触发居中导航（确保文档内容可见）
+            if (ActiveDoc()->needNavigateToContent == 0)
+                ActiveDoc()->needNavigateToContent = 1;
             m_PendingNavigateToFunc.clear();
         }
         else
@@ -1730,7 +1733,15 @@ void BlueprintEditor::OnFrame(float deltaTime)
         float btnW  = ImGui::CalcTextSize(ICON_FA_PLAY " Run").x + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f;
         float iconW = ImGui::CalcTextSize(ICON_FA_PAUSE).x + ImGui::GetStyle().FramePadding.x * 2.0f + 6.0f;
         // 工具条宽度自适应（AlwaysAutoResize），只用 totalW 估算初始水平居中位置
-        float totalW = btnW + 4 + iconW + 4 + iconW + 4 + iconW + 14 + iconW + 4 + iconW + 24;
+        // 布局：Run + Pause/Resume + Step + StepIn + StepOut + Stop + 状态图标
+        float stepInW  = iconW + 6.0f;  // StepIn/StepOut 按钮比普通 icon 稍宽
+        float totalW = btnW + 4          // Run
+                     + iconW + 4         // Pause/Resume
+                     + iconW + 2         // Step
+                     + stepInW + 2       // StepIn
+                     + stepInW + 4       // StepOut
+                     + iconW + 10        // Stop
+                     + iconW + 24;       // 状态图标 + padding
         float centerX = (editorMin.x + editorMax.x) * 0.5f;
         ImVec2 tbPos(centerX - totalW * 0.5f, editorMin.y + 6.0f);
 
