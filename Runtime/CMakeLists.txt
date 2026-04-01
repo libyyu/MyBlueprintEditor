@@ -102,7 +102,7 @@ set(RUNTIME_PUBLIC_HEADERS
 # ---------------------------------------------------------------------------
 # Optional: Lua scripting support
 # ---------------------------------------------------------------------------
-option(BLUEPRINT_LUA "Enable Lua scripting support (requires Lua 5.4)" ON)
+option(BLUEPRINT_LUA "Enable Lua scripting support (requires Lua 5.4)" OFF)
 
 if(BLUEPRINT_LUA)
     # --- Determine Lua library type: STATIC for iOS/Emscripten, SHARED otherwise ---

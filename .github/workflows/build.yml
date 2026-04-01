@@ -21,7 +21,7 @@ jobs:
           key: gtest-v1.14.0-windows
 
       - name: Configure (shared runtime + editor)
-        run: cmake -B build -A x64 -DBUILD_SHARED_LIBS=ON -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON
+        run: cmake -B build -A x64 -DBUILD_SHARED_LIBS=ON -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON -DBLUEPRINT_LUA=ON
 
       - name: Build Release
         run: cmake --build build --config Release --parallel
