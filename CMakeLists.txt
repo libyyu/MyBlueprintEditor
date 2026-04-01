@@ -360,9 +360,16 @@ if(NOT BUILD_RUNTIME_ONLY)
     target_link_libraries(BlueprintEditor PRIVATE Application)
 
     # Phase 3: 若 Runtime 开启了 Lua，Editor 也需要链接 Lua 库（LuaNodeRegistrar.cpp 使用 lua.hpp）
+    # 注意：LUA_LIBRARIES 和 LUA_INCLUDE_DIR 由 Runtime/CMakeLists.txt 中的 Lua 查找逻辑设置，
+    #       BlueprintRuntime PUBLIC 已传递 BLUEPRINT_HAS_LUA，但 BlueprintEditor 直接 include lua.hpp，
+    #       所以需要显式链接 Lua 库并添加头文件路径。
     if(BLUEPRINT_LUA)
-        target_compile_definitions(BlueprintEditor PRIVATE BLUEPRINT_HAS_LUA)
-        target_link_libraries(BlueprintEditor PRIVATE lua::lua)
+        target_include_directories(BlueprintEditor PRIVATE ${LUA_INCLUDE_DIR})
+        if(DEFINED LUA_LIBRARIES)
+            target_link_libraries(BlueprintEditor PRIVATE ${LUA_LIBRARIES})
+        elseif(TARGET lua54)
+            target_link_libraries(BlueprintEditor PRIVATE lua54)
+        endif()
     endif()
 
     set_target_properties(BlueprintEditor PROPERTIES
