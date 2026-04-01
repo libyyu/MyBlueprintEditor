@@ -24,7 +24,7 @@ cmake_minimum_required(VERSION 3.12)
 # Detect whether this file is the top-level CMakeLists (standalone Runtime build)
 # ---------------------------------------------------------------------------
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    project(BlueprintRuntime VERSION 1.0.0 LANGUAGES CXX)
+    project(BlueprintRuntime VERSION 1.0.0 LANGUAGES C CXX)
     set(BLUEPRINT_STANDALONE TRUE)
     # 独立构建时，根目录默认为上一级
     if(NOT DEFINED BLUEPRINT_ROOT_DIR)

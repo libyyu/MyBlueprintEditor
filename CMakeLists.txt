@@ -37,7 +37,7 @@
 
 cmake_minimum_required(VERSION 3.14)
 
-project(MyBlueprintEditor VERSION 0.9.1 LANGUAGES CXX)
+project(MyBlueprintEditor VERSION 0.9.1 LANGUAGES C CXX)
 
 # ---------------------------------------------------------------------------
 # Global C++ standard
