@@ -1307,7 +1307,10 @@ void BlueprintEditor::OnFrame(float deltaTime)
                         {
                             if (fs::path(m_Documents[i]->filePath).lexically_normal().string() == normResolved)
                             {
-                                m_PendingSwitchTabIndex = i;
+                                // 直接切换，不依赖延迟块（延迟块里 GetNodePosition 可能在错误上下文）
+                                m_ActiveDocIndex = i;
+                                ed::SetCurrentEditor(m_Documents[i]->editorContext);
+                                m_Documents[i]->needNavigateToContent = 1;
                                 alreadyOpen = true;
                                 break;
                             }
@@ -1392,8 +1395,12 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     {
                         if (fs::path(m_Documents[i]->filePath).lexically_normal().string() == normLib)
                         {
-                            m_PendingSwitchTabIndex = i;
+                            // 直接切换 tab + 设置导航目标（下帧在正确的 editor context 里 navigate）
+                            m_ActiveDocIndex = i;
+                            ed::SetCurrentEditor(m_Documents[i]->editorContext);
+                            // 设置函数导航：下帧处理（PendingNavigateToFunc 由延迟块消费）
                             m_PendingNavigateToFunc = funcId;
+                            m_PendingSwitchTabIndex = i;  // 触发延迟块做 navigate（复用逻辑）
                             alreadyOpen = true;
                             break;
                         }
@@ -1789,9 +1796,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
                      + iconW + 10        // Stop
                      + iconW + 24;       // 状态图标 + padding
 
-        // 用上帧实际宽度修正（消除首帧估算误差）
-        static float s_tbActualW = 0.0f;
-        if (s_tbActualW > 0.0f) totalW = s_tbActualW;
+        // 在 Begin 之前用 FindWindowByName 获取上帧实际宽度（比 static 缓存更可靠）
+        if (ImGuiWindow* tbWnd = ImGui::FindWindowByName("##DebugToolbar"))
+            if (tbWnd->Size.x > 0) totalW = tbWnd->Size.x;
 
         float centerX = (editorMin.x + editorMax.x) * 0.5f;
         float tbX = centerX - totalW * 0.5f;
@@ -2141,8 +2148,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
             else if (isStopped)
                 ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.30f, 1.0f),  ICON_FA_CIRCLE_STOP);
 
-            // 记录本帧实际宽度，供下帧居中使用（SetWindowPos 在 Begin 前调用才有效）
-            s_tbActualW = ImGui::GetWindowSize().x;
+            // 状态指示结束
         }
         ImGui::End();
     }
