@@ -1,1 +1,0 @@
-{"blueprints":[{"name":"Entry","path":"assets\\Entry.json"},{"name":"Delay","path":"assets\\sub\\Delay.json"}],"description":"","libraries":[{"name":"Common","path":"assets\\Common.json"}],"name":"01","projVersion":1,"version":"1.0"}

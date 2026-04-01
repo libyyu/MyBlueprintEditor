@@ -1,0 +1,204 @@
+{
+    "runtime": {
+    "fileType": "runtime",
+    "metadata": {
+        "schemaVersion": 2,
+        "blueprintClass": 1,
+        "name": "CommonLib",
+        "description": "Blueprint Editor file",
+        "version": ""
+    },
+    "nodes": [
+        {
+            "id": 1,
+            "definitionId": "Function.Entry",
+            "definitionVersion": 1,
+            "name": "TestPrint",
+            "pins": [
+                {
+                    "id": 2,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 8,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Message"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "definitionId": "Function.Return",
+            "definitionVersion": 1,
+            "name": "TestPrint",
+            "pins": [
+                {
+                    "id": 4,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 9,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "NewOutput",
+                    "defaultValue": 0
+                }
+            ]
+        },
+        {
+            "id": 10,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print String",
+            "pins": [
+                {
+                    "id": 11,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 12,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 13,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 17,
+            "definitionId": "MakeLiteralFloat",
+            "definitionVersion": 1,
+            "name": "Make Literal Float",
+            "pins": [
+                {
+                    "id": 18,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Value",
+                    "defaultValue": 99
+                },
+                {
+                    "id": 19,
+                    "kind": 1,
+                    "dataType": 3,
+                    "name": "Result"
+                }
+            ]
+        }
+    ],
+    "links": [
+        {
+            "id": 14,
+            "startPinId": 8,
+            "endPinId": 12,
+            "isEnabled": true
+        },
+        {
+            "id": 15,
+            "startPinId": 2,
+            "endPinId": 11,
+            "isEnabled": true
+        },
+        {
+            "id": 16,
+            "startPinId": 13,
+            "endPinId": 4,
+            "isEnabled": true
+        },
+        {
+            "id": 20,
+            "startPinId": 19,
+            "endPinId": 9,
+            "isEnabled": true
+        }
+    ],
+    "functions": [
+        {
+            "id": "func_1",
+            "name": "TestPrint",
+            "category": "Custom",
+            "description": "",
+            "isPublic": true,
+            "inputs": [{"name":"Message","dataType":4}],
+            "outputs": [{"name":"NewOutput","dataType":3}],
+            "nodes": [],
+            "links": []
+        }
+    ]
+},
+    "editor": {
+    "fileType": "editor",
+    "metadata": {
+        "author": "",
+        "createdAt": "",
+        "updatedAt": ""
+    },
+    "nodes": [
+        {
+            "id": 1,
+            "position": {
+                "x": 100,
+                "y": 80
+            },
+            "size": {
+                "width": 153,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 3,
+            "position": {
+                "x": 664,
+                "y": 78
+            },
+            "size": {
+                "width": 153,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 10,
+            "position": {
+                "x": 392,
+                "y": 80
+            },
+            "size": {
+                "width": 155,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 17,
+            "position": {
+                "x": 573,
+                "y": 219
+            },
+            "size": {
+                "width": 411,
+                "height": 43
+            },
+            "isCollapsed": false
+        }
+    ],
+    "viewInfo": {
+        "viewPosition": { "x": 0, "y": 0 },
+        "viewScale": 1
+    }
+}
+}

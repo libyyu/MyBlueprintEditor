@@ -1,0 +1,1 @@
+{"blueprints":[{"name":"Main","path":"assets\\Main.bjson"},{"name":"Sub","path":"assets\\Sub\\Sub.bjson"}],"description":"","libraries":[{"name":"CommonLib","path":"assets\\CommonLib.bjson"}],"name":"Demo","projVersion":1,"version":"1.0"}
