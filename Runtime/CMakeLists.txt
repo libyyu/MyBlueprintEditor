@@ -102,7 +102,15 @@ set(RUNTIME_PUBLIC_HEADERS
 # ---------------------------------------------------------------------------
 # Optional: Lua scripting support
 # ---------------------------------------------------------------------------
-option(BLUEPRINT_LUA "Enable Lua scripting support (requires Lua 5.4)" OFF)
+option(BLUEPRINT_LUA "Enable Lua scripting support (requires Lua 5.4)" ON)
+
+# iOS / Android / Emscripten 不支持 Lua（无系统包，FetchContent 在 CI 环境不可靠）
+if(EMSCRIPTEN OR (CMAKE_SYSTEM_NAME STREQUAL "iOS") OR (CMAKE_SYSTEM_NAME STREQUAL "Android"))
+    if(BLUEPRINT_LUA)
+        message(STATUS "[BlueprintRuntime] BLUEPRINT_LUA forced OFF on ${CMAKE_SYSTEM_NAME}")
+        set(BLUEPRINT_LUA OFF CACHE BOOL "Lua disabled on this platform" FORCE)
+    endif()
+endif()
 
 if(BLUEPRINT_LUA)
     # --- Determine Lua library type: STATIC for iOS/Emscripten, SHARED otherwise ---
@@ -119,10 +127,27 @@ if(BLUEPRINT_LUA)
     # --- Locate Lua 5.4 ---
     # Priority: find_package first (system / vcpkg / user-installed),
     # fall back to FetchContent if not found.
-    find_package(Lua 5.4 QUIET)
+    #
+    # Ubuntu: apt install liblua5.4-dev → headers at /usr/include/lua5.4,
+    #         CMake FindLua may not find it by default; help it via pkg-config.
+    # macOS:  brew install lua → pkg-config provides lua5.4 / lua-5.4
+    find_package(PkgConfig QUIET)
+    if(PKG_CONFIG_FOUND AND NOT LUA_FOUND)
+        pkg_check_modules(LUA54_PC QUIET lua5.4 lua-5.4)
+        if(LUA54_PC_FOUND)
+            set(LUA_INCLUDE_DIR "${LUA54_PC_INCLUDE_DIRS}")
+            set(LUA_LIBRARIES   "${LUA54_PC_LINK_LIBRARIES}")
+            set(LUA_FOUND TRUE)
+            message(STATUS "[BlueprintRuntime] Lua found via pkg-config: ${LUA_LIBRARIES}")
+        endif()
+    endif()
 
     if(NOT LUA_FOUND)
-        message(STATUS "[BlueprintRuntime] Lua not found via find_package, using FetchContent")
+        find_package(Lua 5.4 QUIET)
+    endif()
+
+    if(NOT LUA_FOUND)
+        message(STATUS "[BlueprintRuntime] Lua not found via find_package/pkg-config, using FetchContent")
         include(FetchContent)
         FetchContent_Declare(lua54
             URL      https://www.lua.org/ftp/lua-5.4.7.tar.gz

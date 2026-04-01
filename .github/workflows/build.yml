@@ -64,7 +64,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtest-dev libgmock-dev
+          sudo apt-get install -y libgtest-dev libgmock-dev liblua5.4-dev
 
       - name: Configure
         run: |
@@ -92,7 +92,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtest-dev libgmock-dev
+          sudo apt-get install -y libgtest-dev libgmock-dev liblua5.4-dev
 
       - name: Configure
         run: |
@@ -116,7 +116,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: brew install googletest
+        run: brew install googletest lua
 
       - name: Configure
         run: |

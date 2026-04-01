@@ -366,9 +366,15 @@ if(NOT BUILD_RUNTIME_ONLY)
     if(BLUEPRINT_LUA)
         target_compile_definitions(BlueprintEditor PRIVATE BLUEPRINT_HAS_LUA)
         if(TARGET lua54)
+            # FetchContent 路径
             target_link_libraries(BlueprintEditor PRIVATE lua54)
         elseif(TARGET Lua::lua)
+            # CMake 3.23+ find_package imported target
             target_link_libraries(BlueprintEditor PRIVATE Lua::lua)
+        elseif(DEFINED LUA_LIBRARIES AND DEFINED LUA_INCLUDE_DIR)
+            # find_package(Lua) 经典变量 或 pkg-config 路径
+            target_include_directories(BlueprintEditor PRIVATE ${LUA_INCLUDE_DIR})
+            target_link_libraries(BlueprintEditor PRIVATE ${LUA_LIBRARIES})
         endif()
     endif()
 
