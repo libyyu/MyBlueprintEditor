@@ -189,9 +189,25 @@ if(BLUEPRINT_LUA)
                 # so Lua doesn't try to load dynamic modules at runtime).
                 target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE LUA_USE_POSIX)
             elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-                # iOS: POSIX available, no readline, no dlopen (static only).
-                # LUA_USE_POSIX is the correct subset — no readline, uses POSIX math.
-                target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE LUA_USE_POSIX)
+                # iOS: POSIX math available, but system()/popen()/pclose() are banned
+                # by Apple and will cause compile errors on iPhoneSimulator/iphoneos SDK.
+                # LUA_USE_POSIX enables POSIX math/signal subset without readline.
+                # LUA_NOENV skips LUA_PATH/LUA_CPATH env-var lookup (meaningless on iOS).
+                target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE
+                    LUA_USE_POSIX
+                    LUA_NOENV
+                )
+                # Stub out the three banned POSIX APIs used in loslib.c.
+                # Macros with parentheses/commas must be passed via -D in compile
+                # options — target_compile_definitions cannot handle them.
+                #   l_system(c)      → os.execute() always fails (returns -1)
+                #   lua_popen(L,c,m) → io.popen() always fails (returns NULL)
+                #   lua_pclose(L,f)  → io.pclose() no-op (returns 0)
+                target_compile_options(${_LUA_TARGET_NAME} PRIVATE
+                    "-Dl_system(c)=(-1)"
+                    "-Dlua_popen(L,c,m)=(NULL)"
+                    "-Dlua_pclose(L,f)=(0)"
+                )
             elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
                 # Android NDK: POSIX + dlopen available, no readline.
                 # LUA_USE_LINUX enables readline guard but NDK lacks readline headers;
