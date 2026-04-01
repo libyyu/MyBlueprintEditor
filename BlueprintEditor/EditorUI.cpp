@@ -1601,18 +1601,36 @@ void BlueprintEditor::OnFrame(float deltaTime)
         {
             // 在 Functions 面板中定位并展开对应函数
             auto* doc = ActiveDoc();
+            std::string funcName;
             for (int fi = 0; fi < (int)doc->functions.size(); ++fi)
             {
                 if (doc->functions[fi].id == m_PendingNavigateToFunc)
                 {
                     doc->selectedFuncIdx = fi;
-                    doc->needNavigateToContent = 2;
+                    funcName = doc->functions[fi].name;
                     break;
                 }
             }
-            // 即使没找到对应函数，也触发居中导航（确保文档内容可见）
-            if (ActiveDoc()->needNavigateToContent == 0)
-                ActiveDoc()->needNavigateToContent = 1;
+            // 找到 Function.Entry 节点并导航到其位置
+            if (!funcName.empty())
+            {
+                for (const auto& node : doc->nodes)
+                {
+                    if (node.DefinitionId == "Function.Entry" && node.Name == funcName)
+                    {
+                        ImVec2 pos = ed::GetNodePosition(node.ID);
+                        ImVec2 sz  = ed::GetNodeSize(node.ID);
+                        float pad  = 200.0f;
+                        doc->pendingContentBounds = ImRect(
+                            ImVec2(pos.x - pad, pos.y - pad),
+                            ImVec2(pos.x + sz.x + pad, pos.y + sz.y + pad));
+                        doc->needNavigateToContent = 2;
+                        break;
+                    }
+                }
+            }
+            if (doc->needNavigateToContent == 0)
+                doc->needNavigateToContent = 1;  // 至少居中
             m_PendingNavigateToFunc.clear();
         }
         else
@@ -1631,15 +1649,43 @@ void BlueprintEditor::OnFrame(float deltaTime)
         if (!funcToNav.empty() && ActiveDoc())
         {
             auto* doc = ActiveDoc();
+            std::string funcName2;
             for (int fi = 0; fi < (int)doc->functions.size(); ++fi)
             {
                 if (doc->functions[fi].id == funcToNav)
                 {
                     doc->selectedFuncIdx = fi;
-                    doc->needNavigateToContent = 2;
+                    funcName2 = doc->functions[fi].name;
                     break;
                 }
             }
+            // 找 Function.Entry 节点，用 pendingContentBounds 定位
+            if (!funcName2.empty())
+            {
+                for (const auto& node : doc->nodes)
+                {
+                    if (node.DefinitionId == "Function.Entry" && node.Name == funcName2)
+                    {
+                        // 文件刚加载，节点位置在 needSetNodePositions 后才有效，多等一帧
+                        // pendingContentBounds 用节点的记录坐标（来自 pendingLoadData）
+                        for (const auto& rtNode : doc->pendingLoadData.nodes)
+                        {
+                            if (rtNode.definitionId == "Function.Entry" && rtNode.name == funcName2)
+                            {
+                                float pad = 200.0f;
+                                doc->pendingContentBounds = ImRect(
+                                    ImVec2(rtNode.position.x - pad, rtNode.position.y - pad),
+                                    ImVec2(rtNode.position.x + 200 + pad, rtNode.position.y + 100 + pad));
+                                doc->needNavigateToContent = 3;  // 多等一帧（节点位置设置需要一帧）
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+            if (doc->needNavigateToContent == 0)
+                doc->needNavigateToContent = 1;
         }
     }
 
@@ -1742,8 +1788,18 @@ void BlueprintEditor::OnFrame(float deltaTime)
                      + stepInW + 4       // StepOut
                      + iconW + 10        // Stop
                      + iconW + 24;       // 状态图标 + padding
+
+        // 用上帧实际宽度修正（消除首帧估算误差）
+        static float s_tbActualW = 0.0f;
+        if (s_tbActualW > 0.0f) totalW = s_tbActualW;
+
         float centerX = (editorMin.x + editorMax.x) * 0.5f;
-        ImVec2 tbPos(centerX - totalW * 0.5f, editorMin.y + 6.0f);
+        float tbX = centerX - totalW * 0.5f;
+        // 限制不超出画布边界
+        float margin = 4.0f;
+        if (tbX < editorMin.x + margin) tbX = editorMin.x + margin;
+        if (tbX + totalW > editorMax.x - margin) tbX = editorMax.x - margin - totalW;
+        ImVec2 tbPos(tbX, editorMin.y + 6.0f);
 
         ImGui::SetNextWindowPos(tbPos, ImGuiCond_Always);
         // 不手动设置 Size，改用 AlwaysAutoResize，让窗口自适应内容宽高
@@ -2085,16 +2141,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
             else if (isStopped)
                 ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.30f, 1.0f),  ICON_FA_CIRCLE_STOP);
 
-            // 用本帧实际窗口宽度修正居中位置（AlwaysAutoResize 场景下确保居中）
-            float actualW = ImGui::GetWindowSize().x;
-            float correctedX = centerX - actualW * 0.5f;
-            // 限制不超出画布左右边界（防止 DPI 缩放下工具条被裁剪）
-            float margin = 4.0f;
-            if (correctedX < editorMin.x + margin)
-                correctedX = editorMin.x + margin;
-            if (correctedX + actualW > editorMax.x - margin)
-                correctedX = editorMax.x - margin - actualW;
-            ImGui::SetWindowPos(ImVec2(correctedX, editorMin.y + 6.0f));
+            // 记录本帧实际宽度，供下帧居中使用（SetWindowPos 在 Begin 前调用才有效）
+            s_tbActualW = ImGui::GetWindowSize().x;
         }
         ImGui::End();
     }
