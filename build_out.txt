@@ -1,57 +1,27 @@
 适用于 .NET Framework MSBuild 版本 17.7.2+d6990bcfa
 
-  Copying resources to output directory
-  crude_json.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build-windows\Utils\Json\Release\crude_json.lib
-  lua54.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build-windows\bin\lua54.dll
-  BlueprintCAPI.cpp
-  BlueprintRunner.cpp
-  BuiltinHandlers.cpp
-  LuaBindings.cpp
-  LuaScriptEngine.cpp
-  BuiltinHandlers_Action.cpp
-  BuiltinHandlers_Array.cpp
-  BuiltinHandlers_Data.cpp
-  BuiltinHandlers_Debug.cpp
-  BuiltinHandlers_Flow.cpp
-  BuiltinHandlers_Houdini.cpp
-  BuiltinHandlers_Map.cpp
-  BuiltinHandlers_Math.cpp
-  BuiltinHandlers_Misc.cpp
-  BuiltinHandlers_String.cpp
-  BuiltinHandlers_Time.cpp
-  BuiltinHandlers_Tree.cpp
-  正在生成代码...
-    正在创建库 C:/Users/maxweili/MyProjects/MyBlueprintEditor/build-windows/Runtime/Release/BlueprintRuntime.lib 和对象 C:/Users/maxweili/MyProjects/MyBlueprintEditor/build-windows/Runtime/Release/BlueprintRuntime.exp
-  BlueprintRuntime.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build-windows\bin\BlueprintRuntime.dll
-  imgui.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build-windows\Release\imgui.lib
-  ImGuiNodeEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build-windows\Release\ImGuiNodeEditor.lib
-  dxerr.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build-windows\Release\dxerr.lib
-  Application.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build-windows\Release\Application.lib
-  BlueprintEditor.cpp
-  BuiltinHandlers.cpp
+  Copying resources to Debug output
+  Copying resources to Release output
+  gmock.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gmock.dll
+  dxerr.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\dxerr.lib
+  gmock_main.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gmock_main.dll
+  crude_json.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Utils\Json\Release\crude_json.lib
+  lua54.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\lua54.dll
+  imgui.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\imgui.lib
+  gtest.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gtest.dll
+  gtest_main.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gtest_main.dll
   BuiltinNodeDefs.cpp
-  ClipboardOps.cpp
-  ContextMenus.cpp
-  EditorUI.cpp
-  EditorUtils.cpp
-  ExecutionPanel.cpp
-  FileOperations.cpp
-C:\Users\maxweili\MyProjects\MyBlueprintEditor\BlueprintEditor\FileOperations.cpp(1237,14): warning C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [C:\Users\maxweili\MyProjects\MyBlueprintEditor\build-windows\BlueprintEditor.vcxproj]
-  LinkRenderer.cpp
-  Minimap.cpp
-  NodeRenderer.cpp
+  BuiltinHandlers_Misc.cpp
+  正在生成代码...
+    正在创建库 C:/Users/maxweili/MyProjects/MyBlueprintEditor/build/Runtime/Release/BlueprintRuntime.lib 和对象 C:/Users/maxweili/MyProjects/MyBlueprintEditor/build/Runtime/Release/BlueprintRuntime.exp
+  BlueprintRuntime.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\BlueprintRuntime.dll
+  ImGuiNodeEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\ImGuiNodeEditor.lib
+  runtime-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\runtime-example.exe
+  blueprint_tests.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\blueprint_tests.exe
+  Application.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\Application.lib
+  basic-interaction-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\basic-interaction-example.exe
+  widgets-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\widgets-example.exe
+  simple-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\simple-example.exe
+  canvas-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\canvas-example.exe
   ProjectOps.cpp
-  SearchOverlay.cpp
-  ThemeManager.cpp
-  ZoomBar.cpp
-  main.cpp
-  正在生成代码...
-  BlueprintEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build-windows\bin\BlueprintEditor.exe
-  basic-interaction-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build-windows\bin\basic-interaction-example.exe
-  canvas-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build-windows\bin\canvas-example.exe
-  runtime-example.cpp
-  test_new_features.cpp
-  正在生成代码...
-  runtime-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build-windows\bin\runtime-example.exe
-  simple-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build-windows\bin\simple-example.exe
-  widgets-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build-windows\bin\widgets-example.exe
+  BlueprintEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\BlueprintEditor.exe

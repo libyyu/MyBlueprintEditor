@@ -9,6 +9,61 @@
 namespace fs = std::filesystem;
 
 // ============================================================================
+// 路径工具函数（内部使用）
+// ============================================================================
+
+// 统一路径分隔符为 '/'
+static std::string NormSlash(std::string s)
+{
+    for (char& c : s) if (c == '\\') c = '/';
+    return s;
+}
+
+// 去掉 "assets/" 前缀（如果存在）
+static std::string StripAssetsPrefix(std::string rp)
+{
+    rp = NormSlash(std::move(rp));
+    if (rp.size() > 7 && rp.substr(0, 7) == "assets/")
+        rp = rp.substr(7);
+    return rp;
+}
+
+// 取 stem（不含扩展名、不含目录）
+static std::string GetStem(const std::string& path)
+{
+    return fs::path(path).stem().string();
+}
+
+// 取扩展名（含点，如 ".bjson"）
+static std::string GetExtension(const std::string& path)
+{
+    return fs::path(path).extension().string();
+}
+
+// 取目录部分（相对路径，去掉 assets/ 后的目录前缀）
+// e.g. "assets/sub/dir/File.bjson" → "sub/dir"
+static std::string GetRelDir(const std::string& relPath)
+{
+    std::string rp = StripAssetsPrefix(relPath);
+    auto slash = rp.rfind('/');
+    return (slash != std::string::npos) ? rp.substr(0, slash) : "";
+}
+
+// 构建工程相对路径（含 assets/ 前缀）
+// e.g. relNoExt="sub/dir/Foo", ext=".bjson" → "assets/sub/dir/Foo.bjson"
+static std::string BuildRelPath(const std::string& relNoExt, const std::string& ext)
+{
+    return "assets/" + relNoExt + ext;
+}
+
+// 两路径是否指向同一文件（lexically_normal 比较）
+static bool SamePath(const std::string& a, const std::string& b)
+{
+    return fs::path(a).lexically_normal().string() ==
+           fs::path(b).lexically_normal().string();
+}
+
+// ============================================================================
 // 工程 —— 新建
 // ============================================================================
 
@@ -562,11 +617,7 @@ void BlueprintEditor::DrawProjectPanel()
             for (int i = 0; i < (int)entries.size(); ++i)
             {
                 // relativePath 格式: "sub/dir/file.json" 或 "file.json"
-                std::string rp = entries[i].relativePath;
-                // 统一分隔符
-                for (char& c : rp) if (c == '\\') c = '/';
-                // 去掉 assets/ 前缀（如果有）
-                if (rp.size() > 7 && rp.substr(0, 7) == "assets/") rp = rp.substr(7);
+                std::string rp = StripAssetsPrefix(entries[i].relativePath);
 
                 // 按 '/' 分割路径
                 DirNode* cur = &root;
@@ -595,11 +646,24 @@ void BlueprintEditor::DrawProjectPanel()
             };
             static RenameState s_renameState;
 
+            // 删除磁盘文件二次确认状态
+            struct DeleteConfirmState {
+                int  targetIdx    = -1;
+                bool openNextFrame = false;
+            };
+            static DeleteConfirmState s_deleteState;
+
             // 弹出改名/移动对话框
             if (s_renameState.openNextFrame)
             {
                 s_renameState.openNextFrame = false;
                 ImGui::OpenPopup("##renameDialog");
+            }
+            // 弹出删除确认对话框
+            if (s_deleteState.openNextFrame)
+            {
+                s_deleteState.openNextFrame = false;
+                ImGui::OpenPopup("##deleteConfirmDialog");
             }
             if (ImGui::BeginPopupModal("##renameDialog", nullptr,
                 ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
@@ -641,37 +705,21 @@ void BlueprintEditor::DrawProjectPanel()
                         // 去首尾空白
                         while (!newInput.empty() && (newInput.front() == ' ' || newInput.front() == '\t')) newInput.erase(newInput.begin());
                         while (!newInput.empty() && (newInput.back()  == ' ' || newInput.back()  == '\t')) newInput.pop_back();
-                        for (char& c : newInput) if (c == '\\') c = '/';
+                        newInput = NormSlash(std::move(newInput));
 
                         if (!newInput.empty())
                         {
                             auto& e = entries[idx];
-                            std::string oldAbs = m_Project.AbsPath(e.relativePath);
-                            std::string oldRelDir;
-                            {
-                                std::string rp = e.relativePath;
-                                for (char& c : rp) if (c == '\\') c = '/';
-                                if (rp.size() > 7 && rp.substr(0, 7) == "assets/") rp = rp.substr(7);
-                                auto slashPos = rp.rfind('/');
-                                oldRelDir = (slashPos != std::string::npos) ? rp.substr(0, slashPos) : "";
-                            }
+                            std::string oldAbs     = m_Project.AbsPath(e.relativePath);
+                            std::string oldRelDir  = GetRelDir(e.relativePath);
+                            std::string ext        = GetExtension(oldAbs);
 
-                            // 计算新的 relative path（相对 assets/）
-                            std::string newRelNoExt;
-                            if (s_renameState.isRename)
-                            {
-                                // 改名：只改文件名，目录不变
-                                newRelNoExt = oldRelDir.empty() ? newInput : (oldRelDir + "/" + newInput);
-                            }
-                            else
-                            {
-                                // 移动：newInput 是完整相对路径（不含扩展名）
-                                newRelNoExt = newInput;
-                            }
+                            // 计算新相对路径（不含 assets/ 前缀和扩展名）
+                            std::string newRelNoExt = s_renameState.isRename
+                                ? (oldRelDir.empty() ? newInput : (oldRelDir + "/" + newInput))
+                                : newInput;
 
-                            // 确定扩展名（从旧文件保留）
-                            std::string ext = fs::path(oldAbs).extension().string();
-                            std::string newRelPath = "assets/" + newRelNoExt + ext;
+                            std::string newRelPath = BuildRelPath(newRelNoExt, ext);
                             std::string newAbs     = m_Project.AbsPath(newRelPath);
 
                             // 执行文件系统操作
@@ -680,26 +728,18 @@ void BlueprintEditor::DrawProjectPanel()
                             fs::rename(oldAbs, newAbs, ec);
                             if (!ec)
                             {
-
-                                // 更新 project 数据
                                 e.relativePath = newRelPath;
-                                e.displayName  = fs::path(newRelPath).stem().string();
+                                e.displayName  = GetStem(newRelPath);
                                 SaveProject();
 
                                 // 更新已打开文档的 filePath
                                 for (auto& doc : m_Documents)
-                                {
-                                    std::string normOld = fs::path(oldAbs).lexically_normal().string();
-                                    std::string normDoc = fs::path(doc->filePath).lexically_normal().string();
-                                    if (normDoc == normOld)
+                                    if (SamePath(doc->filePath, oldAbs))
                                     {
                                         doc->filePath = newAbs;
-                                        std::string title = "Blueprint Editor - " + fs::path(newAbs).stem().string();
-                                        SetTitle(title.c_str());
+                                        SetTitle(("Blueprint Editor - " + GetStem(newAbs)).c_str());
                                     }
-                                }
 
-                                // 更新工程内所有蓝图文件的引用
                                 UpdateBlueprintReferences(oldAbs, newAbs);
                             }
                         }
@@ -709,6 +749,57 @@ void BlueprintEditor::DrawProjectPanel()
                 else
                 {
                     ImGui::TextColored(ImVec4(1,0.3f,0.3f,1), "Invalid target");
+                    if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
+            }
+
+            // ── 删除磁盘文件确认框 ────────────────────────────────────────
+            if (ImGui::BeginPopupModal("##deleteConfirmDialog", nullptr,
+                ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+            {
+                int idx = s_deleteState.targetIdx;
+                bool valid = (idx >= 0 && idx < (int)entries.size());
+                ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.3f, 1.0f),
+                    ICON_FA_TRIANGLE_EXCLAMATION " Delete File from Disk");
+                ImGui::Separator();
+                if (valid)
+                {
+                    ImGui::TextWrapped("This will permanently delete the file from disk:\n  %s",
+                        entries[idx].relativePath.c_str());
+                    ImGui::Spacing();
+                    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "This action cannot be undone!");
+                    ImGui::Spacing();
+                    ImGui::Separator();
+                    ImGui::Spacing();
+
+                    ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(160, 30, 30, 255));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(200, 45, 45, 255));
+                    bool doDelete = ImGui::Button(ICON_FA_TRASH " Delete", ImVec2(110, 0));
+                    ImGui::PopStyleColor(2);
+                    ImGui::SameLine(0, 8);
+                    if (ImGui::Button(ICON_FA_XMARK " Cancel", ImVec2(110, 0)))
+                        ImGui::CloseCurrentPopup();
+
+                    if (doDelete)
+                    {
+                        std::string absPath = m_Project.AbsPath(entries[idx].relativePath);
+                        // 关闭已打开的对应文档（避免悬空文件引用）
+                        for (int d = (int)m_Documents.size() - 1; d >= 0; --d)
+                            if (SamePath(m_Documents[d]->filePath, absPath))
+                                m_Documents.erase(m_Documents.begin() + d);
+                        if (m_ActiveDocIndex >= (int)m_Documents.size())
+                            m_ActiveDocIndex = (int)m_Documents.size() - 1;
+
+                        std::error_code ec;
+                        fs::remove(absPath, ec);
+                        entries.erase(entries.begin() + idx);
+                        SaveProject();
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+                else
+                {
                     if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
                 }
                 ImGui::EndPopup();
@@ -747,20 +838,33 @@ void BlueprintEditor::DrawProjectPanel()
                     if (rowHov && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
                         *pDirOpen = !*pDirOpen;
 
-                    // 目录右键菜单：在此目录下新建文件
+                    // 目录右键菜单：在此目录下新建文件 + 批量操作
                     ImGui::PushID(dirStateKey.c_str());
                     ImGui::SetCursorScreenPos(rowMin);
                     ImGui::InvisibleButton("##dirRow", ImVec2(panelW, rowH));
                     std::string dirCtxId = "##dirCtx_" + dirStateKey;
                     if (ImGui::BeginPopupContextItem(dirCtxId.c_str()))
                     {
-                        if (ImGui::MenuItem(ICON_FA_FILE " New Blueprint Here"))
+                        const char* newLabel = (bpClass == RTBlueprintClass::FunctionLibrary)
+                            ? ICON_FA_CUBE " New Library Here"
+                            : ICON_FA_FILE " New Blueprint Here";
+                        if (ImGui::MenuItem(newLabel))
                         {
-                            // 打开命名对话框，预填目录前缀
                             OpenSaveNameDialog(/*isNew=*/true, bpClass);
-                            // 预填路径
                             snprintf(m_SaveNameDialog.inputBuf, sizeof(m_SaveNameDialog.inputBuf),
                                      "%s/", fullDirPath.c_str());
+                        }
+                        ImGui::Separator();
+                        if (ImGui::MenuItem(ICON_FA_XMARK " Remove All from Project"))
+                        {
+                            // 从 entries 中移除所有属于此目录的文件（不删磁盘）
+                            std::string prefix = "assets/" + fullDirPath + "/";
+                            entries.erase(std::remove_if(entries.begin(), entries.end(),
+                                [&](const BpProjectEntry& e) {
+                                    std::string rp = NormSlash(e.relativePath);
+                                    return rp.rfind(prefix, 0) == 0;
+                                }), entries.end());
+                            SaveProject();
                         }
                         ImGui::EndPopup();
                     }
@@ -779,7 +883,7 @@ void BlueprintEditor::DrawProjectPanel()
                     ImGui::PushID(i);
 
                     std::string label = e.displayName.empty()
-                        ? fs::path(e.relativePath).stem().string()
+                        ? GetStem(e.relativePath)
                         : e.displayName;
                     bool isActive = ActiveDoc() && !ActiveDoc()->filePath.empty() &&
                                     m_Project.RelPath(ActiveDoc()->filePath) == e.relativePath;
@@ -829,28 +933,32 @@ void BlueprintEditor::DrawProjectPanel()
                         {
                             s_renameState.targetIdx = i;
                             s_renameState.isRename  = true;
-                            // 预填当前文件名（不含目录和扩展名）
-                            std::string stem = fs::path(e.relativePath).stem().string();
-                            snprintf(s_renameState.inputBuf, sizeof(s_renameState.inputBuf), "%s", stem.c_str());
+                            snprintf(s_renameState.inputBuf, sizeof(s_renameState.inputBuf),
+                                     "%s", GetStem(e.relativePath).c_str());
                             s_renameState.openNextFrame = true;
                         }
                         if (ImGui::MenuItem(ICON_FA_ARROW_RIGHT " Move"))
                         {
                             s_renameState.targetIdx = i;
                             s_renameState.isRename  = false;
-                            // 预填当前相对路径（不含 assets/ 前缀和扩展名）
-                            std::string rp = e.relativePath;
-                            for (char& c : rp) if (c == '\\') c = '/';
-                            if (rp.size() > 7 && rp.substr(0, 7) == "assets/") rp = rp.substr(7);
-                            // 去掉扩展名
+                            // 预填：去掉 assets/ 前缀和扩展名
+                            std::string rp = StripAssetsPrefix(e.relativePath);
                             auto dotPos = rp.rfind('.');
                             if (dotPos != std::string::npos) rp = rp.substr(0, dotPos);
-                            snprintf(s_renameState.inputBuf, sizeof(s_renameState.inputBuf), "%s", rp.c_str());
+                            snprintf(s_renameState.inputBuf, sizeof(s_renameState.inputBuf),
+                                     "%s", rp.c_str());
                             s_renameState.openNextFrame = true;
                         }
                         ImGui::Separator();
                         if (ImGui::MenuItem(ICON_FA_XMARK " Remove from Project"))
                             removeIdx = i;
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.45f, 0.4f, 1.0f));
+                        if (ImGui::MenuItem(ICON_FA_TRASH " Delete from Disk"))
+                        {
+                            s_deleteState.targetIdx = i;
+                            s_deleteState.openNextFrame = true;
+                        }
+                        ImGui::PopStyleColor();
                         ImGui::EndPopup();
                     }
 

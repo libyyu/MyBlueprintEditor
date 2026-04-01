@@ -213,6 +213,69 @@ void RegisterHandlers_Misc(std::unordered_map<std::string, NodeHandler>& handler
     // Function.Call 在 BlueprintRunner::executeNodeInternal 里内置处理，此处仅占位防止
     // "handler not found" 警告（当 runner 以非 blueprint 方式执行时不会命中此分支）
     // handlers["Function.Call"] — intentionally left to built-in path
+
+    // ── Object 引脚 Demo 节点 ─────────────────────────────────────────────
+    // Object 类型在运行时以 stringValue 存储对象引用 ID
+    // 全局属性表用 "__obj_prop_<objectId>_<key>" 格式变量存储
+
+    handlers["Object.Make"] = [](ExecutionContext& ctx) {
+        std::string id = ctx.GetInputValue("ObjectId").asString();
+        Variant obj;
+        obj.type        = PinDataType::Object;
+        obj.stringValue = id;
+        ctx.SetOutputValue("Object", obj);
+        return true;
+    };
+
+    handlers["Object.GetId"] = [](ExecutionContext& ctx) {
+        Variant obj = ctx.GetInputValue("Object");
+        ctx.SetOutputValue("ObjectId", Variant(obj.asObjectId()));
+        return true;
+    };
+
+    handlers["Object.IsValid"] = [](ExecutionContext& ctx) {
+        Variant obj = ctx.GetInputValue("Object");
+        bool valid = (obj.type == PinDataType::Object && !obj.stringValue.empty());
+        ctx.SetOutputValue("Is Valid", Variant(valid));
+        return true;
+    };
+
+    handlers["Object.SetProperty"] = [](ExecutionContext& ctx) {
+        std::string objId = ctx.GetInputValue("Object").asObjectId();
+        std::string key   = ctx.GetInputValue("Key").asString();
+        std::string val   = ctx.GetInputValue("Value").asString();
+        if (!objId.empty() && !key.empty())
+            ctx.SetVariable("__obj_prop_" + objId + "_" + key, Variant(val));
+        ctx.ActivateOutputFlow("");
+        return true;
+    };
+
+    handlers["Object.GetProperty"] = [](ExecutionContext& ctx) {
+        std::string objId = ctx.GetInputValue("Object").asObjectId();
+        std::string key   = ctx.GetInputValue("Key").asString();
+        std::string varKey = "__obj_prop_" + objId + "_" + key;
+        Variant stored = ctx.GetVariable(varKey);
+        bool found = (stored.type != PinDataType::Unknown);
+        ctx.SetOutputValue("Value", Variant(stored.asString()));
+        ctx.SetOutputValue("Found", Variant(found));
+        return true;
+    };
+
+    handlers["Object.Print"] = [](ExecutionContext& ctx) {
+        std::string objId = ctx.GetInputValue("Object").asObjectId();
+        std::string label = ctx.GetInputValue("Label").asString();
+        std::string msg = (label.empty() ? "Object" : label) + ": [" + objId + "]";
+        ctx.Print(msg);
+        ctx.ActivateOutputFlow("");
+        return true;
+    };
+
+    handlers["Object.Equal"] = [](ExecutionContext& ctx) {
+        std::string a = ctx.GetInputValue("A").asObjectId();
+        std::string b = ctx.GetInputValue("B").asObjectId();
+        ctx.SetOutputValue("Result", Variant(a == b));
+        return true;
+    };
 }
 
 // ============================================================================

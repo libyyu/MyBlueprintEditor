@@ -1181,6 +1181,60 @@ static void RegisterNodeDefs_Misc(INodeRegistry& registry)
         { MakePin("Result", PinDataType::String) },
         "", "Simple");
 
+    // ── Object 引脚 Demo 节点（Object/Demo 分类）─────────────────────────
+    // 演示 PinDataType::Object 类型引脚的使用场景
+    // Object 值在运行时以字符串存储（对象引用 ID / 路径 / 名称）
+
+    // MakeObject — 用字符串 ID 构造一个对象引用
+    reg("Object.Make", "Make Object Ref", "Object",
+        { MakePin("ObjectId", PinDataType::String) },
+        { MakePin("Object", PinDataType::Object) },
+        "C86428", "Simple");
+
+    // GetObjectId — 从对象引用中提取 ID 字符串
+    reg("Object.GetId", "Get Object Id", "Object",
+        { MakePin("Object", PinDataType::Object) },
+        { MakePin("ObjectId", PinDataType::String) },
+        "C86428", "Simple");
+
+    // IsObjectValid — 检查对象引用是否非空
+    reg("Object.IsValid", "Is Object Valid", "Object",
+        { MakePin("Object", PinDataType::Object) },
+        { MakePin("Is Valid", PinDataType::Boolean) },
+        "C86428", "Simple");
+
+    // SetObjectProperty — 在全局属性表中为对象设置一个命名属性
+    reg("Object.SetProperty", "Set Object Property", "Object",
+        { MakeFlowPin(""),
+          MakePin("Object",   PinDataType::Object),
+          MakePin("Key",      PinDataType::String),
+          MakePin("Value",    PinDataType::String) },
+        { MakeFlowPin("") },
+        "C86428");
+
+    // GetObjectProperty — 读取对象命名属性
+    reg("Object.GetProperty", "Get Object Property", "Object",
+        { MakePin("Object",   PinDataType::Object),
+          MakePin("Key",      PinDataType::String) },
+        { MakePin("Value",    PinDataType::String),
+          MakePin("Found",    PinDataType::Boolean) },
+        "C86428", "Simple");
+
+    // PrintObject — 打印对象 ID 及其所有属性
+    reg("Object.Print", "Print Object", "Object",
+        { MakeFlowPin(""),
+          MakePin("Object",   PinDataType::Object),
+          MakePin("Label",    PinDataType::String) },
+        { MakeFlowPin("") },
+        "C86428");
+
+    // EqualObjects — 比较两个对象引用是否相同（按 ID）
+    reg("Object.Equal", "Equal Objects", "Object",
+        { MakePin("A", PinDataType::Object),
+          MakePin("B", PinDataType::Object) },
+        { MakePin("Result", PinDataType::Boolean) },
+        "C86428", "Simple");
+
     // EventBus.Emit — 广播一个具名事件（携带可选 payload）
     reg("EventBusEmit", "EventBus: Emit", "Misc/EventBus",
         { MakeFlowPin(""), MakePin("Event", PinDataType::String),
