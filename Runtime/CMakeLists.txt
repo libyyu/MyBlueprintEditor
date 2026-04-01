@@ -153,11 +153,15 @@ if(BLUEPRINT_LUA)
         FetchContent_Declare(lua54
             URL      https://www.lua.org/ftp/lua-5.4.7.tar.gz
             DOWNLOAD_EXTRACT_TIMESTAMP ON
-            # Do NOT use EXCLUDE_FROM_ALL: it causes the shared library to be skipped
-            # by the top-level build and produces an empty link.txt (cmake bug on some
-            # generators).  Without EXCLUDE_FROM_ALL the target is always part of ALL.
         )
-        FetchContent_MakeAvailable(lua54)
+        # Use FetchContent_Populate (instead of MakeAvailable) so we control the
+        # source directory ourselves without CMake trying to add_subdirectory.
+        # MakeAvailable would also work, but on multi-config generators (Xcode, VS)
+        # the source dir may not be populated yet when file(GLOB) runs.
+        FetchContent_GetProperties(lua54)
+        if(NOT lua54_POPULATED)
+            FetchContent_Populate(lua54)
+        endif()
 
         # Build Lua from source (STATIC or SHARED depending on platform)
         set(LUA54_SRC_DIR "${lua54_SOURCE_DIR}/src")
@@ -254,7 +258,10 @@ if(BLUEPRINT_LUA)
             endif()
 
             set_property(TARGET ${_LUA_TARGET_NAME} PROPERTY FOLDER "External")
-            # Set C standard for Lua (pure C code)
+            # Explicitly tell CMake this is a C target (pure C code).
+            # Required on Xcode/multi-config generators where CMake cannot always
+            # infer the linker language from FetchContent-provided sources.
+            set_property(TARGET ${_LUA_TARGET_NAME} PROPERTY LINKER_LANGUAGE C)
             set_property(TARGET ${_LUA_TARGET_NAME} PROPERTY C_STANDARD 99)
             set_property(TARGET ${_LUA_TARGET_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
         endif()
