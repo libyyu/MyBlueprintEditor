@@ -22,7 +22,7 @@
                     "isExec": true
                 },
                 {
-                    "id": 8,
+                    "id": 3,
                     "kind": 1,
                     "dataType": 4,
                     "name": "Message"
@@ -30,19 +30,19 @@
             ]
         },
         {
-            "id": 3,
+            "id": 4,
             "definitionId": "Function.Return",
             "definitionVersion": 1,
             "name": "TestPrint",
             "pins": [
                 {
-                    "id": 4,
+                    "id": 5,
                     "kind": 0,
                     "dataType": 0,
                     "isExec": true
                 },
                 {
-                    "id": 9,
+                    "id": 6,
                     "kind": 0,
                     "dataType": 3,
                     "name": "NewOutput",
@@ -51,26 +51,26 @@
             ]
         },
         {
-            "id": 10,
+            "id": 7,
             "definitionId": "PrintString",
             "definitionVersion": 1,
             "name": "Print String",
             "pins": [
                 {
-                    "id": 11,
+                    "id": 8,
                     "kind": 0,
                     "dataType": 0,
                     "isExec": true
                 },
                 {
-                    "id": 12,
+                    "id": 9,
                     "kind": 0,
                     "dataType": 4,
                     "name": "In String",
                     "defaultValue": ""
                 },
                 {
-                    "id": 13,
+                    "id": 10,
                     "kind": 1,
                     "dataType": 0,
                     "isExec": true
@@ -78,20 +78,95 @@
             ]
         },
         {
-            "id": 17,
+            "id": 11,
             "definitionId": "MakeLiteralFloat",
             "definitionVersion": 1,
             "name": "Make Literal Float",
             "pins": [
                 {
-                    "id": 18,
+                    "id": 12,
                     "kind": 0,
                     "dataType": 3,
                     "name": "Value",
                     "defaultValue": 99
                 },
                 {
+                    "id": 13,
+                    "kind": 1,
+                    "dataType": 3,
+                    "name": "Result"
+                }
+            ]
+        },
+        {
+            "id": 18,
+            "definitionId": "Function.Entry",
+            "definitionVersion": 1,
+            "name": "TestAdd",
+            "pins": [
+                {
                     "id": 19,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 26,
+                    "kind": 1,
+                    "dataType": 3,
+                    "name": "A"
+                },
+                {
+                    "id": 25,
+                    "kind": 1,
+                    "dataType": 3,
+                    "name": "B"
+                }
+            ]
+        },
+        {
+            "id": 20,
+            "definitionId": "Function.Return",
+            "definitionVersion": 1,
+            "name": "TestAdd",
+            "pins": [
+                {
+                    "id": 21,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 28,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Sum",
+                    "defaultValue": 0
+                }
+            ]
+        },
+        {
+            "id": 29,
+            "definitionId": "Add",
+            "definitionVersion": 1,
+            "name": "+",
+            "pins": [
+                {
+                    "id": 30,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "A",
+                    "defaultValue": 0
+                },
+                {
+                    "id": 31,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "B",
+                    "defaultValue": 0
+                },
+                {
+                    "id": 32,
                     "kind": 1,
                     "dataType": 3,
                     "name": "Result"
@@ -102,26 +177,50 @@
     "links": [
         {
             "id": 14,
-            "startPinId": 8,
-            "endPinId": 12,
+            "startPinId": 3,
+            "endPinId": 9,
             "isEnabled": true
         },
         {
             "id": 15,
             "startPinId": 2,
-            "endPinId": 11,
+            "endPinId": 8,
             "isEnabled": true
         },
         {
             "id": 16,
-            "startPinId": 13,
-            "endPinId": 4,
+            "startPinId": 10,
+            "endPinId": 5,
             "isEnabled": true
         },
         {
-            "id": 20,
+            "id": 17,
+            "startPinId": 13,
+            "endPinId": 6,
+            "isEnabled": true
+        },
+        {
+            "id": 22,
             "startPinId": 19,
-            "endPinId": 9,
+            "endPinId": 21,
+            "isEnabled": true
+        },
+        {
+            "id": 33,
+            "startPinId": 26,
+            "endPinId": 30,
+            "isEnabled": true
+        },
+        {
+            "id": 34,
+            "startPinId": 25,
+            "endPinId": 31,
+            "isEnabled": true
+        },
+        {
+            "id": 35,
+            "startPinId": 32,
+            "endPinId": 28,
             "isEnabled": true
         }
     ],
@@ -134,6 +233,17 @@
             "isPublic": true,
             "inputs": [{"name":"Message","dataType":4}],
             "outputs": [{"name":"NewOutput","dataType":3}],
+            "nodes": [],
+            "links": []
+        },
+        {
+            "id": "func_2",
+            "name": "TestAdd",
+            "category": "Custom",
+            "description": "",
+            "isPublic": true,
+            "inputs": [{"name":"A","dataType":3},{"name":"B","dataType":3}],
+            "outputs": [{"name":"Sum","dataType":3}],
             "nodes": [],
             "links": []
         }
@@ -160,7 +270,7 @@
             "isCollapsed": false
         },
         {
-            "id": 3,
+            "id": 4,
             "position": {
                 "x": 664,
                 "y": 78
@@ -172,7 +282,7 @@
             "isCollapsed": false
         },
         {
-            "id": 10,
+            "id": 7,
             "position": {
                 "x": 392,
                 "y": 80
@@ -184,7 +294,7 @@
             "isCollapsed": false
         },
         {
-            "id": 17,
+            "id": 11,
             "position": {
                 "x": 573,
                 "y": 219
@@ -192,6 +302,42 @@
             "size": {
                 "width": 411,
                 "height": 43
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 18,
+            "position": {
+                "x": -92,
+                "y": 612
+            },
+            "size": {
+                "width": 148,
+                "height": 128
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 20,
+            "position": {
+                "x": 456,
+                "y": 620
+            },
+            "size": {
+                "width": 148,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 29,
+            "position": {
+                "x": 209,
+                "y": 765
+            },
+            "size": {
+                "width": 176,
+                "height": 68
             },
             "isCollapsed": false
         }
