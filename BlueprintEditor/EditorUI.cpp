@@ -1016,7 +1016,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     if (ImGui::BeginTabItem((tabTitle + "###tab" + std::to_string(i)).c_str(), &isOpen, flags))
                     {
                         m_ActiveDocIndex = i;
-                        // SetSelected 已生效（ImGui 本帧切换到该 tab），清除 pending
+                        // SetSelected flag 已触发视觉切换；若延迟块已清除 pending，此处为空操作
                         if (m_PendingSwitchTabIndex == i)
                             m_PendingSwitchTabIndex = -1;
 
@@ -1596,9 +1596,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
     }
 
     // ================================================================
-    // 延迟处理双击跳转（在 ed::End() 之后，TabBar 渲染之前执行）
-    // m_PendingSwitchTabIndex 由 TabBar 的 BeginTabItem 返回 true 时清除（见上方）
-    // 这里只提前在目标 doc 上设置导航状态，让 tab 切换后下帧自动 navigate
+    // 延迟处理双击跳转（在 ed::End() 之后执行，此处调用 ed::SetCurrentEditor 安全）
+    // 主动完成 tab 切换 + context 切换 + 导航，不再依赖 TabBar 回调来清除 pending。
+    // TabBar 里的 ImGuiTabItemFlags_SetSelected 仅用于同步视觉高亮，不再承担清除职责。
     // ================================================================
     if (m_PendingSwitchTabIndex >= 0 &&
         m_PendingSwitchTabIndex < (int)m_Documents.size())
@@ -1606,7 +1606,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         auto* targetDoc = m_Documents[m_PendingSwitchTabIndex].get();
         if (!m_PendingNavigateToFunc.empty())
         {
-            // 设置函数导航：在目标文档上设置，tab 切换后下帧（ed::Begin 之后）才执行 navigate
+            // 设置函数导航
             for (int fi = 0; fi < (int)targetDoc->functions.size(); ++fi)
             {
                 if (targetDoc->functions[fi].id == m_PendingNavigateToFunc)
@@ -1622,9 +1622,11 @@ void BlueprintEditor::OnFrame(float deltaTime)
         {
             targetDoc->needNavigateToContent = 1;
         }
-        // 注意：不在这里修改 m_ActiveDocIndex，也不清除 m_PendingSwitchTabIndex
-        // 清除由上方 TabBar 的 BeginTabItem 返回 true 时负责
-        // 这样 ImGui Tab 的 SetSelected 能在次帧正确触发切换
+        // 主动切换活跃文档和编辑器上下文，并立即清除 pending。
+        // ed::End() 已在上方执行完毕，此处调用 SetCurrentEditor 安全。
+        m_ActiveDocIndex = m_PendingSwitchTabIndex;
+        ed::SetCurrentEditor(targetDoc->editorContext);
+        m_PendingSwitchTabIndex = -1;
     }
     else if (!m_PendingOpenFilePath.empty())
     {
@@ -1751,17 +1753,27 @@ void BlueprintEditor::OnFrame(float deltaTime)
                      + iconW + 10        // Stop
                      + iconW + 24;       // 状态图标 + padding
 
-        // 在 Begin 之前用 FindWindowByName 获取上帧实际宽度（比 static 缓存更可靠）
+        // totalW 补上 WindowPadding 水平量（8*2=16px），使首帧居中估算更准确
+        totalW += 16.0f;
+
+        // 用上帧实际窗口宽度覆盖估算值（AlwaysAutoResize 稳定后此值最准确）
         if (ImGuiWindow* tbWnd = ImGui::FindWindowByName("##DebugToolbar"))
             if (tbWnd->Size.x > 0) totalW = tbWnd->Size.x;
 
+        float margin = 4.0f;
+        float canvasW = editorMax.x - editorMin.x;
+
         float centerX = (editorMin.x + editorMax.x) * 0.5f;
         float tbX = centerX - totalW * 0.5f;
-        // 限制不超出画布边界
-        float margin = 4.0f;
-        if (tbX < editorMin.x + margin) tbX = editorMin.x + margin;
+        // 优先保证不超出右边界，再保证不超出左边界
         if (tbX + totalW > editorMax.x - margin) tbX = editorMax.x - margin - totalW;
+        if (tbX < editorMin.x + margin)          tbX = editorMin.x + margin;
         ImVec2 tbPos(tbX, editorMin.y + 6.0f);
+
+        // 当画布宽度不足以容纳工具栏时，限制窗口最大宽度，避免内容溢出屏幕外
+        float maxTbW = canvasW - margin * 2.0f;
+        if (maxTbW > 0.0f)
+            ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(maxTbW, FLT_MAX));
 
         ImGui::SetNextWindowPos(tbPos, ImGuiCond_Always);
         // 不手动设置 Size，改用 AlwaysAutoResize，让窗口自适应内容宽高
