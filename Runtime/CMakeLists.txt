@@ -105,19 +105,23 @@ set(RUNTIME_PUBLIC_HEADERS
 option(BLUEPRINT_LUA "Enable Lua scripting support (requires Lua 5.4)" ON)
 
 # Platform capability check:
-# - iOS         : STATIC only (no dylib loading in App Store bundles)
-# - Emscripten  : STATIC only (no dlopen in WebGL/wasm environment)
-# - Android     : SHARED (.so packaged in APK/AAB, loaded via System.loadLibrary)
-# - Others (Windows, Linux, macOS): SHARED preferred
+# - iOS        : STATIC only (App Store forbids dynamic loading of arbitrary .dylib)
+# - Emscripten : STATIC only (wasm has no real dlopen; shared libs not supported)
+# - Android    : follows BUILD_SHARED_LIBS (SHARED when ON, STATIC when OFF)
+#                SHARED .so is packaged by AGP into APK; STATIC is fine for
+#                embedding BlueprintRuntime into a single JNI .so.
+# - Others (Windows, Linux, macOS): SHARED preferred (follows BUILD_SHARED_LIBS)
 # No platform forces BLUEPRINT_LUA OFF; callers may still set it OFF explicitly.
 
 if(BLUEPRINT_LUA)
     # --- Determine Lua library type per platform ---
     if(EMSCRIPTEN OR (CMAKE_SYSTEM_NAME STREQUAL "iOS"))
+        # Must be STATIC regardless of BUILD_SHARED_LIBS
         set(_LUA_LIB_TYPE STATIC)
-    else()
-        # Android, Windows, Linux, macOS → SHARED
+    elseif(BUILD_SHARED_LIBS)
         set(_LUA_LIB_TYPE SHARED)
+    else()
+        set(_LUA_LIB_TYPE STATIC)
     endif()
     message(STATUS "[BlueprintRuntime] Lua library type: ${_LUA_LIB_TYPE}")
 
@@ -172,33 +176,28 @@ if(BLUEPRINT_LUA)
             )
 
             # Platform-specific compile definitions for Lua
-            # Each platform needs the right LUA_USE_* so Lua picks correct
-            # implementations of os/io/readline/setjmp etc.
+            # Lua 5.4 only recognises: LUA_USE_LINUX, LUA_USE_MACOSX, LUA_USE_POSIX,
+            # LUA_USE_DLOPEN, LUA_USE_WINDOWS (implicit default).
+            # There is NO LUA_USE_IOS or LUA_USE_ANDROID in the official source.
             if(EMSCRIPTEN)
-                # Emscripten: POSIX subset; no readline, limited os/io
-                # LUA_USE_POSIX gives POSIX math/signal without readline dependency
-                target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE
-                    LUA_USE_POSIX
-                    LUA_USE_DLOPEN   # dlopen is emulated by Emscripten
-                )
+                # Emscripten: POSIX math/signal subset is available; no readline,
+                # no real dlopen (Emscripten's dlopen is a stub — omit LUA_USE_DLOPEN
+                # so Lua doesn't try to load dynamic modules at runtime).
+                target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE LUA_USE_POSIX)
             elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-                # iOS: POSIX available, no readline, no dlopen (static only)
-                target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE
-                    LUA_USE_IOS      # defined since Lua 5.4.4; falls back to POSIX subset
-                )
-                # Fallback: older Lua tarballs may not recognise LUA_USE_IOS;
-                # LUA_USE_POSIX is always safe on iOS (no readline, no RTLD_DEFAULT)
-                target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE
-                    LUA_USE_POSIX
-                )
+                # iOS: POSIX available, no readline, no dlopen (static only).
+                # LUA_USE_POSIX is the correct subset — no readline, uses POSIX math.
+                target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE LUA_USE_POSIX)
             elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
-                # Android NDK: POSIX + dlopen available, no readline
+                # Android NDK: POSIX + dlopen available, no readline.
+                # LUA_USE_LINUX enables readline guard but NDK lacks readline headers;
+                # use LUA_USE_POSIX + LUA_USE_DLOPEN instead.
                 target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE
                     LUA_USE_POSIX
                     LUA_USE_DLOPEN
                 )
             elseif(UNIX AND NOT APPLE)
-                # Linux and other POSIX systems
+                # Linux and other POSIX systems (readline available)
                 target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE LUA_USE_LINUX)
             elseif(APPLE)
                 # macOS (not iOS — caught above)
