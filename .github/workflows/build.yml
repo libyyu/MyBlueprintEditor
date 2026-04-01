@@ -148,13 +148,18 @@ jobs:
             -DBUILD_RUNTIME_ONLY=ON \
             -DBUILD_SHARED_LIBS=OFF \
             -DBUILD_TESTS=OFF \
-            -DBUILD_EXAMPLES=OFF
+            -DBUILD_EXAMPLES=OFF \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY=""
 
       - name: Build
         run: |
-          cmake --build build-ios --config Release -- \
-            -sdk iphoneos \
-            CODE_SIGNING_ALLOWED=NO
+          cmake --build build-ios --config Release \
+            -- \
+            -sdk iphonesimulator \
+            -arch arm64 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY=""
 
       - name: Check output
         run: |
