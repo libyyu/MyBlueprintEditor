@@ -37,7 +37,7 @@ int LoadFunctionLibrary(INodeRegistry& registry, const std::string& dirPath)
         if (!entry.is_regular_file()) continue;
 
         auto p = entry.path();
-        if (p.extension() != ".json") continue;
+        if (p.extension() != ".bjson") continue;
 
         // 加载蓝图文件
         auto result = exporter.importRuntimeFromFile(p.string());

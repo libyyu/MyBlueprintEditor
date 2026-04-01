@@ -156,7 +156,7 @@ void BlueprintEditor::ExecuteBlueprint()
                 if (ec) break;
                 if (!entry.is_regular_file()) continue;
                 auto p = entry.path();
-                if (p.extension() != ".json") continue;
+                if (p.extension() != ".bjson") continue;
                 auto r = exporter.importRuntimeFromFile(p.string());
                 if (!r.success) continue;
                 if (r.data.metadata.blueprintClass != ::NodeEditor::Runtime::BlueprintClass::FunctionLibrary) continue;
@@ -197,7 +197,7 @@ void BlueprintEditor::ExecuteBlueprint()
         const std::string& fp = ActiveDoc()->filePath;
         auto pos = fp.find_last_of("/\\");
         if (pos != std::string::npos)
-            basePath = fp.substr(0, pos);  // "C:/foo/bar/NLoop.json" → "C:/foo/bar"
+            basePath = fp.substr(0, pos);  // "C:/foo/bar/NLoop.bjson" → "C:/foo/bar"
         else
             basePath = ".";               // 无目录分隔符时使用当前目录
         ::NodeEditor::Runtime::RegisterBuiltinHandlers(

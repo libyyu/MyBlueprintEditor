@@ -1032,7 +1032,7 @@ void BlueprintEditor::OnStart()
     LoadRecentProjects();
 
     // 加载外部自定义节点定义（文件不存在时静默跳过）
-    ::NodeEditor::Runtime::LoadCustomNodesFromFile(m_NodeRegistry, "data/custom_nodes.json");
+    ::NodeEditor::Runtime::LoadCustomNodesFromFile(m_NodeRegistry, "data/custom_nodes.bjson");
 
     // 加载公共函数库（目录不存在时静默返回 0）
     // 若工程系统启用后，此处可改为 SyncProjectLibrariesToRegistry()

@@ -10,7 +10,7 @@
 
 struct BpProjectEntry
 {
-    std::string relativePath;   // 相对于 .bproj 文件的路径，如 "actors/Player.bp.json"
+    std::string relativePath;   // 相对于 .bproj 文件的路径，如 "actors/Player.bjson"
     std::string displayName;    // 可选显示名（空则取文件名）
 };
 
