@@ -357,6 +357,9 @@ struct BlueprintEditor : public Application
     int         m_PendingSwitchTabIndex = -1;
     std::string m_PendingNavigateToFunc;  // 打开文件后定位的函数名（FuncLib 双击用）
 
+    // 工程面板：新建/保存后需要展开并高亮的相对路径
+    std::string m_PendingExpandToPath;    // 相对路径，下一帧 drawSection 展开对应目录
+
     // ------------------------------------------------------------------
     // 剪贴板（Copy/Paste/Duplicate）
     // ------------------------------------------------------------------

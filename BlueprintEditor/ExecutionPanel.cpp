@@ -290,16 +290,21 @@ void BlueprintEditor::ExecuteBlueprint()
     ActiveDoc()->executionLog.push_back("  Elapsed: " + std::string(elapsedBuf));
     ActiveDoc()->executionLog.push_back("========================================");
 
-    // 5. 执行可视化 —— 精确高亮已执行的节点 & 触发 Flow 动画
+    // 5. 执行可视化 —— 高亮已执行的节点（按执行顺序错开起始时间，营造逐节点播放感）
     ActiveDoc()->executedNodeHighlight.clear();
     std::unordered_set<uint64_t> executedNodeSet;
     bool execFailed = !result.success && !result.errorMessage.empty() && result.errorMessage != "Paused at breakpoint";
-    for (size_t i = 0; i < result.executedNodeIds.size(); ++i)
+    size_t n = result.executedNodeIds.size();
+    for (size_t i = 0; i < n; ++i)
     {
         uint64_t runtimeId = result.executedNodeIds[i];
-        bool isFailNode = execFailed && (i + 1 == result.executedNodeIds.size());
+        bool isFailNode = execFailed && (i + 1 == n);
         BlueprintDocument::NodeHighlight hl;
-        hl.timeLeft = 3.0f;
+        // 按顺序错开：最后执行的节点最先开始显示（timeLeft 最大），
+        // 最先执行的节点稍后消失，形成"顺序流动"视觉效果
+        // 每个节点之间错开 0.08 秒，总持续 3 秒
+        float stagger = static_cast<float>(i) * 0.08f;
+        hl.timeLeft = 3.0f + stagger;  // 越靠后执行的节点显示时间越长
         hl.color    = isFailNode ? ImColor(255, 60, 60) : ImColor(50, 220, 100);
         ActiveDoc()->executedNodeHighlight[runtimeId] = hl;
         executedNodeSet.insert(runtimeId);

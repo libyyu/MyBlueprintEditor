@@ -232,6 +232,11 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
             ActiveDoc()->executionLog.push_back(
                 "[INFO] Auto-registered " + std::to_string(libCount) +
                 " library function(s) from: " + dir);
+            // 确保 FunctionLibrary 根分类存在于菜单树
+            ::NodeEditor::Runtime::NodeCategory cat;
+            cat.id   = "FunctionLibrary";
+            cat.name = "FunctionLibrary";
+            m_NodeRegistry.registerCategory(cat);
             m_CachedDefCount = 0;  // 强制重建菜单缓存
         }
     }
@@ -296,6 +301,10 @@ void BlueprintEditor::DoSaveFile(const std::string& path)
 
         // 自动将文档加入当前工程（去重由 AddCurrentDocToProject 处理）
         AddCurrentDocToProject();
+
+        // 新建/另存后，通知工程面板展开到该文件所在目录
+        if (m_Project.IsOpen())
+            m_PendingExpandToPath = m_Project.RelPath(path);
         
         ActiveDoc()->executionLog.push_back("[INFO] Saved: " + path + " ("
             + std::to_string(result.bytesWritten) + " bytes)");

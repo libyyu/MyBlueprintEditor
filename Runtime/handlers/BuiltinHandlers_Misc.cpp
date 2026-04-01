@@ -204,9 +204,17 @@ void RegisterHandlers_Misc(std::unordered_map<std::string, NodeHandler>& handler
         return true;
     };
 
-    // Function.Return：函数子图的终点，无任何操作（子 runner Execute 自然结束）
+    // Function.Return：函数子图的终点，将输入引脚值写入变量（供调用方回传）
     handlers["Function.Return"] = [](ExecutionContext& ctx) {
-        (void)ctx;
+        const auto* node = ctx.GetCurrentNode();
+        if (node)
+        {
+            for (const auto& pin : node->pins)
+            {
+                if (pin.kind == PinKind::Input && pin.dataType != PinDataType::Unknown && !pin.name.empty())
+                    ctx.SetVariable(pin.name, ctx.GetInputValue(pin.name));
+            }
+        }
         return true;
     };
 

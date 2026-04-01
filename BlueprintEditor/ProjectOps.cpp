@@ -404,6 +404,15 @@ void BlueprintEditor::SyncProjectLibrariesToRegistry()
     }
     BPLOG("SyncProjectLibraries: registered " + std::to_string(total) + " functions");
 
+    // 确保 FunctionLibrary 根分类存在（否则右键菜单分类树不会显示库函数）
+    if (total > 0)
+    {
+        RTNodeCategory cat;
+        cat.id   = "FunctionLibrary";
+        cat.name = "FunctionLibrary";
+        m_NodeRegistry.registerCategory(cat);
+    }
+
     // Phase 3：加载 Lua 扩展脚本（先清除旧定义再重新加载）
 #ifdef BLUEPRINT_HAS_LUA
     m_LuaNodeRegistrar.UnregisterAll();
@@ -645,6 +654,30 @@ void BlueprintEditor::DrawProjectPanel()
                 bool openNextFrame = false;
             };
             static RenameState s_renameState;
+
+            // ── 新建/保存后自动展开到对应目录 ──────────────────────────
+            if (!m_PendingExpandToPath.empty())
+            {
+                std::string target = StripAssetsPrefix(m_PendingExpandToPath);
+                // 展开该路径中每一级子目录
+                std::string accum;
+                size_t pos2 = 0;
+                while (true)
+                {
+                    size_t slash2 = target.find('/', pos2);
+                    if (slash2 == std::string::npos) break;  // 最后一段是文件名
+                    std::string seg = target.substr(pos2, slash2 - pos2);
+                    accum = accum.empty() ? seg : (accum + "/" + seg);
+                    std::string key2 = std::string(openStateKey) + "/" + accum;
+                    ImGuiID id2 = ImGui::GetID(key2.c_str());
+                    ImGui::GetStateStorage()->SetBool(id2, true);  // 强制展开
+                    pos2 = slash2 + 1;
+                }
+                // 同时展开本 section
+                ImGuiID secId2 = ImGui::GetID(openStateKey);
+                ImGui::GetStateStorage()->SetBool(secId2, true);
+                m_PendingExpandToPath.clear();
+            }
 
             // 删除磁盘文件二次确认状态
             struct DeleteConfirmState {

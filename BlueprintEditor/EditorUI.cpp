@@ -1354,6 +1354,35 @@ void BlueprintEditor::OnFrame(float deltaTime)
                         { libAbsPath = abs; break; }
                     }
                 }
+                // 没有工程时：尝试从当前文件同目录下查找同名 .bjson 文件
+                if (libAbsPath.empty() && ActiveDoc() && !ActiveDoc()->filePath.empty())
+                {
+                    fs::path basePath = fs::path(ActiveDoc()->filePath).parent_path();
+                    fs::path candidate = basePath / (libStem + ".bjson");
+                    if (fs::exists(candidate))
+                        libAbsPath = candidate.lexically_normal().string();
+                }
+                // 最后尝试从 runner 已注册的外部库中找（利用 loaded file path）
+                if (libAbsPath.empty() && ActiveDoc())
+                {
+                    const auto& exLibs = ActiveDoc()->persistentRunner.GetExternalLibraries();
+                    for (const auto& kv : exLibs)
+                    {
+                        if (!kv.second) continue;
+                        const std::string& libName = kv.second->metadata.name;
+                        if (libName == libStem)
+                        {
+                            // 尝试从已打开文档中匹配
+                            for (int di = 0; di < (int)m_Documents.size(); ++di)
+                            {
+                                std::string ds = fs::path(m_Documents[di]->filePath).stem().string();
+                                if (ds == libStem)
+                                { libAbsPath = m_Documents[di]->filePath; break; }
+                            }
+                            break;
+                        }
+                    }
+                }
 
                 if (!libAbsPath.empty())
                 {
@@ -2024,11 +2053,17 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 ImGui::SetTooltip("Step Out (return to caller)\nShift+F11");
 
             ImGui::SameLine(0, 4);
+
+            // Stop
+            if (isIdle || isStopped) ImGui::BeginDisabled();
+            ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(120, 30, 30, 255));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(160, 40, 40, 255));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(190, 50, 50, 255));
             if (ImGui::Button(ICON_FA_STOP "##stop", ImVec2(iconW, btnH)))
                 runner.Stop();
+            ImGui::PopStyleColor(3);
             if (isIdle || isStopped) ImGui::EndDisabled();
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Stop");
-            ImGui::PopStyleColor(3);
 
             // 状态指示
             ImGui::SameLine(0, 10);
