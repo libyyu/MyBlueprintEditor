@@ -168,7 +168,7 @@ jobs:
 
   # ── Android / NDK (build-only, no tests) ────────────────────────────────────
   android:
-    name: Android (arm64-v8a, runtime-only static, build-only)
+    name: Android (arm64-v8a, runtime-only shared, build-only)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -191,7 +191,7 @@ jobs:
             -DANDROID_PLATFORM=android-21 \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_RUNTIME_ONLY=ON \
-            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_SHARED_LIBS=ON \
             -DBUILD_TESTS=OFF \
             -DBUILD_EXAMPLES=OFF
 
@@ -200,8 +200,8 @@ jobs:
 
       - name: Check output
         run: |
-          find build-android -name "*.a" | head -5
-          echo "Android static lib build succeeded"
+          find build-android -name "*.so" | head -5
+          echo "Android shared lib build succeeded"
 
   # ── WebGL / Emscripten ──────────────────────────────────────────────────────
   wasm:
