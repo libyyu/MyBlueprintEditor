@@ -104,22 +104,19 @@ set(RUNTIME_PUBLIC_HEADERS
 # ---------------------------------------------------------------------------
 option(BLUEPRINT_LUA "Enable Lua scripting support (requires Lua 5.4)" ON)
 
-# iOS / Android / Emscripten 不支持 Lua（无系统包，FetchContent 在 CI 环境不可靠）
-if(EMSCRIPTEN OR (CMAKE_SYSTEM_NAME STREQUAL "iOS") OR (CMAKE_SYSTEM_NAME STREQUAL "Android"))
-    if(BLUEPRINT_LUA)
-        message(STATUS "[BlueprintRuntime] BLUEPRINT_LUA forced OFF on ${CMAKE_SYSTEM_NAME}")
-        set(BLUEPRINT_LUA OFF CACHE BOOL "Lua disabled on this platform" FORCE)
-    endif()
-endif()
+# Platform capability check:
+# - iOS         : STATIC only (no dylib loading in App Store bundles)
+# - Emscripten  : STATIC only (no dlopen in WebGL/wasm environment)
+# - Android     : SHARED (.so packaged in APK/AAB, loaded via System.loadLibrary)
+# - Others (Windows, Linux, macOS): SHARED preferred
+# No platform forces BLUEPRINT_LUA OFF; callers may still set it OFF explicitly.
 
 if(BLUEPRINT_LUA)
-    # --- Determine Lua library type: STATIC for iOS/Emscripten, SHARED otherwise ---
-    # iOS and Emscripten/WebGL cannot use shared libraries; all other platforms
-    # (Windows, Linux, macOS, Android) use a shared Lua library to reduce
-    # binary size and allow runtime updates.
+    # --- Determine Lua library type per platform ---
     if(EMSCRIPTEN OR (CMAKE_SYSTEM_NAME STREQUAL "iOS"))
         set(_LUA_LIB_TYPE STATIC)
     else()
+        # Android, Windows, Linux, macOS → SHARED
         set(_LUA_LIB_TYPE SHARED)
     endif()
     message(STATUS "[BlueprintRuntime] Lua library type: ${_LUA_LIB_TYPE}")
@@ -152,9 +149,9 @@ if(BLUEPRINT_LUA)
         FetchContent_Declare(lua54
             URL      https://www.lua.org/ftp/lua-5.4.7.tar.gz
             DOWNLOAD_EXTRACT_TIMESTAMP ON
-            # FetchContent_MakeAvailable would try to add_subdirectory,
-            # but Lua has no CMakeLists.txt, so we populate and build manually.
-            EXCLUDE_FROM_ALL
+            # Do NOT use EXCLUDE_FROM_ALL: it causes the shared library to be skipped
+            # by the top-level build and produces an empty link.txt (cmake bug on some
+            # generators).  Without EXCLUDE_FROM_ALL the target is always part of ALL.
         )
         FetchContent_MakeAvailable(lua54)
 
@@ -174,12 +171,40 @@ if(BLUEPRINT_LUA)
                     $<INSTALL_INTERFACE:include/lua54>
             )
 
-            # Platform-specific defines
-            if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
+            # Platform-specific compile definitions for Lua
+            # Each platform needs the right LUA_USE_* so Lua picks correct
+            # implementations of os/io/readline/setjmp etc.
+            if(EMSCRIPTEN)
+                # Emscripten: POSIX subset; no readline, limited os/io
+                # LUA_USE_POSIX gives POSIX math/signal without readline dependency
+                target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE
+                    LUA_USE_POSIX
+                    LUA_USE_DLOPEN   # dlopen is emulated by Emscripten
+                )
+            elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+                # iOS: POSIX available, no readline, no dlopen (static only)
+                target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE
+                    LUA_USE_IOS      # defined since Lua 5.4.4; falls back to POSIX subset
+                )
+                # Fallback: older Lua tarballs may not recognise LUA_USE_IOS;
+                # LUA_USE_POSIX is always safe on iOS (no readline, no RTLD_DEFAULT)
+                target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE
+                    LUA_USE_POSIX
+                )
+            elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
+                # Android NDK: POSIX + dlopen available, no readline
+                target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE
+                    LUA_USE_POSIX
+                    LUA_USE_DLOPEN
+                )
+            elseif(UNIX AND NOT APPLE)
+                # Linux and other POSIX systems
                 target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE LUA_USE_LINUX)
-            elseif(APPLE AND NOT (CMAKE_SYSTEM_NAME STREQUAL "iOS"))
+            elseif(APPLE)
+                # macOS (not iOS — caught above)
                 target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE LUA_USE_MACOSX)
             endif()
+            # Windows: no extra define needed (LUA_USE_WINDOWS is the default fallback)
 
             # SHARED library: export symbols
             if(_LUA_LIB_TYPE STREQUAL "SHARED")
