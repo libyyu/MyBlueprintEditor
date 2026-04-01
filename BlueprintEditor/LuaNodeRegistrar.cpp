@@ -5,7 +5,7 @@
 
 #include "LuaNodeRegistrar.h"
 #include "../Runtime/NodeDefinition.h"
-#include "../Runtime/BlueprintRunner.h"  // NodeHandler typedef
+#include "../Runtime/BlueprintRunner.h"  // NodeHandler / ExecutionContext
 #include "../Runtime/Types.h"
 #include "../Runtime/LuaBindings.h"
 
@@ -15,6 +15,12 @@
 #include <sstream>
 
 namespace fs = std::filesystem;
+
+// ── 析构函数 ──────────────────────────────────────────────────────────────
+LuaNodeRegistrar::~LuaNodeRegistrar()
+{
+    resetLuaState();
+}
 
 // ============================================================================
 // 内部：Lua 工具
@@ -473,17 +479,6 @@ void LuaNodeRegistrar::PollFileChanges()
 
     if (needReload)
         ReloadAll();
-}
-
-// 供 l_registerNode 回调使用的可变访问器
-std::unordered_set<std::string>& LuaNodeRegistrar::GetRegisteredIds_Mutable()
-{
-    return m_registeredIds;
-}
-
-void LuaNodeRegistrar::IncrPendingCount()
-{
-    ++m_pendingCount;
 }
 
 #endif // BLUEPRINT_HAS_LUA

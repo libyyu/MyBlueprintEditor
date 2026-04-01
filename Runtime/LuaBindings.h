@@ -9,6 +9,8 @@
 
 #ifdef BLUEPRINT_HAS_LUA
 
+#include "BlueprintExport.h"
+
 struct lua_State;
 
 namespace NodeEditor {
@@ -18,7 +20,7 @@ class BlueprintRunner;
 
 // 注册所有 Lua 绑定（Variant metatable + ExecutionContext metatable + Blueprint 全局表）
 // 在 LuaScriptEngine::Initialize 中调用
-void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner);
+BLUEPRINT_API void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner);
 
 } // namespace Runtime
 } // namespace NodeEditor

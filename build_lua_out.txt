@@ -1,0 +1,27 @@
+适用于 .NET Framework MSBuild 版本 17.7.2+d6990bcfa
+
+  Copying resources to Debug output
+  Copying resources to Release output
+  dxerr.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\dxerr.lib
+  imgui.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\imgui.lib
+  gmock_main.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gmock_main.dll
+  gmock.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gmock.dll
+  crude_json.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Utils\Json\Release\crude_json.lib
+  lua54.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\lua54.dll
+  gtest.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gtest.dll
+  gtest_main.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\gtest_main.dll
+  LuaBindings.cpp
+  LuaScriptEngine.cpp
+  正在生成代码...
+    正在创建库 C:/Users/maxweili/MyProjects/MyBlueprintEditor/build/Runtime/Release/BlueprintRuntime.lib 和对象 C:/Users/maxweili/MyProjects/MyBlueprintEditor/build/Runtime/Release/BlueprintRuntime.exp
+  BlueprintRuntime.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\BlueprintRuntime.dll
+  ImGuiNodeEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\ImGuiNodeEditor.lib
+  Application.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\Release\Application.lib
+  LuaNodeRegistrar.cpp
+  runtime-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\runtime-example.exe
+  blueprint_tests.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\blueprint_tests.exe
+  canvas-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\canvas-example.exe
+  simple-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\simple-example.exe
+  widgets-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\widgets-example.exe
+  basic-interaction-example.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\basic-interaction-example.exe
+  BlueprintEditor.vcxproj -> C:\Users\maxweili\MyProjects\MyBlueprintEditor\build\bin\Release\BlueprintEditor.exe

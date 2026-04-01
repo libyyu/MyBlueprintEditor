@@ -901,7 +901,7 @@ void BlueprintEditor::DrawProjectPanel()
 
         const char* arrow = *pOpen ? ICON_FA_CARET_DOWN : ICON_FA_CARET_RIGHT;
         char headerText[80];
-        std::snprintf(headerText, sizeof(headerText), "%s  " ICON_FA_SCROLL "  LUA SCRIPTS  (%d)",
+        std::snprintf(headerText, sizeof(headerText), "%s  " ICON_FA_CODE_BRANCH "  LUA SCRIPTS  (%d)",
                       arrow, (int)m_Project.luaExtensions.size());
         ImVec2 textPos(secMin.x + 6.0f, secMin.y + (secH - lineH) * 0.5f);
         dl->AddText(textPos, IM_COL32(200, 170, 100, 230), headerText);
@@ -920,9 +920,8 @@ void BlueprintEditor::DrawProjectPanel()
         if (plusClick)
         {
             // 打开文件选择对话框，选择 .lua 文件加入工程
-            std::vector<std::string> filters = {"Lua Script (*.lua)", "*.lua"};
             std::string startDir = m_Project.projectDir.empty() ? "." : m_Project.projectDir;
-            std::string luaPath = OpenFileDialog(filters, startDir);
+            std::string luaPath = OpenFileDialog("Lua Script (*.lua)\0*.lua\0All Files (*.*)\0*.*\0", "Add Lua Script");
             if (!luaPath.empty())
             {
                 std::string relPath = m_Project.RelPath(luaPath);
@@ -1008,7 +1007,7 @@ void BlueprintEditor::DrawProjectPanel()
                 // Lua 文件图标（橙黄色）
                 bool fileExists = fs::exists(m_Project.AbsPath(relPath));
                 ImU32 textCol = fileExists ? IM_COL32(220, 180, 60, 230) : IM_COL32(160, 60, 60, 200);
-                std::string rowText = std::string("    " ICON_FA_SCROLL "  ") + fname;
+                std::string rowText = std::string("    " ICON_FA_CODE_BRANCH "  ") + fname;
                 dl->AddText(ImVec2(rowMin.x + 4.0f, rowMin.y + 2.0f), textCol, rowText.c_str());
 
                 // Tooltip：完整路径 + 错误提示
