@@ -1016,6 +1016,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
                     if (ImGui::BeginTabItem((tabTitle + "###tab" + std::to_string(i)).c_str(), &isOpen, flags))
                     {
                         m_ActiveDocIndex = i;
+                        // SetSelected 已生效（ImGui 本帧切换到该 tab），清除 pending
+                        if (m_PendingSwitchTabIndex == i)
+                            m_PendingSwitchTabIndex = -1;
 
                         // VS 2022 风格：活跃标签顶部蓝色指示线
                         {
@@ -1593,36 +1596,35 @@ void BlueprintEditor::OnFrame(float deltaTime)
     }
 
     // ================================================================
-    // 延迟处理双击打开文件（必须在 ed::End() 之后执行）
+    // 延迟处理双击跳转（在 ed::End() 之后，TabBar 渲染之前执行）
+    // m_PendingSwitchTabIndex 由 TabBar 的 BeginTabItem 返回 true 时清除（见上方）
+    // 这里只提前在目标 doc 上设置导航状态，让 tab 切换后下帧自动 navigate
     // ================================================================
-    if (m_PendingSwitchTabIndex >= 0)
+    if (m_PendingSwitchTabIndex >= 0 &&
+        m_PendingSwitchTabIndex < (int)m_Documents.size())
     {
-        m_ActiveDocIndex = m_PendingSwitchTabIndex;
-        // 注意：不在这里调用 ed::SetCurrentEditor，也不调用 ed::GetNodePosition
-        // 因为目标文档本帧没有运行 ed::Begin，节点位置数据未更新
-        // tab 切换由 m_ActiveDocIndex 驱动，下帧 ed::Begin 时自动用正确上下文
-        m_PendingSwitchTabIndex = -1;
+        auto* targetDoc = m_Documents[m_PendingSwitchTabIndex].get();
         if (!m_PendingNavigateToFunc.empty())
         {
-            // 设置函数导航：在目标文档上设置，下帧（ed::Begin 之后）才执行 navigate
-            auto* doc = ActiveDoc();
-            for (int fi = 0; fi < (int)doc->functions.size(); ++fi)
+            // 设置函数导航：在目标文档上设置，tab 切换后下帧（ed::Begin 之后）才执行 navigate
+            for (int fi = 0; fi < (int)targetDoc->functions.size(); ++fi)
             {
-                if (doc->functions[fi].id == m_PendingNavigateToFunc)
+                if (targetDoc->functions[fi].id == m_PendingNavigateToFunc)
                 {
-                    doc->selectedFuncIdx = fi;
+                    targetDoc->selectedFuncIdx = fi;
                     break;
                 }
             }
-            // needNavigateToContent = 1 触发下帧 NavigateToContent（全局居中）
-            // 更精确的定位需要下帧才能 GetNodePosition，这里用全局居中兜底
-            doc->needNavigateToContent = 1;
+            targetDoc->needNavigateToContent = 1;
             m_PendingNavigateToFunc.clear();
         }
         else
         {
-            ActiveDoc()->needNavigateToContent = 1;
+            targetDoc->needNavigateToContent = 1;
         }
+        // 注意：不在这里修改 m_ActiveDocIndex，也不清除 m_PendingSwitchTabIndex
+        // 清除由上方 TabBar 的 BeginTabItem 返回 true 时负责
+        // 这样 ImGui Tab 的 SetSelected 能在次帧正确触发切换
     }
     else if (!m_PendingOpenFilePath.empty())
     {
