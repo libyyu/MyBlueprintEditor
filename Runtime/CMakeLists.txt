@@ -520,9 +520,18 @@ install(FILES
 #   cmake --build . --target BlueprintBundle
 #
 # or enable it by default with -DBUILD_BUNDLE=ON (adds it to ALL).
+#
+# Lua merging:
+#   BUNDLE_LUA=OFF (default) – liblua54.a is NOT merged into the bundle.
+#                              Use this when the host app already provides a
+#                              Lua VM (e.g. xLua on iOS).  Call
+#                              BP_SetExternalLuaState() at runtime to share it.
+#   BUNDLE_LUA=ON            – liblua54.a IS merged.  Use only when Blueprint
+#                              is the sole Lua user in the final binary.
 # ==============================================================================
 
 option(BUILD_BUNDLE "Build merged static library BlueprintBundle for engine delivery" OFF)
+option(BUNDLE_LUA   "Include liblua54 in BlueprintBundle (OFF = use external Lua VM)" OFF)
 
 if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
 
@@ -532,9 +541,12 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
         $<TARGET_FILE:crude_json>
     )
 
-    # Include Lua only when it is also static (iOS/Emscripten)
-    if(BLUEPRINT_LUA AND (NOT _LUA_LIB_TYPE STREQUAL "SHARED"))
+    # Include Lua only when explicitly requested AND it is static
+    if(BLUEPRINT_LUA AND BUNDLE_LUA AND (NOT _LUA_LIB_TYPE STREQUAL "SHARED"))
         list(APPEND _BUNDLE_INPUTS $<TARGET_FILE:${LUA_LIBRARIES}>)
+        message(STATUS "[BlueprintBundle] Lua WILL be merged into bundle (BUNDLE_LUA=ON)")
+    elseif(BLUEPRINT_LUA AND (NOT _LUA_LIB_TYPE STREQUAL "SHARED"))
+        message(STATUS "[BlueprintBundle] Lua will NOT be merged (BUNDLE_LUA=OFF) — use BP_SetExternalLuaState() to provide external VM")
     endif()
 
     # Output path ------------------------------------------------------------
