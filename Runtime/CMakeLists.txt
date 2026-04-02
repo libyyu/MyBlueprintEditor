@@ -104,47 +104,74 @@ set(RUNTIME_PUBLIC_HEADERS
 # ---------------------------------------------------------------------------
 option(BLUEPRINT_LUA "Enable Lua scripting support (requires Lua 5.4)" ON)
 
+# LUA_LINK_STATIC – controls how Lua is linked when BlueprintRuntime is SHARED.
+#
+#   ON  (default): Lua is built as STATIC and baked into BlueprintRuntime.dll/so/dylib.
+#                  Consumers only need the single BlueprintRuntime library file.
+#                  System Lua is intentionally skipped (system libs are usually .so/.dylib
+#                  only; we use FetchContent to build a .a we can absorb).
+#
+#   OFF           : Lua follows BUILD_SHARED_LIBS — a separate liblua54.so/dll is produced.
+#                  Use when you want to share a Lua VM with another library (e.g. xLua)
+#                  via BP_SetExternalLuaState(), and the dynamic Lua is already present.
+#
+# Has no effect when BlueprintRuntime itself is STATIC (Lua is always baked in that case).
+# Has no effect on iOS / Emscripten (always STATIC regardless).
+option(LUA_LINK_STATIC "Bake Lua as static into BlueprintRuntime SHARED library" ON)
+
 # Platform capability check:
 # - iOS        : STATIC only (App Store forbids dynamic loading of arbitrary .dylib)
 # - Emscripten : STATIC only (wasm has no real dlopen; shared libs not supported)
-# - Android    : follows BUILD_SHARED_LIBS (SHARED when ON, STATIC when OFF)
-#                SHARED .so is packaged by AGP into APK; STATIC is fine for
-#                embedding BlueprintRuntime into a single JNI .so.
-# - Others (Windows, Linux, macOS): SHARED preferred (follows BUILD_SHARED_LIBS)
+# - Android    : follows LUA_LINK_STATIC when SHARED, else STATIC
+# - Others (Windows, Linux, macOS): follows LUA_LINK_STATIC when SHARED, else STATIC
 # No platform forces BLUEPRINT_LUA OFF; callers may still set it OFF explicitly.
 
 if(BLUEPRINT_LUA)
     # --- Determine Lua library type per platform ---
     if(EMSCRIPTEN OR (CMAKE_SYSTEM_NAME STREQUAL "iOS"))
-        # Must be STATIC regardless of BUILD_SHARED_LIBS
+        # Must be STATIC regardless of any option
         set(_LUA_LIB_TYPE STATIC)
-    elseif(BUILD_SHARED_LIBS)
+    elseif(BUILD_SHARED_LIBS AND NOT LUA_LINK_STATIC)
+        # Caller explicitly opted out of baking — build Lua as SHARED
         set(_LUA_LIB_TYPE SHARED)
     else()
+        # Default: STATIC (baked into BlueprintRuntime, whether it is SHARED or STATIC)
         set(_LUA_LIB_TYPE STATIC)
     endif()
-    message(STATUS "[BlueprintRuntime] Lua library type: ${_LUA_LIB_TYPE}")
+    message(STATUS "[BlueprintRuntime] Lua library type: ${_LUA_LIB_TYPE} (LUA_LINK_STATIC=${LUA_LINK_STATIC})")
 
     # --- Locate Lua 5.4 ---
     # Priority: find_package first (system / vcpkg / user-installed),
     # fall back to FetchContent if not found.
     #
+    # EXCEPTION: when _LUA_LIB_TYPE is STATIC we need a linkable .a archive.
+    # System packages (apt liblua5.4-dev, brew lua) typically ship only .so/.dylib,
+    # so we skip system discovery in that case and go straight to FetchContent to
+    # build our own .a that can be baked into BlueprintRuntime.
+    #
     # Ubuntu: apt install liblua5.4-dev → headers at /usr/include/lua5.4,
     #         CMake FindLua may not find it by default; help it via pkg-config.
     # macOS:  brew install lua → pkg-config provides lua5.4 / lua-5.4
-    find_package(PkgConfig QUIET)
-    if(PKG_CONFIG_FOUND AND NOT LUA_FOUND)
-        pkg_check_modules(LUA54_PC QUIET lua5.4 lua-5.4)
-        if(LUA54_PC_FOUND)
-            set(LUA_INCLUDE_DIR "${LUA54_PC_INCLUDE_DIRS}")
-            set(LUA_LIBRARIES   "${LUA54_PC_LINK_LIBRARIES}")
-            set(LUA_FOUND TRUE)
-            message(STATUS "[BlueprintRuntime] Lua found via pkg-config: ${LUA_LIBRARIES}")
+    if(_LUA_LIB_TYPE STREQUAL "SHARED")
+        # SHARED Lua: system library is fine, try pkg-config / find_package first.
+        find_package(PkgConfig QUIET)
+        if(PKG_CONFIG_FOUND AND NOT LUA_FOUND)
+            pkg_check_modules(LUA54_PC QUIET lua5.4 lua-5.4)
+            if(LUA54_PC_FOUND)
+                set(LUA_INCLUDE_DIR "${LUA54_PC_INCLUDE_DIRS}")
+                set(LUA_LIBRARIES   "${LUA54_PC_LINK_LIBRARIES}")
+                set(LUA_FOUND TRUE)
+                message(STATUS "[BlueprintRuntime] Lua found via pkg-config: ${LUA_LIBRARIES}")
+            endif()
         endif()
-    endif()
 
-    if(NOT LUA_FOUND)
-        find_package(Lua 5.4 QUIET)
+        if(NOT LUA_FOUND)
+            find_package(Lua 5.4 QUIET)
+        endif()
+    else()
+        # STATIC Lua: skip system discovery — system libs are usually .so/.dylib only.
+        # Always build from source via FetchContent so we get a proper .a to bake in.
+        message(STATUS "[BlueprintRuntime] Lua STATIC mode: skipping system Lua, using FetchContent")
     endif()
 
     if(NOT LUA_FOUND)
