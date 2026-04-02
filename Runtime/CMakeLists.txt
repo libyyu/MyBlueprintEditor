@@ -506,3 +506,91 @@ install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/BlueprintRuntimeConfigVersion.cmake"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/BlueprintRuntime"
 )
+
+# ==============================================================================
+# BlueprintBundle – merged static library for Unity / engine delivery
+# ==============================================================================
+#
+# Only built when _RUNTIME_LIB_TYPE is STATIC (iOS, Emscripten, or explicit
+# BUILD_SHARED_LIBS=OFF).  Dynamic platforms don't need merging.
+#
+# Output: libBlueprintBundle.a  (contains BlueprintRuntime + crude_json [+ lua54])
+#
+# Build the bundle target explicitly:
+#   cmake --build . --target BlueprintBundle
+#
+# or enable it by default with -DBUILD_BUNDLE=ON (adds it to ALL).
+# ==============================================================================
+
+option(BUILD_BUNDLE "Build merged static library BlueprintBundle for engine delivery" OFF)
+
+if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
+
+    # Collect input archives -------------------------------------------------
+    set(_BUNDLE_INPUTS
+        $<TARGET_FILE:BlueprintRuntime>
+        $<TARGET_FILE:crude_json>
+    )
+
+    # Include Lua only when it is also static (iOS/Emscripten)
+    if(BLUEPRINT_LUA AND (NOT _LUA_LIB_TYPE STREQUAL "SHARED"))
+        list(APPEND _BUNDLE_INPUTS $<TARGET_FILE:${LUA_LIBRARIES}>)
+    endif()
+
+    # Output path ------------------------------------------------------------
+    set(_BUNDLE_OUT "${CMAKE_BINARY_DIR}/bin/Release/libBlueprintBundle.a")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(_BUNDLE_OUT "${CMAKE_BINARY_DIR}/bin/Debug/libBlueprintBundle.a")
+    endif()
+
+    # Platform-specific merge command ----------------------------------------
+    if(APPLE)
+        # macOS / iOS: libtool -static
+        set(_MERGE_CMD
+            libtool -static -o "${_BUNDLE_OUT}" ${_BUNDLE_INPUTS}
+        )
+    elseif(EMSCRIPTEN)
+        # Emscripten: emar (llvm-ar wrapper)
+        set(_MERGE_CMD
+            ${CMAKE_AR} -rcsT "${_BUNDLE_OUT}" ${_BUNDLE_INPUTS}
+        )
+    else()
+        # Linux / Android NDK: use a small MRI script fed to ar
+        # MRI ADDLIB lines are generated via a cmake -E echo chain below.
+        set(_MRI_FILE "${CMAKE_CURRENT_BINARY_DIR}/bundle.mri")
+        set(_MERGE_CMD
+            ${CMAKE_COMMAND}
+                -D OUTPUT=${_BUNDLE_OUT}
+                -D "INPUTS=${_BUNDLE_INPUTS}"
+                -D MRI_FILE=${_MRI_FILE}
+                -D AR=${CMAKE_AR}
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/MergeStaticLibs.cmake"
+        )
+    endif()
+
+    # Custom target ----------------------------------------------------------
+    if(BUILD_BUNDLE)
+        set(_BUNDLE_ALL ALL)
+    else()
+        set(_BUNDLE_ALL "")
+    endif()
+
+    add_custom_target(BlueprintBundle ${_BUNDLE_ALL}
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/bin/Release"
+        COMMAND ${_MERGE_CMD}
+        DEPENDS BlueprintRuntime crude_json
+        COMMENT "Merging static libs → libBlueprintBundle.a"
+        VERBATIM
+    )
+
+    # Install the bundle archive alongside the individual libs ---------------
+    install(FILES "${_BUNDLE_OUT}"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        OPTIONAL    # don't fail if BlueprintBundle target was never built
+    )
+
+    message(STATUS "[BlueprintBundle] Merge target configured → ${_BUNDLE_OUT}")
+
+else()
+    message(STATUS "[BlueprintBundle] Skipped (SHARED build, no merging needed)")
+endif()
