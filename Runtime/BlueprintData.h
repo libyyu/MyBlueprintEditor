@@ -94,7 +94,10 @@ struct LinkInstance
 struct VariableDefinition
 {
     std::string     name;
-    PinDataType     dataType = PinDataType::Unknown;
+    PinDataType     dataType      = PinDataType::Unknown;
+    ContainerType   containerType = ContainerType::Single;
+    PinDataType     itemType      = PinDataType::Any;
+    PinDataType     mapKeyType    = PinDataType::String;
     Variant         defaultValue;
     bool            isExposed = true;           // 是否在编辑器中显示
     std::string     category;                   // 变量类别

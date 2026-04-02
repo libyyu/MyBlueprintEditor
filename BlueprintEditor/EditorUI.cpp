@@ -28,6 +28,7 @@ ImColor BlueprintEditor::GetIconColor(PinType type)
         case PinType::Delegate: return ImColor(235,  55,  55);
         case PinType::Array:    return ImColor(245, 170,  30);
         case PinType::Map:      return ImColor( 80, 190, 220);
+        case PinType::Set:      return ImColor(180, 100, 240);  // 紫色
         case PinType::Any:      return ImColor(170, 170, 180);
     }
 };
@@ -203,6 +204,7 @@ void BlueprintEditor::DrawPinIcon(const Pin& pin, bool connected, int alpha)
         case PinType::Delegate: iconType = IconType::Square;      break;
         case PinType::Array:    iconType = IconType::Grid;        break;
         case PinType::Map:      iconType = IconType::Grid;        break;
+        case PinType::Set:      iconType = IconType::Grid;        break;
         case PinType::Any:      iconType = IconType::Diamond;     break;
         default:
             return;

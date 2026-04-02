@@ -11,6 +11,7 @@
 #include <vector>
 #include <unordered_map>
 #include <variant>
+#include <utility>   // std::pair
 
 namespace NodeEditor {
 namespace Runtime {
@@ -41,16 +42,17 @@ enum class PinKind
 // 引脚数据类型
 enum class PinDataType
 {
-    Unknown,
-    Boolean,
-    Integer,
-    Float,
-    String,
-    Object,
-    Array,
-    Map,    // 键值对映射（字符串键 → Variant 值）
-    Any,
-    Custom  // 用户自定义类型
+    Unknown,   // 0
+    Boolean,   // 1
+    Integer,   // 2
+    Float,     // 3
+    String,    // 4
+    Object,    // 5
+    Array,     // 6
+    Map,       // 7  键值对映射
+    Set,       // 8  集合（无重复，内部用 arrayValue 存储）
+    Any,       // 9  通配类型
+    Custom     // 10 用户自定义类型
 };
 
 // 节点类型 —— 编辑器与运行时共用
@@ -64,6 +66,15 @@ enum class NodeType
     Group,      // 组节点
     Reroute,    // 重定向节点
     Custom      // 自定义节点
+};
+
+// 容器类型（UE4 风格）
+enum class ContainerType : int
+{
+    Single = 0,
+    Array  = 1,
+    Map    = 2,
+    Set    = 3,
 };
 
 // ============================================================================
@@ -81,9 +92,11 @@ struct Variant
     // std::string 含非平凡析构，不能放入 variant，单独存储
     std::string stringValue;
     // Array 值 —— 用于 PinDataType::Array
+    // 同时也用于 Set（PinDataType::Set）的内部存储
     std::vector<Variant> arrayValue;
     // Map 值 —— 用于 PinDataType::Map
-    std::unordered_map<std::string, Variant> mapValue;
+    // 改为有序 vector<pair<Variant,Variant>> 以支持任意键类型
+    std::vector<std::pair<Variant, Variant>> mapValue;
 
     // 默认构造
     Variant() : numericValue(std::monostate{}) {}
@@ -92,7 +105,6 @@ struct Variant
     ~Variant() = default;
 
     // 拷贝构造 / 移动构造 / 拷贝赋值 / 移动赋值 —— 全部默认即可
-    // std::variant 已正确处理拷贝/移动语义，无需手写
     Variant(const Variant&)            = default;
     Variant(Variant&&) noexcept        = default;
     Variant& operator=(const Variant&) = default;
@@ -107,7 +119,6 @@ struct Variant
     explicit Variant(const char* v)        : type(PinDataType::String),  stringValue(v) {}
     explicit Variant(const std::string& v) : type(PinDataType::String),  stringValue(v) {}
     explicit Variant(std::vector<Variant> v) : type(PinDataType::Array), arrayValue(std::move(v)) {}
-    explicit Variant(std::unordered_map<std::string, Variant> m) : type(PinDataType::Map), mapValue(std::move(m)) {}
 
     // Object 工厂方法（用字符串 ID 表示对象引用）
     static Variant MakeObject(const std::string& objectId)
@@ -126,7 +137,27 @@ struct Variant
         return "";
     }
 
-    // 获取值（带自动类型转换）
+    // ============================================================
+    // 相等性比较（用于 Set 去重和 Map 键比较）
+    // ============================================================
+    bool operator==(const Variant& other) const
+    {
+        if (type != other.type) return false;
+        switch (type)
+        {
+        case PinDataType::Boolean: return std::get<bool>(numericValue) == std::get<bool>(other.numericValue);
+        case PinDataType::Integer: return std::get<int64_t>(numericValue) == std::get<int64_t>(other.numericValue);
+        case PinDataType::Float:   return std::get<double>(numericValue) == std::get<double>(other.numericValue);
+        case PinDataType::String:
+        case PinDataType::Object:  return stringValue == other.stringValue;
+        default:                   return false;
+        }
+    }
+    bool operator!=(const Variant& other) const { return !(*this == other); }
+
+    // ============================================================
+    // 值转换
+    // ============================================================
     bool asBool() const
     {
         switch (type)
@@ -138,6 +169,7 @@ struct Variant
         case PinDataType::Object:  return !stringValue.empty();
         case PinDataType::Array:   return !arrayValue.empty();
         case PinDataType::Map:     return !mapValue.empty();
+        case PinDataType::Set:     return !arrayValue.empty();
         default:                   return false;
         }
     }
@@ -158,6 +190,7 @@ struct Variant
         }
         case PinDataType::Array: return static_cast<int64_t>(arrayValue.size());
         case PinDataType::Map:   return static_cast<int64_t>(mapValue.size());
+        case PinDataType::Set:   return static_cast<int64_t>(arrayValue.size());
         default: return 0;
         }
     }
@@ -189,7 +222,6 @@ struct Variant
         case PinDataType::Integer: return std::to_string(std::get<int64_t>(numericValue));
         case PinDataType::Float:
         {
-            // 用 %.17g 保证往返精度，同时去除多余的尾零（比 std::to_string 的 %.6f 更准确）
             char buf[64];
             std::snprintf(buf, sizeof(buf), "%.17g", std::get<double>(numericValue));
             return std::string(buf);
@@ -214,7 +246,18 @@ struct Variant
             {
                 if (!first) result += ", ";
                 first = false;
-                result += "\"" + kv.first + "\": " + kv.second.asString();
+                result += kv.first.asString() + ": " + kv.second.asString();
+            }
+            result += "}";
+            return result;
+        }
+        case PinDataType::Set:
+        {
+            std::string result = "{";
+            for (size_t i = 0; i < arrayValue.size(); ++i)
+            {
+                if (i > 0) result += ", ";
+                result += arrayValue[i].asString();
             }
             result += "}";
             return result;
@@ -223,7 +266,9 @@ struct Variant
         }
     }
 
+    // ============================================================
     // Array 访问方法
+    // ============================================================
     const std::vector<Variant>& asArray() const { return arrayValue; }
     size_t arraySize() const { return arrayValue.size(); }
     const Variant& arrayGet(size_t index) const
@@ -232,7 +277,6 @@ struct Variant
         return (index < arrayValue.size()) ? arrayValue[index] : empty;
     }
 
-    // 设置数组指定索引处的元素，索引越界时自动扩展
     void arraySet(size_t index, const Variant& value)
     {
         if (type != PinDataType::Array)
@@ -245,7 +289,6 @@ struct Variant
         arrayValue[index] = value;
     }
 
-    // 移除数组指定索引处的元素，返回是否成功
     bool arrayRemoveAt(size_t index)
     {
         if (index >= arrayValue.size())
@@ -254,51 +297,77 @@ struct Variant
         return true;
     }
 
-    // 清空数组
     void arrayClear()
     {
         arrayValue.clear();
     }
 
-    // Map 访问方法
-    const std::unordered_map<std::string, Variant>& asMap() const { return mapValue; }
+    // ============================================================
+    // Map 访问方法（主版本：Variant key）
+    // ============================================================
+    const std::vector<std::pair<Variant, Variant>>& asMap() const { return mapValue; }
     size_t mapSize() const { return mapValue.size(); }
 
-    bool mapHasKey(const std::string& key) const
+    bool mapHasKey(const Variant& key) const
     {
-        return mapValue.find(key) != mapValue.end();
+        for (const auto& kv : mapValue)
+            if (kv.first == key) return true;
+        return false;
     }
 
-    const Variant& mapGet(const std::string& key) const
+    const Variant& mapGet(const Variant& key) const
     {
         static Variant empty;
-        auto it = mapValue.find(key);
-        return (it != mapValue.end()) ? it->second : empty;
+        for (const auto& kv : mapValue)
+            if (kv.first == key) return kv.second;
+        return empty;
     }
 
-    void mapSet(const std::string& key, const Variant& value)
+    void mapSet(const Variant& key, const Variant& value)
     {
         if (type != PinDataType::Map)
         {
             type = PinDataType::Map;
             mapValue.clear();
         }
-        mapValue[key] = value;
+        for (auto& kv : mapValue)
+        {
+            if (kv.first == key)
+            {
+                kv.second = value;
+                return;
+            }
+        }
+        mapValue.push_back({key, value});
     }
 
-    bool mapRemove(const std::string& key)
+    bool mapRemove(const Variant& key)
     {
-        return mapValue.erase(key) > 0;
+        for (auto it = mapValue.begin(); it != mapValue.end(); ++it)
+        {
+            if (it->first == key)
+            {
+                mapValue.erase(it);
+                return true;
+            }
+        }
+        return false;
     }
+
+    // Map 访问方法（兼容旧 string key 版本）
+    bool mapHasKey(const std::string& key) const  { return mapHasKey(Variant(key)); }
+    const Variant& mapGet(const std::string& key) const { return mapGet(Variant(key)); }
+    void mapSet(const std::string& key, const Variant& value) { mapSet(Variant(key), value); }
+    bool mapRemove(const std::string& key) { return mapRemove(Variant(key)); }
 
     void mapClear()
     {
         mapValue.clear();
     }
 
-    std::vector<std::string> mapKeys() const
+    std::vector<Variant> mapKeys() const
     {
-        std::vector<std::string> keys;
+        std::vector<Variant> keys;
         keys.reserve(mapValue.size());
         for (const auto& kv : mapValue)
             keys.push_back(kv.first);
@@ -314,8 +383,46 @@ struct Variant
         return values;
     }
 
+    // ============================================================
+    // Set 操作（内部用 arrayValue 存储，setAdd 去重）
+    // ============================================================
+    void setAdd(const Variant& value)
+    {
+        if (type != PinDataType::Set)
+        {
+            type = PinDataType::Set;
+            arrayValue.clear();
+        }
+        for (const auto& v : arrayValue)
+            if (v == value) return;
+        arrayValue.push_back(value);
+    }
+
+    bool setRemove(const Variant& value)
+    {
+        for (auto it = arrayValue.begin(); it != arrayValue.end(); ++it)
+        {
+            if (*it == value)
+            {
+                arrayValue.erase(it);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool setContains(const Variant& value) const
+    {
+        for (const auto& v : arrayValue)
+            if (v == value) return true;
+        return false;
+    }
+
+    size_t setSize() const { return arrayValue.size(); }
+    void setClear() { arrayValue.clear(); }
+    std::vector<Variant> setToArray() const { return arrayValue; }
+
     // 驻留当前字符串值，返回稳定指针（适合频繁比较的场景）
-    // 实现在 StringPool.cpp（避免 Types.h 依赖 StringPool.h）
     BLUEPRINT_API const char* internedString() const;
 };
 
@@ -329,6 +436,9 @@ struct PinInfo
     std::string     name;
     PinKind         kind = PinKind::Input;
     PinDataType     dataType = PinDataType::Unknown;
+    ContainerType   containerType = ContainerType::Single;
+    PinDataType     itemType = PinDataType::Any;
+    PinDataType     mapKeyType = PinDataType::String;
     Variant         defaultValue;
     bool            allowMultiple = false;  // 是否允许连接多个链接
     bool            isExec = false;         // 是否是执行引脚

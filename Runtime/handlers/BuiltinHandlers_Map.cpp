@@ -9,7 +9,8 @@ void RegisterHandlers_Map(std::unordered_map<std::string, NodeHandler>& handlers
     // NodeDef id 是 "MapMake"，同时保留 "MakeMap" 兼容旧蓝图
     handlers["MapMake"] = handlers["MakeMap"] = [](ExecutionContext& ctx) {
         const auto* node = ctx.GetCurrentNode();
-        std::unordered_map<std::string, Variant> result;
+        Variant result;
+        result.type = PinDataType::Map;
         if (node)
         {
             // 从输入引脚中按 Key/Value 配对收集
@@ -19,23 +20,21 @@ void RegisterHandlers_Map(std::unordered_map<std::string, NodeHandler>& handlers
                 if (pin.kind == PinKind::Input && !pin.isExec)
                     dataPins.push_back(&pin);
             }
-            // 每两个引脚为一组：Key, Value
-            // Key 支持任意类型，通过 asString() 统一转为字符串键
+            // 每两个引脚为一组：Key, Value（Key 支持任意类型 Variant）
             for (size_t i = 0; i + 1 < dataPins.size(); i += 2)
             {
-                std::string key = ctx.GetInputValue(dataPins[i]->id).asString();
+                Variant key = ctx.GetInputValue(dataPins[i]->id);
                 Variant val = ctx.GetInputValue(dataPins[i + 1]->id);
-                if (!key.empty())
-                    result[key] = val;
+                result.mapSet(key, val);
             }
         }
-        ctx.SetOutputValue("Map", Variant(std::move(result)));
+        ctx.SetOutputValue("Map", result);
         return true;
     };
 
     handlers["MapGet"] = [](ExecutionContext& ctx) {
         auto map = ctx.GetInputValue("Map");
-        auto key = ctx.GetInputValue("Key").asString();
+        Variant key = ctx.GetInputValue("Key");
         bool found = map.mapHasKey(key);
         if (found)
             ctx.SetOutputValue("Value", map.mapGet(key));
@@ -47,27 +46,27 @@ void RegisterHandlers_Map(std::unordered_map<std::string, NodeHandler>& handlers
 
     handlers["MapSet"] = [](ExecutionContext& ctx) {
         auto map = ctx.GetInputValue("Map");
-        auto key = ctx.GetInputValue("Key").asString();
+        Variant key = ctx.GetInputValue("Key");
         auto value = ctx.GetInputValue("Value");
         map.mapSet(key, value);
         ctx.SetOutputValue("Map", map);
-        ctx.Log("  [MapSet] Set key \"" + key + "\" -> " + value.asString());
+        ctx.Log("  [MapSet] Set key \"" + key.asString() + "\" -> " + value.asString());
         return true;
     };
 
     handlers["MapRemove"] = [](ExecutionContext& ctx) {
         auto map = ctx.GetInputValue("Map");
-        auto key = ctx.GetInputValue("Key").asString();
+        Variant key = ctx.GetInputValue("Key");
         bool removed = map.mapRemove(key);
         ctx.SetOutputValue("Map", map);
         ctx.SetOutputValue("Removed", Variant(removed));
-        ctx.Log("  [MapRemove] Key \"" + key + "\" " + (removed ? "removed" : "not found"));
+        ctx.Log("  [MapRemove] Key \"" + key.asString() + "\" " + (removed ? "removed" : "not found"));
         return true;
     };
 
     handlers["MapHasKey"] = [](ExecutionContext& ctx) {
         auto map = ctx.GetInputValue("Map");
-        auto key = ctx.GetInputValue("Key").asString();
+        Variant key = ctx.GetInputValue("Key");
         ctx.SetOutputValue("Result", Variant(map.mapHasKey(key)));
         return true;
     };
@@ -81,12 +80,8 @@ void RegisterHandlers_Map(std::unordered_map<std::string, NodeHandler>& handlers
 
     handlers["MapKeys"] = [](ExecutionContext& ctx) {
         auto map = ctx.GetInputValue("Map");
-        auto keys = map.mapKeys();
-        std::vector<Variant> keyVariants;
-        keyVariants.reserve(keys.size());
-        for (const auto& k : keys)
-            keyVariants.push_back(Variant(k));
-        ctx.SetOutputValue("Keys", Variant(std::move(keyVariants)));
+        auto keys = map.mapKeys();  // 现在返回 vector<Variant>
+        ctx.SetOutputValue("Keys", Variant(std::move(keys)));
         return true;
     };
 
@@ -119,11 +114,11 @@ void RegisterHandlers_Map(std::unordered_map<std::string, NodeHandler>& handlers
 
     handlers["ForEachMapLoop"] = [](ExecutionContext& ctx) {
         auto map = ctx.GetInputValue("Map");
-        auto keys = map.mapKeys();
+        auto keys = map.mapKeys();  // 返回 vector<Variant>
         ctx.Log("  [ForEachMapLoop] Map size = " + std::to_string(keys.size()));
         for (const auto& key : keys)
         {
-            ctx.SetOutputValue("Key", Variant(key));
+            ctx.SetOutputValue("Key", key);  // key 已是 Variant
             ctx.SetOutputValue("Value", map.mapGet(key));
             if (!ctx.ActivateOutputFlow("Loop Body"))
                 return false;

@@ -25,6 +25,7 @@
 #include "handlers/BuiltinHandlers_String.h"
 #include "handlers/BuiltinHandlers_Map.h"
 #include "handlers/BuiltinHandlers_Array.h"
+#include "handlers/BuiltinHandlers_Set.h"
 #include "handlers/BuiltinHandlers_Tree.h"
 #include "handlers/BuiltinHandlers_Houdini.h"
 #include "handlers/BuiltinHandlers_Time.h"
@@ -48,6 +49,7 @@ void RegisterBuiltinHandlers(
     RegisterHandlers_String(allHandlers);
     RegisterHandlers_Map(allHandlers);
     RegisterHandlers_Array(allHandlers);
+    RegisterHandlers_Set(allHandlers);
     RegisterHandlers_Time(allHandlers, runner);
     RegisterHandlers_Data(allHandlers);
     RegisterHandlers_Tree(allHandlers);

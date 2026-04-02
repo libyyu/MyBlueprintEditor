@@ -71,6 +71,7 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_String.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Map.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Array.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Set.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Tree.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Houdini.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Time.cpp

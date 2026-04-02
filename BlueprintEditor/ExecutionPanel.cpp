@@ -531,6 +531,7 @@ void BlueprintEditor::DrawWatchPanel(float paneWidth)
         case RTPinDataType::Object:  return "Object";
         case RTPinDataType::Array:   return "Array";
         case RTPinDataType::Map:     return "Map";
+        case RTPinDataType::Set:     return "Set";
         case RTPinDataType::Any:     return "Any";
         default:                     return "Unknown";
         }
@@ -546,6 +547,7 @@ void BlueprintEditor::DrawWatchPanel(float paneWidth)
         case RTPinDataType::Object:  return ImVec4(0.8f, 0.5f, 1.0f, 1.0f);
         case RTPinDataType::Array:   return ImVec4(0.5f, 1.0f, 0.8f, 1.0f);
         case RTPinDataType::Map:     return ImVec4(1.0f, 0.6f, 0.2f, 1.0f);
+        case RTPinDataType::Set:     return ImVec4(0.7f, 0.4f, 0.9f, 1.0f);
         default:                     return ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
         }
     };

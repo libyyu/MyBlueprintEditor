@@ -701,14 +701,31 @@ void BlueprintEditor::DrawVariablePanel()
         ImGui::SetNextItemWidth(160.0f);
         ImGui::InputTextWithHint("##VarName", "Variable name...", newVarName, kVarNameBufSize);
 
-        const char* typeNames[] = { "Unknown", "Boolean", "Integer", "Float", "String", "Object", "Array", "Map", "Any" };
-        const RTPinDataType typeValues[] = {
-            RTPinDataType::Unknown, RTPinDataType::Boolean, RTPinDataType::Integer,
-            RTPinDataType::Float, RTPinDataType::String, RTPinDataType::Object,
-            RTPinDataType::Array, RTPinDataType::Map, RTPinDataType::Any
+        static const char* containerTypeNames[] = { "Single", "Array", "Map", "Set" };
+        static const char* baseTypeNames[]      = { "Boolean", "Integer", "Float", "String", "Object", "Any" };
+        static const RTPinDataType baseTypeValues[] = {
+            RTPinDataType::Boolean, RTPinDataType::Integer, RTPinDataType::Float,
+            RTPinDataType::String, RTPinDataType::Object, RTPinDataType::Any
         };
-        ImGui::SetNextItemWidth(160.0f);
-        ImGui::Combo("##VarType", &newVarTypeIdx, typeNames, IM_ARRAYSIZE(typeNames));
+        static const char* keyTypeNames[]          = { "Boolean", "Integer", "Float", "String" };
+        static const RTPinDataType keyTypeValues[]  = {
+            RTPinDataType::Boolean, RTPinDataType::Integer, RTPinDataType::Float, RTPinDataType::String
+        };
+
+        ImGui::SetNextItemWidth(90.0f);
+        ImGui::Combo("##ContType", &newVarTypeIdx, containerTypeNames, 4);
+        ImGui::SameLine();
+        static int newItemTypeIdx = 3;   // String
+        static int newKeyTypeIdx  = 3;   // String
+        ImGui::SetNextItemWidth(80.0f);
+        ImGui::Combo("##ItemType", &newItemTypeIdx, baseTypeNames, 6);
+        if (newVarTypeIdx == 2) {  // Map
+            ImGui::SameLine();
+            ImGui::TextUnformatted("Key:");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(70.0f);
+            ImGui::Combo("##KeyType", &newKeyTypeIdx, keyTypeNames, 4);
+        }
 
         ImGui::Spacing();
         bool canAdd = (newVarName[0] != '\0');
@@ -724,8 +741,15 @@ void BlueprintEditor::DrawVariablePanel()
             {
                 PushUndoState();  // 新增变量前保存快照
                 RTVariableDefinition var;
-                var.name      = newVarName;
-                var.dataType  = typeValues[newVarTypeIdx];
+                var.name          = newVarName;
+                var.containerType = static_cast<RTContainerType>(newVarTypeIdx);
+                var.itemType      = baseTypeValues[newItemTypeIdx];
+                var.mapKeyType    = (newVarTypeIdx == 2) ? keyTypeValues[newKeyTypeIdx] : RTPinDataType::String;
+                // dataType 同步
+                if      (newVarTypeIdx == 0) var.dataType = baseTypeValues[newItemTypeIdx];
+                else if (newVarTypeIdx == 1) var.dataType = RTPinDataType::Array;
+                else if (newVarTypeIdx == 2) var.dataType = RTPinDataType::Map;
+                else                         var.dataType = RTPinDataType::Set;
                 var.isExposed = true;
                 doc->variables.push_back(std::move(var));
                 doc->isDirty = true;
@@ -756,20 +780,31 @@ void BlueprintEditor::DrawVariablePanel()
         return;
     }
 
+    // ── 辅助函数：构建完整类型标签 ──────────────────────────────────────
+    auto buildTypeLabel = [](RTContainerType ct, RTPinDataType itemType, RTPinDataType mapKeyType) -> std::string {
+        auto baseLabel = [](RTPinDataType t) -> const char* {
+            switch(t) {
+            case RTPinDataType::Boolean: return "Bool";
+            case RTPinDataType::Integer: return "Int";
+            case RTPinDataType::Float:   return "Float";
+            case RTPinDataType::String:  return "String";
+            case RTPinDataType::Object:  return "Object";
+            case RTPinDataType::Any:     return "Any";
+            default:                     return "?";
+            }
+        };
+        switch (ct) {
+        case RTContainerType::Array: return std::string("Array<") + baseLabel(itemType) + ">";
+        case RTContainerType::Map:   return std::string("Map<") + baseLabel(mapKeyType) + ", " + baseLabel(itemType) + ">";
+        case RTContainerType::Set:   return std::string("Set<") + baseLabel(itemType) + ">";
+        default:                     return baseLabel(itemType);
+        }
+    };
+
     // ── 变量列表 ──────────────────────────────────────────────────────────
     // 类型名映射
-    auto typeToStr = [](RTPinDataType t) -> const char* {
-        switch (t) {
-        case RTPinDataType::Boolean: return "Bool";
-        case RTPinDataType::Integer: return "Int";
-        case RTPinDataType::Float:   return "Float";
-        case RTPinDataType::String:  return "String";
-        case RTPinDataType::Object:  return "Object";
-        case RTPinDataType::Array:   return "Array";
-        case RTPinDataType::Map:     return "Map";
-        case RTPinDataType::Any:     return "Any";
-        default:                   return "Unknown";
-        }
+    auto typeToStr = [&buildTypeLabel](const RTVariableDefinition& var) -> std::string {
+        return buildTypeLabel(var.containerType, var.itemType, var.mapKeyType);
     };
 
     // 类型颜色
@@ -782,6 +817,7 @@ void BlueprintEditor::DrawVariablePanel()
         case RTPinDataType::Object:  return ImVec4(0.8f, 0.5f, 1.0f, 1.0f);
         case RTPinDataType::Array:   return ImVec4(0.5f, 1.0f, 0.8f, 1.0f);
         case RTPinDataType::Map:     return ImVec4(1.0f, 0.6f, 0.2f, 1.0f);
+        case RTPinDataType::Set:     return ImVec4(0.7f, 0.4f, 0.9f, 1.0f);
         default:                   return ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
         }
     };
@@ -806,7 +842,7 @@ void BlueprintEditor::DrawVariablePanel()
             payload.dataType = static_cast<int>(var.dataType);
             ImGui::SetDragDropPayload(VAR_DRAG_DROP_TYPE, &payload, sizeof(payload));
             // 拖拽预览提示
-            ImGui::TextColored(typeColor(var.dataType), "● %s  [%s]", var.name.c_str(), typeToStr(var.dataType));
+            ImGui::TextColored(typeColor(var.dataType), "● %s  [%s]", var.name.c_str(), typeToStr(var).c_str());
             ImGui::TextDisabled("Drop → Get node   Shift+Drop → Set node");
             ImGui::EndDragDropSource();
         }
@@ -839,7 +875,7 @@ void BlueprintEditor::DrawVariablePanel()
         ImGui::SameLine();
 
         // 类型标签（点击切换类型）
-        ImGui::TextColored(typeColor(var.dataType), "[%s]", typeToStr(var.dataType));
+        ImGui::TextColored(typeColor(var.dataType), "[%s]", typeToStr(var).c_str());
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Click to change type");
         if (ImGui::IsItemClicked())
@@ -847,22 +883,60 @@ void BlueprintEditor::DrawVariablePanel()
 
         if (ImGui::BeginPopup("##VarType"))
         {
-            const char* typeNames[] = { "Boolean", "Integer", "Float", "String", "Object", "Array", "Map", "Any" };
-            const RTPinDataType typeValues[] = {
+            static const char* containerTypeNamesPopup[] = { "Single", "Array", "Map", "Set" };
+            static const char* baseTypeNamesPopup[]      = { "Boolean", "Integer", "Float", "String", "Object", "Any" };
+            static const RTPinDataType baseTypeValuesPopup[] = {
                 RTPinDataType::Boolean, RTPinDataType::Integer, RTPinDataType::Float,
-                RTPinDataType::String, RTPinDataType::Object, RTPinDataType::Array,
-                RTPinDataType::Map, RTPinDataType::Any
+                RTPinDataType::String, RTPinDataType::Object, RTPinDataType::Any
             };
-            for (int t = 0; t < IM_ARRAYSIZE(typeNames); ++t)
+            static const char* keyTypeNamesPopup[]         = { "Boolean", "Integer", "Float", "String" };
+            static const RTPinDataType keyTypeValuesPopup[] = {
+                RTPinDataType::Boolean, RTPinDataType::Integer, RTPinDataType::Float, RTPinDataType::String
+            };
+
+            // 当前容器类型索引
+            int curContIdx = static_cast<int>(var.containerType);
+            ImGui::TextUnformatted("Container:");
+            ImGui::SetNextItemWidth(90.0f);
+            if (ImGui::Combo("##PopContType", &curContIdx, containerTypeNamesPopup, 4))
             {
-                ImGui::TextColored(typeColor(typeValues[t]), "●");
-                ImGui::SameLine();
-                if (ImGui::Selectable(typeNames[t], var.dataType == typeValues[t]))
+                PushUndoState();
+                var.containerType = static_cast<RTContainerType>(curContIdx);
+                if (curContIdx == 0) var.dataType = var.itemType;
+                else if (curContIdx == 1) var.dataType = RTPinDataType::Array;
+                else if (curContIdx == 2) var.dataType = RTPinDataType::Map;
+                else                      var.dataType = RTPinDataType::Set;
+                doc->isDirty = true;
+            }
+
+            // 元素类型索引
+            int curItemIdx = 0;
+            for (int ti = 0; ti < 6; ++ti)
+                if (baseTypeValuesPopup[ti] == var.itemType) { curItemIdx = ti; break; }
+            ImGui::TextUnformatted("Item type:");
+            ImGui::SetNextItemWidth(80.0f);
+            if (ImGui::Combo("##PopItemType", &curItemIdx, baseTypeNamesPopup, 6))
+            {
+                PushUndoState();
+                var.itemType = baseTypeValuesPopup[curItemIdx];
+                if (var.containerType == RTContainerType::Single)
+                    var.dataType = var.itemType;
+                doc->isDirty = true;
+            }
+
+            // Map 键类型
+            if (var.containerType == RTContainerType::Map)
+            {
+                int curKeyIdx = 3;  // default String
+                for (int ki = 0; ki < 4; ++ki)
+                    if (keyTypeValuesPopup[ki] == var.mapKeyType) { curKeyIdx = ki; break; }
+                ImGui::TextUnformatted("Key type:");
+                ImGui::SetNextItemWidth(70.0f);
+                if (ImGui::Combo("##PopKeyType", &curKeyIdx, keyTypeNamesPopup, 4))
                 {
-                    PushUndoState();  // 类型修改前保存快照
-                    var.dataType = typeValues[t];
+                    PushUndoState();
+                    var.mapKeyType = keyTypeValuesPopup[curKeyIdx];
                     doc->isDirty = true;
-                    ImGui::CloseCurrentPopup();
                 }
             }
             ImGui::EndPopup();
@@ -884,7 +958,7 @@ void BlueprintEditor::DrawVariablePanel()
         {
             ImGui::BeginTooltip();
             ImGui::Text("Name:     %s", var.name.c_str());
-            ImGui::Text("Type:     %s", typeToStr(var.dataType));
+            ImGui::Text("Type:     %s", typeToStr(var).c_str());
             ImGui::Text("Exposed:  %s", var.isExposed ? "Yes" : "No");
             if (!var.tooltip.empty()) ImGui::Text("Tip: %s", var.tooltip.c_str());
             ImGui::EndTooltip();
@@ -1266,27 +1340,37 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
     float paneWidth = ImGui::GetContentRegionAvail().x;
 
     // 类型选项（与变量面板保持一致）
-    static const char* typeNames[] = { "Boolean", "Integer", "Float", "String", "Object", "Array", "Map", "Any" };
-    static const RTPinDataType typeValues[] = {
+    static const char* containerTypeNamesFunc[] = { "Single", "Array", "Map", "Set" };
+    static const char* baseTypeNamesFunc[]      = { "Boolean", "Integer", "Float", "String", "Object", "Any" };
+    static const RTPinDataType baseTypeValuesFunc[] = {
         RTPinDataType::Boolean, RTPinDataType::Integer, RTPinDataType::Float,
-        RTPinDataType::String, RTPinDataType::Object,
-        RTPinDataType::Array, RTPinDataType::Map, RTPinDataType::Any
+        RTPinDataType::String, RTPinDataType::Object, RTPinDataType::Any
     };
-    static const int typeCount = 8;
+    static const char* keyTypeNamesFunc[]         = { "Boolean", "Integer", "Float", "String" };
+    static const RTPinDataType keyTypeValuesFunc[] = {
+        RTPinDataType::Boolean, RTPinDataType::Integer, RTPinDataType::Float, RTPinDataType::String
+    };
 
-    auto dataTypeToIndex = [](RTPinDataType dt) -> int {
-        switch (dt) {
-        case RTPinDataType::Boolean: return 0;
-        case RTPinDataType::Integer: return 1;
-        case RTPinDataType::Float:   return 2;
-        case RTPinDataType::String:  return 3;
-        case RTPinDataType::Object:  return 4;
-        case RTPinDataType::Array:   return 5;
-        case RTPinDataType::Map:     return 6;
-        case RTPinDataType::Any:     return 7;
-        default:                     return 3; // 默认 String
-        }
+    // Helper: 从 baseTypeValues 找 index
+    auto findBaseTypeIdx = [](RTPinDataType dt) -> int {
+        static const RTPinDataType bv[] = {
+            RTPinDataType::Boolean, RTPinDataType::Integer, RTPinDataType::Float,
+            RTPinDataType::String, RTPinDataType::Object, RTPinDataType::Any
+        };
+        for (int i = 0; i < 6; ++i) if (bv[i] == dt) return i;
+        return 3;
     };
+    auto findKeyTypeIdx = [](RTPinDataType dt) -> int {
+        static const RTPinDataType kv[] = {
+            RTPinDataType::Boolean, RTPinDataType::Integer, RTPinDataType::Float, RTPinDataType::String
+        };
+        for (int i = 0; i < 4; ++i) if (kv[i] == dt) return i;
+        return 3;
+    };
+    // 容器类型 combo 宽度
+    float contComboW = 72.0f;
+    float itemComboW = 64.0f;
+    float keyComboW  = 60.0f;
 
     // ── 函数信息标题 ──────────────────────────────────────────────────
     {
@@ -1395,22 +1479,55 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
         auto& param = func.inputs[i];
         ImGui::PushID(i);
 
-        // 类型下拉
-        int typeIdx = dataTypeToIndex(param.dataType);
-        ImGui::SetNextItemWidth(comboW);
-        if (ImGui::Combo("##type", &typeIdx, typeNames, typeCount))
+        // 容器类型下拉
+        int contIdx = static_cast<int>(param.containerType);
+        ImGui::SetNextItemWidth(contComboW);
+        if (ImGui::Combo("##ctype", &contIdx, containerTypeNamesFunc, 4))
         {
             PushUndoState();
-            param.dataType = typeValues[typeIdx];
+            param.containerType = static_cast<RTContainerType>(contIdx);
+            if      (contIdx == 0) param.dataType = param.itemType;
+            else if (contIdx == 1) param.dataType = RTPinDataType::Array;
+            else if (contIdx == 2) param.dataType = RTPinDataType::Map;
+            else                   param.dataType = RTPinDataType::Set;
             doc->isDirty = true;
             inputsChanged = true;
+        }
+        ImGui::SameLine();
+        // 元素类型下拉
+        int itemIdx = findBaseTypeIdx(param.itemType);
+        ImGui::SetNextItemWidth(itemComboW);
+        if (ImGui::Combo("##itype", &itemIdx, baseTypeNamesFunc, 6))
+        {
+            PushUndoState();
+            param.itemType = baseTypeValuesFunc[itemIdx];
+            if (param.containerType == RTContainerType::Single)
+                param.dataType = param.itemType;
+            doc->isDirty = true;
+            inputsChanged = true;
+        }
+        // Map key type
+        if (param.containerType == RTContainerType::Map)
+        {
+            ImGui::SameLine();
+            int keyIdx = findKeyTypeIdx(param.mapKeyType);
+            ImGui::SetNextItemWidth(keyComboW);
+            if (ImGui::Combo("##ktype", &keyIdx, keyTypeNamesFunc, 4))
+            {
+                PushUndoState();
+                param.mapKeyType = keyTypeValuesFunc[keyIdx];
+                doc->isDirty = true;
+                inputsChanged = true;
+            }
         }
 
         // 名称编辑
         ImGui::SameLine();
         char nameBuf[64];
         snprintf(nameBuf, sizeof(nameBuf), "%s", param.name.c_str());
-        ImGui::SetNextItemWidth(nameW);
+        float dynNameW = nameW - (param.containerType == RTContainerType::Map ? keyComboW + spacingX : 0.0f);
+        if (dynNameW < 30.0f) dynNameW = 30.0f;
+        ImGui::SetNextItemWidth(dynNameW);
         if (ImGui::InputText("##name", nameBuf, sizeof(nameBuf), ImGuiInputTextFlags_EnterReturnsTrue))
         {
             // 检查重名：若与其他参数同名则加序号
@@ -1509,22 +1626,55 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
         auto& param = func.outputs[i];
         ImGui::PushID(i + 1000);  // 偏移避免与 inputs PushID 冲突
 
-        // 类型下拉
-        int typeIdx = dataTypeToIndex(param.dataType);
-        ImGui::SetNextItemWidth(comboW);
-        if (ImGui::Combo("##type", &typeIdx, typeNames, typeCount))
+        // 容器类型下拉
+        int contIdx = static_cast<int>(param.containerType);
+        ImGui::SetNextItemWidth(contComboW);
+        if (ImGui::Combo("##ctype", &contIdx, containerTypeNamesFunc, 4))
         {
             PushUndoState();
-            param.dataType = typeValues[typeIdx];
+            param.containerType = static_cast<RTContainerType>(contIdx);
+            if      (contIdx == 0) param.dataType = param.itemType;
+            else if (contIdx == 1) param.dataType = RTPinDataType::Array;
+            else if (contIdx == 2) param.dataType = RTPinDataType::Map;
+            else                   param.dataType = RTPinDataType::Set;
             doc->isDirty = true;
             outputsChanged = true;
+        }
+        ImGui::SameLine();
+        // 元素类型下拉
+        int itemIdx = findBaseTypeIdx(param.itemType);
+        ImGui::SetNextItemWidth(itemComboW);
+        if (ImGui::Combo("##itype", &itemIdx, baseTypeNamesFunc, 6))
+        {
+            PushUndoState();
+            param.itemType = baseTypeValuesFunc[itemIdx];
+            if (param.containerType == RTContainerType::Single)
+                param.dataType = param.itemType;
+            doc->isDirty = true;
+            outputsChanged = true;
+        }
+        // Map key type
+        if (param.containerType == RTContainerType::Map)
+        {
+            ImGui::SameLine();
+            int keyIdx = findKeyTypeIdx(param.mapKeyType);
+            ImGui::SetNextItemWidth(keyComboW);
+            if (ImGui::Combo("##ktype", &keyIdx, keyTypeNamesFunc, 4))
+            {
+                PushUndoState();
+                param.mapKeyType = keyTypeValuesFunc[keyIdx];
+                doc->isDirty = true;
+                outputsChanged = true;
+            }
         }
 
         // 名称编辑（独立 buffer）
         ImGui::SameLine();
         char nameBuf[64];
         snprintf(nameBuf, sizeof(nameBuf), "%s", param.name.c_str());
-        ImGui::SetNextItemWidth(nameW);
+        float dynNameW = nameW - (param.containerType == RTContainerType::Map ? keyComboW + spacingX : 0.0f);
+        if (dynNameW < 30.0f) dynNameW = 30.0f;
+        ImGui::SetNextItemWidth(dynNameW);
         if (ImGui::InputText("##name", nameBuf, sizeof(nameBuf), ImGuiInputTextFlags_EnterReturnsTrue))
         {
             std::string newName(nameBuf);

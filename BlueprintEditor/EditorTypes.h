@@ -31,6 +31,7 @@ enum class PinType
     Delegate,
     Array,
     Map,        // 键值对映射类型
+    Set,        // 集合类型（无重复元素）
     Any,        // 通配类型：可与任何数据类型连接（用于 ArrayGet 等泛型节点）
 };
 

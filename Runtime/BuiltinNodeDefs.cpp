@@ -936,32 +936,32 @@ static void RegisterNodeDefs_Map(INodeRegistry& registry)
 
     // MapMake — 带命名引脚的 Map 构建（Node-03）
     reg("MapMake", "Map Make", "Misc/Map",
-        { MakePin("Key 0", PinDataType::String), MakePin("Value 0", PinDataType::Any),
-          MakePin("Key 1", PinDataType::String), MakePin("Value 1", PinDataType::Any) },
+        { MakePin("Key 0", PinDataType::Any), MakePin("Value 0", PinDataType::Any),
+          MakePin("Key 1", PinDataType::Any), MakePin("Value 1", PinDataType::Any) },
         { MakePin("Result", PinDataType::Map) },
         "20CCDD", "Simple");
     
 
     reg("MapGet", "Map Get", "Misc/Map",
-        { MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::String) },
+        { MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::Any) },
         { MakePin("Value", PinDataType::Any), MakePin("Found", PinDataType::Boolean) },
         "20CCDD", "Simple");
     
 
     reg("MapSet", "Map Set", "Misc/Map",
-        { MakeFlowPin(""), MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::String), MakePin("Value", PinDataType::Any) },
+        { MakeFlowPin(""), MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::Any), MakePin("Value", PinDataType::Any) },
         { MakeFlowPin(""), MakePin("Result", PinDataType::Map) },
         "20CCDD");
     
 
     reg("MapRemove", "Map Remove", "Misc/Map",
-        { MakeFlowPin(""), MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::String) },
+        { MakeFlowPin(""), MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::Any) },
         { MakeFlowPin(""), MakePin("Result", PinDataType::Map) },
         "20CCDD");
     
 
     reg("MapHasKey", "Map Has Key", "Misc/Map",
-        { MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::String) },
+        { MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::Any) },
         { MakePin("Result", PinDataType::Boolean) },
         "20CCDD", "Simple");
     
@@ -1005,6 +1005,58 @@ static void RegisterNodeDefs_Map(INodeRegistry& registry)
         { MakeFlowPin(""), MakePin("Map", PinDataType::Map) },
         { MakeFlowPin("Loop Body"), MakePin("Key", PinDataType::Any),
           MakePin("Value", PinDataType::Any), MakeFlowPin("Completed") });
+
+    // ── Set 节点定义 ──────────────────────────────────────────────────────
+    reg("SetMake", "Set Make", "Misc/Set",
+        { MakePin("Value 0", PinDataType::Any), MakePin("Value 1", PinDataType::Any) },
+        { MakePin("Set", PinDataType::Set) },
+        "B464F0", "Simple");
+
+    reg("SetAdd", "Set Add", "Misc/Set",
+        { MakeFlowPin(""), MakePin("Set", PinDataType::Set), MakePin("Value", PinDataType::Any) },
+        { MakeFlowPin(""), MakePin("Set", PinDataType::Set), MakePin("Added", PinDataType::Boolean) },
+        "B464F0");
+
+    reg("SetRemove", "Set Remove", "Misc/Set",
+        { MakeFlowPin(""), MakePin("Set", PinDataType::Set), MakePin("Value", PinDataType::Any) },
+        { MakeFlowPin(""), MakePin("Set", PinDataType::Set), MakePin("Removed", PinDataType::Boolean) },
+        "B464F0");
+
+    reg("SetContains", "Set Contains", "Misc/Set",
+        { MakePin("Set", PinDataType::Set), MakePin("Value", PinDataType::Any) },
+        { MakePin("Result", PinDataType::Boolean) },
+        "B464F0", "Simple");
+
+    reg("SetSize", "Set Size", "Misc/Set",
+        { MakePin("Set", PinDataType::Set) },
+        { MakePin("Size", PinDataType::Integer) },
+        "B464F0", "Simple");
+
+    reg("SetLength", "Set Length", "Misc/Set",
+        { MakePin("Set", PinDataType::Set) },
+        { MakePin("Size", PinDataType::Integer) },
+        "B464F0", "Simple");
+
+    reg("SetClear", "Set Clear", "Misc/Set",
+        { MakeFlowPin(""), MakePin("Set", PinDataType::Set) },
+        { MakeFlowPin(""), MakePin("Set", PinDataType::Set) },
+        "B464F0");
+
+    reg("SetToArray", "Set To Array", "Misc/Set",
+        { MakePin("Set", PinDataType::Set) },
+        { MakePin("Array", PinDataType::Array) },
+        "B464F0", "Simple");
+
+    reg("SetFromArray", "Set From Array", "Misc/Set",
+        { MakePin("Array", PinDataType::Array) },
+        { MakePin("Set", PinDataType::Set) },
+        "B464F0", "Simple");
+
+    reg("ForEachSetLoop", "For Each Set", "Misc/Set",
+        { MakeFlowPin(""), MakePin("Set", PinDataType::Set) },
+        { MakeFlowPin("Loop Body"), MakePin("Value", PinDataType::Any),
+          MakePin("Index", PinDataType::Integer), MakeFlowPin("Completed") },
+        "B464F0");
 }
 
 static void RegisterNodeDefs_Tree(INodeRegistry& registry)

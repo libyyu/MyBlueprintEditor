@@ -235,7 +235,11 @@ static void test_map_nodes()
     CHECK(loaded, "内联 BlueprintData 加载成功");
 
     // 预注入一个空 Map 到 pin12（MapSet 的 Map 输入）
-    runner.SetPinValue(12, Variant(std::unordered_map<std::string,Variant>{}));
+    {
+        Variant emptyMap;
+        emptyMap.type = NodeEditor::Runtime::PinDataType::Map;
+        runner.SetPinValue(12, emptyMap);
+    }
 
     // 手动触发 exec 起点（执行 Node1=MapSet）
     ExecutionResult result = runner.ExecuteNode(1);

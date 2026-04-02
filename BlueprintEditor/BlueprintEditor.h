@@ -48,6 +48,7 @@ typedef NodeEditor::Runtime::NodeInstance       RTNodeInstance;
 typedef NodeEditor::Runtime::LinkInstance       RTLinkInstance;
 typedef NodeEditor::Runtime::PinInfo            RTPinInfo;
 typedef NodeEditor::Runtime::PinDataType        RTPinDataType;
+typedef NodeEditor::Runtime::ContainerType      RTContainerType;
 typedef NodeEditor::Runtime::NodeDefinition     RTNodeDef;
 typedef NodeEditor::Runtime::ExecutionResult    RTExecutionResult;
 typedef NodeEditor::Runtime::BlueprintClass     RTBlueprintClass;

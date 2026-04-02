@@ -407,6 +407,12 @@ std::string JsonBlueprintExporter::exportRuntimeToString(const BlueprintData& da
             
             writeIndent(); oss << "\"name\": \"" << escapeJson(var.name) << "\","; writeNewline();
             writeIndent(); oss << "\"dataType\": " << static_cast<int>(var.dataType) << ","; writeNewline();
+            if (var.containerType != ContainerType::Single)
+            {
+                writeIndent(); oss << "\"containerType\": " << static_cast<int>(var.containerType) << ","; writeNewline();
+                writeIndent(); oss << "\"itemType\": " << static_cast<int>(var.itemType) << ","; writeNewline();
+                writeIndent(); oss << "\"mapKeyType\": " << static_cast<int>(var.mapKeyType) << ","; writeNewline();
+            }
             writeIndent(); oss << "\"isExposed\": " << (var.isExposed ? "true" : "false");
             
             if (var.defaultValue.type != PinDataType::Unknown)
@@ -454,7 +460,14 @@ std::string JsonBlueprintExporter::exportRuntimeToString(const BlueprintData& da
             for (size_t ii = 0; ii < func.inputs.size(); ++ii)
             {
                 const auto& inp = func.inputs[ii];
-                oss << "{\"name\":\"" << escapeJson(inp.name) << "\",\"dataType\":" << static_cast<int>(inp.dataType) << "}";
+                oss << "{\"name\":\"" << escapeJson(inp.name) << "\",\"dataType\":" << static_cast<int>(inp.dataType);
+                if (inp.containerType != ContainerType::Single)
+                {
+                    oss << ",\"containerType\":" << static_cast<int>(inp.containerType);
+                    oss << ",\"itemType\":" << static_cast<int>(inp.itemType);
+                    oss << ",\"mapKeyType\":" << static_cast<int>(inp.mapKeyType);
+                }
+                oss << "}";
                 if (ii + 1 < func.inputs.size()) oss << ",";
             }
             oss << "],"; writeNewline();
@@ -464,7 +477,14 @@ std::string JsonBlueprintExporter::exportRuntimeToString(const BlueprintData& da
             for (size_t oi = 0; oi < func.outputs.size(); ++oi)
             {
                 const auto& out = func.outputs[oi];
-                oss << "{\"name\":\"" << escapeJson(out.name) << "\",\"dataType\":" << static_cast<int>(out.dataType) << "}";
+                oss << "{\"name\":\"" << escapeJson(out.name) << "\",\"dataType\":" << static_cast<int>(out.dataType);
+                if (out.containerType != ContainerType::Single)
+                {
+                    oss << ",\"containerType\":" << static_cast<int>(out.containerType);
+                    oss << ",\"itemType\":" << static_cast<int>(out.itemType);
+                    oss << ",\"mapKeyType\":" << static_cast<int>(out.mapKeyType);
+                }
+                oss << "}";
                 if (oi + 1 < func.outputs.size()) oss << ",";
             }
             oss << "],"; writeNewline();
@@ -1113,10 +1133,55 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
 
             VariableDefinition var;
             var.name      = getString(varJson, "name");
-            var.dataType  = static_cast<PinDataType>(static_cast<int>(getNumber(varJson, "dataType")));
             var.isExposed = getBool(varJson, "isExposed", true);
             var.category  = getString(varJson, "category");
             var.tooltip   = getString(varJson, "tooltip");
+
+            // 向后兼容逻辑
+            // 有 containerType 字段 → 新格式，直接用
+            // 无 containerType 字段 → 旧格式，按旧枚举值解释 dataType
+            bool hasContainerType = varJson.contains("containerType")
+                                 && varJson["containerType"].type() == crude_json::type_t::number;
+            int rawDataType = static_cast<int>(getNumber(varJson, "dataType"));
+            if (hasContainerType)
+            {
+                var.dataType      = static_cast<PinDataType>(rawDataType);
+                var.containerType = static_cast<ContainerType>(static_cast<int>(getNumber(varJson, "containerType")));
+                var.itemType      = static_cast<PinDataType>(static_cast<int>(getNumber(varJson, "itemType")));
+                var.mapKeyType    = static_cast<PinDataType>(static_cast<int>(getNumber(varJson, "mapKeyType")));
+            }
+            else
+            {
+                // 旧枚举：Any=8, Custom=9  新枚举：Set=8, Any=9, Custom=10
+                if (rawDataType == 6)       // Array
+                {
+                    var.dataType      = PinDataType::Array;
+                    var.containerType = ContainerType::Array;
+                    var.itemType      = PinDataType::Any;
+                    var.mapKeyType    = PinDataType::String;
+                }
+                else if (rawDataType == 7)  // Map
+                {
+                    var.dataType      = PinDataType::Map;
+                    var.containerType = ContainerType::Map;
+                    var.itemType      = PinDataType::Any;
+                    var.mapKeyType    = PinDataType::String;
+                }
+                else if (rawDataType == 8)  // 旧 Any（新 Set）
+                {
+                    var.dataType      = PinDataType::Any;
+                    var.containerType = ContainerType::Single;
+                    var.itemType      = PinDataType::Any;
+                    var.mapKeyType    = PinDataType::String;
+                }
+                else
+                {
+                    var.dataType      = static_cast<PinDataType>(rawDataType);
+                    var.containerType = ContainerType::Single;
+                    var.itemType      = PinDataType::Any;
+                    var.mapKeyType    = PinDataType::String;
+                }
+            }
 
             if (varJson.contains("defaultValue"))
             {
@@ -1148,8 +1213,25 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
                 {
                     if (inpJson.type() != crude_json::type_t::object) continue;
                     VariableDefinition vd;
-                    vd.name     = getString(inpJson, "name");
-                    vd.dataType = static_cast<PinDataType>(static_cast<int>(getNumber(inpJson, "dataType")));
+                    vd.name = getString(inpJson, "name");
+
+                    bool hasContainerType2 = inpJson.contains("containerType")
+                                          && inpJson["containerType"].type() == crude_json::type_t::number;
+                    int rawDt2 = static_cast<int>(getNumber(inpJson, "dataType"));
+                    if (hasContainerType2)
+                    {
+                        vd.dataType      = static_cast<PinDataType>(rawDt2);
+                        vd.containerType = static_cast<ContainerType>(static_cast<int>(getNumber(inpJson, "containerType")));
+                        vd.itemType      = static_cast<PinDataType>(static_cast<int>(getNumber(inpJson, "itemType")));
+                        vd.mapKeyType    = static_cast<PinDataType>(static_cast<int>(getNumber(inpJson, "mapKeyType")));
+                    }
+                    else
+                    {
+                        if (rawDt2 == 6)      { vd.dataType = PinDataType::Array; vd.containerType = ContainerType::Array; vd.itemType = PinDataType::Any; }
+                        else if (rawDt2 == 7) { vd.dataType = PinDataType::Map;   vd.containerType = ContainerType::Map;   vd.itemType = PinDataType::Any; vd.mapKeyType = PinDataType::String; }
+                        else if (rawDt2 == 8) { vd.dataType = PinDataType::Any;   vd.containerType = ContainerType::Single; }
+                        else                  { vd.dataType = static_cast<PinDataType>(rawDt2); vd.containerType = ContainerType::Single; }
+                    }
                     func.inputs.push_back(std::move(vd));
                 }
             }
@@ -1160,8 +1242,25 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
                 {
                     if (outJson.type() != crude_json::type_t::object) continue;
                     VariableDefinition vd;
-                    vd.name     = getString(outJson, "name");
-                    vd.dataType = static_cast<PinDataType>(static_cast<int>(getNumber(outJson, "dataType")));
+                    vd.name = getString(outJson, "name");
+
+                    bool hasContainerType3 = outJson.contains("containerType")
+                                          && outJson["containerType"].type() == crude_json::type_t::number;
+                    int rawDt3 = static_cast<int>(getNumber(outJson, "dataType"));
+                    if (hasContainerType3)
+                    {
+                        vd.dataType      = static_cast<PinDataType>(rawDt3);
+                        vd.containerType = static_cast<ContainerType>(static_cast<int>(getNumber(outJson, "containerType")));
+                        vd.itemType      = static_cast<PinDataType>(static_cast<int>(getNumber(outJson, "itemType")));
+                        vd.mapKeyType    = static_cast<PinDataType>(static_cast<int>(getNumber(outJson, "mapKeyType")));
+                    }
+                    else
+                    {
+                        if (rawDt3 == 6)      { vd.dataType = PinDataType::Array; vd.containerType = ContainerType::Array; vd.itemType = PinDataType::Any; }
+                        else if (rawDt3 == 7) { vd.dataType = PinDataType::Map;   vd.containerType = ContainerType::Map;   vd.itemType = PinDataType::Any; vd.mapKeyType = PinDataType::String; }
+                        else if (rawDt3 == 8) { vd.dataType = PinDataType::Any;   vd.containerType = ContainerType::Single; }
+                        else                  { vd.dataType = static_cast<PinDataType>(rawDt3); vd.containerType = ContainerType::Single; }
+                    }
                     func.outputs.push_back(std::move(vd));
                 }
             }
@@ -1592,15 +1691,26 @@ std::string JsonBlueprintExporter::variantToJson(const Variant& value) const
     }
     case PinDataType::Map:
     {
-        std::string s = "{";
-        bool first = true;
-        for (const auto& kv : value.mapValue)
+        // 序列化为 [[key1,val1],[key2,val2]] 以支持非 string 键
+        std::string s = "[";
+        for (size_t i = 0; i < value.mapValue.size(); ++i)
         {
-            if (!first) s += ",";
-            first = false;
-            s += "\"" + escapeJson(kv.first) + "\":" + variantToJson(kv.second);
+            if (i > 0) s += ",";
+            const auto& kv = value.mapValue[i];
+            s += "[" + variantToJson(kv.first) + "," + variantToJson(kv.second) + "]";
         }
-        s += "}";
+        s += "]";
+        return s;
+    }
+    case PinDataType::Set:
+    {
+        std::string s = "[";
+        for (size_t i = 0; i < value.arrayValue.size(); ++i)
+        {
+            if (i > 0) s += ",";
+            s += variantToJson(value.arrayValue[i]);
+        }
+        s += "]";
         return s;
     }
     default:
@@ -1659,8 +1769,10 @@ Variant JsonBlueprintExporter::jsonToVariant(const std::string& json, PinDataTyp
     case PinDataType::Map:
         if (val.type() == crude_json::type_t::object)
         {
+            // 旧格式：JSON object (string keys)
             for (auto& kv : val.get<crude_json::object>())
             {
+                Variant keyVar(kv.first);
                 Variant elemVar;
                 if (kv.second.type() == crude_json::type_t::boolean)
                     elemVar = Variant(kv.second.get<bool>());
@@ -1668,7 +1780,54 @@ Variant JsonBlueprintExporter::jsonToVariant(const std::string& json, PinDataTyp
                     elemVar = Variant(kv.second.get<double>());
                 else if (kv.second.type() == crude_json::type_t::string)
                     elemVar = Variant(kv.second.get<std::string>());
-                result.mapValue[kv.first] = std::move(elemVar);
+                result.mapSet(keyVar, elemVar);
+            }
+        }
+        else if (val.type() == crude_json::type_t::array)
+        {
+            // 新格式：JSON array of [key, value] pairs
+            for (auto& elem : val.get<crude_json::array>())
+            {
+                if (elem.type() == crude_json::type_t::array)
+                {
+                    const auto& pairArr = elem.get<crude_json::array>();
+                    if (pairArr.size() >= 2)
+                    {
+                        // 推断 key 类型
+                        Variant keyVar;
+                        if (pairArr[0].type() == crude_json::type_t::boolean)
+                            keyVar = Variant(pairArr[0].get<bool>());
+                        else if (pairArr[0].type() == crude_json::type_t::number)
+                            keyVar = Variant(pairArr[0].get<double>());
+                        else if (pairArr[0].type() == crude_json::type_t::string)
+                            keyVar = Variant(pairArr[0].get<std::string>());
+                        // 推断 value 类型
+                        Variant valVar;
+                        if (pairArr[1].type() == crude_json::type_t::boolean)
+                            valVar = Variant(pairArr[1].get<bool>());
+                        else if (pairArr[1].type() == crude_json::type_t::number)
+                            valVar = Variant(pairArr[1].get<double>());
+                        else if (pairArr[1].type() == crude_json::type_t::string)
+                            valVar = Variant(pairArr[1].get<std::string>());
+                        result.mapSet(keyVar, valVar);
+                    }
+                }
+            }
+        }
+        break;
+    case PinDataType::Set:
+        if (val.type() == crude_json::type_t::array)
+        {
+            for (auto& elem : val.get<crude_json::array>())
+            {
+                Variant elemVar;
+                if (elem.type() == crude_json::type_t::boolean)
+                    elemVar = Variant(elem.get<bool>());
+                else if (elem.type() == crude_json::type_t::number)
+                    elemVar = Variant(elem.get<double>());
+                else if (elem.type() == crude_json::type_t::string)
+                    elemVar = Variant(elem.get<std::string>());
+                result.setAdd(elemVar);
             }
         }
         break;

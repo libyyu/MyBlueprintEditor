@@ -59,6 +59,7 @@ static NodeEditor::Runtime::PinDataType parsePinDataType(const std::string& s)
     if (s == "object")                    return PinDataType::Object;
     if (s == "array")                     return PinDataType::Array;
     if (s == "map")                       return PinDataType::Map;
+    if (s == "set")                       return PinDataType::Set;
     if (s == "flow"    || s == "exec")    return PinDataType::Unknown; // Flow 由 isExec 标志控制
     return PinDataType::Unknown;
 }

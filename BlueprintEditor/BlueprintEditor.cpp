@@ -376,6 +376,7 @@ PinType BlueprintEditor::MapRTPinDataType(RTPinDataType dt, bool isExec)
     case RTPinDataType::Object:  return PinType::Object;
     case RTPinDataType::Array:   return PinType::Array;
     case RTPinDataType::Map:     return PinType::Map;
+    case RTPinDataType::Set:     return PinType::Set;
     case RTPinDataType::Any:     return PinType::Any;
     default:                     return PinType::Flow;
     }
@@ -393,6 +394,7 @@ RTPinDataType BlueprintEditor::MapPinType(PinType type)
     case PinType::Object:   return RTPinDataType::Object;
     case PinType::Array:    return RTPinDataType::Array;
     case PinType::Map:      return RTPinDataType::Map;
+    case PinType::Set:      return RTPinDataType::Set;
     case PinType::Any:      return RTPinDataType::Any;
     case PinType::Function: return RTPinDataType::Custom;
     case PinType::Delegate: return RTPinDataType::Custom;

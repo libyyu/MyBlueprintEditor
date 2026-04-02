@@ -49,9 +49,20 @@ static void pushVariantRaw(lua_State* L, const Variant& v)
     case PinDataType::Map: {
         lua_createtable(L, 0, static_cast<int>(v.mapSize()));
         for (const auto& kv : v.asMap()) {
-            lua_pushstring(L, kv.first.c_str());
+            // kv.first は Variant — Lua テーブルキーは文字列に変換
+            std::string keyStr = kv.first.asString();
+            lua_pushstring(L, keyStr.c_str());
             pushVariantRaw(L, kv.second);
             lua_rawset(L, -3);
+        }
+        break;
+    }
+    case PinDataType::Set: {
+        lua_createtable(L, static_cast<int>(v.setSize()), 0);
+        auto elements = v.setToArray();
+        for (size_t i = 0; i < elements.size(); ++i) {
+            pushVariantRaw(L, elements[i]);
+            lua_rawseti(L, -2, static_cast<int>(i + 1));
         }
         break;
     }
@@ -92,15 +103,17 @@ static Variant toVariant(lua_State* L, int idx)
             }
             return Variant(std::move(arr));
         } else {
-            std::unordered_map<std::string, Variant> map;
+            Variant result;
+            result.type = PinDataType::Map;
             lua_pushnil(L);
             while (lua_next(L, absIdx) != 0) {
                 if (lua_type(L, -2) == LUA_TSTRING) {
-                    map[lua_tostring(L, -2)] = toVariant(L, -1);
+                    Variant keyVar(std::string(lua_tostring(L, -2)));
+                    result.mapSet(keyVar, toVariant(L, -1));
                 }
                 lua_pop(L, 1);
             }
-            return Variant(std::move(map));
+            return result;
         }
     }
     case LUA_TUSERDATA: {
