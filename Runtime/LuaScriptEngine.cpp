@@ -108,6 +108,58 @@ bool LuaScriptEngine::InitializeWithExternalState(lua_State* L, BlueprintRunner*
     return true;
 }
 
+void LuaScriptEngine::SetSearcher(lua_CFunction loader)
+{
+    if (!m_L || !loader) return;
+    lua_State* L = m_L;
+    int top = lua_gettop(L);
+
+    lua_pushcfunction(L, loader);
+    int loaderFunc = lua_gettop(L);
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "searchers");
+    int loaderTable = lua_gettop(L);
+    // 把现有 searchers 整体后移一格
+    for (lua_Integer e = (lua_Integer)lua_rawlen(L, loaderTable) + 1; e > 1; e--)
+    {
+        lua_rawgeti(L, loaderTable, (int)(e - 1));
+        lua_rawseti(L, loaderTable, (int)e);
+    }
+    lua_pushvalue(L, loaderFunc);
+    lua_rawseti(L, loaderTable, 1);
+
+    lua_settop(L, top);
+}
+
+void LuaScriptEngine::AddLuaPath(const std::string& dir)
+{
+    if (!m_L || dir.empty()) return;
+    lua_State* L = m_L;
+    int top = lua_gettop(L);
+
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "path");
+    const char* cur = lua_tostring(L, -1);
+    std::string newPath = std::string(cur ? cur : "");
+
+    // 追加 dir/?.lua 和 dir/?/init.lua
+    auto append = [&](const std::string& pat) {
+        if (newPath.find(pat) == std::string::npos)
+        {
+            if (!newPath.empty()) newPath += ";";
+            newPath += pat;
+        }
+    };
+    append(dir + "/?.lua");
+    append(dir + "/?/init.lua");
+
+    lua_pop(L, 1);  // pop old path
+    lua_pushstring(L, newPath.c_str());
+    lua_setfield(L, -2, "path");
+
+    lua_settop(L, top);
+}
+
 void LuaScriptEngine::Shutdown()
 {
     if (m_L)

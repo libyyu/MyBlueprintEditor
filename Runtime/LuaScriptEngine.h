@@ -24,6 +24,8 @@
 
 // 前向声明，避免暴露 lua.h 给使用者
 struct lua_State;
+// lua_CFunction: int (*)(lua_State*) — 与 lua.h 一致，此处手动前向声明以免引入 lua.h
+typedef int (*lua_CFunction)(lua_State*);
 
 namespace NodeEditor {
 namespace Runtime {
@@ -70,6 +72,15 @@ public:
 
     // 获取底层 lua_State（高级用途）
     lua_State* GetState() const { return m_L; }
+
+    // 向 package.searchers 头部插入一个自定义 loader（插入到索引 1，优先级最高）
+    // 必须在 Initialize / InitializeWithExternalState 之后调用。
+    // loader 的 Lua 签名：function(modname) -> chunk | string（见 Lua 5.4 searchers 规范）
+    void SetSearcher(lua_CFunction loader);
+
+    // 向 package.path 追加搜索路径（dir 末尾自动补 /?.lua;/?.lua）
+    // 如 AddLuaPath("/home/user/scripts") => "/home/user/scripts/?.lua"
+    void AddLuaPath(const std::string& dir);
 
     // 获取已加载的脚本文件列表（按加载顺序）
     const std::vector<std::string>& GetLoadedFiles() const { return m_loadedFiles; }

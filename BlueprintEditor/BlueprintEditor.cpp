@@ -4,6 +4,9 @@
 #include <map>
 #include <functional>
 #include <algorithm>
+#ifndef __EMSCRIPTEN__
+#include <filesystem>
+#endif
 #include "../Runtime/ScriptNodeLoader.h"
 
 // ============================================================================
@@ -1021,6 +1024,24 @@ void BlueprintEditor::OnStart()
 
     // Phase 3：初始化 Lua 节点注册器
     m_LuaNodeRegistrar.Initialize(&m_NodeRegistry, &m_HandlerRegistry);
+
+    // ── Lua 搜索路径：追加 exe 所在目录 + 静默加载全局 BlueprintEntry ──────
+    {
+#ifndef __EMSCRIPTEN__
+        namespace fs = std::filesystem;
+        std::string exeDir;
+        if (m_Argc > 0 && m_Argv && m_Argv[0])
+            exeDir = fs::path(fs::absolute(m_Argv[0])).parent_path().string();
+        else
+            exeDir = fs::current_path().string();
+
+        m_LuaNodeRegistrar.AddLuaPath(exeDir);
+        // exe 目录下的全局入口脚本（不存在则静默跳过，不 watch——全局不会动态出现）
+        std::string globalEntry = exeDir + "/BlueprintEntry.lua";
+        m_LuaNodeRegistrar.LoadEntrySilent(globalEntry, "global:BlueprintEntry");
+        BPLOG("Lua global path: " + exeDir);
+#endif
+    }
 
     // 不自动创建空白文档——无工程时右侧画布留空，由 Project 面板引导用户
 

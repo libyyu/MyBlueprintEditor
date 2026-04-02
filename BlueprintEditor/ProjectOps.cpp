@@ -95,6 +95,13 @@ void BlueprintEditor::NewProject()
     AddRecentProject(m_Project.filePath);
     BPLOG("Created new project: " + name);
     SetTitle(("Blueprint Editor - [" + name + "]").c_str());
+
+    // ── 新建工程后：watch 工程目录下的 BlueprintEntry.lua（静默）──────────
+    m_LuaNodeRegistrar.AddLuaPath(m_Project.projectDir);
+    m_LuaNodeRegistrar.WatchEntryScript(
+        m_Project.projectDir + "/BlueprintEntry.lua",
+        m_Project.name + ":BlueprintEntry"
+    );
 }
 
 // ============================================================================
@@ -126,6 +133,13 @@ void BlueprintEditor::OpenProject()
     AddRecentProject(m_Project.filePath);
     SetTitle(("Blueprint Editor - [" + m_Project.name + "]").c_str());
     BPLOG("Opened project: " + m_Project.name + " @ " + m_Project.filePath);
+
+    // ── 打开工程后：watch 工程目录下的 BlueprintEntry.lua（静默）──────────
+    m_LuaNodeRegistrar.AddLuaPath(m_Project.projectDir);
+    m_LuaNodeRegistrar.WatchEntryScript(
+        m_Project.projectDir + "/BlueprintEntry.lua",
+        m_Project.name + ":BlueprintEntry"
+    );
 }
 
 // ============================================================================

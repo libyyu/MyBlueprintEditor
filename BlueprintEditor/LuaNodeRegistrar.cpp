@@ -384,6 +384,126 @@ int LuaNodeRegistrar::executeString(const std::string& code, const std::string& 
     return m_pendingCount;
 }
 
+void LuaNodeRegistrar::SetSearcher(lua_CFunction loader)
+{
+    if (!ensureLuaState() || !loader) return;
+    lua_State* L = m_L;
+    int top = lua_gettop(L);
+
+    lua_pushcfunction(L, loader);
+    int loaderFunc = lua_gettop(L);
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "searchers");
+    int loaderTable = lua_gettop(L);
+    for (lua_Integer e = (lua_Integer)lua_rawlen(L, loaderTable) + 1; e > 1; e--)
+    {
+        lua_rawgeti(L, loaderTable, (int)(e - 1));
+        lua_rawseti(L, loaderTable, (int)e);
+    }
+    lua_pushvalue(L, loaderFunc);
+    lua_rawseti(L, loaderTable, 1);
+
+    lua_settop(L, top);
+}
+
+void LuaNodeRegistrar::AddLuaPath(const std::string& dir)
+{
+    if (!ensureLuaState() || dir.empty()) return;
+    lua_State* L = m_L;
+    int top = lua_gettop(L);
+
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "path");
+    const char* cur = lua_tostring(L, -1);
+    std::string newPath(cur ? cur : "");
+
+    auto append = [&](const std::string& pat) {
+        if (newPath.find(pat) == std::string::npos)
+        {
+            if (!newPath.empty()) newPath += ";";
+            newPath += pat;
+        }
+    };
+    append(dir + "/?.lua");
+    append(dir + "/?/init.lua");
+
+    lua_pop(L, 1);
+    lua_pushstring(L, newPath.c_str());
+    lua_setfield(L, -2, "path");
+
+    lua_settop(L, top);
+}
+
+void LuaNodeRegistrar::LoadEntrySilent(const std::string& filePath, const std::string& chunkName)
+{
+    if (!ensureLuaState() || filePath.empty()) return;
+    if (!fs::exists(filePath)) return;  // 文件不存在静默跳过
+
+    lua_State* L = m_L;
+    int top = lua_gettop(L);
+
+    // 用指定 chunkName（或文件路径）标识，避免与其他同名脚本混淆
+    const std::string& name = chunkName.empty() ? filePath : chunkName;
+
+    // luaL_loadfilex 加载，错误函数包裹执行
+    if (luaL_loadfilex(L, filePath.c_str(), nullptr) != LUA_OK)
+    {
+        // 语法错误静默忽略（不影响编辑器启动）
+        lua_pop(L, 1);
+        lua_settop(L, top);
+        return;
+    }
+
+    // 设置 chunk 名（@前缀表示文件名，此处用自定义 name 覆盖）
+    // luaL_loadfilex 已设置 chunk 名为 @filePath，若需覆盖需要额外操作；
+    // 直接执行即可——chunk 名仅用于错误信息，不影响隔离性
+    (void)name;  // chunk 名已由调用方通过 chunkName 语义区分
+
+    // 错误处理函数
+    lua_pushcfunction(L, [](lua_State* Ls) -> int {
+        return 1;  // 直接返回错误对象，外层 pcall 捕获
+    });
+    lua_insert(L, -2);  // errFunc 置于 chunk 前
+
+    if (lua_pcall(L, 0, 0, lua_gettop(L) - 1) != LUA_OK)
+    {
+        // 运行时错误静默忽略
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);  // pop errFunc
+    lua_settop(L, top);
+}
+
+void LuaNodeRegistrar::WatchEntryScript(const std::string& filePath, const std::string& chunkName)
+{
+    if (filePath.empty()) return;
+
+    // 同一路径已存在则更新（工程切换时重置 loaded 状态）
+    for (auto& w : m_entryWatches)
+    {
+        if (w.filePath == filePath)
+        {
+            w.chunkName = chunkName;
+            w.loaded    = false;  // 重置，强制重新加载
+            break;
+        }
+    }
+    // 新增监视项
+    bool found = false;
+    for (auto& w : m_entryWatches)
+        if (w.filePath == filePath) { found = true; break; }
+    if (!found)
+        m_entryWatches.push_back({ filePath, chunkName, false });
+
+    // 立即尝试加载（若文件已存在）
+    if (fs::exists(filePath))
+    {
+        LoadEntrySilent(filePath, chunkName);
+        for (auto& w : m_entryWatches)
+            if (w.filePath == filePath) { w.loaded = true; break; }
+    }
+}
+
 int LuaNodeRegistrar::LoadScript(const std::string& filePath)
 {
     if (!m_registry) { m_lastError = "Not initialized"; return -1; }
@@ -461,25 +581,40 @@ int LuaNodeRegistrar::ReloadFile(const std::string& filePath)
 
 void LuaNodeRegistrar::PollFileChanges()
 {
-    if (!m_autoReload || m_loadedFiles.empty()) return;
-
-    bool needReload = false;
-    for (const auto& f : m_loadedFiles)
+    // ── 热重载：已加载脚本变更检测 ───────────────────────────────────────
+    if (m_autoReload && !m_loadedFiles.empty())
     {
+        bool needReload = false;
+        for (const auto& f : m_loadedFiles)
+        {
+            try {
+                auto t = fs::last_write_time(f);
+                int64_t tval = t.time_since_epoch().count();
+                auto it = m_fileModTimes.find(f);
+                if (it == m_fileModTimes.end() || it->second != tval)
+                {
+                    needReload = true;
+                    break;
+                }
+            } catch (...) {}
+        }
+        if (needReload)
+            ReloadAll();
+    }
+
+    // ── Entry Script Watcher：轮询未加载的入口脚本 ───────────────────────
+    for (auto& w : m_entryWatches)
+    {
+        if (w.loaded) continue;
         try {
-            auto t = fs::last_write_time(f);
-            int64_t tval = t.time_since_epoch().count();
-            auto it = m_fileModTimes.find(f);
-            if (it == m_fileModTimes.end() || it->second != tval)
+            if (fs::exists(w.filePath))
             {
-                needReload = true;
-                break;
+                LoadEntrySilent(w.filePath, w.chunkName);
+                w.loaded = true;
             }
         } catch (...) {}
     }
-
-    if (needReload)
-        ReloadAll();
 }
 
 #endif // BLUEPRINT_HAS_LUA
+

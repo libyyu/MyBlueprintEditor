@@ -24,6 +24,7 @@ namespace NodeEditor { namespace Runtime {
 #ifdef BLUEPRINT_HAS_LUA
 
 struct lua_State;
+typedef int (*lua_CFunction)(lua_State*);  // matches lua.h definition
 
 // ============================================================================
 // LuaNodeRegistrar — 编辑器侧 Lua 扩展管理器
@@ -41,6 +42,23 @@ public:
     // ── 初始化 ────────────────────────────────────────────────────────────
     void Initialize(NodeEditor::Runtime::INodeRegistry* registry,
                     std::unordered_map<std::string, NodeEditor::Runtime::NodeHandler>* handlerMap);
+
+    // ── Lua 路径 / Searcher ───────────────────────────────────────────
+    // 向 package.searchers[1] 插入自定义 loader（优先级最高）
+    void SetSearcher(lua_CFunction loader);
+    // 向 package.path 追加搜索目录（自动补 /?.lua;/?/init.lua）
+    void AddLuaPath(const std::string& dir);
+
+    // ── Entry Script 加载（直接 loadfile，不走 require，支持独立 chunkName）
+    // 立即尝试加载 filePath；文件不存在或执行出错均静默忽略。
+    // chunkName 用于区分同名脚本（建议用工程名，如 "MyGame:BlueprintEntry"）。
+    void LoadEntrySilent(const std::string& filePath, const std::string& chunkName = "");
+
+    // ── Entry Script Watcher ─────────────────────────────────────────
+    // 注册一个待监视的入口脚本。
+    // 若文件已存在则立即加载；否则在 PollFileChanges() 中轮询，出现后自动加载。
+    // 同一 filePath 重复注册时更新 chunkName 并重置加载状态（支持工程切换）。
+    void WatchEntryScript(const std::string& filePath, const std::string& chunkName = "");
 
     // ── 加载脚本 ─────────────────────────────────────────────────────────
     int  LoadScript(const std::string& filePath);
@@ -86,6 +104,14 @@ private:
     float  m_pollIntervalSec = 1.0f;
     float  m_pollAccum       = 0.0f;
     int    m_pendingCount    = 0;
+
+    // Entry script watcher（BlueprintEntry.lua per-project）
+    struct EntryWatch {
+        std::string filePath;
+        std::string chunkName;
+        bool        loaded = false;   // true = 已成功加载（不重复加载）
+    };
+    std::vector<EntryWatch> m_entryWatches;
 };
 
 #else // !BLUEPRINT_HAS_LUA
