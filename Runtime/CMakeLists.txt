@@ -406,6 +406,22 @@ if(_RUNTIME_LIB_TYPE STREQUAL "SHARED")
         LIBRARY_OUTPUT_DIRECTORY_DEBUG     "${CMAKE_BINARY_DIR}/bin/Debug"
         LIBRARY_OUTPUT_DIRECTORY_RELEASE   "${CMAKE_BINARY_DIR}/bin/Release"
     )
+
+    # macOS + Unity: output as .bundle instead of .dylib.
+    # Unity on macOS loads native plugins as .bundle files placed under
+    # Assets/Plugins/  (or Assets/Plugins/x86_64/ for Intel,
+    #                    Assets/Plugins/arm64/   for Apple Silicon).
+    # A .bundle is structurally identical to a .dylib; only the suffix differs.
+    # This option is ON by default so CI / delivery builds produce the right file.
+    # Turn it OFF if you need a plain .dylib for non-Unity consumers on macOS.
+    option(BUILD_MACOS_BUNDLE "Output BlueprintRuntime as .bundle on macOS (required by Unity)" ON)
+
+    if(APPLE AND NOT IOS AND BUILD_MACOS_BUNDLE)
+        set_target_properties(BlueprintRuntime PROPERTIES
+            SUFFIX ".bundle"
+        )
+        message(STATUS "[BlueprintRuntime] macOS: output suffix set to .bundle (Unity plugin)")
+    endif()
 endif()
 
 if(EMSCRIPTEN)
@@ -450,9 +466,9 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
 endif()
 
 # ---------------------------------------------------------------------------
-# macOS: set the dylib install name (so consumers find it after install)
+# macOS: set the dylib/bundle install name (so consumers find it after install)
 # ---------------------------------------------------------------------------
-if(APPLE AND _RUNTIME_LIB_TYPE STREQUAL "SHARED")
+if(APPLE AND NOT IOS AND _RUNTIME_LIB_TYPE STREQUAL "SHARED")
     set_target_properties(BlueprintRuntime PROPERTIES
         MACOSX_RPATH ON
         INSTALL_NAME_DIR "@rpath"
