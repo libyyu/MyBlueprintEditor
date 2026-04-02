@@ -625,16 +625,25 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
             ${CMAKE_AR} -rcsT "${_BUNDLE_OUT}" ${_BUNDLE_INPUTS}
         )
     else()
-        # Linux / Android NDK: use a small MRI script fed to ar
-        # MRI ADDLIB lines are generated via a cmake -E echo chain below.
+        # Linux / Android NDK: generate the MRI script at build time (after
+        # generator expressions have been evaluated) then feed it to ar -M.
+        # We cannot pass $<TARGET_FILE:...> via -D to a cmake -P script because
+        # generator expressions are not re-evaluated inside cmake -P.  Instead
+        # we write the MRI file using a second COMMAND that runs *after* the
+        # generator expressions are resolved, then invoke ar directly.
         set(_MRI_FILE "${CMAKE_CURRENT_BINARY_DIR}/bundle.mri")
-        set(_MERGE_CMD
-            ${CMAKE_COMMAND}
-                -D OUTPUT=${_BUNDLE_OUT}
-                -D "INPUTS=${_BUNDLE_INPUTS}"
-                -D MRI_FILE=${_MRI_FILE}
-                -D AR=${CMAKE_AR}
-                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/MergeStaticLibs.cmake"
+
+        # Build the MRI content as a generator expression string
+        # Each ADDLIB line is appended for every input archive.
+        set(_MRI_CONTENT "CREATE ${_BUNDLE_OUT}")
+        foreach(_inp IN LISTS _BUNDLE_INPUTS)
+            string(APPEND _MRI_CONTENT "\nADDLIB ${_inp}")
+        endforeach()
+        string(APPEND _MRI_CONTENT "\nSAVE\nEND")
+
+        set(_MERGE_COMMANDS
+            COMMAND ${CMAKE_COMMAND} -E echo "${_MRI_CONTENT}" > "${_MRI_FILE}"
+            COMMAND ${CMAKE_AR} -M < "${_MRI_FILE}"
         )
     endif()
 
@@ -645,13 +654,40 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
         set(_BUNDLE_ALL "")
     endif()
 
-    add_custom_target(BlueprintBundle ${_BUNDLE_ALL}
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/bin/Release"
-        COMMAND ${_MERGE_CMD}
-        DEPENDS BlueprintRuntime crude_json
-        COMMENT "Merging static libs → libBlueprintBundle.a"
-        VERBATIM
-    )
+    if(APPLE OR EMSCRIPTEN)
+        add_custom_target(BlueprintBundle ${_BUNDLE_ALL}
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/bin/Release"
+            COMMAND ${_MERGE_CMD}
+            DEPENDS BlueprintRuntime crude_json
+            COMMENT "Merging static libs → libBlueprintBundle.a"
+            VERBATIM
+        )
+    else()
+        # Linux/Android: two-step (write MRI then ar -M).
+        # Generator expressions in _MRI_CONTENT are evaluated at build time.
+        set(_MRI_FILE "${CMAKE_CURRENT_BINARY_DIR}/bundle.mri")
+        add_custom_target(BlueprintBundle ${_BUNDLE_ALL}
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/bin/Release"
+            # Step 1: write the MRI file with resolved archive paths
+            COMMAND ${CMAKE_COMMAND} -E echo
+                "CREATE ${_BUNDLE_OUT}"    > "${_MRI_FILE}"
+            COMMAND ${CMAKE_COMMAND} -E echo
+                "ADDLIB $<TARGET_FILE:BlueprintRuntime>" >> "${_MRI_FILE}"
+            COMMAND ${CMAKE_COMMAND} -E echo
+                "ADDLIB $<TARGET_FILE:crude_json>"       >> "${_MRI_FILE}"
+            COMMAND ${CMAKE_COMMAND} -E echo
+                "SAVE"                                   >> "${_MRI_FILE}"
+            COMMAND ${CMAKE_COMMAND} -E echo
+                "END"                                    >> "${_MRI_FILE}"
+            # Step 2: merge
+            COMMAND ${CMAKE_AR} -M < "${_MRI_FILE}"
+            COMMAND ${CMAKE_COMMAND} -E echo
+                "[BlueprintBundle] merged → ${_BUNDLE_OUT}"
+            DEPENDS BlueprintRuntime crude_json
+            COMMENT "Merging static libs → libBlueprintBundle.a"
+            VERBATIM
+        )
+    endif()
 
     # Install the bundle archive alongside the individual libs ---------------
     install(FILES "${_BUNDLE_OUT}"

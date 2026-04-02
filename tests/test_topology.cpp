@@ -132,7 +132,7 @@ TEST(TopologyTest, ForLoopExecution)
     runner.SetPrintCallback([&](LogLevel, const std::string& m){ logs.push_back(m); });
 
     // Main.bjson: ForLoop 0..10 → PrintString each index, then Branch/PrintString/ExecuteBlueprint
-    bool loaded = runner.LoadFromFile("assets/Main.bjson");
+    bool loaded = runner.LoadFromFileWithDeps("assets/Main.bjson");
     ASSERT_TRUE(loaded) << "Failed to load assets/Main.bjson: " << runner.GetLastError();
 
     auto result = runner.Execute();
