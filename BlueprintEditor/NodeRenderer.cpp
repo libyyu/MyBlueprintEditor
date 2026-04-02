@@ -430,7 +430,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 int minDyn = (isMakeMap) ? 2 : 1;
                                 bool isContainerMake = (node.DefinitionId == "MakeArray" ||
                                                         node.DefinitionId == "MakeMap"   ||
-                                                        node.DefinitionId == "SetMake");
+                                                        node.DefinitionId == "MakeSet");
                                 if (isContainerMake && dynCount <= minDyn)
                                     showRemoveBtn = false;
                             }
@@ -524,7 +524,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 std::string pinName = "Element " + std::to_string(dynCount);
                                 node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
                             }
-                            else if (node.DefinitionId == "SetMake")
+                            else if (node.DefinitionId == "MakeSet")
                             {
                                 std::string pinName = "Value " + std::to_string(dynCount);
                                 node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
@@ -583,7 +583,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                             pinName = "Element " + std::to_string(dynCount);
                             node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
                         }
-                        else if (node.DefinitionId == "SetMake")
+                        else if (node.DefinitionId == "MakeSet")
                         {
                             pinName = "Value " + std::to_string(dynCount);
                             node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);

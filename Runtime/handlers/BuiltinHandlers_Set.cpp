@@ -6,8 +6,8 @@ namespace Runtime {
 
 void RegisterHandlers_Set(std::unordered_map<std::string, NodeHandler>& handlers)
 {
-    // SetMake：从输入引脚 Value0/Value1/... 收集，返回 Set
-    handlers["SetMake"] = [](ExecutionContext& ctx) {
+    // MakeSet：从输入引脚 Value0/Value1/... 收集，返回 Set（旧 id SetMake 保留兼容）
+    handlers["MakeSet"] = handlers["SetMake"] = [](ExecutionContext& ctx) {
         const auto* node = ctx.GetCurrentNode();
         Variant result;
         result.type = PinDataType::Set;

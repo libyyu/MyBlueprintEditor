@@ -6,8 +6,8 @@ namespace Runtime {
 
 void RegisterHandlers_Map(std::unordered_map<std::string, NodeHandler>& handlers)
 {
-    // NodeDef id 是 "MapMake"，同时保留 "MakeMap" 兼容旧蓝图
-    handlers["MapMake"] = handlers["MakeMap"] = [](ExecutionContext& ctx) {
+    // MakeMap handler（旧 MapMake id 保留兼容）
+    handlers["MakeMap"] = handlers["MapMake"] = [](ExecutionContext& ctx) {
         const auto* node = ctx.GetCurrentNode();
         Variant result;
         result.type = PinDataType::Map;

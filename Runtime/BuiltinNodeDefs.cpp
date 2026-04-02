@@ -934,14 +934,6 @@ static void RegisterNodeDefs_Map(INodeRegistry& registry)
         if (d) d->customProperties["dynamicInputs"] = "Any";
     }
 
-    // MapMake — 带命名引脚的 Map 构建（Node-03）
-    reg("MapMake", "Map Make", "Misc/Map",
-        { MakePin("Key 0", PinDataType::Any), MakePin("Value 0", PinDataType::Any),
-          MakePin("Key 1", PinDataType::Any), MakePin("Value 1", PinDataType::Any) },
-        { MakePin("Result", PinDataType::Map) },
-        "20CCDD", "Simple");
-    
-
     reg("MapGet", "Map Get", "Misc/Map",
         { MakePin("Map", PinDataType::Map), MakePin("Key", PinDataType::Any) },
         { MakePin("Value", PinDataType::Any), MakePin("Found", PinDataType::Boolean) },
@@ -1007,12 +999,12 @@ static void RegisterNodeDefs_Map(INodeRegistry& registry)
           MakePin("Value", PinDataType::Any), MakeFlowPin("Completed") });
 
     // ── Set 节点定义 ──────────────────────────────────────────────────────
-    reg("SetMake", "Set Make", "Misc/Set",
+    reg("MakeSet", "Make Set", "Misc/Set",
         { MakePin("Value 0", PinDataType::Any) },
         { MakePin("Set", PinDataType::Set) },
         "B464F0", "Simple");
     {
-        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("SetMake"));
+        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("MakeSet"));
         if (d) d->customProperties["dynamicInputs"] = "Any";
     }
 
