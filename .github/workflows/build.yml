@@ -228,5 +228,5 @@ jobs:
 
       - name: Check output
         run: |
-          ls build-wasm/Runtime/ || ls build-wasm/
+          find build-wasm -name "libBlueprintRuntime.a" | xargs ls -lh
           echo "WASM build succeeded"
