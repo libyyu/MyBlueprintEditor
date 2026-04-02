@@ -357,16 +357,16 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
             // ── 初始化 TextEditor（只执行一次）────────────────────────────────
             if (!doc->logEditorInited)
             {
-                doc->logTextEditor.SetReadOnly(true);
-                doc->logTextEditor.SetShowWhitespaces(false);
+                doc->logTextEditor.SetReadOnlyEnabled(true);          // santaclose API
+                doc->logTextEditor.SetShowWhitespacesEnabled(false);  // santaclose API
 
                 // 自定义调色板：基于 Dark 主题，覆盖日志所需颜色槽
-                // PaletteIndex::Default      → 普通日志（浅灰白）
-                // PaletteIndex::Comment      → 成功/OK（绿）
-                // PaletteIndex::Preprocessor → ERROR（红）
-                // PaletteIndex::String       → WARN（橙黄）
+                // PaletteIndex::Default         → 普通日志（浅灰白）
+                // PaletteIndex::Comment         → 成功/OK（绿）
+                // PaletteIndex::Preprocessor    → ERROR（红）
+                // PaletteIndex::String          → WARN（橙黄）
                 // PaletteIndex::KnownIdentifier → INFO/Timer（蓝）
-                // PaletteIndex::Identifier   → 分隔线（暗灰）
+                // PaletteIndex::Identifier      → 分隔线（暗灰）
                 TextEditor::Palette pal = TextEditor::GetDarkPalette();
                 pal[(int)TextEditor::PaletteIndex::Default]         = IM_COL32(210, 213, 230, 255); // 普通
                 pal[(int)TextEditor::PaletteIndex::Comment]         = IM_COL32( 89, 224, 107, 255); // 成功/绿
@@ -375,53 +375,57 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
                 pal[(int)TextEditor::PaletteIndex::KnownIdentifier] = IM_COL32( 97, 173, 242, 255); // INFO/蓝
                 pal[(int)TextEditor::PaletteIndex::Identifier]      = IM_COL32(127, 132, 142, 229); // 分隔/暗
                 pal[(int)TextEditor::PaletteIndex::Background]      = IM_COL32( 21,  22,  26, 255); // 背景
-                pal[(int)TextEditor::PaletteIndex::LineNumber]       = IM_COL32( 80,  85,  95, 200); // 行号
-                pal[(int)TextEditor::PaletteIndex::Selection]        = IM_COL32( 38,  79, 120, 180); // 选区
-                pal[(int)TextEditor::PaletteIndex::Cursor]           = IM_COL32(220, 220, 220, 255); // 光标
-                doc->logTextEditor.SetPalette(pal);
+                pal[(int)TextEditor::PaletteIndex::LineNumber]      = IM_COL32( 80,  85,  95, 200); // 行号
+                pal[(int)TextEditor::PaletteIndex::Selection]       = IM_COL32( 38,  79, 120, 180); // 选区
+                pal[(int)TextEditor::PaletteIndex::Cursor]          = IM_COL32(220, 220, 220, 255); // 光标
+                doc->logTextEditor.SetPalette(TextEditor::PaletteId::Dark);  // 先设内置主题
+                // 然后通过自定义 palette 覆盖（santaclose 暂无 SetCustomPalette，用内置枚举+调色板静态修改）
+                // 改走静态方式：直接用 PaletteId::Dark 并靠 tokenizer 颜色槽映射
 
-                // 自定义 Language：tokenizer 按行前缀决定颜色槽
-                TextEditor::LanguageDefinition lang;
-                lang.mName = "BlueprintLog";
-                // 关闭语法高亮相关特性，全靠 tokenizer
-                lang.mAutoIndentation = false;
-                lang.mTokenize = [](
-                    const char* in_begin, const char* in_end,
-                    const char*& out_begin, const char*& out_end,
-                    TextEditor::PaletteIndex& paletteIndex) -> bool
+                // 自定义 LanguageDefinition：tokenizer 按行关键词决定颜色槽
+                // 注意：santaclose 的 SetLanguageDefinition 只接受枚举，
+                // 我们在 TextEditor.h 中已添加 SetCustomLanguageDefinition 重载
+                static TextEditor::LanguageDefinition s_bpLogLang;
+                static bool s_langInited = false;
+                if (!s_langInited)
                 {
-                    // 逐字符扫描，给整行标记颜色
-                    // 这里实现"行前缀"着色：找到换行前的内容，按关键词决定颜色
-                    if (in_begin == in_end) return false;
+                    s_bpLogLang.mName = "BlueprintLog";
+                    s_bpLogLang.mTokenize = [](
+                        const char* in_begin, const char* in_end,
+                        const char*& out_begin, const char*& out_end,
+                        TextEditor::PaletteIndex& paletteIndex) -> bool
+                    {
+                        if (in_begin == in_end) return false;
+                        // 扫到行尾
+                        const char* lineEnd = in_begin;
+                        while (lineEnd < in_end && *lineEnd != '\n') ++lineEnd;
+                        if (lineEnd == in_begin) return false;
 
-                    // 辅助：从当前位置扫到行尾（不含 \n）
-                    const char* lineEnd = in_begin;
-                    while (lineEnd < in_end && *lineEnd != '\n') ++lineEnd;
+                        std::string_view line(in_begin, lineEnd - in_begin);
+                        auto contains = [&](std::string_view pat) {
+                            return line.find(pat) != std::string_view::npos;
+                        };
 
-                    std::string_view line(in_begin, lineEnd - in_begin);
+                        if (contains("[ERROR]") || contains("FAILED") || contains("ABORTED"))
+                            paletteIndex = TextEditor::PaletteIndex::Preprocessor;    // 红
+                        else if (contains("[WARN]"))
+                            paletteIndex = TextEditor::PaletteIndex::String;           // 橙
+                        else if (contains("[INFO]") || contains("[Timer:"))
+                            paletteIndex = TextEditor::PaletteIndex::KnownIdentifier;  // 蓝
+                        else if (contains("Completed Successfully") || contains("success"))
+                            paletteIndex = TextEditor::PaletteIndex::Comment;          // 绿
+                        else if (contains("========"))
+                            paletteIndex = TextEditor::PaletteIndex::Identifier;       // 暗灰
+                        else
+                            paletteIndex = TextEditor::PaletteIndex::Default;          // 默认
 
-                    auto contains = [&](std::string_view pat) {
-                        return line.find(pat) != std::string_view::npos;
+                        out_begin = in_begin;
+                        out_end   = lineEnd;
+                        return true;
                     };
-
-                    if (contains("[ERROR]") || contains("FAILED") || contains("ABORTED"))
-                        paletteIndex = TextEditor::PaletteIndex::Preprocessor;    // 红
-                    else if (contains("[WARN]"))
-                        paletteIndex = TextEditor::PaletteIndex::String;           // 橙
-                    else if (contains("[INFO]") || contains("[Timer:"))
-                        paletteIndex = TextEditor::PaletteIndex::KnownIdentifier;  // 蓝
-                    else if (contains("Completed Successfully") || contains("✓"))
-                        paletteIndex = TextEditor::PaletteIndex::Comment;          // 绿
-                    else if (contains("========"))
-                        paletteIndex = TextEditor::PaletteIndex::Identifier;       // 暗灰
-                    else
-                        paletteIndex = TextEditor::PaletteIndex::Default;          // 默认
-
-                    out_begin = in_begin;
-                    out_end   = lineEnd;   // 消费到行尾（不含换行符本身，TextEditor 自己处理 \n）
-                    return true;
-                };
-                doc->logTextEditor.SetLanguageDefinition(lang);
+                    s_langInited = true;
+                }
+                doc->logTextEditor.SetCustomLanguageDefinition(&s_bpLogLang);
                 doc->logEditorInited = true;
             }
 
@@ -440,17 +444,17 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
             if (ImGui::Button(ICON_FA_COPY " Copy##logcopy"))
             {
                 // 优先复制选区，无选区则复制全部（含过滤）
-                if (doc->logTextEditor.HasSelection())
+                if (doc->logTextEditor.AnyCursorHasSelection())         // santaclose API
                 {
                     ImGui::SetClipboardText(doc->logTextEditor.GetSelectedText().c_str());
                 }
                 else
                 {
                     std::string allText;
-                    std::string filter(doc->execLogFilter);
+                    std::string flt(doc->execLogFilter);
                     for (const auto& line : doc->executionLog)
                     {
-                        if (!filter.empty() && line.find(filter) == std::string::npos)
+                        if (!flt.empty() && line.find(flt) == std::string::npos)
                             continue;
                         allText += line;
                         allText += '\n';
@@ -473,11 +477,12 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
                 doc->logTextEditor.SetText("");
             }
 
-            // ── 同步 TextEditor 内容（日志有更新或过滤条件变化时重建）─────────
+            // ── 同步 TextEditor 内容（日志更新或过滤条件变化时重建）────────────
             std::string filter(doc->execLogFilter);
             bool needRebuild = doc->executionLogDirty
                              || filterChanged
                              || (doc->execLogCachedFilter != filter);
+            bool shouldScrollBottom = doc->executionLogDirty;
             if (needRebuild)
             {
                 doc->execLogCachedFilter = filter;
@@ -492,22 +497,22 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
                 }
                 doc->executionLogText = txt;
                 doc->logTextEditor.SetText(txt);
+                doc->executionLogDirty = false;
             }
 
             // ── TextEditor 渲染（只读，支持选词 / Ctrl+C / Ctrl+A）────────────
             float logH = ImGui::GetContentRegionAvail().y - 4.0f;
             if (logH < 40.0f) logH = 40.0f;
 
-            // 自动滚动到底部
-            if (doc->executionLogDirty)
+            // 自动滚到最后一行
+            if (shouldScrollBottom)
             {
-                int totalLines = doc->logTextEditor.GetTotalLines();
+                int totalLines = doc->logTextEditor.GetLineCount();   // santaclose API
                 if (totalLines > 0)
-                    doc->logTextEditor.SetCursorPosition({ totalLines - 1, 0 });
-                doc->executionLogDirty = false;
+                    doc->logTextEditor.SetCursorPosition(totalLines - 1, 0); // santaclose: (line, col)
             }
 
-            doc->logTextEditor.Render("##ExecLog", ImVec2(paneWidth, logH), true);
+            doc->logTextEditor.Render("##ExecLog", false, ImVec2(paneWidth, logH), true);
             ImGui::EndTabItem();
         }
 

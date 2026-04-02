@@ -154,6 +154,7 @@ if(NOT BUILD_RUNTIME_ONLY)
     # ------------------------------------------------------------------
     add_library(ImGuiColorTextEdit STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/external/ImGuiColorTextEdit/TextEditor.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/ImGuiColorTextEdit/LanguageDefinitions.cpp
     )
     target_include_directories(ImGuiColorTextEdit PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/external/ImGuiColorTextEdit
