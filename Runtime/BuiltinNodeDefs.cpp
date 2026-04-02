@@ -861,7 +861,7 @@ static void RegisterNodeDefs_Array(INodeRegistry& registry)
         { MakeFlowPin(""), MakePin("Array", PinDataType::Array) });
 
     reg("MakeArray", "Make Array", "Misc/Array",
-        { },
+        { MakePin("Element 0", PinDataType::Any) },
         { MakePin("Array", PinDataType::Array) },
         "", "Simple");
     {
@@ -926,7 +926,7 @@ static void RegisterNodeDefs_Map(INodeRegistry& registry)
     { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
 
     reg("MakeMap", "Make Map", "Misc/Map",
-        { },
+        { MakePin("Key 0", PinDataType::Any), MakePin("Value 0", PinDataType::Any) },
         { MakePin("Map", PinDataType::Map) },
         "", "Simple");
     {
@@ -1008,7 +1008,7 @@ static void RegisterNodeDefs_Map(INodeRegistry& registry)
 
     // ── Set 节点定义 ──────────────────────────────────────────────────────
     reg("SetMake", "Set Make", "Misc/Set",
-        { },
+        { MakePin("Value 0", PinDataType::Any) },
         { MakePin("Set", PinDataType::Set) },
         "B464F0", "Simple");
     {

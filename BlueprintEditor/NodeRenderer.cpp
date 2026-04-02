@@ -409,6 +409,8 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                         int pinIdx = static_cast<int>(&input - node.Inputs.data());
                         if (pinIdx >= node.DynamicInputFixedCount)
                         {
+                            int dynCount = static_cast<int>(node.Inputs.size()) - node.DynamicInputFixedCount;
+
                             // MakeMap: 成对删除，只在 Key 引脚上显示 [-] 按钮
                             bool isMakeMap = (node.DefinitionId == "MakeMap");
                             bool showRemoveBtn = true;
@@ -417,6 +419,19 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 int dynIdx = pinIdx - node.DynamicInputFixedCount;
                                 // 动态引脚中偶数索引是 Key，奇数是 Value
                                 if (dynIdx % 2 != 0)
+                                    showRemoveBtn = false;
+                            }
+
+                            // 容器类型：至少保留 1 个元素用于类型推断
+                            // MakeArray / SetMake: 至少 1 个动态 pin
+                            // MakeMap: 至少 1 对（2 个动态 pin）
+                            if (showRemoveBtn)
+                            {
+                                int minDyn = (isMakeMap) ? 2 : 1;
+                                bool isContainerMake = (node.DefinitionId == "MakeArray" ||
+                                                        node.DefinitionId == "MakeMap"   ||
+                                                        node.DefinitionId == "SetMake");
+                                if (isContainerMake && dynCount <= minDyn)
                                     showRemoveBtn = false;
                             }
 
