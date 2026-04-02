@@ -492,11 +492,10 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
 
                             if (node.DefinitionId == "MakeMap")
                             {
-                                // MakeMap: 成对添加 Key + Value
+                                // MakeMap: 成对添加 Key + Value，索引基于动态 pin 对数
                                 int pairIdx = dynCount / 2;
-                                int totalPairs = static_cast<int>(node.Inputs.size()) / 2;
-                                std::string keyName = "Key " + std::to_string(totalPairs);
-                                std::string valName = "Value " + std::to_string(totalPairs);
+                                std::string keyName = "Key " + std::to_string(pairIdx);
+                                std::string valName = "Value " + std::to_string(pairIdx);
                                 node.Inputs.emplace_back(GetNextId(), keyName.c_str(), node.DynamicInputPinType);
                                 node.Inputs.emplace_back(GetNextId(), valName.c_str(), node.DynamicInputPinType);
                             }
@@ -508,6 +507,11 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                             else if (node.DefinitionId == "MakeArray")
                             {
                                 std::string pinName = "Element " + std::to_string(dynCount);
+                                node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
+                            }
+                            else if (node.DefinitionId == "SetMake")
+                            {
+                                std::string pinName = "Value " + std::to_string(dynCount);
                                 node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
                             }
                             else
@@ -547,10 +551,10 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
 
                         if (node.DefinitionId == "MakeMap")
                         {
-                            // MakeMap: 成对添加 Key + Value
-                            int totalPairs = static_cast<int>(node.Inputs.size()) / 2;
-                            std::string keyName = "Key " + std::to_string(totalPairs);
-                            std::string valName = "Value " + std::to_string(totalPairs);
+                            // MakeMap: 成对添加 Key + Value，索引基于动态 pin 对数
+                            int pairIdx = dynCount / 2;
+                            std::string keyName = "Key " + std::to_string(pairIdx);
+                            std::string valName = "Value " + std::to_string(pairIdx);
                             node.Inputs.emplace_back(GetNextId(), keyName.c_str(), node.DynamicInputPinType);
                             node.Inputs.emplace_back(GetNextId(), valName.c_str(), node.DynamicInputPinType);
                         }
@@ -562,6 +566,11 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                         else if (node.DefinitionId == "MakeArray")
                         {
                             pinName = "Element " + std::to_string(dynCount);
+                            node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
+                        }
+                        else if (node.DefinitionId == "SetMake")
+                        {
+                            pinName = "Value " + std::to_string(dynCount);
                             node.Inputs.emplace_back(GetNextId(), pinName.c_str(), node.DynamicInputPinType);
                         }
                         else

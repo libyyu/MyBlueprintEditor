@@ -743,7 +743,7 @@ static void RegisterNodeDefs_String(INodeRegistry& registry)
 
     // FormatString — 格式化字符串 ({0}, {1}, ... 占位符)
     reg("FormatString", "Format String", "Misc/String",
-        { MakePin("Format", PinDataType::String), MakePin("Arg 0", PinDataType::Any), MakePin("Arg 1", PinDataType::Any) },
+        { MakePin("Format", PinDataType::String) },
         { MakePin("Result", PinDataType::String) },
         "", "Simple");
     {
@@ -861,7 +861,7 @@ static void RegisterNodeDefs_Array(INodeRegistry& registry)
         { MakeFlowPin(""), MakePin("Array", PinDataType::Array) });
 
     reg("MakeArray", "Make Array", "Misc/Array",
-        { MakePin("Element 0", PinDataType::Any), MakePin("Element 1", PinDataType::Any) },
+        { },
         { MakePin("Array", PinDataType::Array) },
         "", "Simple");
     {
@@ -926,7 +926,7 @@ static void RegisterNodeDefs_Map(INodeRegistry& registry)
     { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
 
     reg("MakeMap", "Make Map", "Misc/Map",
-        { MakePin("Key 0", PinDataType::Any), MakePin("Value 0", PinDataType::Any) },
+        { },
         { MakePin("Map", PinDataType::Map) },
         "", "Simple");
     {
@@ -1008,9 +1008,13 @@ static void RegisterNodeDefs_Map(INodeRegistry& registry)
 
     // ── Set 节点定义 ──────────────────────────────────────────────────────
     reg("SetMake", "Set Make", "Misc/Set",
-        { MakePin("Value 0", PinDataType::Any), MakePin("Value 1", PinDataType::Any) },
+        { },
         { MakePin("Set", PinDataType::Set) },
         "B464F0", "Simple");
+    {
+        auto* d = const_cast<NodeDefinition*>(registry.getNodeDefinition("SetMake"));
+        if (d) d->customProperties["dynamicInputs"] = "Any";
+    }
 
     reg("SetAdd", "Set Add", "Misc/Set",
         { MakeFlowPin(""), MakePin("Set", PinDataType::Set), MakePin("Value", PinDataType::Any) },
