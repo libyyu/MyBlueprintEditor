@@ -1266,12 +1266,13 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
     float paneWidth = ImGui::GetContentRegionAvail().x;
 
     // 类型选项（与变量面板保持一致）
-    static const char* typeNames[] = { "Boolean", "Integer", "Float", "String", "Object" };
+    static const char* typeNames[] = { "Boolean", "Integer", "Float", "String", "Object", "Array", "Map", "Any" };
     static const RTPinDataType typeValues[] = {
         RTPinDataType::Boolean, RTPinDataType::Integer, RTPinDataType::Float,
-        RTPinDataType::String, RTPinDataType::Object
+        RTPinDataType::String, RTPinDataType::Object,
+        RTPinDataType::Array, RTPinDataType::Map, RTPinDataType::Any
     };
-    static const int typeCount = 5;
+    static const int typeCount = 8;
 
     auto dataTypeToIndex = [](RTPinDataType dt) -> int {
         switch (dt) {
@@ -1280,6 +1281,9 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
         case RTPinDataType::Float:   return 2;
         case RTPinDataType::String:  return 3;
         case RTPinDataType::Object:  return 4;
+        case RTPinDataType::Array:   return 5;
+        case RTPinDataType::Map:     return 6;
+        case RTPinDataType::Any:     return 7;
         default:                     return 3; // 默认 String
         }
     };
