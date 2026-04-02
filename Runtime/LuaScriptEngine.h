@@ -44,11 +44,16 @@ public:
     LuaScriptEngine(LuaScriptEngine&& other) noexcept;
     LuaScriptEngine& operator=(LuaScriptEngine&& other) noexcept;
 
-    // 初始化 VM（打开标准库 + 注册 Blueprint.* API）
+    // 初始化 VM（自建 lua_State，打开标准库 + 注册 Blueprint.* API）
     // runner: handler 注册目标（生命周期由调用者保证）
     bool Initialize(BlueprintRunner* runner);
 
-    // 关闭 VM，释放所有资源
+    // 使用外部 lua_State 初始化（不自建 VM，不关闭 VM）
+    // 用于 iOS/Emscripten 等静态链接平台，复用宿主（如 xLua）的 Lua VM，避免符号冲突。
+    // 注意：外部 lua_State 的生命周期由调用者管理，Blueprint 不会调用 lua_close()。
+    bool InitializeWithExternalState(lua_State* L, BlueprintRunner* runner);
+
+    // 关闭 VM，释放所有资源（外部 State 模式下只注销绑定，不 close VM）
     void Shutdown();
 
     // 是否已初始化
@@ -78,6 +83,7 @@ private:
 
     lua_State*                 m_L = nullptr;
     BlueprintRunner*           m_runner = nullptr;
+    bool                       m_ownsState = true;  // false = 外部传入，Shutdown 时不 close
     std::string                m_lastError;
     std::vector<std::string>   m_loadedFiles;   // 按顺序记录已加载的文件路径
     int                        m_loadedCount = 0; // 总加载次数（文件 + 字符串）

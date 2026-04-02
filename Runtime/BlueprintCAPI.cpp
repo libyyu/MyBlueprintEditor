@@ -246,4 +246,23 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetLastError(BP_Runner runner, 
     return copyString(asWrapper(runner)->lastError, buf, bufLen);
 }
 
+// ---------------------------------------------------------------------------
+// Lua external state
+// ---------------------------------------------------------------------------
+
+#ifdef BLUEPRINT_HAS_LUA
+#include "LuaScriptEngine.h"
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetExternalLuaState(BP_Runner runner, lua_State* L)
+{
+    if (!runner || !L) return;
+    auto* w = asWrapper(runner);
+    LuaScriptEngine* engine = w->runner.GetLuaEngine();
+    if (!engine) return;
+    if (engine->IsInitialized()) return;  // 已初始化则忽略，避免重复设置
+
+    engine->InitializeWithExternalState(L, &w->runner);
+}
+#endif
+
 } // extern "C"

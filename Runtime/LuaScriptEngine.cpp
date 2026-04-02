@@ -21,10 +21,12 @@ LuaScriptEngine::~LuaScriptEngine()
 LuaScriptEngine::LuaScriptEngine(LuaScriptEngine&& other) noexcept
     : m_L(other.m_L)
     , m_runner(other.m_runner)
+    , m_ownsState(other.m_ownsState)
     , m_lastError(std::move(other.m_lastError))
 {
     other.m_L = nullptr;
     other.m_runner = nullptr;
+    other.m_ownsState = true;
 }
 
 LuaScriptEngine& LuaScriptEngine::operator=(LuaScriptEngine&& other) noexcept
@@ -34,9 +36,11 @@ LuaScriptEngine& LuaScriptEngine::operator=(LuaScriptEngine&& other) noexcept
         Shutdown();
         m_L = other.m_L;
         m_runner = other.m_runner;
+        m_ownsState = other.m_ownsState;
         m_lastError = std::move(other.m_lastError);
         other.m_L = nullptr;
         other.m_runner = nullptr;
+        other.m_ownsState = true;
     }
     return *this;
 }
@@ -74,14 +78,47 @@ bool LuaScriptEngine::Initialize(BlueprintRunner* runner)
     return true;
 }
 
+bool LuaScriptEngine::InitializeWithExternalState(lua_State* L, BlueprintRunner* runner)
+{
+    if (m_L)
+    {
+        m_lastError = "Lua VM already initialized";
+        return false;
+    }
+    if (!L)
+    {
+        m_lastError = "external lua_State is null";
+        return false;
+    }
+    if (!runner)
+    {
+        m_lastError = "runner is null";
+        return false;
+    }
+
+    m_L         = L;
+    m_runner    = runner;
+    m_ownsState = false;  // 不拥有这个 VM，Shutdown 时不 close
+
+    // 不调用 luaL_openlibs（外部 VM 已初始化，重复 open 可能覆盖全局表）
+    // 只注册 Blueprint.* 绑定
+    RegisterLuaBindings(m_L, m_runner);
+
+    m_lastError.clear();
+    return true;
+}
+
 void LuaScriptEngine::Shutdown()
 {
     if (m_L)
     {
-        lua_close(m_L);
+        // 外部 State 模式：不关闭 VM，只清空引用
+        if (m_ownsState)
+            lua_close(m_L);
         m_L = nullptr;
     }
     m_runner = nullptr;
+    m_ownsState = true;
     m_loadedFiles.clear();
     m_loadedCount = 0;
 }

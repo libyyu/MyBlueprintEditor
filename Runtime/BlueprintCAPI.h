@@ -186,6 +186,27 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetPrintCallback(BP_Runner run
 /// Returns the number of bytes written (excluding NUL).
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetLastError(BP_Runner runner, char* buf, int bufLen);
 
+// ---------------------------------------------------------------------------
+// Lua external state (iOS / Emscripten / static-link platforms)
+// ---------------------------------------------------------------------------
+// On platforms where Blueprint is linked statically alongside another Lua host
+// (e.g. xLua on iOS), duplicate Lua symbols cause linker errors.
+// Use BP_SetExternalLuaState() to share the host's lua_State with Blueprint
+// instead of letting Blueprint create its own VM.
+//
+// Must be called BEFORE BP_Initialize() (or the first script load).
+// The lua_State lifetime is managed by the caller; Blueprint will NOT call
+// lua_close() on it.
+//
+// On Android / macOS / Windows (dynamic Lua), this is a no-op — Blueprint
+// uses its own VM as usual.
+//
+// Only available when BLUEPRINT_HAS_LUA is defined.
+#ifdef BLUEPRINT_HAS_LUA
+struct lua_State;
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetExternalLuaState(BP_Runner runner, lua_State* L);
+#endif
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
