@@ -4,8 +4,10 @@
 #include "BlueprintData.h"
 #include "BuiltinNodeDefs.h"
 #include "BuiltinHandlers.h"
+#include "test_helpers.h"
 
 using namespace NodeEditor::Runtime;
+using namespace TestHelpers;
 
 // ── 辅助 ─────────────────────────────────────────────────────────────────────
 
@@ -19,11 +21,12 @@ protected:
         runner.SetPrintCallback([this](LogLevel, const std::string& m){ logs.push_back(m); });
     }
 
-    // 构建并执行单节点蓝图（inline）
+    // 构建并执行单节点蓝图（inline），走 Tick 循环
     bool loadAndRun(BlueprintData& bp)
     {
         bp.rebuildIndices();
-        return runner.Load(bp) && runner.Execute().success;
+        if (!runner.Load(bp)) return false;
+        return RunWithTick(runner).success;
     }
 
     BlueprintRunner runner;
@@ -53,7 +56,7 @@ TEST_F(HandlersTest, BranchTrue)
     bp.rebuildIndices();
     ASSERT_TRUE(runner.Load(bp));
 
-    auto result = runner.Execute();
+    auto result = RunWithTick(runner);
     EXPECT_TRUE(result.success);
     // Branch 节点本身被执行
     EXPECT_GE(result.nodesExecuted, 1u);
@@ -139,7 +142,7 @@ TEST_F(HandlersTest, ForLoopAccumulation)
     bool loaded = fr.LoadFromFile("assets/TestBP.01.bjson");
     ASSERT_TRUE(loaded) << "Failed to load assets/TestBP.01.bjson: " << fr.GetLastError();
 
-    auto result = fr.Execute();
+    auto result = RunWithTick(fr);
     EXPECT_TRUE(result.success) << fr.GetLastError();
     EXPECT_GT(result.nodesExecuted, 0u);
 

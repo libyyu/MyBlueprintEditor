@@ -1,11 +1,13 @@
-// tests/test_topology.cpp -- 拓扑排序 / 执行顺序测试
+// tests/test_topology.cpp -- 拓扑排序 / 执行顺序 / 端到端集成测试
 // buildTopologicalOrder 是 BlueprintRunner 的私有方法，通过执行结果间接验证顺序正确性
 #include <gtest/gtest.h>
 #include "BlueprintRunner.h"
 #include "BlueprintData.h"
 #include "BuiltinHandlers.h"
+#include "test_helpers.h"
 
 using namespace NodeEditor::Runtime;
+using namespace TestHelpers;
 
 // ── 辅助 ─────────────────────────────────────────────────────────────────────
 
@@ -64,7 +66,7 @@ TEST(TopologyTest, LinearChainExecutionOrder)
     RegisterBuiltinHandlers(runner, ".");
     ASSERT_TRUE(runner.Load(bp));
 
-    auto result = runner.Execute();
+    auto result = RunWithTick(runner);
     EXPECT_TRUE(result.success) << runner.GetLastError();
 
     // A 先执行（a=1），B 后执行（a=2），最终 a==2
@@ -90,11 +92,8 @@ TEST(TopologyTest, AcyclicGraphExecutes)
     BlueprintRunner runner;
     RegisterBuiltinHandlers(runner, ".");
 
-    std::vector<std::string> logs;
-    runner.SetLogCallback([&](LogLevel, const std::string& m){ logs.push_back(m); });
-
     ASSERT_TRUE(runner.Load(bp));
-    auto result = runner.Execute();
+    auto result = RunWithTick(runner);
     EXPECT_TRUE(result.success);
     EXPECT_GE(result.nodesExecuted, 1u);
 }
@@ -116,31 +115,90 @@ TEST(TopologyTest, IsolatedNodeExecutes)
     BlueprintRunner runner;
     RegisterBuiltinHandlers(runner, ".");
     ASSERT_TRUE(runner.Load(bp));
-    auto result = runner.Execute();
+    auto result = RunWithTick(runner);
     EXPECT_TRUE(result.success);
 }
 
-// ── 端到端：ForLoop 累加（从 JSON 文件）────────────────────────────────────────
+// ── 端到端：Main.bjson 完整集成（ForLoop + Branch + FuncLib + ExecuteBlueprint）─
 
 TEST(TopologyTest, ForLoopExecution)
 {
     BlueprintRunner runner;
     RegisterBuiltinHandlers(runner, "assets");
 
-    // 收集 Print 输出
     std::vector<std::string> logs;
     runner.SetPrintCallback([&](LogLevel, const std::string& m){ logs.push_back(m); });
 
-    // Main.bjson: ForLoop 0..10 → PrintString each index, then Branch/PrintString/ExecuteBlueprint
+    // LoadFromFileWithDeps 自动加载 CommonLib（metadata.dependencies）
     bool loaded = runner.LoadFromFileWithDeps("assets/Main.bjson");
     ASSERT_TRUE(loaded) << "Failed to load assets/Main.bjson: " << runner.GetLastError();
 
-    auto result = runner.Execute();
-    EXPECT_TRUE(result.success) << runner.GetLastError();
-    EXPECT_GT(result.nodesExecuted, 0u);
+    RunWithTick(runner);
 
-    // ForLoop 0..10 prints 11 lines ("Loop Index: 0" .. "Loop Index: 10")
-    // plus "Index Matched 5" (when index==5) and "Loop Finished"
-    EXPECT_GE(logs.size(), 11u) << "Expected at least 11 log entries from ForLoop";
+    // ── ForLoop 0..10 产生 11 条 "Loop Index:N" ──────────────────────────────
+    int loopCount = 0;
+    for (const auto& l : logs)
+        if (l.rfind("Loop Index:", 0) == 0) ++loopCount;
+    EXPECT_EQ(loopCount, 11) << "ForLoop 0..10 should print 11 'Loop Index:N' lines";
+
+    // ── Branch: Index==5 时额外打印 ──────────────────────────────────────────
+    bool branchHit = false;
+    for (const auto& l : logs)
+        if (l.find("Index Matched 5") != std::string::npos) { branchHit = true; break; }
+    EXPECT_TRUE(branchHit) << "Branch should print 'Index Matched 5' when index==5";
+
+    // ── ForLoop 完成出口 ──────────────────────────────────────────────────────
+    bool loopFinished = false;
+    for (const auto& l : logs)
+        if (l.find("Loop Finished") != std::string::npos) { loopFinished = true; break; }
+    EXPECT_TRUE(loopFinished) << "ForLoop.Completed should print 'Loop Finished'";
+
+    // ── Sub Continue: ExecuteBlueprint 完成后回到主流程 ───────────────────────
+    bool subContinue = false;
+    for (const auto& l : logs)
+        if (l.find("Sub Continue") != std::string::npos) { subContinue = true; break; }
+    EXPECT_TRUE(subContinue) << "After ExecuteBlueprint, should print 'Sub Continue'";
+
+    // ── FuncLib.TestPrint 打印 Message 参数 ──────────────────────────────────
+    bool libMsg = false;
+    for (const auto& l : logs)
+        if (l.find("test lib") != std::string::npos) { libMsg = true; break; }
+    EXPECT_TRUE(libMsg) << "FuncLib.TestPrint should print the Message input 'test lib'";
+
+    // ── FuncLib 返回值正确（TestPrint 返回 MakeLiteralFloat(99)）─────────────
+    bool libReturn = false;
+    for (const auto& l : logs)
+        if (l.find("Lib Return:") != std::string::npos &&
+            l.find("99") != std::string::npos) { libReturn = true; break; }
+    EXPECT_TRUE(libReturn) << "FuncLib.TestPrint return value should be 99 (got: Lib Return:99.xxx)";
 }
 
+// ── 端到端：Sub/Sub.bjson 含 Delay 异步节点，Tick 循环驱动 ────────────────────
+
+TEST(TopologyTest, AsyncDelayInSubBlueprint)
+{
+    BlueprintRunner runner;
+    RegisterBuiltinHandlers(runner, "assets");
+
+    std::vector<std::string> logs;
+    runner.SetPrintCallback([&](LogLevel, const std::string& m){ logs.push_back(m); });
+
+    // Sub/Sub.bjson: PrintString → Delay(2s) → PrintString × 2
+    bool loaded = runner.LoadFromFile("assets/Sub/Sub.bjson");
+    ASSERT_TRUE(loaded) << "Failed to load assets/Sub/Sub.bjson: " << runner.GetLastError();
+
+    // RunWithTick 使用实时时钟，Delay(2s) 完成后 HasPendingAsync() 变 false
+    RunWithTick(runner);
+
+    // ── Delay 同步出口（Exec）：立即输出 ─────────────────────────────────────
+    bool enterSub = false, delayContinue = false, delayReached = false;
+    for (const auto& l : logs) {
+        if (l.find("Enter Sub")      != std::string::npos) enterSub      = true;
+        if (l.find("Delay Continue") != std::string::npos) delayContinue = true;
+        if (l.find("Delay Reached")  != std::string::npos) delayReached  = true;
+    }
+    EXPECT_TRUE(enterSub)      << "Should print 'Enter Sub' at start";
+    EXPECT_TRUE(delayContinue) << "Delay.Exec (sync) should print 'Delay Continue'";
+    // Delay(2s).Completed 是异步回调，Tick 循环驱动后应到达
+    EXPECT_TRUE(delayReached)  << "Delay.Completed (async, 2s) should print 'Delay Reached' after Tick loop";
+}
