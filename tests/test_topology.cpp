@@ -125,16 +125,22 @@ TEST(TopologyTest, IsolatedNodeExecutes)
 TEST(TopologyTest, ForLoopExecution)
 {
     BlueprintRunner runner;
-    RegisterBuiltinHandlers(runner, ".");
+    RegisterBuiltinHandlers(runner, "assets");
 
-    bool loaded = runner.LoadFromFile("TestBP.01.bjson");
-    if (!loaded)
-    {
-        GTEST_SKIP() << "TestBP.01.bjson not found in working directory";
-        return;
-    }
+    // 收集 Print 输出
+    std::vector<std::string> logs;
+    runner.SetPrintCallback([&](LogLevel, const std::string& m){ logs.push_back(m); });
+
+    // Main.bjson: ForLoop 0..10 → PrintString each index, then Branch/PrintString/ExecuteBlueprint
+    bool loaded = runner.LoadFromFile("assets/Main.bjson");
+    ASSERT_TRUE(loaded) << "Failed to load assets/Main.bjson: " << runner.GetLastError();
+
     auto result = runner.Execute();
     EXPECT_TRUE(result.success) << runner.GetLastError();
     EXPECT_GT(result.nodesExecuted, 0u);
+
+    // ForLoop 0..10 prints 11 lines ("Loop Index: 0" .. "Loop Index: 10")
+    // plus "Index Matched 5" (when index==5) and "Loop Finished"
+    EXPECT_GE(logs.size(), 11u) << "Expected at least 11 log entries from ForLoop";
 }
 

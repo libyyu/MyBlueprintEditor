@@ -131,21 +131,22 @@ TEST_F(HandlersTest, SetGetVariable)
 
 TEST_F(HandlersTest, ForLoopAccumulation)
 {
-    // 若测试 JSON 文件存在则执行端到端测试
-    bool loaded = runner.LoadFromFile("TestBP.01.bjson");
-    if (!loaded)
-    {
-        GTEST_SKIP() << "TestBP.01.bjson not found in working directory";
-        return;
-    }
+    // TestBP.01.bjson: ForLoop 0..4 累加 counter = 0+1+2+3+4 = 10
+    // 使用独立 runner（LoadFromFile 会重置状态）
+    BlueprintRunner fr;
+    RegisterBuiltinHandlers(fr, "assets");
 
-    auto result = runner.Execute();
-    EXPECT_TRUE(result.success) << runner.GetLastError();
+    bool loaded = fr.LoadFromFile("assets/TestBP.01.bjson");
+    ASSERT_TRUE(loaded) << "Failed to load assets/TestBP.01.bjson: " << fr.GetLastError();
 
-    // TestBP.01 执行 ForLoop 0..4 累加 → counter = 10
-    Variant counter = runner.GetVariable("counter");
-    if (counter.type != PinDataType::Unknown)
-        EXPECT_EQ(counter.asInt(), 10);
+    auto result = fr.Execute();
+    EXPECT_TRUE(result.success) << fr.GetLastError();
+    EXPECT_GT(result.nodesExecuted, 0u);
+
+    // ForLoop 0..4 累加：counter = 0+1+2+3+4 = 10
+    Variant counter = fr.GetVariable("counter");
+    EXPECT_NE(counter.type, PinDataType::Unknown) << "Variable 'counter' not found";
+    EXPECT_EQ(counter.asInt(), 10) << "counter should be 10 after accumulating 0..4";
 }
 
 // ── PrintString 产生日志 ──────────────────────────────────────────────────────
