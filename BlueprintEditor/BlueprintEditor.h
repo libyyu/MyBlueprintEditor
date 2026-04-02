@@ -22,6 +22,7 @@
 #include "BpProject.h"
 #include "BpLogger.h"
 #include "LuaNodeRegistrar.h"
+#include "TextEditor.h"
 
 #include <string>
 #include <vector>
@@ -172,11 +173,13 @@ public:
 
     // 运行时执行状态
     std::vector<std::string>    executionLog;
-    std::string                 executionLogText;          // 合并后的日志文本
+    std::string                 executionLogText;          // 合并后的日志文本（Copy 用）
     bool                        executionLogDirty = false;
     bool                        isExecuting = false;
     std::string                 lastExecutionStatus;
     std::vector<ed::LinkId>     flowLinks;
+    TextEditor                  logTextEditor;             // 彩色日志编辑器（只读，支持选词）
+    bool                        logEditorInited = false;   // palette/只读模式是否已初始化
 
     // 节点位置追踪（用于检测拖拽移动，标记 dirty）
     std::map<ed::NodeId, ImVec2, NodeIdLess> lastNodePositions;

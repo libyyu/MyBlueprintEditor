@@ -352,84 +352,162 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
         // ── Tab: Log ────────────────────────────────────────────────────
         if (ImGui::BeginTabItem(ICON_FA_TERMINAL " Log"))
         {
-            // 过滤框 + Copy + Clear 按钮（同行）
+            auto* doc = ActiveDoc();
+
+            // ── 初始化 TextEditor（只执行一次）────────────────────────────────
+            if (!doc->logEditorInited)
+            {
+                doc->logTextEditor.SetReadOnly(true);
+                doc->logTextEditor.SetShowWhitespaces(false);
+
+                // 自定义调色板：基于 Dark 主题，覆盖日志所需颜色槽
+                // PaletteIndex::Default      → 普通日志（浅灰白）
+                // PaletteIndex::Comment      → 成功/OK（绿）
+                // PaletteIndex::Preprocessor → ERROR（红）
+                // PaletteIndex::String       → WARN（橙黄）
+                // PaletteIndex::KnownIdentifier → INFO/Timer（蓝）
+                // PaletteIndex::Identifier   → 分隔线（暗灰）
+                TextEditor::Palette pal = TextEditor::GetDarkPalette();
+                pal[(int)TextEditor::PaletteIndex::Default]         = IM_COL32(210, 213, 230, 255); // 普通
+                pal[(int)TextEditor::PaletteIndex::Comment]         = IM_COL32( 89, 224, 107, 255); // 成功/绿
+                pal[(int)TextEditor::PaletteIndex::Preprocessor]    = IM_COL32(242,  82,  82, 255); // ERROR/红
+                pal[(int)TextEditor::PaletteIndex::String]          = IM_COL32(242, 183,  71, 255); // WARN/橙
+                pal[(int)TextEditor::PaletteIndex::KnownIdentifier] = IM_COL32( 97, 173, 242, 255); // INFO/蓝
+                pal[(int)TextEditor::PaletteIndex::Identifier]      = IM_COL32(127, 132, 142, 229); // 分隔/暗
+                pal[(int)TextEditor::PaletteIndex::Background]      = IM_COL32( 21,  22,  26, 255); // 背景
+                pal[(int)TextEditor::PaletteIndex::LineNumber]       = IM_COL32( 80,  85,  95, 200); // 行号
+                pal[(int)TextEditor::PaletteIndex::Selection]        = IM_COL32( 38,  79, 120, 180); // 选区
+                pal[(int)TextEditor::PaletteIndex::Cursor]           = IM_COL32(220, 220, 220, 255); // 光标
+                doc->logTextEditor.SetPalette(pal);
+
+                // 自定义 Language：tokenizer 按行前缀决定颜色槽
+                TextEditor::LanguageDefinition lang;
+                lang.mName = "BlueprintLog";
+                // 关闭语法高亮相关特性，全靠 tokenizer
+                lang.mAutoIndentation = false;
+                lang.mTokenize = [](
+                    const char* in_begin, const char* in_end,
+                    const char*& out_begin, const char*& out_end,
+                    TextEditor::PaletteIndex& paletteIndex) -> bool
+                {
+                    // 逐字符扫描，给整行标记颜色
+                    // 这里实现"行前缀"着色：找到换行前的内容，按关键词决定颜色
+                    if (in_begin == in_end) return false;
+
+                    // 辅助：从当前位置扫到行尾（不含 \n）
+                    const char* lineEnd = in_begin;
+                    while (lineEnd < in_end && *lineEnd != '\n') ++lineEnd;
+
+                    std::string_view line(in_begin, lineEnd - in_begin);
+
+                    auto contains = [&](std::string_view pat) {
+                        return line.find(pat) != std::string_view::npos;
+                    };
+
+                    if (contains("[ERROR]") || contains("FAILED") || contains("ABORTED"))
+                        paletteIndex = TextEditor::PaletteIndex::Preprocessor;    // 红
+                    else if (contains("[WARN]"))
+                        paletteIndex = TextEditor::PaletteIndex::String;           // 橙
+                    else if (contains("[INFO]") || contains("[Timer:"))
+                        paletteIndex = TextEditor::PaletteIndex::KnownIdentifier;  // 蓝
+                    else if (contains("Completed Successfully") || contains("✓"))
+                        paletteIndex = TextEditor::PaletteIndex::Comment;          // 绿
+                    else if (contains("========"))
+                        paletteIndex = TextEditor::PaletteIndex::Identifier;       // 暗灰
+                    else
+                        paletteIndex = TextEditor::PaletteIndex::Default;          // 默认
+
+                    out_begin = in_begin;
+                    out_end   = lineEnd;   // 消费到行尾（不含换行符本身，TextEditor 自己处理 \n）
+                    return true;
+                };
+                doc->logTextEditor.SetLanguageDefinition(lang);
+                doc->logEditorInited = true;
+            }
+
+            // ── 工具栏：过滤框 + Copy + Clear ────────────────────────────────
             float copyW  = ImGui::CalcTextSize(ICON_FA_COPY  " Copy").x  + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f;
             float clearW = ImGui::CalcTextSize(ICON_FA_ERASER " Clear").x + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f;
             float filterW = paneWidth - copyW - clearW - ImGui::GetStyle().ItemSpacing.x * 2.0f - 4.0f;
             if (filterW < 80.0f) filterW = 80.0f;
 
             ImGui::SetNextItemWidth(filterW);
-            ImGui::InputTextWithHint("##LogFilter",
+            bool filterChanged = ImGui::InputTextWithHint("##LogFilter",
                 ICON_FA_MAGNIFYING_GLASS " Filter...",
-                ActiveDoc()->execLogFilter, sizeof(ActiveDoc()->execLogFilter));
+                doc->execLogFilter, sizeof(doc->execLogFilter));
 
             ImGui::SameLine(0, 4);
             if (ImGui::Button(ICON_FA_COPY " Copy##logcopy"))
             {
-                std::string allText;
-                std::string filter(ActiveDoc()->execLogFilter);
-                for (const auto& line : ActiveDoc()->executionLog)
+                // 优先复制选区，无选区则复制全部（含过滤）
+                if (doc->logTextEditor.HasSelection())
                 {
-                    if (!filter.empty() && line.find(filter) == std::string::npos)
-                        continue;
-                    allText += line;
-                    allText += '\n';
+                    ImGui::SetClipboardText(doc->logTextEditor.GetSelectedText().c_str());
                 }
-                ImGui::SetClipboardText(allText.c_str());
+                else
+                {
+                    std::string allText;
+                    std::string filter(doc->execLogFilter);
+                    for (const auto& line : doc->executionLog)
+                    {
+                        if (!filter.empty() && line.find(filter) == std::string::npos)
+                            continue;
+                        allText += line;
+                        allText += '\n';
+                    }
+                    ImGui::SetClipboardText(allText.c_str());
+                }
             }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Copy selection or all filtered lines");
 
             ImGui::SameLine(0, 4);
             if (ImGui::Button(ICON_FA_ERASER " Clear##logclear"))
             {
-                ActiveDoc()->executionLog.clear();
-                ActiveDoc()->executionLogText.clear();
-                ActiveDoc()->execLogCachedFilter.clear();
-                ActiveDoc()->executionLogDirty = false;
-                ActiveDoc()->lastExecutionStatus.clear();
-                ActiveDoc()->lastExecutionResult = RTExecutionResult{};
+                doc->executionLog.clear();
+                doc->executionLogText.clear();
+                doc->execLogCachedFilter.clear();
+                doc->executionLogDirty = false;
+                doc->lastExecutionStatus.clear();
+                doc->lastExecutionResult = RTExecutionResult{};
+                doc->logTextEditor.SetText("");
             }
 
+            // ── 同步 TextEditor 内容（日志有更新或过滤条件变化时重建）─────────
+            std::string filter(doc->execLogFilter);
+            bool needRebuild = doc->executionLogDirty
+                             || filterChanged
+                             || (doc->execLogCachedFilter != filter);
+            if (needRebuild)
+            {
+                doc->execLogCachedFilter = filter;
+                std::string txt;
+                txt.reserve(doc->executionLog.size() * 64);
+                for (const auto& line : doc->executionLog)
+                {
+                    if (!filter.empty() && line.find(filter) == std::string::npos)
+                        continue;
+                    txt += line;
+                    txt += '\n';
+                }
+                doc->executionLogText = txt;
+                doc->logTextEditor.SetText(txt);
+            }
+
+            // ── TextEditor 渲染（只读，支持选词 / Ctrl+C / Ctrl+A）────────────
             float logH = ImGui::GetContentRegionAvail().y - 4.0f;
             if (logH < 40.0f) logH = 40.0f;
 
-            // 同步 executionLogText 缓存（供 InputTextMultiline 文字选取使用）
-            std::string filter(ActiveDoc()->execLogFilter);
+            // 自动滚动到底部
+            if (doc->executionLogDirty)
             {
-                bool needRebuild = ActiveDoc()->executionLogDirty
-                                || (ActiveDoc()->execLogCachedFilter != filter);
-                if (needRebuild)
-                {
-                    ActiveDoc()->execLogCachedFilter = filter;
-                    auto& txt = ActiveDoc()->executionLogText;
-                    txt.clear();
-                    for (const auto& line : ActiveDoc()->executionLog)
-                    {
-                        if (!filter.empty() && line.find(filter) == std::string::npos)
-                            continue;
-                        txt += line;
-                        txt += '\n';
-                    }
-                }
+                int totalLines = doc->logTextEditor.GetTotalLines();
+                if (totalLines > 0)
+                    doc->logTextEditor.SetCursorPosition({ totalLines - 1, 0 });
+                doc->executionLogDirty = false;
             }
 
-            // ── 彩色日志显示（BeginChild + DrawColoredLogLine）────────────────
-            ImGui::BeginChild("##ExecLog", ImVec2(paneWidth, logH), true,
-                ImGuiWindowFlags_HorizontalScrollbar);
-
-            for (const auto& line : ActiveDoc()->executionLog)
-            {
-                if (!filter.empty() && line.find(filter) == std::string::npos)
-                    continue;
-                DrawColoredLogLine(line);
-            }
-
-            bool shouldScroll = ActiveDoc()->executionLogDirty;
-            if (shouldScroll)
-            {
-                ImGui::SetScrollHereY(1.0f);
-                ActiveDoc()->executionLogDirty = false;
-            }
-            ImGui::EndChild();
+            doc->logTextEditor.Render("##ExecLog", ImVec2(paneWidth, logH), true);
             ImGui::EndTabItem();
         }
 

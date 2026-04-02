@@ -150,6 +150,18 @@ if(NOT BUILD_RUNTIME_ONLY)
     set_property(TARGET imgui PROPERTY FOLDER "Libraries")
 
     # ------------------------------------------------------------------
+    # ImGuiColorTextEdit  (彩色文本编辑器，用于日志窗口选词 + 颜色)
+    # ------------------------------------------------------------------
+    add_library(ImGuiColorTextEdit STATIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/ImGuiColorTextEdit/TextEditor.cpp
+    )
+    target_include_directories(ImGuiColorTextEdit PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/ImGuiColorTextEdit
+    )
+    target_link_libraries(ImGuiColorTextEdit PUBLIC imgui)
+    set_property(TARGET ImGuiColorTextEdit PROPERTY FOLDER "Libraries")
+
+    # ------------------------------------------------------------------
     # ImGuiNodeEditor  (Editor core – depends on imgui + BlueprintRuntime)
     # ------------------------------------------------------------------
     set(CORE_SOURCES
@@ -357,7 +369,7 @@ if(NOT BUILD_RUNTIME_ONLY)
             ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintEditor/utilities
     )
 
-    target_link_libraries(BlueprintEditor PRIVATE Application)
+    target_link_libraries(BlueprintEditor PRIVATE Application ImGuiColorTextEdit)
 
     # Phase 3: 若 Runtime 开启了 Lua，Editor 也需要链接 Lua 库（LuaNodeRegistrar.cpp 使用 lua.hpp）
     # LuaNodeRegistrar.cpp 属于 BlueprintEditor，必须显式传递 BLUEPRINT_HAS_LUA 和 Lua include。
