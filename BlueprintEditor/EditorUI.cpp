@@ -1744,12 +1744,11 @@ void BlueprintEditor::OnFrame(float deltaTime)
         float iconW = ImGui::CalcTextSize(ICON_FA_PAUSE).x + ImGui::GetStyle().FramePadding.x * 2.0f + 6.0f;
         // 工具条宽度自适应（AlwaysAutoResize），只用 totalW 估算初始水平居中位置
         // 布局：Run + Pause/Resume + Step + StepIn + StepOut + Stop + 状态图标
-        float stepInW  = iconW + 6.0f;  // StepIn/StepOut 按钮比普通 icon 稍宽
         float totalW = btnW + 4          // Run
                      + iconW + 4         // Pause/Resume
                      + iconW + 2         // Step
-                     + stepInW + 2       // StepIn
-                     + stepInW + 4       // StepOut
+                     + iconW + 2         // StepIn
+                     + iconW + 4         // StepOut
                      + iconW + 10        // Stop
                      + iconW + 24;       // 状态图标 + padding
 
@@ -1887,7 +1886,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
             if (!canStepIn) ImGui::BeginDisabled();
             ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(50, 80, 140, 255));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(70, 110, 190, 255));
-            if (ImGui::Button(ICON_FA_ARROW_DOWN " I##stepin", ImVec2(iconW + 6.0f, btnH)))
+            if (ImGui::Button(ICON_FA_ARROW_DOWN "##stepin", ImVec2(iconW, btnH)))
             {
                 // ---- StepIn 实现 ----
                 std::string libAbsPath2;
@@ -2057,7 +2056,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
             if (!canStepOut) ImGui::BeginDisabled();
             ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(80, 50, 120, 255));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(110, 70, 160, 255));
-            if (ImGui::Button(ICON_FA_ARROW_UP " O##stepout", ImVec2(iconW + 6.0f, btnH)))
+            if (ImGui::Button(ICON_FA_ARROW_UP "##stepout", ImVec2(iconW, btnH)))
             {
                 int parentIdx2 = ActiveDoc()->stepInParentDocIndex;
                 ActiveDoc()->stepInParentDocIndex = -1;
