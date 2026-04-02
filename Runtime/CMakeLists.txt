@@ -543,7 +543,14 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
 
     # Include Lua only when explicitly requested AND it is static
     if(BLUEPRINT_LUA AND BUNDLE_LUA AND (NOT _LUA_LIB_TYPE STREQUAL "SHARED"))
-        list(APPEND _BUNDLE_INPUTS $<TARGET_FILE:${LUA_LIBRARIES}>)
+        # LUA_LIBRARIES may be a CMake target (self-built via FetchContent)
+        # or a plain file path (system Lua found via find_package/pkg-config).
+        # $<TARGET_FILE:...> only works with targets — use TARGET guard.
+        if(TARGET ${LUA_LIBRARIES})
+            list(APPEND _BUNDLE_INPUTS $<TARGET_FILE:${LUA_LIBRARIES}>)
+        else()
+            list(APPEND _BUNDLE_INPUTS ${LUA_LIBRARIES})
+        endif()
         message(STATUS "[BlueprintBundle] Lua WILL be merged into bundle (BUNDLE_LUA=ON)")
     elseif(BLUEPRINT_LUA AND (NOT _LUA_LIB_TYPE STREQUAL "SHARED"))
         message(STATUS "[BlueprintBundle] Lua will NOT be merged (BUNDLE_LUA=OFF) — use BP_SetExternalLuaState() to provide external VM")
@@ -557,9 +564,16 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
 
     # Platform-specific merge command ----------------------------------------
     if(APPLE)
-        # macOS / iOS: libtool -static
+        # macOS / iOS: use xcrun libtool (Apple's static linker tool).
+        # 'libtool' in PATH on GitHub Actions macOS runners may resolve to the
+        # GNU libtool, which does NOT support -static.  Force Apple's libtool
+        # via xcrun to be safe.
+        find_program(_APPLE_LIBTOOL libtool HINTS /usr/bin /usr/local/bin)
+        if(NOT _APPLE_LIBTOOL)
+            set(_APPLE_LIBTOOL libtool)
+        endif()
         set(_MERGE_CMD
-            libtool -static -o "${_BUNDLE_OUT}" ${_BUNDLE_INPUTS}
+            xcrun ${_APPLE_LIBTOOL} -static -o "${_BUNDLE_OUT}" ${_BUNDLE_INPUTS}
         )
     elseif(EMSCRIPTEN)
         # Emscripten: emar (llvm-ar wrapper)
