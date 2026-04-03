@@ -601,9 +601,18 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
     endif()
 
     # Output path ------------------------------------------------------------
-    set(_BUNDLE_OUT "${CMAKE_BINARY_DIR}/bin/Release/libBlueprintBundle.a")
+    # BUNDLE_NAME 可由外部指定文件名（不含 lib 前缀和 .a 后缀），
+    # 默认为 BlueprintBundle；BUNDLE_LUA=OFF 时自动降级为 BlueprintBundleNoLua。
+    if(NOT DEFINED BUNDLE_NAME OR BUNDLE_NAME STREQUAL "")
+        if(BUNDLE_LUA)
+            set(BUNDLE_NAME "BlueprintBundle")
+        else()
+            set(BUNDLE_NAME "BlueprintBundleNoLua")
+        endif()
+    endif()
+    set(_BUNDLE_OUT "${CMAKE_BINARY_DIR}/bin/Release/lib${BUNDLE_NAME}.a")
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set(_BUNDLE_OUT "${CMAKE_BINARY_DIR}/bin/Debug/libBlueprintBundle.a")
+        set(_BUNDLE_OUT "${CMAKE_BINARY_DIR}/bin/Debug/lib${BUNDLE_NAME}.a")
     endif()
 
     # Platform-specific merge command ----------------------------------------

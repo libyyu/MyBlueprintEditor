@@ -200,37 +200,46 @@ collect_all() {
         "${AND_BIN}/bin/${BT}/liblua54.so" \
         "${UNITY_PLUGINS_DIR}/Android/arm64-v8a" "liblua54.so"
 
-    # ── iOS：使用 BlueprintBundle（静态全合并包） ─────────────────────────────
+    # ── iOS：BlueprintBundle（含 Lua）+ BlueprintBundleNoLua ─────────────────
     local IOS_BIN="${PROJECT_DIR}/build-ios/bin/${BT}"
-    # Xcode generator 把 .a 放在 <config>-iphoneos/ 子目录
-    local IOS_BUNDLE=""
-    for candidate in \
-        "${IOS_BIN}/libBlueprintBundle.a" \
-        "${PROJECT_DIR}/build-ios/bin/${BT}-iphoneos/libBlueprintBundle.a" \
-        "${PROJECT_DIR}/build-ios/Runtime/${BT}/libBlueprintBundle.a" \
-        "${PROJECT_DIR}/build-ios/Runtime/libBlueprintBundle.a"; do
-        [[ -f "$candidate" ]] && { IOS_BUNDLE="$candidate"; break; }
+    for bundle_name in "libBlueprintBundle.a" "libBlueprintBundleNoLua.a"; do
+        local IOS_BUNDLE=""
+        for candidate in \
+            "${IOS_BIN}/${bundle_name}" \
+            "${PROJECT_DIR}/build-ios/bin/${BT}-iphoneos/${bundle_name}" \
+            "${PROJECT_DIR}/build-ios/Runtime/${BT}/${bundle_name}" \
+            "${PROJECT_DIR}/build-ios/Runtime/${bundle_name}"; do
+            [[ -f "$candidate" ]] && { IOS_BUNDLE="$candidate"; break; }
+        done
+        if [[ -n "$IOS_BUNDLE" ]]; then
+            collect "ios" "$IOS_BUNDLE" "${UNITY_PLUGINS_DIR}/iOS" "${bundle_name}"
+        fi
     done
-    if [[ -n "$IOS_BUNDLE" ]]; then
-        collect_required "ios" "$IOS_BUNDLE" "${UNITY_PLUGINS_DIR}/iOS" "libBlueprintBundle.a"
-    else
+    # 若两个 Bundle 都没有，回退到裸 Runtime
+    if [[ ! -f "${UNITY_PLUGINS_DIR}/iOS/libBlueprintBundle.a" && \
+          ! -f "${UNITY_PLUGINS_DIR}/iOS/libBlueprintBundleNoLua.a" ]]; then
         collect_required "ios" \
             "${IOS_BIN}/libBlueprintRuntime.a" \
             "${UNITY_PLUGINS_DIR}/iOS" "libBlueprintRuntime.a"
     fi
 
-    # ── WebGL：使用 BlueprintBundle（静态全合并包） ───────────────────────────
+    # ── WebGL：BlueprintBundle（含 Lua）+ BlueprintBundleNoLua ───────────────
     local WASM_BIN="${PROJECT_DIR}/build-wasm/bin/${BT}"
-    local WASM_BUNDLE=""
-    for candidate in \
-        "${WASM_BIN}/libBlueprintBundle.a" \
-        "${PROJECT_DIR}/build-wasm/Runtime/libBlueprintBundle.a" \
-        "${PROJECT_DIR}/build-wasm/bin/libBlueprintBundle.a"; do
-        [[ -f "$candidate" ]] && { WASM_BUNDLE="$candidate"; break; }
+    for bundle_name in "libBlueprintBundle.a" "libBlueprintBundleNoLua.a"; do
+        local WASM_BUNDLE=""
+        for candidate in \
+            "${WASM_BIN}/${bundle_name}" \
+            "${PROJECT_DIR}/build-wasm/Runtime/${bundle_name}" \
+            "${PROJECT_DIR}/build-wasm/bin/${bundle_name}"; do
+            [[ -f "$candidate" ]] && { WASM_BUNDLE="$candidate"; break; }
+        done
+        if [[ -n "$WASM_BUNDLE" ]]; then
+            collect "wasm" "$WASM_BUNDLE" "${UNITY_PLUGINS_DIR}/WebGL" "${bundle_name}"
+        fi
     done
-    if [[ -n "$WASM_BUNDLE" ]]; then
-        collect_required "wasm" "$WASM_BUNDLE" "${UNITY_PLUGINS_DIR}/WebGL" "libBlueprintBundle.a"
-    else
+    # 若两个 Bundle 都没有，回退到裸 Runtime
+    if [[ ! -f "${UNITY_PLUGINS_DIR}/WebGL/libBlueprintBundle.a" && \
+          ! -f "${UNITY_PLUGINS_DIR}/WebGL/libBlueprintBundleNoLua.a" ]]; then
         collect_required "wasm" \
             "${PROJECT_DIR}/build-wasm/Runtime/libBlueprintRuntime.a" \
             "${UNITY_PLUGINS_DIR}/WebGL" "libBlueprintRuntime.a"
@@ -294,12 +303,15 @@ echo -e "${BOLD}============================================${NC}"
 # -DBUILD_BUNDLE=ON -DBUNDLE_LUA=ON 重新 configure 并构建 BlueprintBundle target。
 
 build_bundle_target() {
-    # build_bundle_target <build_dir> <build_type>
-    local bdir="$1" btype="$2"
+    # build_bundle_target <build_dir> <build_type> <bundle_lua ON|OFF>
+    local bdir="$1" btype="$2" bundle_lua="${3:-OFF}"
     [[ -d "$bdir" ]] || return 0
-    info "  Configuring BlueprintBundle in ${bdir} ..."
+    local suffix=""
+    [[ "$bundle_lua" == "ON" ]] && suffix=" (with Lua)" || suffix=" (no Lua)"
+    info "  Configuring BlueprintBundle${suffix} in ${bdir} ..."
     cmake -S "${PROJECT_DIR}" -B "${bdir}" \
-        -DBUILD_BUNDLE=ON -DBUNDLE_LUA=ON \
+        -DBUILD_BUNDLE=ON \
+        -DBUNDLE_LUA="${bundle_lua}" \
         -DCMAKE_BUILD_TYPE="${btype}" > /dev/null
     cmake --build "${bdir}" --target BlueprintBundle \
         --config "${btype}" --parallel \
@@ -326,10 +338,13 @@ WASM_ARGS=()
 if command -v emcmake &>/dev/null || [[ -n "$EMSDK_PATH" ]]; then
     run_build "wasm" "${WASM_ARGS[@]}"
     if [[ "${BUILD_STATUS[wasm]:-}" == "OK" ]]; then
-        step "Building BlueprintBundle (wasm)"
-        build_bundle_target "${PROJECT_DIR}/build-wasm" "${BUILD_TYPE}" \
-            && success "BlueprintBundle (wasm) OK" \
-            || warn "BlueprintBundle (wasm) failed – will fall back to libBlueprintRuntime.a"
+        step "Building BlueprintBundle (wasm) – with Lua + without Lua"
+        build_bundle_target "${PROJECT_DIR}/build-wasm" "${BUILD_TYPE}" "ON" \
+            && success "BlueprintBundle+Lua (wasm) OK" \
+            || warn "BlueprintBundle+Lua (wasm) failed"
+        build_bundle_target "${PROJECT_DIR}/build-wasm" "${BUILD_TYPE}" "OFF" \
+            && success "BlueprintBundleNoLua (wasm) OK" \
+            || warn "BlueprintBundleNoLua (wasm) failed"
     fi
 else
     BUILD_STATUS["wasm"]="NA"
@@ -363,10 +378,13 @@ fi
 if [[ "$HOST_OS" == "Darwin" ]]; then
     run_build "ios"
     if [[ "${BUILD_STATUS[ios]:-}" == "OK" ]]; then
-        step "Building BlueprintBundle (ios)"
-        build_bundle_target "${PROJECT_DIR}/build-ios" "${BUILD_TYPE}" \
-            && success "BlueprintBundle (ios) OK" \
-            || warn "BlueprintBundle (ios) failed – will fall back to libBlueprintRuntime.a"
+        step "Building BlueprintBundle (ios) – with Lua + without Lua"
+        build_bundle_target "${PROJECT_DIR}/build-ios" "${BUILD_TYPE}" "ON" \
+            && success "BlueprintBundle+Lua (ios) OK" \
+            || warn "BlueprintBundle+Lua (ios) failed"
+        build_bundle_target "${PROJECT_DIR}/build-ios" "${BUILD_TYPE}" "OFF" \
+            && success "BlueprintBundleNoLua (ios) OK" \
+            || warn "BlueprintBundleNoLua (ios) failed"
     fi
 else
     BUILD_STATUS["ios"]="NA"
@@ -413,8 +431,10 @@ echo -e "    Android/arm64/   libBlueprintRuntime.so  liblua54.so"
 echo -e "    Linux/x86_64/    libBlueprintRuntime.so  liblua54.so"
 echo -e "    macOS/           libBlueprintRuntime.bundle  liblua54.dylib"
 echo -e "  收集的产物（静态平台，全合并包）:"
-echo -e "    iOS/             libBlueprintBundle.a  (Runtime+JSON+Lua)"
-echo -e "    WebGL/           libBlueprintBundle.a  (Runtime+JSON+Lua)"
+echo -e "    iOS/             libBlueprintBundle.a      (Runtime+JSON+Lua)"
+echo -e "    iOS/             libBlueprintBundleNoLua.a (Runtime+JSON, 无Lua)"
+echo -e "    WebGL/           libBlueprintBundle.a      (Runtime+JSON+Lua)"
+echo -e "    WebGL/           libBlueprintBundleNoLua.a (Runtime+JSON, 无Lua)"
 echo -e "${BOLD}============================================${NC}"
 
 if [[ $ALL_OK -eq 1 ]]; then
