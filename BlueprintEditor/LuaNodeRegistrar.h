@@ -82,6 +82,8 @@ public:
 
     // 供 l_registerNode 回调使用（内部用）
     std::unordered_set<std::string>& GetRegisteredIds_Mutable() { return m_registeredIds; }
+    std::unordered_map<std::string, std::unordered_set<std::string>>& GetFileNodeIds_Mutable() { return m_fileNodeIds; }
+    const std::string& GetCurrentLoadingFile() const { return m_currentLoadingFile; }
     void IncrPendingCount() { ++m_pendingCount; }
 
 private:
@@ -100,6 +102,10 @@ private:
     std::string                     m_lastError;
 
     std::unordered_map<std::string, int64_t> m_fileModTimes;
+    // 每个文件注册的节点 id 集合（用于单文件精确热重载）
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_fileNodeIds;
+    // 当前正在 execute 的文件路径（供 l_registerNode 回调归因）
+    std::string m_currentLoadingFile;
     bool   m_autoReload      = true;
     float  m_pollIntervalSec = 1.0f;
     float  m_pollAccum       = 0.0f;

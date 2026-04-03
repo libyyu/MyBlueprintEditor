@@ -199,7 +199,13 @@ static int l_registerNode(lua_State* L)
 
     // 记录已注册 ID（用于热重载时清理）
     if (registrar)
+    {
         registrar->GetRegisteredIds_Mutable().insert(def.id);
+        // 同时将 id 归入当前加载文件的节点集合（用于单文件精确热重载）
+        const std::string& loadingFile = registrar->GetCurrentLoadingFile();
+        if (!loadingFile.empty())
+            registrar->GetFileNodeIds_Mutable()[loadingFile].insert(def.id);
+    }
 
     // 如果 Lua 脚本同时提供了 handler 函数（第二个参数），自动注册 handler
     if (lua_isfunction(L, 2) && handlerMap)
@@ -323,6 +329,9 @@ int LuaNodeRegistrar::executeFile(const std::string& filePath)
 {
     m_pendingCount = 0;
 
+    // 设置当前加载文件路径，l_registerNode 回调用它归因节点 id 到文件
+    m_currentLoadingFile = filePath;
+
     if (luaL_loadfile(m_L, filePath.c_str()) != LUA_OK)
     {
         const char* err = lua_tostring(m_L, -1);
@@ -344,10 +353,12 @@ int LuaNodeRegistrar::executeFile(const std::string& filePath)
         const char* err = lua_tostring(m_L, -1);
         m_lastError = "Runtime error [" + filePath + "]: " + (err ? err : "unknown");
         lua_pop(m_L, 2);
+        m_currentLoadingFile.clear();
         return -1;
     }
     lua_pop(m_L, 1);  // pop errFunc
 
+    m_currentLoadingFile.clear();
     m_lastError.clear();
     return m_pendingCount;
 }
@@ -545,6 +556,7 @@ void LuaNodeRegistrar::UnregisterAll()
     }
 
     m_registeredIds.clear();
+    m_fileNodeIds.clear();  // 清空文件→节点id映射
 }
 
 int LuaNodeRegistrar::ReloadAll()
@@ -574,9 +586,31 @@ int LuaNodeRegistrar::ReloadFile(const std::string& filePath)
 {
     if (!m_registry) return -1;
 
-    // 只卸载该文件注册的节点（通过重建来简化：reload all）
-    // TODO: 更精细的单文件热重载（需要追踪每文件注册的 id 集合）
-    return ReloadAll();
+    // 精确单文件热重载：
+    // 1. 只卸载该文件注册的节点定义（不影响其他文件）
+    auto fit = m_fileNodeIds.find(filePath);
+    if (fit != m_fileNodeIds.end())
+    {
+        for (const auto& id : fit->second)
+        {
+            m_registry->unregisterNode(id);
+            m_registeredIds.erase(id);
+            if (m_handlerMap) m_handlerMap->erase(id);
+        }
+        fit->second.clear();
+    }
+
+    // 2. 重新执行该文件（Lua VM 保持，其他文件的函数引用不受影响）
+    int n = executeFile(filePath);
+    if (n < 0) return -1;
+
+    // 3. 更新文件修改时间
+    try {
+        auto t = fs::last_write_time(filePath);
+        m_fileModTimes[filePath] = t.time_since_epoch().count();
+    } catch (...) {}
+
+    return n;
 }
 
 void LuaNodeRegistrar::PollFileChanges()
@@ -584,7 +618,6 @@ void LuaNodeRegistrar::PollFileChanges()
     // ── 热重载：已加载脚本变更检测 ───────────────────────────────────────
     if (m_autoReload && !m_loadedFiles.empty())
     {
-        bool needReload = false;
         for (const auto& f : m_loadedFiles)
         {
             try {
@@ -593,13 +626,11 @@ void LuaNodeRegistrar::PollFileChanges()
                 auto it = m_fileModTimes.find(f);
                 if (it == m_fileModTimes.end() || it->second != tval)
                 {
-                    needReload = true;
-                    break;
+                    // 单文件精确重载，不影响其他文件的注册状态
+                    ReloadFile(f);
                 }
             } catch (...) {}
         }
-        if (needReload)
-            ReloadAll();
     }
 
     // ── Entry Script Watcher：轮询未加载的入口脚本 ───────────────────────
