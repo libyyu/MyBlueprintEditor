@@ -245,6 +245,7 @@ void BlueprintEditor::ClearEditor()
     ActiveDoc()->flowLinks.clear();
     ActiveDoc()->nextId = 1;
     ActiveDoc()->isExecuting = false;
+    ActiveDoc()->invalidateEditorIndices();
 }
 
 // ============================================================================

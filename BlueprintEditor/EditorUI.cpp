@@ -134,6 +134,7 @@ void BlueprintEditor::CreateLinkWithFlowReconnect(
             }
         }
     }
+    ActiveDoc()->invalidateEditorIndices();
 }
 
 // ============================================================================
@@ -338,12 +339,6 @@ void BlueprintEditor::ShowLeftPane(float /*paneWidth*/)
 
 void BlueprintEditor::OnFrame(float deltaTime)
 {
-    // 每帧标记编辑器侧索引为 dirty，确保 mutation 后的查找（IsPinLinked/FindPin 等）始终使用最新数据。
-    // 已知性能代价：每帧 O(nodes+links) 重建；节点数 < 200 时影响可忽略。
-    // 后续优化：在每个 mutation 点精确调用 invalidateEditorIndices() 后可移除此行。
-    if (ActiveDoc())
-        ActiveDoc()->invalidateEditorIndices();
-
     // Phase 3：Lua 热重载轮询（每帧调用，内部按 m_pollIntervalSec 节流）
 #ifdef BLUEPRINT_HAS_LUA
     if (m_LuaNodeRegistrar.IsInitialized() && m_LuaNodeRegistrar.GetAutoReload())

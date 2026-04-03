@@ -337,6 +337,7 @@ Node* BlueprintEditor::InsertConversionNode(
     ActiveDoc()->links.emplace_back(Link(GetNextId(), convOut->ID, endPinId));
     ActiveDoc()->links.back().Color = GetIconColor(GetLinkColor(convOut, endPin));
 
+    ActiveDoc()->invalidateEditorIndices();  // links 变化
     return conv;
 }
 
@@ -363,6 +364,8 @@ void BlueprintEditor::BuildNodes()
 {
     for (auto& node : ActiveDoc()->nodes)
         BuildNode(&node);
+    // 节点/引脚结构已变化，标记索引失效
+    ActiveDoc()->invalidateEditorIndices();
 }
 
 // ============================================================================

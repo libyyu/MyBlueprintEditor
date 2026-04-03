@@ -156,6 +156,7 @@ void BlueprintEditor::DrawLinks()
             if (ed::BeginDelete())
             {
                 bool deletePushed = false;  // 一次 BeginDelete 只 push 一次 undo
+                bool deleted = false;
 
                 ed::NodeId nodeId = 0;
                 while (ed::QueryDeletedNode(&nodeId))
@@ -168,6 +169,7 @@ void BlueprintEditor::DrawLinks()
                         {
                             ActiveDoc()->nodes.erase(id);
                             ActiveDoc()->isDirty = true;
+                            deleted = true;
                         }
                     }
                 }
@@ -183,9 +185,13 @@ void BlueprintEditor::DrawLinks()
                         {
                             ActiveDoc()->links.erase(id);
                             ActiveDoc()->isDirty = true;
+                            deleted = true;
                         }
                     }
                 }
+
+                if (deleted)
+                    ActiveDoc()->invalidateEditorIndices();
             }
             ed::EndDelete();
         }
