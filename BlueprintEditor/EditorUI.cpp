@@ -1151,8 +1151,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
             }
 
             ActiveDoc()->pendingLoadData.clear();
-            // pendingContentBounds 不再需要，导航时用真实尺寸重算
-            // 多等 2 帧确保节点完成 layout（size 从 (0,0) 变为真实值）
+            // 多等 2 帧确保节点完成 layout（size 从 (0,0) 变为真实值），然后再恢复视图
             ActiveDoc()->needNavigateToContent = 2;
         }
 
@@ -1165,28 +1164,41 @@ void BlueprintEditor::OnFrame(float deltaTime)
             ActiveDoc()->pendingRestoreNodePos.clear();
         }
 
-        // 延迟居中显示（倒计帧数，到 0 时触发）
+        // 延迟视图恢复（倒计帧数，到 0 时触发）
         if (ActiveDoc()->needNavigateToContent > 0)
         {
             ActiveDoc()->needNavigateToContent--;
             if (ActiveDoc()->needNavigateToContent == 0)
             {
-                // 延迟足够帧后，用节点真实尺寸（已完成 layout）重新计算包围盒再导航。
-                // 这样跨设备 DPI 不同时，fit-to-view 的结果也是稳定一致的。
-                ImRect realBounds(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
-                for (const auto& node : ActiveDoc()->nodes)
+                if (ActiveDoc()->hasSavedView)
                 {
-                    ImVec2 pos  = ed::GetNodePosition(node.ID);
-                    ImVec2 size = ed::GetNodeSize(node.ID);
-                    // 节点尚未 layout 时 size 为 (0,0)，跳过避免包围盒污染
-                    if (size.x > 0 && size.y > 0)
-                        realBounds.Add(ImRect(pos, pos + size));
+                    // 文件中保存了视图状态：精确恢复 origin + zoom。
+                    // 做法：用 origin 和 zoom 反算出视口矩形，再用 NavigateToRectExact 瞬时还原。
+                    // viewSize = 屏幕尺寸 / zoom（canvas 空间中的视口大小）
+                    ImVec2 screenSize = ed::GetScreenSize();
+                    float  zoom       = ActiveDoc()->savedViewScale;
+                    ImVec2 origin     = ActiveDoc()->savedViewOrigin;  // canvas 左上角
+                    ImVec2 viewSize(screenSize.x / zoom, screenSize.y / zoom);
+                    ed::NavigateToRectExact(origin, ImVec2(origin.x + viewSize.x, origin.y + viewSize.y), 0.f);
+                    ActiveDoc()->hasSavedView = false;  // 只恢复一次
                 }
-
-                if (realBounds.Min.x < realBounds.Max.x)
-                    ed::NavigateToRect(realBounds.Min, realBounds.Max, true, 0);
                 else
-                    ed::NavigateToContent();
+                {
+                    // 无保存视图（新文件或旧格式文件）：fit-to-content
+                    ImRect realBounds(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
+                    for (const auto& node : ActiveDoc()->nodes)
+                    {
+                        ImVec2 pos  = ed::GetNodePosition(node.ID);
+                        ImVec2 size = ed::GetNodeSize(node.ID);
+                        if (size.x > 0 && size.y > 0)
+                            realBounds.Add(ImRect(pos, pos + size));
+                    }
+
+                    if (realBounds.Min.x < realBounds.Max.x)
+                        ed::NavigateToRect(realBounds.Min, realBounds.Max, true, 0);
+                    else
+                        ed::NavigateToContent();
+                }
             }
         }
 

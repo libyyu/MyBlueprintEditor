@@ -57,10 +57,157 @@ std::string SaveFileDialog(const char* filter, const char* title, const char* de
     return "";
 }
 #else
-// Linux/Mac：空实现（未来可集成 nfd/zenity）
-std::string OpenFileDialog(const char*, const char*) { return ""; }
-std::string SaveFileDialog(const char*, const char*, const char*) { return ""; }
-#endif
+// Linux / macOS 文件对话框实现
+// Linux  → zenity（GNOME 自带），若不存在则回退 kdialog（KDE）
+// macOS  → osascript (AppleScript)，系统自带，无额外依赖
+//
+// filter 参数（Windows 格式: "Desc\0*.ext\0..."）在此解析第一个 *.ext 用作过滤。
+
+#include <cstdio>
+#include <cstring>
+
+namespace {
+
+// 从 Windows 格式 filter 字符串里提取第一个扩展名（如 "bjson"）
+static std::string ExtractFirstExt(const char* filter)
+{
+    if (!filter) return "";
+    // 格式: "desc\0*.ext\0All\0*.*\0"
+    // 第二个 \0 后是模式串，形如 "*.bjson"
+    const char* p = filter;
+    // 跳过第一段描述
+    while (*p) ++p;
+    ++p; // 跳过 '\0'
+    if (!*p) return "";
+    // p 指向 "*.bjson"
+    if (*p == '*' && *(p+1) == '.')
+        p += 2;  // 跳过 "*."
+    std::string ext;
+    while (*p && *p != '\0' && *p != ';')
+        ext += *p++;
+    return ext;  // e.g. "bjson"
+}
+
+// 执行 shell 命令，读取 stdout，返回第一行（去掉末尾换行）
+static std::string RunDialog(const std::string& cmd)
+{
+    FILE* f = popen(cmd.c_str(), "r");
+    if (!f) return "";
+    char buf[4096] = {};
+    if (!fgets(buf, sizeof(buf), f)) { pclose(f); return ""; }
+    pclose(f);
+    std::string s(buf);
+    while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
+    return s;
+}
+
+// 检测可执行文件是否在 PATH 里
+static bool HasExe(const char* name)
+{
+    std::string cmd = std::string("command -v ") + name + " >/dev/null 2>&1";
+    return system(cmd.c_str()) == 0;
+}
+
+} // anonymous namespace
+
+#if defined(__APPLE__)
+
+std::string OpenFileDialog(const char* /*filter*/, const char* title)
+{
+    std::string script =
+        "tell application \"System Events\"\n"
+        "  activate\n"
+        "  set f to POSIX path of (choose file with prompt \"" + std::string(title ? title : "Open") + "\")\n"
+        "end tell";
+    // Single-quoted to avoid shell expansion inside the AppleScript
+    std::string cmd = "osascript -e '" + script + "' 2>/dev/null";
+    return RunDialog(cmd);
+}
+
+std::string SaveFileDialog(const char* filter, const char* title, const char* defaultExt)
+{
+    std::string ext = defaultExt ? defaultExt : ExtractFirstExt(filter);
+    std::string script =
+        "tell application \"System Events\"\n"
+        "  activate\n"
+        "  set f to POSIX path of (choose file name with prompt \"" + std::string(title ? title : "Save") + "\""
+        + (ext.empty() ? "" : " default name \"Untitled." + ext + "\"")
+        + ")\n"
+        "end tell";
+    std::string cmd = "osascript -e '" + script + "' 2>/dev/null";
+    std::string path = RunDialog(cmd);
+    // 确保扩展名
+    if (!path.empty() && !ext.empty())
+    {
+        std::string suffix = "." + ext;
+        if (path.size() < suffix.size() ||
+            path.compare(path.size() - suffix.size(), suffix.size(), suffix) != 0)
+            path += suffix;
+    }
+    return path;
+}
+
+#else  // Linux
+
+std::string OpenFileDialog(const char* filter, const char* /*title*/)
+{
+    std::string ext = ExtractFirstExt(filter);
+    if (HasExe("zenity"))
+    {
+        std::string cmd = "zenity --file-selection --title='Open Blueprint'";
+        if (!ext.empty()) cmd += " --file-filter='*." + ext + "'";
+        cmd += " 2>/dev/null";
+        return RunDialog(cmd);
+    }
+    if (HasExe("kdialog"))
+    {
+        std::string cmd = "kdialog --getopenfilename . '";
+        cmd += ext.empty() ? "*" : ("*." + ext);
+        cmd += "' 2>/dev/null";
+        return RunDialog(cmd);
+    }
+    // 无 GUI 工具：返回空（调用方会处理）
+    return "";
+}
+
+std::string SaveFileDialog(const char* filter, const char* /*title*/, const char* defaultExt)
+{
+    std::string ext = defaultExt ? defaultExt : ExtractFirstExt(filter);
+    if (HasExe("zenity"))
+    {
+        std::string cmd = "zenity --file-selection --save --confirm-overwrite --title='Save Blueprint'";
+        if (!ext.empty()) cmd += " --file-filter='*." + ext + "'";
+        cmd += " 2>/dev/null";
+        std::string path = RunDialog(cmd);
+        if (!path.empty() && !ext.empty())
+        {
+            std::string suffix = "." + ext;
+            if (path.size() < suffix.size() ||
+                path.compare(path.size() - suffix.size(), suffix.size(), suffix) != 0)
+                path += suffix;
+        }
+        return path;
+    }
+    if (HasExe("kdialog"))
+    {
+        std::string cmd = "kdialog --getsavefilename . '";
+        cmd += ext.empty() ? "*" : ("*." + ext);
+        cmd += "' 2>/dev/null";
+        std::string path = RunDialog(cmd);
+        if (!path.empty() && !ext.empty())
+        {
+            std::string suffix = "." + ext;
+            if (path.size() < suffix.size() ||
+                path.compare(path.size() - suffix.size(), suffix.size(), suffix) != 0)
+                path += suffix;
+        }
+        return path;
+    }
+    return "";
+}
+
+#endif // __APPLE__ / Linux
+#endif // _WIN32
 
 // ============================================================================
 // 内部辅助（匿名 namespace）
@@ -347,7 +494,17 @@ RTBlueprintData BlueprintEditor::BuildFullEditorData()
     bp.metadata.description = "Blueprint Editor file";
     // 蓝图类型写入元数据
     bp.metadata.blueprintClass = ActiveDoc()->blueprintClass;
-    
+
+    // 视图状态：保存当前 zoom 和 canvas origin，下次打开时精确恢复
+    // ed::ScreenToCanvas(ImVec2(0,0)) 返回屏幕左上角对应的 canvas 坐标（即 view origin）
+    // GetCurrentZoom() 返回当前缩放倍率
+    // 注：这两个 API 必须在 ed::Begin/End 之间调用才有效；
+    //     DoSaveFile 由 UI 层（帧内）调用，此时 ed::Begin/End 已经执行过，结果有效
+    bp.viewInfo.viewScale      = ed::GetCurrentZoom();
+    ImVec2 origin              = ed::ScreenToCanvas(ImVec2(0.f, 0.f));
+    bp.viewInfo.viewPosition.x = origin.x;
+    bp.viewInfo.viewPosition.y = origin.y;
+
     return bp;
 }
 
@@ -779,7 +936,13 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
     // 保存加载数据和 ID 映射，用于延迟设置节点位置
     ActiveDoc()->pendingLoadData = data;
     ActiveDoc()->needSetNodePositions = true;
-    
+
+    // 记录文件中保存的视图状态（origin + scale）
+    // viewScale > 0 且 origin 任意值都算有效（包括 0,0）
+    ActiveDoc()->hasSavedView    = (data.viewInfo.viewScale > 0.f);
+    ActiveDoc()->savedViewOrigin = ImVec2(data.viewInfo.viewPosition.x, data.viewInfo.viewPosition.y);
+    ActiveDoc()->savedViewScale  = (data.viewInfo.viewScale > 0.f) ? data.viewInfo.viewScale : 1.f;
+
     // 保存 nodeIdMap 到成员中以便 OnFrame 使用
     // 直接在这里使用：在编辑器初始化后设置位置
     // 注意：ed::SetNodePosition 需要在 ed::Begin/End 之间调用，

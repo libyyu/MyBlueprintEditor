@@ -426,8 +426,8 @@ void BlueprintEditor::DrawNodeListPanel(int panelIdx)
                 ImGui::Separator();
 
                 // --- 函数列表 ---
-                static int renamingIdx = -1;
-                static char renameBuf[128] = {};
+                int& renamingIdx = doc->funcRenamingIdx;
+                char* renameBuf  = doc->funcRenameBuf;
                 int deleteIdx = -1;  // 延迟删除索引
                 for (int i = 0; i < (int)doc->functions.size(); ++i)
                 {
@@ -606,8 +606,11 @@ void BlueprintEditor::DrawNodeListPanel(int panelIdx)
             }
             else
             {
-                static char payloadBuf[256] = {};
-                static std::string fireEventTarget;
+                auto* doc_ = ActiveDoc();
+                char* payloadBuf             = doc_ ? doc_->evtPayloadBuf : nullptr;
+                std::string* pFireEventTarget = doc_ ? &doc_->evtFireTarget : nullptr;
+                if (!payloadBuf) break;  // 安全守卫
+                std::string& fireEventTarget = *pFireEventTarget;
 
                 for (const auto& evtName : events)
                 {
@@ -1406,11 +1409,11 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
 
     // Category
     {
-        static char catBuf[128] = {};
-        static std::string lastCatFuncId;
+        std::string& lastCatFuncId = doc->inspFuncCatLastId;
+        char*        catBuf        = doc->inspFuncCatBuf;
         if (lastCatFuncId != func.id)
         {
-            snprintf(catBuf, sizeof(catBuf), "%s", func.category.c_str());
+            snprintf(catBuf, 128, "%s", func.category.c_str());
             lastCatFuncId = func.id;
         }
         ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "Category:");
@@ -1425,11 +1428,11 @@ void BlueprintEditor::DrawFunctionDetailsPanel(RTFunctionDefinition& func)
 
     // Description
     {
-        static char descBuf[256] = {};
-        static std::string lastFuncId;
+        std::string& lastFuncId = doc->inspFuncDescLastId;
+        char*        descBuf    = doc->inspFuncDescBuf;
         if (lastFuncId != func.id)
         {
-            snprintf(descBuf, sizeof(descBuf), "%s", func.description.c_str());
+            snprintf(descBuf, 256, "%s", func.description.c_str());
             lastFuncId = func.id;
         }
         ImGui::TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "Description:");

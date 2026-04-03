@@ -168,6 +168,12 @@ public:
     ImRect               pendingContentBounds;             // 从加载数据计算的节点包围盒
     RTBlueprintData      pendingLoadData;                  // 待设置位置的加载数据
 
+    // 加载时保存的视图状态（viewPosition = canvas origin，viewScale = zoom）
+    // hasSavedView=true 时加载后精确恢复，否则 NavigateToContent
+    bool                 hasSavedView      = false;
+    ImVec2               savedViewOrigin   = {0.f, 0.f};  // canvas 左上角对应的 canvas 坐标
+    float                savedViewScale    = 1.f;
+
     // 依赖关系（从 JSON 加载时读入，保存时写回）
     std::vector<std::string> dependencies;
 
@@ -245,6 +251,21 @@ public:
 
     // Functions 面板状态
     int  selectedFuncIdx = -1;           // 当前选中的函数索引（-1 = 无选中）
+
+    // InspectorPanel：函数列表内联重命名状态（原 static，迁移至文档避免多标签污染）
+    int  funcRenamingIdx = -1;
+    char funcRenameBuf[128] = {};
+
+    // InspectorPanel：Inspector 函数详情页的缓存字段
+    // 用于跟踪上次渲染的函数 id，文档切换/函数切换时强制刷新缓冲区
+    std::string inspFuncCatLastId;
+    char        inspFuncCatBuf[128] = {};
+    std::string inspFuncDescLastId;
+    char        inspFuncDescBuf[256] = {};
+
+    // InspectorPanel：事件总线面板临时输入状态
+    char        evtPayloadBuf[256] = {};
+    std::string evtFireTarget;
 
     // ---- StepIn 调用栈（FuncLib 单步进入）----
     // 当用户 StepIn 一个 FuncLib 节点时，保存父文档索引，
