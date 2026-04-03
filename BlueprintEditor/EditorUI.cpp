@@ -1127,9 +1127,6 @@ void BlueprintEditor::OnFrame(float deltaTime)
         {
             ActiveDoc()->needSetNodePositions = false;
 
-            // 从加载数据计算所有节点的包围盒
-            ImRect contentBounds(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
-
             for (const auto& pendNode : ActiveDoc()->pendingLoadData.nodes)
             {
                 auto it = pendNode.customProperties.find("__newEditorId");
@@ -1150,20 +1147,13 @@ void BlueprintEditor::OnFrame(float deltaTime)
                             node->Size = ImVec2(pendNode.size.width, pendNode.size.height);
                         }
                     }
-
-                    // 用位置和尺寸计算包围盒（尺寸默认给 200x100）
-                    float w = pendNode.size.width > 0 ? pendNode.size.width : 200.0f;
-                    float h = pendNode.size.height > 0 ? pendNode.size.height : 100.0f;
-                    contentBounds.Add(ImRect(
-                        ImVec2(pendNode.position.x, pendNode.position.y),
-                        ImVec2(pendNode.position.x + w, pendNode.position.y + h)
-                    ));
                 }
             }
 
             ActiveDoc()->pendingLoadData.clear();
-            ActiveDoc()->pendingContentBounds = contentBounds;
-            ActiveDoc()->needNavigateToContent = 1;
+            // pendingContentBounds 不再需要，导航时用真实尺寸重算
+            // 多等 2 帧确保节点完成 layout（size 从 (0,0) 变为真实值）
+            ActiveDoc()->needNavigateToContent = 2;
         }
 
         // Undo/Redo 恢复节点位置
@@ -1181,12 +1171,20 @@ void BlueprintEditor::OnFrame(float deltaTime)
             ActiveDoc()->needNavigateToContent--;
             if (ActiveDoc()->needNavigateToContent == 0)
             {
-                // 如果有预计算的 bounds（加载文件时），直接用它导航
-                if (ActiveDoc()->pendingContentBounds.Min.x < ActiveDoc()->pendingContentBounds.Max.x)
+                // 延迟足够帧后，用节点真实尺寸（已完成 layout）重新计算包围盒再导航。
+                // 这样跨设备 DPI 不同时，fit-to-view 的结果也是稳定一致的。
+                ImRect realBounds(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
+                for (const auto& node : ActiveDoc()->nodes)
                 {
-                    ed::NavigateToRect(ActiveDoc()->pendingContentBounds.Min, ActiveDoc()->pendingContentBounds.Max, true, 0);
-                    ActiveDoc()->pendingContentBounds = ImRect();  // 清除
+                    ImVec2 pos  = ed::GetNodePosition(node.ID);
+                    ImVec2 size = ed::GetNodeSize(node.ID);
+                    // 节点尚未 layout 时 size 为 (0,0)，跳过避免包围盒污染
+                    if (size.x > 0 && size.y > 0)
+                        realBounds.Add(ImRect(pos, pos + size));
                 }
+
+                if (realBounds.Min.x < realBounds.Max.x)
+                    ed::NavigateToRect(realBounds.Min, realBounds.Max, true, 0);
                 else
                     ed::NavigateToContent();
             }
