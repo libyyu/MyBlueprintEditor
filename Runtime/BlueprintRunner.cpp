@@ -204,6 +204,30 @@ void BlueprintRunner::SetDefaultHandler(NodeHandler handler)
 }
 
 // ============================================================================
+// 脚本动态节点定义注册（Lua / C# 共用）
+// ============================================================================
+
+void BlueprintRunner::RegisterNodeDef(const NodeDefinition& def)
+{
+    m_scriptRegistry.registerNode(def);
+}
+
+void BlueprintRunner::UnregisterNodeDef(const std::string& id)
+{
+    m_scriptRegistry.unregisterNode(id);
+}
+
+bool BlueprintRunner::HasNodeDef(const std::string& id) const
+{
+    return m_scriptRegistry.getNodeDefinition(id) != nullptr;
+}
+
+const NodeDefinition* BlueprintRunner::GetNodeDef(const std::string& id) const
+{
+    return m_scriptRegistry.getNodeDefinition(id);
+}
+
+// ============================================================================
 // 拓扑排序（Kahn 算法）
 // ============================================================================
 

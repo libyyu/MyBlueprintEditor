@@ -207,6 +207,154 @@ struct lua_State;
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetExternalLuaState(BP_Runner runner, lua_State* L);
 #endif
 
+// ---------------------------------------------------------------------------
+// Script node definition registration  (Lua / C# shared)
+// ---------------------------------------------------------------------------
+//
+// Allows Lua scripts and C# code to dynamically register node definitions
+// and execution handlers at runtime, equivalent to what Lua scripts can do
+// via Blueprint.RegisterNodeDef() / Blueprint.RegisterHandler().
+//
+// C# usage example:
+//
+//   // 1. Define pin descriptors
+//   BP_PinDef[] pins = {
+//       new BP_PinDef { name="A",      dataType=2 /*Float*/, isInput=1 },
+//       new BP_PinDef { name="B",      dataType=2 /*Float*/, isInput=1 },
+//       new BP_PinDef { name="Result", dataType=2 /*Float*/, isInput=0 },
+//   };
+//   BP_RegisterNodeDef(runner, "MyAdd", "My Add", "Custom/Math", null, pins, 3);
+//
+//   // 2. Register handler
+//   BP_RegisterHandler(runner, "MyAdd", (ctx, ud) => {
+//       float a = BP_GetInputFloat(ctx, "A");
+//       float b = BP_GetInputFloat(ctx, "B");
+//       BP_SetOutputFloat(ctx, "Result", a + b);
+//       return 1;
+//   }, IntPtr.Zero);
+//
+// PinDataType integer values (BP_PinDef.dataType):
+//   0=Unknown/Any  1=Boolean  2=Integer  3=Float  4=String
+//   5=Object       6=Array    7=Map      8=Set
+//
+// For Flow (exec) pins: set isExec=1 (dataType is ignored).
+
+/// Opaque execution context handle — valid only inside a BP_HandlerFn call.
+typedef void* BP_Context;
+
+/// Pin data type constants (match NodeEditor::Runtime::PinDataType)
+typedef enum BP_PinDataType {
+    BP_PIN_UNKNOWN  = 0,
+    BP_PIN_BOOLEAN  = 1,
+    BP_PIN_INTEGER  = 2,
+    BP_PIN_FLOAT    = 3,
+    BP_PIN_STRING   = 4,
+    BP_PIN_OBJECT   = 5,
+    BP_PIN_ARRAY    = 6,
+    BP_PIN_MAP      = 7,
+    BP_PIN_SET      = 8,
+    BP_PIN_ANY      = 9
+} BP_PinDataType;
+
+/// Descriptor for a single pin (input or output).
+typedef struct BP_PinDef {
+    const char*      name;       ///< Pin name (required)
+    int              dataType;   ///< BP_PinDataType value; ignored when isExec=1
+    int              isInput;    ///< 1 = Input pin, 0 = Output pin
+    int              isExec;     ///< 1 = Flow (exec) pin, 0 = data pin
+    const char*      tooltip;    ///< Optional tooltip (may be NULL)
+} BP_PinDef;
+
+/// Node handler callback type.
+/// ctx:      execution context — use BP_GetInput*/BP_SetOutput* etc.
+/// userdata: value passed to BP_RegisterHandler (e.g. GCHandle in C#).
+/// Return 1 on success, 0 on failure.
+typedef int (BLUEPRINT_CAPI_CALL *BP_HandlerFn)(BP_Context ctx, void* userdata);
+
+/// Register a node definition dynamically (equivalent to Blueprint.RegisterNodeDef in Lua).
+/// id/name/category/color may be NULL (name defaults to id, others default to empty).
+/// pins is an array of pinCount BP_PinDef entries; may be NULL if pinCount==0.
+/// Returns 0 on success, non-zero on failure.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_RegisterNodeDef(
+    BP_Runner       runner,
+    const char*     id,
+    const char*     name,
+    const char*     category,
+    const char*     color,
+    BP_PinDef*      pins,
+    int             pinCount
+);
+
+/// Unregister a previously registered node definition.
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_UnregisterNodeDef(
+    BP_Runner runner, const char* id);
+
+/// Returns 1 if a node def with the given id has been registered, 0 otherwise.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_HasNodeDef(
+    BP_Runner runner, const char* id);
+
+/// Register a C handler for a node definition (equivalent to Blueprint.RegisterHandler in Lua).
+/// fn is called each time a node of this type executes.
+/// userdata is an arbitrary pointer forwarded to fn (e.g. a GCHandle.ToIntPtr() in C#).
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_RegisterHandler(
+    BP_Runner    runner,
+    const char*  definitionId,
+    BP_HandlerFn fn,
+    void*        userdata
+);
+
+/// Unregister a handler registered with BP_RegisterHandler.
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_UnregisterHandler(
+    BP_Runner runner, const char* definitionId);
+
+// ---------------------------------------------------------------------------
+// ExecutionContext accessors  (valid only inside BP_HandlerFn)
+// ---------------------------------------------------------------------------
+
+// --- Input ---
+BLUEPRINT_CAPI_EXPORT int64_t BLUEPRINT_CAPI_CALL BP_GetInputInt   (BP_Context ctx, const char* pin);
+BLUEPRINT_CAPI_EXPORT double  BLUEPRINT_CAPI_CALL BP_GetInputFloat (BP_Context ctx, const char* pin);
+BLUEPRINT_CAPI_EXPORT int     BLUEPRINT_CAPI_CALL BP_GetInputBool  (BP_Context ctx, const char* pin);
+/// Copies the string value into buf. Returns bytes written (excl. NUL), or -1 if not found.
+BLUEPRINT_CAPI_EXPORT int     BLUEPRINT_CAPI_CALL BP_GetInputString(BP_Context ctx, const char* pin,
+                                                                     char* buf, int bufLen);
+
+// --- Output ---
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetOutputInt   (BP_Context ctx, const char* pin, int64_t val);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetOutputFloat (BP_Context ctx, const char* pin, double  val);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetOutputBool  (BP_Context ctx, const char* pin, int     val);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetOutputString(BP_Context ctx, const char* pin, const char* val);
+
+// --- Control flow ---
+/// Activate an output Flow pin (triggers connected nodes). Returns 1 on success.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_ActivateOutputFlow(BP_Context ctx, const char* pin);
+
+// --- Variables ---
+BLUEPRINT_CAPI_EXPORT int64_t BLUEPRINT_CAPI_CALL BP_CtxGetVariableInt   (BP_Context ctx, const char* name);
+BLUEPRINT_CAPI_EXPORT double  BLUEPRINT_CAPI_CALL BP_CtxGetVariableFloat (BP_Context ctx, const char* name);
+BLUEPRINT_CAPI_EXPORT int     BLUEPRINT_CAPI_CALL BP_CtxGetVariableBool  (BP_Context ctx, const char* name);
+BLUEPRINT_CAPI_EXPORT int     BLUEPRINT_CAPI_CALL BP_CtxGetVariableString(BP_Context ctx, const char* name,
+                                                                           char* buf, int bufLen);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxSetVariableInt   (BP_Context ctx, const char* name, int64_t val);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxSetVariableFloat (BP_Context ctx, const char* name, double  val);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxSetVariableBool  (BP_Context ctx, const char* name, int     val);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxSetVariableString(BP_Context ctx, const char* name, const char* val);
+
+// --- Logging / Print (from within a handler) ---
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxLog     (BP_Context ctx, const char* msg);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxLogWarn (BP_Context ctx, const char* msg);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxLogError(BP_Context ctx, const char* msg);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxPrint   (BP_Context ctx, const char* msg);
+
+// --- Current node info ---
+BLUEPRINT_CAPI_EXPORT uint64_t BLUEPRINT_CAPI_CALL BP_CtxGetCurrentNodeId(BP_Context ctx);
+/// Copies current node's definitionId into buf. Returns bytes written (excl. NUL).
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_CtxGetCurrentNodeDefId(BP_Context ctx,
+                                                                          char* buf, int bufLen);
+/// Copies the name of the activated input pin into buf.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_CtxGetActivatedInputPin(BP_Context ctx,
+                                                                           char* buf, int bufLen);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

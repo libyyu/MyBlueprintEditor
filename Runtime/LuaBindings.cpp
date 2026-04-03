@@ -464,6 +464,152 @@ static int l_hasHandler(lua_State* L)
 }
 
 // =========================================================================
+// Blueprint.RegisterNodeDef(tbl)
+//
+// tbl 格式：
+//   {
+//     id       = "MyNode",           -- 必填，唯一 ID
+//     name     = "My Node",          -- 可选，显示名称（默认同 id）
+//     category = "Custom/Math",      -- 可选
+//     color    = "FF6600",           -- 可选，RRGGBB
+//     inputs   = {                   -- 可选
+//       { name="A", type="Float" },
+//       { name="In", type="Flow" },  -- Flow 引脚（isExec=true）
+//     },
+//     outputs  = {                   -- 可选
+//       { name="Result", type="Float" },
+//       { name="Out", type="Flow" },
+//     },
+//   }
+// =========================================================================
+
+static PinDataType luaParsePinType(const std::string& t, bool& isExec)
+{
+    isExec = false;
+    if (t == "Flow")    { isExec = true; return PinDataType::Unknown; }
+    if (t == "Integer") return PinDataType::Integer;
+    if (t == "Float")   return PinDataType::Float;
+    if (t == "Boolean") return PinDataType::Boolean;
+    if (t == "String")  return PinDataType::String;
+    if (t == "Array")   return PinDataType::Array;
+    if (t == "Map")     return PinDataType::Map;
+    if (t == "Set")     return PinDataType::Set;
+    if (t == "Object")  return PinDataType::Object;
+    return PinDataType::Any;
+}
+
+static void parsePinArray(lua_State* L, int tableIdx, PinKind kind,
+                          std::vector<PinDefinition>& out)
+{
+    int n = static_cast<int>(lua_rawlen(L, tableIdx));
+    for (int i = 1; i <= n; ++i)
+    {
+        lua_rawgeti(L, tableIdx, i);
+        if (!lua_istable(L, -1)) { lua_pop(L, 1); continue; }
+
+        PinDefinition pin;
+        pin.kind = kind;
+
+        lua_getfield(L, -1, "name");
+        if (lua_isstring(L, -1)) pin.name = lua_tostring(L, -1);
+        lua_pop(L, 1);
+
+        std::string typeStr;
+        lua_getfield(L, -1, "type");
+        if (lua_isstring(L, -1)) typeStr = lua_tostring(L, -1);
+        lua_pop(L, 1);
+
+        bool isExec = false;
+        lua_getfield(L, -1, "isExec");
+        if (lua_isboolean(L, -1) && lua_toboolean(L, -1)) isExec = true;
+        lua_pop(L, 1);
+
+        if (!isExec)
+            pin.dataType = luaParsePinType(typeStr, isExec);
+        pin.isExec = isExec;
+
+        // tooltip（可选）
+        lua_getfield(L, -1, "tooltip");
+        if (lua_isstring(L, -1)) pin.tooltip = lua_tostring(L, -1);
+        lua_pop(L, 1);
+
+        out.push_back(std::move(pin));
+        lua_pop(L, 1); // pop pin table
+    }
+}
+
+static int l_registerNodeDef(lua_State* L)
+{
+    luaL_checktype(L, 1, LUA_TTABLE);
+
+    lua_getfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
+    auto* runner = static_cast<BlueprintRunner*>(lua_touserdata(L, -1));
+    lua_pop(L, 1);
+
+    if (!runner)
+        return luaL_error(L, "Blueprint.RegisterNodeDef: runner not available");
+
+    NodeDefinition def;
+
+    lua_getfield(L, 1, "id");
+    if (!lua_isstring(L, -1))
+    {
+        lua_pop(L, 1);
+        return luaL_error(L, "Blueprint.RegisterNodeDef: 'id' field is required (string)");
+    }
+    def.id = lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    lua_getfield(L, 1, "name");
+    def.name = lua_isstring(L, -1) ? lua_tostring(L, -1) : def.id;
+    lua_pop(L, 1);
+
+    lua_getfield(L, 1, "category");
+    if (lua_isstring(L, -1)) def.category = lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    lua_getfield(L, 1, "color");
+    if (lua_isstring(L, -1)) def.color = lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    lua_getfield(L, 1, "description");
+    if (lua_isstring(L, -1)) def.description = lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    lua_getfield(L, 1, "inputs");
+    if (lua_istable(L, -1))
+        parsePinArray(L, lua_gettop(L), PinKind::Input, def.inputPins);
+    lua_pop(L, 1);
+
+    lua_getfield(L, 1, "outputs");
+    if (lua_istable(L, -1))
+        parsePinArray(L, lua_gettop(L), PinKind::Output, def.outputPins);
+    lua_pop(L, 1);
+
+    if (runner->HasNodeDef(def.id))
+        runner->LogWarning(std::string("[Lua] Overriding existing node def '") + def.id + "'");
+
+    runner->RegisterNodeDef(def);
+    return 0;
+}
+
+// =========================================================================
+// Blueprint.HasNodeDef(id) → bool
+// =========================================================================
+
+static int l_hasNodeDef(lua_State* L)
+{
+    const char* id = luaL_checkstring(L, 1);
+
+    lua_getfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
+    auto* runner = static_cast<BlueprintRunner*>(lua_touserdata(L, -1));
+    lua_pop(L, 1);
+
+    lua_pushboolean(L, runner && runner->HasNodeDef(id));
+    return 1;
+}
+
+// =========================================================================
 // 入口：注册所有 Lua 绑定
 // =========================================================================
 
@@ -485,6 +631,12 @@ void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner)
 
     lua_pushcfunction(L, l_hasHandler);
     lua_setfield(L, -2, "HasHandler");
+
+    lua_pushcfunction(L, l_registerNodeDef);
+    lua_setfield(L, -2, "RegisterNodeDef");
+
+    lua_pushcfunction(L, l_hasNodeDef);
+    lua_setfield(L, -2, "HasNodeDef");
 
     lua_setglobal(L, "Blueprint");
 }

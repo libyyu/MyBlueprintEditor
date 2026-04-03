@@ -373,6 +373,27 @@ public:
     bool IsLoaded() const { return m_loaded; }
 
     // ------------------------------------------------------------------
+    // 脚本动态节点定义注册（Lua / C# 共用）
+    // ------------------------------------------------------------------
+
+    // 注册一个节点定义（同时对 Lua 和 C# 脚本开放）
+    // 重复注册同一 id 会覆盖旧定义
+    void RegisterNodeDef(const NodeDefinition& def);
+
+    // 注销一个节点定义
+    void UnregisterNodeDef(const std::string& id);
+
+    // 检查节点定义是否已注册
+    bool HasNodeDef(const std::string& id) const;
+
+    // 获取节点定义（未注册返回 nullptr）
+    const NodeDefinition* GetNodeDef(const std::string& id) const;
+
+    // 获取脚本注册表（编辑器/外部合并用）
+    INodeRegistry& GetScriptRegistry() { return m_scriptRegistry; }
+    const INodeRegistry& GetScriptRegistry() const { return m_scriptRegistry; }
+
+    // ------------------------------------------------------------------
     // 注册节点处理器
     // ------------------------------------------------------------------
 
@@ -665,6 +686,9 @@ private:
     // 节点处理器注册表
     std::unordered_map<std::string, NodeHandler>        m_handlers;
     NodeHandler                                         m_defaultHandler;
+
+    // 脚本动态节点定义注册表（Lua / C# 通过 RegisterNodeDef 注册）
+    DefaultNodeRegistry                                 m_scriptRegistry;
 
     // 数据层：节点执行状态（引脚值、变量、当前节点等纯数据）
     NodeExecutionState                                  m_state;

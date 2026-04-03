@@ -265,4 +265,274 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetExternalLuaState(BP_Runner 
 }
 #endif
 
+// ---------------------------------------------------------------------------
+// Script node definition registration
+// ---------------------------------------------------------------------------
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_RegisterNodeDef(
+    BP_Runner   runner,
+    const char* id,
+    const char* name,
+    const char* category,
+    const char* color,
+    BP_PinDef*  pins,
+    int         pinCount)
+{
+    if (!runner || !id || id[0] == '\0') return 1;
+    auto* w = asWrapper(runner);
+
+    NodeDefinition def;
+    def.id       = id;
+    def.name     = (name && name[0]) ? name : id;
+    def.category = category ? category : "";
+    def.color    = color    ? color    : "";
+
+    for (int i = 0; i < pinCount; ++i)
+    {
+        const BP_PinDef& p = pins[i];
+        PinDefinition pin;
+        pin.name    = p.name ? p.name : "";
+        pin.kind    = p.isInput ? PinKind::Input : PinKind::Output;
+        pin.tooltip = p.tooltip ? p.tooltip : "";
+
+        if (p.isExec)
+        {
+            pin.isExec   = true;
+            pin.dataType = PinDataType::Unknown;
+        }
+        else
+        {
+            pin.isExec   = false;
+            // BP_PinDataType 与 PinDataType 枚举值一一对应
+            pin.dataType = static_cast<PinDataType>(p.dataType);
+        }
+
+        if (p.isInput)
+            def.inputPins.push_back(std::move(pin));
+        else
+            def.outputPins.push_back(std::move(pin));
+    }
+
+    w->runner.RegisterNodeDef(def);
+    return 0;
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_UnregisterNodeDef(BP_Runner runner, const char* id)
+{
+    if (!runner || !id) return;
+    asWrapper(runner)->runner.UnregisterNodeDef(id);
+}
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_HasNodeDef(BP_Runner runner, const char* id)
+{
+    if (!runner || !id) return 0;
+    return asWrapper(runner)->runner.HasNodeDef(id) ? 1 : 0;
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_RegisterHandler(
+    BP_Runner    runner,
+    const char*  definitionId,
+    BP_HandlerFn fn,
+    void*        userdata)
+{
+    if (!runner || !definitionId || !fn) return;
+    auto* w = asWrapper(runner);
+
+    // 捕获 fn + userdata，包装成 C++ NodeHandler
+    w->runner.RegisterHandler(definitionId,
+        [fn, userdata](ExecutionContext& ctx) -> bool {
+            return fn(static_cast<BP_Context>(&ctx), userdata) != 0;
+        });
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_UnregisterHandler(
+    BP_Runner runner, const char* definitionId)
+{
+    if (!runner || !definitionId) return;
+    asWrapper(runner)->runner.UnregisterHandler(definitionId);
+}
+
+// ---------------------------------------------------------------------------
+// ExecutionContext accessors
+// ---------------------------------------------------------------------------
+
+namespace {
+inline ExecutionContext* asCtx(BP_Context c)
+{
+    return static_cast<ExecutionContext*>(c);
+}
+} // anonymous namespace
+
+// --- Input ---
+
+BLUEPRINT_CAPI_EXPORT int64_t BLUEPRINT_CAPI_CALL BP_GetInputInt(BP_Context ctx, const char* pin)
+{
+    if (!ctx || !pin) return 0;
+    return asCtx(ctx)->GetInputValue(pin).asInt();
+}
+
+BLUEPRINT_CAPI_EXPORT double BLUEPRINT_CAPI_CALL BP_GetInputFloat(BP_Context ctx, const char* pin)
+{
+    if (!ctx || !pin) return 0.0;
+    return asCtx(ctx)->GetInputValue(pin).asFloat();
+}
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetInputBool(BP_Context ctx, const char* pin)
+{
+    if (!ctx || !pin) return 0;
+    return asCtx(ctx)->GetInputValue(pin).asBool() ? 1 : 0;
+}
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetInputString(BP_Context ctx, const char* pin,
+                                                                  char* buf, int bufLen)
+{
+    if (!ctx || !pin) return -1;
+    Variant v = asCtx(ctx)->GetInputValue(pin);
+    if (v.type == PinDataType::Unknown) return -1;
+    return copyString(v.asString(), buf, bufLen);
+}
+
+// --- Output ---
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetOutputInt(BP_Context ctx, const char* pin, int64_t val)
+{
+    if (!ctx || !pin) return;
+    asCtx(ctx)->SetOutputValue(pin, Variant(val));
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetOutputFloat(BP_Context ctx, const char* pin, double val)
+{
+    if (!ctx || !pin) return;
+    asCtx(ctx)->SetOutputValue(pin, Variant(val));
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetOutputBool(BP_Context ctx, const char* pin, int val)
+{
+    if (!ctx || !pin) return;
+    asCtx(ctx)->SetOutputValue(pin, Variant(val != 0));
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetOutputString(BP_Context ctx, const char* pin,
+                                                                    const char* val)
+{
+    if (!ctx || !pin) return;
+    asCtx(ctx)->SetOutputValue(pin, Variant(val ? std::string(val) : std::string{}));
+}
+
+// --- Control flow ---
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_ActivateOutputFlow(BP_Context ctx, const char* pin)
+{
+    if (!ctx || !pin) return 0;
+    return asCtx(ctx)->ActivateOutputFlow(pin) ? 1 : 0;
+}
+
+// --- Variables ---
+
+BLUEPRINT_CAPI_EXPORT int64_t BLUEPRINT_CAPI_CALL BP_CtxGetVariableInt(BP_Context ctx, const char* name)
+{
+    if (!ctx || !name) return 0;
+    return asCtx(ctx)->GetVariable(name).asInt();
+}
+
+BLUEPRINT_CAPI_EXPORT double BLUEPRINT_CAPI_CALL BP_CtxGetVariableFloat(BP_Context ctx, const char* name)
+{
+    if (!ctx || !name) return 0.0;
+    return asCtx(ctx)->GetVariable(name).asFloat();
+}
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_CtxGetVariableBool(BP_Context ctx, const char* name)
+{
+    if (!ctx || !name) return 0;
+    return asCtx(ctx)->GetVariable(name).asBool() ? 1 : 0;
+}
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_CtxGetVariableString(BP_Context ctx, const char* name,
+                                                                        char* buf, int bufLen)
+{
+    if (!ctx || !name) return -1;
+    Variant v = asCtx(ctx)->GetVariable(name);
+    if (v.type == PinDataType::Unknown) return -1;
+    return copyString(v.asString(), buf, bufLen);
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxSetVariableInt(BP_Context ctx, const char* name,
+                                                                      int64_t val)
+{
+    if (!ctx || !name) return;
+    asCtx(ctx)->SetVariable(name, Variant(val));
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxSetVariableFloat(BP_Context ctx, const char* name,
+                                                                        double val)
+{
+    if (!ctx || !name) return;
+    asCtx(ctx)->SetVariable(name, Variant(val));
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxSetVariableBool(BP_Context ctx, const char* name,
+                                                                       int val)
+{
+    if (!ctx || !name) return;
+    asCtx(ctx)->SetVariable(name, Variant(val != 0));
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxSetVariableString(BP_Context ctx, const char* name,
+                                                                         const char* val)
+{
+    if (!ctx || !name) return;
+    asCtx(ctx)->SetVariable(name, Variant(val ? std::string(val) : std::string{}));
+}
+
+// --- Logging / Print ---
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxLog(BP_Context ctx, const char* msg)
+{
+    if (!ctx || !msg) return;
+    asCtx(ctx)->Log(msg);
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxLogWarn(BP_Context ctx, const char* msg)
+{
+    if (!ctx || !msg) return;
+    asCtx(ctx)->LogWarning(msg);
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxLogError(BP_Context ctx, const char* msg)
+{
+    if (!ctx || !msg) return;
+    asCtx(ctx)->LogError(msg);
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_CtxPrint(BP_Context ctx, const char* msg)
+{
+    if (!ctx || !msg) return;
+    asCtx(ctx)->Print(msg);
+}
+
+// --- Current node info ---
+
+BLUEPRINT_CAPI_EXPORT uint64_t BLUEPRINT_CAPI_CALL BP_CtxGetCurrentNodeId(BP_Context ctx)
+{
+    if (!ctx) return 0;
+    const NodeInstance* node = asCtx(ctx)->GetCurrentNode();
+    return node ? static_cast<uint64_t>(node->id) : 0;
+}
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_CtxGetCurrentNodeDefId(BP_Context ctx,
+                                                                          char* buf, int bufLen)
+{
+    if (!ctx) return 0;
+    const NodeInstance* node = asCtx(ctx)->GetCurrentNode();
+    if (!node) return 0;
+    return copyString(node->definitionId, buf, bufLen);
+}
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_CtxGetActivatedInputPin(BP_Context ctx,
+                                                                           char* buf, int bufLen)
+{
+    if (!ctx) return 0;
+    return copyString(asCtx(ctx)->GetActivatedInputPinName(), buf, bufLen);
+}
+
 } // extern "C"
