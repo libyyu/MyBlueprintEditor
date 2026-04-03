@@ -155,6 +155,28 @@ struct Variant
     }
     bool operator!=(const Variant& other) const { return !(*this == other); }
 
+    // Set/Map 键匹配：Float 使用 epsilon 比较，避免浮点精度导致集合操作失效。
+    // 不修改 operator== 以保留 Equal 节点的精确语义。
+    bool matchesKey(const Variant& other) const
+    {
+        if (type != other.type) return false;
+        if (type == PinDataType::Float)
+        {
+            double a = std::get<double>(numericValue);
+            double b = std::get<double>(other.numericValue);
+            // ULP-based epsilon：相对误差 1e-9 或绝对误差 1e-12
+            double diff = a - b;
+            if (diff < 0) diff = -diff;
+            double mag = a < 0 ? -a : a;
+            double magB = b < 0 ? -b : b;
+            double largest = mag > magB ? mag : magB;
+            const double kRelEps = 1e-9;
+            const double kAbsEps = 1e-12;
+            return diff <= (largest * kRelEps + kAbsEps);
+        }
+        return *this == other;
+    }
+
     // ============================================================
     // 值转换
     // ============================================================
@@ -311,7 +333,7 @@ struct Variant
     bool mapHasKey(const Variant& key) const
     {
         for (const auto& kv : mapValue)
-            if (kv.first == key) return true;
+            if (kv.first.matchesKey(key)) return true;
         return false;
     }
 
@@ -319,7 +341,7 @@ struct Variant
     {
         static Variant empty;
         for (const auto& kv : mapValue)
-            if (kv.first == key) return kv.second;
+            if (kv.first.matchesKey(key)) return kv.second;
         return empty;
     }
 
@@ -332,7 +354,7 @@ struct Variant
         }
         for (auto& kv : mapValue)
         {
-            if (kv.first == key)
+            if (kv.first.matchesKey(key))
             {
                 kv.second = value;
                 return;
@@ -345,7 +367,7 @@ struct Variant
     {
         for (auto it = mapValue.begin(); it != mapValue.end(); ++it)
         {
-            if (it->first == key)
+            if (it->first.matchesKey(key))
             {
                 mapValue.erase(it);
                 return true;
@@ -394,7 +416,7 @@ struct Variant
             arrayValue.clear();
         }
         for (const auto& v : arrayValue)
-            if (v == value) return;
+            if (v.matchesKey(value)) return;
         arrayValue.push_back(value);
     }
 
@@ -402,7 +424,7 @@ struct Variant
     {
         for (auto it = arrayValue.begin(); it != arrayValue.end(); ++it)
         {
-            if (*it == value)
+            if (it->matchesKey(value))
             {
                 arrayValue.erase(it);
                 return true;
@@ -414,7 +436,7 @@ struct Variant
     bool setContains(const Variant& value) const
     {
         for (const auto& v : arrayValue)
-            if (v == value) return true;
+            if (v.matchesKey(value)) return true;
         return false;
     }
 
