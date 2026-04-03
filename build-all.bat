@@ -171,8 +171,33 @@ goto :after_build_bundle
     exit /b 0
 :after_build_bundle
 
-:: ── 收集辅助 ──────────────────────────────────────────────────────────────────
-goto :after_collect
+goto :after_build_nolua
+:build_nolua
+    :: %1=build目录  %2=cmake源码目录  %3=BUILD_TYPE
+    :: 在已有 build 目录重新 configure（BLUEPRINT_LUA=OFF），
+    :: OUTPUT_NAME 自动变为 BlueprintRuntimeNoLua，然后恢复 LUA=ON。
+    set _BD=%~1
+    set _SD=%~2
+    set _BT=%~3
+    if not exist "%_BD%" exit /b 0
+    echo   Building BlueprintRuntimeNoLua in %_BD% ...
+    cmake -S "%_SD%" -B "%_BD%" -DBLUEPRINT_LUA=OFF -DCMAKE_BUILD_TYPE=%_BT% >nul
+    cmake --build "%_BD%" --target BlueprintRuntime --config %_BT% --parallel
+    if %ERRORLEVEL% neq 0 (
+        echo [WARN] BlueprintRuntimeNoLua failed in %_BD%
+    ) else (
+        echo [OK]   BlueprintRuntimeNoLua built in %_BD%
+    )
+    :: 恢复含 Lua 版本
+    cmake -S "%_SD%" -B "%_BD%" -DBLUEPRINT_LUA=ON -DCMAKE_BUILD_TYPE=%_BT% >nul
+    cmake --build "%_BD%" --target BlueprintRuntime --config %_BT% --parallel
+    if %ERRORLEVEL% neq 0 (
+        echo [WARN] BlueprintRuntime ^(restore with Lua^) failed in %_BD%
+    ) else (
+        echo [OK]   BlueprintRuntime ^(with Lua^) restored in %_BD%
+    )
+    exit /b 0
+:after_build_nolua
 :collect
     set _CP=%~1
     set _SRC=%~2
@@ -214,6 +239,11 @@ goto :after_collect_req
 
 :: ── 1. Windows x64（完整编辑器 + 共享 DLL） ──────────────────────────────────
 call :run_build windows windows
+if "!STATUS_windows!"=="OK" (
+    echo.
+    echo [1b] Building BlueprintRuntimeNoLua (windows)...
+    call :build_nolua "%PROJECT_DIR%\build-windows" "%PROJECT_DIR%" %BUILD_TYPE%
+)
 echo.
 
 :: ── 2. WebAssembly ────────────────────────────────────────────────────────────
@@ -246,6 +276,11 @@ if "%NDK_PATH%"=="" (
 )
 if not "%NDK_PATH%"=="" (
     call :run_build android android --ndk "%NDK_PATH%" --api %ANDROID_API%
+    if "!STATUS_android!"=="OK" (
+        echo.
+        echo [3b] Building BlueprintRuntimeNoLua (android)...
+        call :build_nolua "%PROJECT_DIR%\build-android" "%PROJECT_DIR%" %BUILD_TYPE%
+    )
 ) else (
     set STATUS_android=NA
     echo [--] Android NDK not found - skipping. Pass --ndk ^<path^> or set %%ANDROID_NDK%%.
@@ -263,11 +298,17 @@ call :collect_req windows "%WIN_BIN%\BlueprintRuntime.dll" ^
     "%UNITY_PLUGINS_DIR%\Windows\x86_64" "BlueprintRuntime.dll"
 call :collect windows "%WIN_BIN%\liblua54.dll" ^
     "%UNITY_PLUGINS_DIR%\Windows\x86_64" "liblua54.dll"
+call :collect windows "%WIN_BIN%\BlueprintRuntimeNoLua.dll" ^
+    "%UNITY_PLUGINS_DIR%\Windows\x86_64" "BlueprintRuntimeNoLua.dll"
 
 :: Android
 set AND_BIN=%PROJECT_DIR%\build-android\bin\%BUILD_TYPE%
 call :collect_req android "%AND_BIN%\libBlueprintRuntime.so" ^
     "%UNITY_PLUGINS_DIR%\Android\arm64-v8a" "libBlueprintRuntime.so"
+call :collect android "%AND_BIN%\liblua54.so" ^
+    "%UNITY_PLUGINS_DIR%\Android\arm64-v8a" "liblua54.so"
+call :collect android "%AND_BIN%\libBlueprintRuntimeNoLua.so" ^
+    "%UNITY_PLUGINS_DIR%\Android\arm64-v8a" "libBlueprintRuntimeNoLua.so"
 call :collect android "%AND_BIN%\liblua54.so" ^
     "%UNITY_PLUGINS_DIR%\Android\arm64-v8a" "liblua54.so"
 
@@ -308,10 +349,14 @@ for %%P in (windows wasm android) do (
 )
 echo.
 echo  Collected artifacts:
-echo    Windows\x86_64\  BlueprintRuntime.dll  liblua54.dll
-echo    Android\arm64\   libBlueprintRuntime.so  liblua54.so
-echo    WebGL\           libBlueprintBundle.a      (Runtime+JSON+Lua)
-echo    WebGL\           libBlueprintBundleNoLua.a (Runtime+JSON, no Lua)
+echo    Windows\x86_64\  BlueprintRuntime.dll        (含 Lua VM)
+echo                     BlueprintRuntimeNoLua.dll   (无 Lua, 配合 xLua/tolua)
+echo                     liblua54.dll
+echo    Android\arm64\   libBlueprintRuntime.so      (含 Lua VM)
+echo                     libBlueprintRuntimeNoLua.so (无 Lua)
+echo                     liblua54.so
+echo    WebGL\           libBlueprintBundle.a          (Runtime+JSON+Lua)
+echo    WebGL\           libBlueprintBundleNoLua.a     (Runtime+JSON, no Lua)
 echo.
 echo  iOS / macOS: run build-all.sh on a macOS host
 echo  Unity Plugins: %UNITY_PLUGINS_DIR%
