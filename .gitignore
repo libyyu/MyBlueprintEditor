@@ -47,3 +47,7 @@ build-*/
 *.user
 .vs/
 logs
+
+# Core dumps
+tests/core.*
+core.*
