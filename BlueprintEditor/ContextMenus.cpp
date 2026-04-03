@@ -305,15 +305,17 @@ void BlueprintEditor::DrawContextMenus(
 
     if (ImGui::BeginPopup("Create New Node"))
     {
-        auto newNodePostion = openPopupPosition;
+        // openPopupPosition 是屏幕坐标（ImGui::GetMousePos()），
+        // ed::SetNodePosition 需要 canvas 坐标，必须先转换。
+        // Popup 打开期间 ed::Suspend() 已调用，此时 ScreenToCanvas 仍有效。
+        const ImVec2 newNodePosition = ed::ScreenToCanvas(openPopupPosition);
 
         // 如果剪贴板中有节点，提供 Paste Here 选项
         if (!m_ClipboardNodes.empty())
         {
             if (ImGui::MenuItem(ICON_FA_PASTE " Paste Here", "Ctrl+V"))
             {
-                ImVec2 canvasPos = ed::ScreenToCanvas(newNodePostion);
-                PasteNodes(canvasPos);
+                PasteNodes(newNodePosition);
             }
         }
 
@@ -328,7 +330,7 @@ void BlueprintEditor::DrawContextMenus(
                 cmt->Size = ImVec2(300, 200);
                 BuildNodes();
                 ActiveDoc()->isDirty = true;
-                ed::SetNodePosition(cmt->ID, newNodePostion);
+                ed::SetNodePosition(cmt->ID, newNodePosition);
                 // 立即进入编辑状态
                 ActiveDoc()->editingCommentId = cmt->ID;
                 snprintf(ActiveDoc()->commentEditBuf,
@@ -349,7 +351,7 @@ void BlueprintEditor::DrawContextMenus(
             createNewNode = false;
             ActiveDoc()->isDirty = true;
 
-            ed::SetNodePosition(node->ID, newNodePostion);
+            ed::SetNodePosition(node->ID, newNodePosition);
 
             if (auto startPin = newNodeLinkPin)
             {
