@@ -17,25 +17,38 @@
 #   -h/--help
 #
 # 构建的平台:
-#   host     当前宿主（Linux→linux, macOS→macos）完整编辑器 + 运行时 .so/.dylib
-#   wasm     WebAssembly 静态库（需要 Emscripten）
-#   android  Android ARM64-v8a .so（需要 NDK）
-#   ios      iOS arm64 静态库（仅 macOS 宿主）
-#   windows  Windows x64 .dll（需要 MinGW-w64 交叉编译器）
+#   host     当前宿主（Linux→linux, macOS→macos）完整编辑器 + 运行时
+#   wasm     WebAssembly（需要 Emscripten）
+#   android  Android ARM64-v8a（需要 NDK）
+#   ios      iOS arm64（仅 macOS 宿主）
+#   windows  Windows x64（需要 MinGW-w64 交叉编译器）
 #
 # 产物收集到 Unity/Runtime/Plugins/:
-#   Windows/x86_64/BlueprintRuntime.dll
-#   Android/arm64-v8a/libBlueprintRuntime.so
-#   iOS/libBlueprintRuntime.a
-#   WebGL/libBlueprintRuntime.a
-#   macOS/libBlueprintRuntime.bundle  （仅 macOS 宿主）
-#   Linux/x86_64/libBlueprintRuntime.so（仅 Linux 宿主）
+#   Windows/x86_64/
+#     BlueprintRuntime.dll          ← 运行时主体
+#     liblua54.dll                  ← Lua VM（动态链接）
+#   Android/arm64-v8a/
+#     libBlueprintRuntime.so
+#     liblua54.so
+#   iOS/
+#     libBlueprintBundle.a          ← Runtime + crude_json + lua54 合并包
+#   WebGL/
+#     libBlueprintBundle.a          ← 同上
+#   macOS/
+#     libBlueprintRuntime.bundle/.dylib
+#     liblua54.dylib/.so
+#   Linux/x86_64/
+#     libBlueprintRuntime.so
+#     liblua54.so
+#
+# 注: iOS/WebGL 使用 BlueprintBundle（Runtime+JSON+Lua 全合并静态库），
+#     其余动态链接平台单独收集各库。
 #
 # 示例:
-#   ./build-all.sh                          # 构建所有可用平台（Release）
-#   ./build-all.sh debug                    # Debug 模式
-#   ./build-all.sh --skip android --skip ios  # 跳过移动端
-#   ./build-all.sh --only wasm --only windows # 只构建 WASM 和 Windows
+#   ./build-all.sh
+#   ./build-all.sh debug
+#   ./build-all.sh --skip android --skip ios
+#   ./build-all.sh --only wasm --only windows
 #   ./build-all.sh --ndk ~/Android/Sdk/ndk/25.2.9519653
 # ==============================================================================
 
@@ -66,7 +79,6 @@ EMSDK_PATH="${EMSDK:-}"
 UNITY_PLUGINS_DIR="${PROJECT_DIR}/Unity/Runtime/Plugins"
 SKIP_PLATFORMS=()
 ONLY_PLATFORMS=()
-
 HOST_OS="$(uname -s)"
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
@@ -90,14 +102,12 @@ done
 # ── Platform filter helpers ───────────────────────────────────────────────────
 should_build() {
     local p="$1"
-    # --only 白名单优先
     if [[ ${#ONLY_PLATFORMS[@]} -gt 0 ]]; then
         for o in "${ONLY_PLATFORMS[@]}"; do
             [[ "$o" == "$p" ]] && return 0
         done
         return 1
     fi
-    # --skip 黑名单
     for s in "${SKIP_PLATFORMS[@]}"; do
         [[ "$s" == "$p" ]] && return 1
     done
@@ -105,7 +115,7 @@ should_build() {
 }
 
 # ── 构建状态追踪 ──────────────────────────────────────────────────────────────
-declare -A BUILD_STATUS   # platform → "OK" | "SKIP" | "FAIL" | "NA"
+declare -A BUILD_STATUS
 
 run_build() {
     local platform="$1"; shift
@@ -130,82 +140,141 @@ run_build() {
     fi
 }
 
-# ── 产物收集 ──────────────────────────────────────────────────────────────────
+# ── 单文件收集辅助 ────────────────────────────────────────────────────────────
+# collect <platform> <src> <dst_dir> <dst_name>
 collect() {
-    local platform="$1"
-    local src="$2"
-    local dst_dir="$3"
-    local dst_name="$4"
-
-    [[ "${BUILD_STATUS[$platform]:-NA}" != "OK" ]] && return
+    local platform="$1" src="$2" dst_dir="$3" dst_name="$4"
+    [[ "${BUILD_STATUS[$platform]:-NA}" != "OK" ]] && return 0
 
     if [[ ! -f "$src" ]]; then
-        warn "Expected artifact not found: ${src}"
-        BUILD_STATUS["${platform}"]="FAIL"
-        return
+        warn "Artifact not found: ${src}"
+        return 0   # 不把缺产物升级为失败（可选产物场景）
     fi
 
     mkdir -p "$dst_dir"
     cp -f "$src" "${dst_dir}/${dst_name}"
-    success "Collected [${platform}]: ${dst_dir}/${dst_name}"
+    success "  [${platform}] → ${dst_dir}/${dst_name}"
 }
 
-# ── 收集所有平台产物到 Unity Plugins ──────────────────────────────────────────
+# collect_required：找不到文件则标记 FAIL
+collect_required() {
+    local platform="$1" src="$2" dst_dir="$3" dst_name="$4"
+    [[ "${BUILD_STATUS[$platform]:-NA}" != "OK" ]] && return 0
+
+    if [[ ! -f "$src" ]]; then
+        warn "Required artifact not found: ${src}"
+        BUILD_STATUS["$platform"]="FAIL"
+        return 0
+    fi
+
+    mkdir -p "$dst_dir"
+    cp -f "$src" "${dst_dir}/${dst_name}"
+    success "  [${platform}] → ${dst_dir}/${dst_name}"
+}
+
+# ── 按平台收集所有产物 ────────────────────────────────────────────────────────
+# 约定路径：
+#   动态库（.so/.dylib/.dll）→ build-<platform>/bin/[Release|Debug]/
+#   静态库（.a）             → build-<platform>/Runtime/
+#   BlueprintBundle          → build-<platform>/bin/[Release|Debug]/libBlueprintBundle.a
 collect_all() {
-    info "Collecting artifacts to: ${UNITY_PLUGINS_DIR}"
+    info "Collecting artifacts → ${UNITY_PLUGINS_DIR}"
+    local BT="${BUILD_TYPE}"   # Release 或 Debug
 
-    # Windows
+    # ── Windows ──────────────────────────────────────────────────────────────
+    local WIN_BIN="${PROJECT_DIR}/build-windows-dll/bin/${BT}"
+    collect_required "windows" \
+        "${WIN_BIN}/BlueprintRuntime.dll" \
+        "${UNITY_PLUGINS_DIR}/Windows/x86_64" "BlueprintRuntime.dll"
+    # liblua54.dll（动态链接时存在，BUNDLE_LUA=ON 时不存在）
     collect "windows" \
-        "${PROJECT_DIR}/build-windows/bin/${BUILD_TYPE}/BlueprintRuntime.dll" \
-        "${UNITY_PLUGINS_DIR}/Windows/x86_64" \
-        "BlueprintRuntime.dll"
+        "${WIN_BIN}/liblua54.dll" \
+        "${UNITY_PLUGINS_DIR}/Windows/x86_64" "liblua54.dll"
 
-    # Android
+    # ── Android ──────────────────────────────────────────────────────────────
+    local AND_BIN="${PROJECT_DIR}/build-android"
+    collect_required "android" \
+        "${AND_BIN}/bin/${BT}/libBlueprintRuntime.so" \
+        "${UNITY_PLUGINS_DIR}/Android/arm64-v8a" "libBlueprintRuntime.so"
     collect "android" \
-        "${PROJECT_DIR}/build-android/Runtime/libBlueprintRuntime.so" \
-        "${UNITY_PLUGINS_DIR}/Android/arm64-v8a" \
-        "libBlueprintRuntime.so"
+        "${AND_BIN}/bin/${BT}/liblua54.so" \
+        "${UNITY_PLUGINS_DIR}/Android/arm64-v8a" "liblua54.so"
 
-    # iOS
-    collect "ios" \
-        "${PROJECT_DIR}/build-ios/Runtime/${BUILD_TYPE}/libBlueprintRuntime.a" \
-        "${UNITY_PLUGINS_DIR}/iOS" \
-        "libBlueprintRuntime.a"
-
-    # WebGL
-    collect "wasm" \
-        "${PROJECT_DIR}/build-wasm/Runtime/libBlueprintRuntime.a" \
-        "${UNITY_PLUGINS_DIR}/WebGL" \
-        "libBlueprintRuntime.a"
-
-    # macOS
-    if [[ "$HOST_OS" == "Darwin" ]]; then
-        # CMake 可能输出 .bundle 或 .dylib，都尝试
-        local macos_src=""
-        for ext in bundle dylib so; do
-            local candidate="${PROJECT_DIR}/build-macos/bin/libBlueprintRuntime.${ext}"
-            [[ -f "$candidate" ]] && { macos_src="$candidate"; break; }
-        done
-        if [[ -n "$macos_src" ]]; then
-            local fname="$(basename "$macos_src")"
-            mkdir -p "${UNITY_PLUGINS_DIR}/macOS"
-            cp -f "$macos_src" "${UNITY_PLUGINS_DIR}/macOS/${fname}"
-            success "Collected [macos]: ${UNITY_PLUGINS_DIR}/macOS/${fname}"
-        else
-            warn "macOS artifact not found under build-macos/bin/"
-        fi
+    # ── iOS：使用 BlueprintBundle（静态全合并包） ─────────────────────────────
+    local IOS_BIN="${PROJECT_DIR}/build-ios/bin/${BT}"
+    # Xcode generator 把 .a 放在 <config>-iphoneos/ 子目录
+    local IOS_BUNDLE=""
+    for candidate in \
+        "${IOS_BIN}/libBlueprintBundle.a" \
+        "${PROJECT_DIR}/build-ios/bin/${BT}-iphoneos/libBlueprintBundle.a" \
+        "${PROJECT_DIR}/build-ios/Runtime/${BT}/libBlueprintBundle.a" \
+        "${PROJECT_DIR}/build-ios/Runtime/libBlueprintBundle.a"; do
+        [[ -f "$candidate" ]] && { IOS_BUNDLE="$candidate"; break; }
+    done
+    if [[ -n "$IOS_BUNDLE" ]]; then
+        collect_required "ios" "$IOS_BUNDLE" "${UNITY_PLUGINS_DIR}/iOS" "libBlueprintBundle.a"
+    else
+        collect_required "ios" \
+            "${IOS_BIN}/libBlueprintRuntime.a" \
+            "${UNITY_PLUGINS_DIR}/iOS" "libBlueprintRuntime.a"
     fi
 
-    # Linux
+    # ── WebGL：使用 BlueprintBundle（静态全合并包） ───────────────────────────
+    local WASM_BIN="${PROJECT_DIR}/build-wasm/bin/${BT}"
+    local WASM_BUNDLE=""
+    for candidate in \
+        "${WASM_BIN}/libBlueprintBundle.a" \
+        "${PROJECT_DIR}/build-wasm/Runtime/libBlueprintBundle.a" \
+        "${PROJECT_DIR}/build-wasm/bin/libBlueprintBundle.a"; do
+        [[ -f "$candidate" ]] && { WASM_BUNDLE="$candidate"; break; }
+    done
+    if [[ -n "$WASM_BUNDLE" ]]; then
+        collect_required "wasm" "$WASM_BUNDLE" "${UNITY_PLUGINS_DIR}/WebGL" "libBlueprintBundle.a"
+    else
+        collect_required "wasm" \
+            "${PROJECT_DIR}/build-wasm/Runtime/libBlueprintRuntime.a" \
+            "${UNITY_PLUGINS_DIR}/WebGL" "libBlueprintRuntime.a"
+    fi
+
+    # ── macOS（仅 macOS 宿主） ────────────────────────────────────────────────
+    if [[ "$HOST_OS" == "Darwin" ]]; then
+        local MAC_BIN="${PROJECT_DIR}/build-macos/bin"
+        local mac_rt=""
+        for ext in bundle dylib so; do
+            local c="${MAC_BIN}/libBlueprintRuntime.${ext}"
+            [[ -f "$c" ]] && { mac_rt="$c"; break; }
+        done
+        if [[ -n "$mac_rt" ]]; then
+            mkdir -p "${UNITY_PLUGINS_DIR}/macOS"
+            cp -f "$mac_rt" "${UNITY_PLUGINS_DIR}/macOS/$(basename "$mac_rt")"
+            success "  [macos] → ${UNITY_PLUGINS_DIR}/macOS/$(basename "$mac_rt")"
+        else
+            warn "macOS BlueprintRuntime artifact not found under build-macos/bin/"
+        fi
+        # Lua dylib
+        for ext in dylib so; do
+            local c="${MAC_BIN}/liblua54.${ext}"
+            if [[ -f "$c" ]]; then
+                cp -f "$c" "${UNITY_PLUGINS_DIR}/macOS/$(basename "$c")"
+                success "  [macos] → ${UNITY_PLUGINS_DIR}/macOS/$(basename "$c")"
+                break
+            fi
+        done
+    fi
+
+    # ── Linux（仅 Linux 宿主） ────────────────────────────────────────────────
     if [[ "$HOST_OS" == "Linux" ]]; then
+        local LIN_BIN="${PROJECT_DIR}/build-linux/bin"
+        collect_required "linux" \
+            "${LIN_BIN}/libBlueprintRuntime.so" \
+            "${UNITY_PLUGINS_DIR}/Linux/x86_64" "libBlueprintRuntime.so"
         collect "linux" \
-            "${PROJECT_DIR}/build-linux/bin/libBlueprintRuntime.so" \
-            "${UNITY_PLUGINS_DIR}/Linux/x86_64" \
-            "libBlueprintRuntime.so"
+            "${LIN_BIN}/liblua54.so" \
+            "${UNITY_PLUGINS_DIR}/Linux/x86_64" "liblua54.so"
     fi
 }
 
-# ── 主流程 ────────────────────────────────────────────────────────────────────
+# ── Banner ────────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}============================================${NC}"
 echo -e "${BOLD}  Blueprint Editor – Build All Platforms${NC}"
@@ -218,7 +287,26 @@ echo -e "  Unity Plugins : ${CYAN}${UNITY_PLUGINS_DIR}${NC}"
     echo -e "  Only          : ${CYAN}${ONLY_PLATFORMS[*]}${NC}"
 echo -e "${BOLD}============================================${NC}"
 
-# ── 1. 宿主平台（完整编辑器 + 共享运行时） ───────────────────────────────────
+# ── 通用额外 CMake 参数（通过 build.sh 的尾部 -- 转发不方便，改用 env 注入） ─
+# build.sh 目前不支持转发任意 CMake 参数，这里用 CMAKE_EXTRA_FLAGS env 注入
+# （需要 build.sh 支持）；或者直接在 build dir 里 re-configure。
+# 当前策略：先用 build.sh 正常构建，然后对静态平台在同一 build 目录追加
+# -DBUILD_BUNDLE=ON -DBUNDLE_LUA=ON 重新 configure 并构建 BlueprintBundle target。
+
+build_bundle_target() {
+    # build_bundle_target <build_dir> <build_type>
+    local bdir="$1" btype="$2"
+    [[ -d "$bdir" ]] || return 0
+    info "  Configuring BlueprintBundle in ${bdir} ..."
+    cmake -S "${PROJECT_DIR}" -B "${bdir}" \
+        -DBUILD_BUNDLE=ON -DBUNDLE_LUA=ON \
+        -DCMAKE_BUILD_TYPE="${btype}" > /dev/null
+    cmake --build "${bdir}" --target BlueprintBundle \
+        --config "${btype}" --parallel \
+        "$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+}
+
+# ── 1. 宿主平台 ───────────────────────────────────────────────────────────────
 case "$HOST_OS" in
     Linux)
         run_build "linux" "shared"
@@ -237,45 +325,57 @@ WASM_ARGS=()
 [[ -n "$EMSDK_PATH" ]] && WASM_ARGS+=("--emsdk" "$EMSDK_PATH")
 if command -v emcmake &>/dev/null || [[ -n "$EMSDK_PATH" ]]; then
     run_build "wasm" "${WASM_ARGS[@]}"
+    if [[ "${BUILD_STATUS[wasm]:-}" == "OK" ]]; then
+        step "Building BlueprintBundle (wasm)"
+        build_bundle_target "${PROJECT_DIR}/build-wasm" "${BUILD_TYPE}" \
+            && success "BlueprintBundle (wasm) OK" \
+            || warn "BlueprintBundle (wasm) failed – will fall back to libBlueprintRuntime.a"
+    fi
 else
     BUILD_STATUS["wasm"]="NA"
-    warn "emcmake not found – skipping WASM build. Pass --emsdk <path> to enable."
+    warn "emcmake not found – skipping WASM. Pass --emsdk <path> to enable."
 fi
 
 # ── 3. Android ────────────────────────────────────────────────────────────────
 ANDROID_ARGS=()
+_ndk_found=0
 if [[ -n "$NDK_PATH" ]]; then
-    ANDROID_ARGS+=("--ndk" "$NDK_PATH" "--api" "$ANDROID_API")
-    run_build "android" "${ANDROID_ARGS[@]}"
+    _ndk_found=1
 else
-    # 尝试从环境变量找 NDK
     for _ndk in "${ANDROID_NDK:-}" "${ANDROID_NDK_HOME:-}" \
                 "${HOME}/Library/Android/sdk/ndk-bundle" \
                 "${HOME}/Android/Sdk/ndk-bundle"; do
         if [[ -n "$_ndk" && -d "$_ndk" ]]; then
-            ANDROID_ARGS+=("--ndk" "$_ndk" "--api" "$ANDROID_API")
-            run_build "android" "${ANDROID_ARGS[@]}"
-            break
+            NDK_PATH="$_ndk"; _ndk_found=1; break
         fi
     done
-    if [[ ${#ANDROID_ARGS[@]} -eq 0 ]]; then
-        BUILD_STATUS["android"]="NA"
-        warn "Android NDK not found – skipping Android build. Pass --ndk <path> to enable."
-    fi
+fi
+
+if [[ $_ndk_found -eq 1 ]]; then
+    ANDROID_ARGS+=("--ndk" "$NDK_PATH" "--api" "$ANDROID_API")
+    run_build "android" "${ANDROID_ARGS[@]}"
+else
+    BUILD_STATUS["android"]="NA"
+    warn "Android NDK not found – skipping. Pass --ndk <path> to enable."
 fi
 
 # ── 4. iOS（仅 macOS） ────────────────────────────────────────────────────────
 if [[ "$HOST_OS" == "Darwin" ]]; then
     run_build "ios"
+    if [[ "${BUILD_STATUS[ios]:-}" == "OK" ]]; then
+        step "Building BlueprintBundle (ios)"
+        build_bundle_target "${PROJECT_DIR}/build-ios" "${BUILD_TYPE}" \
+            && success "BlueprintBundle (ios) OK" \
+            || warn "BlueprintBundle (ios) failed – will fall back to libBlueprintRuntime.a"
+    fi
 else
     BUILD_STATUS["ios"]="NA"
     warn "iOS build requires macOS host – skipping."
 fi
 
-# ── 5. Windows（通过 MinGW-w64 交叉编译，Linux/macOS 宿主） ──────────────────
+# ── 5. Windows（MinGW-w64 交叉编译） ─────────────────────────────────────────
 if command -v x86_64-w64-mingw32-gcc &>/dev/null; then
     run_build "windows-dll"
-    # windows-dll 对应 build-windows-dll 目录，帮 collect 映射一下
     BUILD_STATUS["windows"]="${BUILD_STATUS[windows-dll]:-NA}"
 else
     BUILD_STATUS["windows"]="NA"
@@ -306,6 +406,15 @@ done
 
 echo ""
 echo -e "  Unity Plugins : ${CYAN}${UNITY_PLUGINS_DIR}${NC}"
+echo ""
+echo -e "  收集的产物（动态平台）:"
+echo -e "    Windows/x86_64/  BlueprintRuntime.dll  liblua54.dll"
+echo -e "    Android/arm64/   libBlueprintRuntime.so  liblua54.so"
+echo -e "    Linux/x86_64/    libBlueprintRuntime.so  liblua54.so"
+echo -e "    macOS/           libBlueprintRuntime.bundle  liblua54.dylib"
+echo -e "  收集的产物（静态平台，全合并包）:"
+echo -e "    iOS/             libBlueprintBundle.a  (Runtime+JSON+Lua)"
+echo -e "    WebGL/           libBlueprintBundle.a  (Runtime+JSON+Lua)"
 echo -e "${BOLD}============================================${NC}"
 
 if [[ $ALL_OK -eq 1 ]]; then
