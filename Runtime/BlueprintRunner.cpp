@@ -762,6 +762,10 @@ ExecutionResult BlueprintRunner::Execute()
     m_flowExecutedNodes.clear(); // 清空控制流已执行记录
     m_stepTopoIndex = 0;         // 重置单步索引
 
+    // 注：m_state.pinValues 在多次 Execute() 之间保留（持久 Runner 语义）。
+    // 这允许节点/变量在事件驱动场景下跨调用保持状态。
+    // 若需全量重置（包括引脚中间值），在 Execute() 前显式调用 ResetState()。
+
     // 收集所有事件源节点及其 exec 下游子图（缓存，随拓扑缓存一起失效）
     if (m_eventSubgraphDirty)
     {

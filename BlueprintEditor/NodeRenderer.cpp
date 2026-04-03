@@ -352,8 +352,12 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                         else if (input.Type == PinType::Float)
                         {
                             ImGui::SetNextItemWidth(80.0f);
-                            if (ImGui::DragFloat("##value", &input.FloatValue, 0.01f))
+                            float fval = static_cast<float>(input.FloatValue);
+                            if (ImGui::DragFloat("##value", &fval, 0.01f))
+                            {
+                                input.FloatValue = static_cast<double>(fval);
                                 ActiveDoc()->isDirty = true;
+                            }
                             if (ImGui::IsItemActivated()) PushUndoState();  // 拖拽开始帧保存
                         }
                         else if (input.Type == PinType::String)

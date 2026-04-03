@@ -1204,12 +1204,12 @@ void BlueprintEditor::DrawDetailsPanel()
                 }
                 case PinType::Float:
                 {
-                    float fval = pin.FloatValue;
+                    float fval = static_cast<float>(pin.FloatValue);
                     ImGui::SetNextItemWidth(editWidth);
                     if (ImGui::DragFloat("##val", &fval, 0.1f))
                     {
                         PushUndoState();
-                        pin.FloatValue = fval;
+                        pin.FloatValue = static_cast<double>(fval);
                         doc->isDirty = true;
                     }
                     break;

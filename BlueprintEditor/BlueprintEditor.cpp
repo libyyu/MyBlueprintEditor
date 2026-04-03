@@ -507,7 +507,7 @@ Node* BlueprintEditor::SpawnNodeByDef(const std::string& defId)
         else if (pd.dataType == RTPinDataType::Integer)
             pin.IntValue = pd.defaultValue.asInt();
         else if (pd.dataType == RTPinDataType::Float)
-            pin.FloatValue = static_cast<float>(pd.defaultValue.asFloat());
+            pin.FloatValue = pd.defaultValue.asFloat();  // double → double，无截断
         else if (pd.dataType == RTPinDataType::String)
             pin.StringValue = pd.defaultValue.asString();
         else if (pd.dataType == RTPinDataType::Object)
@@ -888,7 +888,7 @@ RTBlueprintData BlueprintEditor::BuildRuntimeData()
             {
             case PinType::Bool:   pi.defaultValue = RTVariant(pin.BoolValue); break;
             case PinType::Int:    pi.defaultValue = RTVariant(pin.IntValue); break;
-            case PinType::Float:  pi.defaultValue = RTVariant(static_cast<double>(pin.FloatValue)); break;
+            case PinType::Float:  pi.defaultValue = RTVariant(pin.FloatValue); break;  // already double
             case PinType::String: pi.defaultValue = RTVariant(pin.StringValue); break;
             case PinType::Object: pi.defaultValue = RTVariant::MakeObject(pin.ObjectValue); break;
             default: break;

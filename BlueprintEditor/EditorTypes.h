@@ -48,7 +48,7 @@ struct Pin
     // 引脚默认值（未连线时可在节点上直接编辑）
     bool        BoolValue   = false;
     int64_t     IntValue    = 0;
-    float       FloatValue  = 0.0f;
+    double      FloatValue  = 0.0;  // float 默认值（用 double 存储与 Runtime Variant 精度对齐）
     std::string StringValue;
     std::string ObjectValue;    // Object 类型引脚的对象引用 ID
 

@@ -611,7 +611,7 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
                 else if (rtPin.dataType == RTPinDataType::Integer)
                     pin.IntValue = static_cast<int>(rtPin.defaultValue.asInt());
                 else if (rtPin.dataType == RTPinDataType::Float)
-                    pin.FloatValue = static_cast<float>(rtPin.defaultValue.asFloat());
+                    pin.FloatValue = rtPin.defaultValue.asFloat();  // double, no truncation
                 else if (rtPin.dataType == RTPinDataType::String)
                     pin.StringValue = rtPin.defaultValue.asString();
                 else if (rtPin.dataType == RTPinDataType::Object)
@@ -764,7 +764,7 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
                     else if (pinDef.dataType == RTPinDataType::Integer)
                         pin.IntValue = pinDef.defaultValue.asInt();
                     else if (pinDef.dataType == RTPinDataType::Float)
-                        pin.FloatValue = static_cast<float>(pinDef.defaultValue.asFloat());
+                        pin.FloatValue = pinDef.defaultValue.asFloat();  // double, no truncation
                     else if (pinDef.dataType == RTPinDataType::String)
                         pin.StringValue = pinDef.defaultValue.asString();
                     else if (pinDef.dataType == RTPinDataType::Object)
