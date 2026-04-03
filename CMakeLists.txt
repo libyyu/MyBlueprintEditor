@@ -145,8 +145,13 @@ if(NOT BUILD_RUNTIME_ONLY)
     )
 
     add_library(imgui STATIC ${IMGUI_SOURCES})
-    target_include_directories(imgui PUBLIC ${IMGUI_INCLUDE_DIR})
+    target_include_directories(imgui SYSTEM PUBLIC ${IMGUI_INCLUDE_DIR})
     target_compile_definitions(imgui PUBLIC IMGUI_DEFINE_MATH_OPERATORS)
+    if(MSVC)
+        target_compile_options(imgui PRIVATE /W0)
+    else()
+        target_compile_options(imgui PRIVATE -w)
+    endif()
     set_property(TARGET imgui PROPERTY FOLDER "Libraries")
 
     # ------------------------------------------------------------------
@@ -156,10 +161,20 @@ if(NOT BUILD_RUNTIME_ONLY)
         ${CMAKE_CURRENT_SOURCE_DIR}/external/ImGuiColorTextEdit/TextEditor.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/external/ImGuiColorTextEdit/LanguageDefinitions.cpp
     )
-    target_include_directories(ImGuiColorTextEdit PUBLIC
+    # 用 SYSTEM 标记头文件目录，使编译器将其视为系统头文件，
+    # 从而在 GCC/Clang 上屏蔽 -Wall/-Wextra 警告，
+    # 在 MSVC 上触发 /external:I 语义（需 CMake ≥ 3.25 或手动追加选项）。
+    target_include_directories(ImGuiColorTextEdit SYSTEM PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/external/ImGuiColorTextEdit
     )
     target_link_libraries(ImGuiColorTextEdit PUBLIC imgui)
+    # MSVC 兼容：直接对该 target 关闭所有警告（/W0），
+    # 因为 MSVC 的 /external:W0 在 CMake < 3.25 下不自动生效。
+    if(MSVC)
+        target_compile_options(ImGuiColorTextEdit PRIVATE /W0)
+    else()
+        target_compile_options(ImGuiColorTextEdit PRIVATE -w)
+    endif()
     set_property(TARGET ImGuiColorTextEdit PROPERTY FOLDER "Libraries")
 
     # ------------------------------------------------------------------
