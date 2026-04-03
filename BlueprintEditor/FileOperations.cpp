@@ -495,16 +495,6 @@ RTBlueprintData BlueprintEditor::BuildFullEditorData()
     // 蓝图类型写入元数据
     bp.metadata.blueprintClass = ActiveDoc()->blueprintClass;
 
-    // 视图状态：保存当前 zoom 和 canvas origin，下次打开时精确恢复
-    // ed::ScreenToCanvas(ImVec2(0,0)) 返回屏幕左上角对应的 canvas 坐标（即 view origin）
-    // GetCurrentZoom() 返回当前缩放倍率
-    // 注：这两个 API 必须在 ed::Begin/End 之间调用才有效；
-    //     DoSaveFile 由 UI 层（帧内）调用，此时 ed::Begin/End 已经执行过，结果有效
-    bp.viewInfo.viewScale      = ed::GetCurrentZoom();
-    ImVec2 origin              = ed::ScreenToCanvas(ImVec2(0.f, 0.f));
-    bp.viewInfo.viewPosition.x = origin.x;
-    bp.viewInfo.viewPosition.y = origin.y;
-
     return bp;
 }
 
@@ -936,12 +926,6 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
     // 保存加载数据和 ID 映射，用于延迟设置节点位置
     ActiveDoc()->pendingLoadData = data;
     ActiveDoc()->needSetNodePositions = true;
-
-    // 记录文件中保存的视图状态（origin + scale）
-    // viewScale > 0 且 origin 任意值都算有效（包括 0,0）
-    ActiveDoc()->hasSavedView    = (data.viewInfo.viewScale > 0.f);
-    ActiveDoc()->savedViewOrigin = ImVec2(data.viewInfo.viewPosition.x, data.viewInfo.viewPosition.y);
-    ActiveDoc()->savedViewScale  = (data.viewInfo.viewScale > 0.f) ? data.viewInfo.viewScale : 1.f;
 
     // 保存 nodeIdMap 到成员中以便 OnFrame 使用
     // 直接在这里使用：在编辑器初始化后设置位置

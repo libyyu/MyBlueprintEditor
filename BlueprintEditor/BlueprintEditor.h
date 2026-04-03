@@ -170,9 +170,7 @@ public:
 
     // 加载时保存的视图状态（viewPosition = canvas origin，viewScale = zoom）
     // hasSavedView=true 时加载后精确恢复，否则 NavigateToContent
-    bool                 hasSavedView      = false;
-    ImVec2               savedViewOrigin   = {0.f, 0.f};  // canvas 左上角对应的 canvas 坐标
-    float                savedViewScale    = 1.f;
+
 
     // 依赖关系（从 JSON 加载时读入，保存时写回）
     std::vector<std::string> dependencies;
