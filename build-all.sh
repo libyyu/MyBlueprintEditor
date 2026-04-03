@@ -190,6 +190,10 @@ collect_all() {
     collect "windows" \
         "${WIN_BIN}/liblua54.dll" \
         "${UNITY_PLUGINS_DIR}/Windows/x86_64" "liblua54.dll"
+    # NoLua 变体
+    collect "windows" \
+        "${WIN_BIN}/BlueprintRuntimeNoLua.dll" \
+        "${UNITY_PLUGINS_DIR}/Windows/x86_64" "BlueprintRuntimeNoLua.dll"
 
     # ── Android ──────────────────────────────────────────────────────────────
     local AND_BIN="${PROJECT_DIR}/build-android"
@@ -199,6 +203,10 @@ collect_all() {
     collect "android" \
         "${AND_BIN}/bin/${BT}/liblua54.so" \
         "${UNITY_PLUGINS_DIR}/Android/arm64-v8a" "liblua54.so"
+    # NoLua 变体
+    collect "android" \
+        "${AND_BIN}/bin/${BT}/libBlueprintRuntimeNoLua.so" \
+        "${UNITY_PLUGINS_DIR}/Android/arm64-v8a" "libBlueprintRuntimeNoLua.so"
 
     # ── iOS：BlueprintBundle（含 Lua）+ BlueprintBundleNoLua ─────────────────
     local IOS_BIN="${PROJECT_DIR}/build-ios/bin/${BT}"
@@ -269,6 +277,15 @@ collect_all() {
                 break
             fi
         done
+        # NoLua 变体
+        for ext in bundle dylib so; do
+            local c="${MAC_BIN}/libBlueprintRuntimeNoLua.${ext}"
+            if [[ -f "$c" ]]; then
+                cp -f "$c" "${UNITY_PLUGINS_DIR}/macOS/$(basename "$c")"
+                success "  [macos] → ${UNITY_PLUGINS_DIR}/macOS/$(basename "$c")"
+                break
+            fi
+        done
     fi
 
     # ── Linux（仅 Linux 宿主） ────────────────────────────────────────────────
@@ -280,6 +297,10 @@ collect_all() {
         collect "linux" \
             "${LIN_BIN}/liblua54.so" \
             "${UNITY_PLUGINS_DIR}/Linux/x86_64" "liblua54.so"
+        # NoLua 变体
+        collect "linux" \
+            "${LIN_BIN}/libBlueprintRuntimeNoLua.so" \
+            "${UNITY_PLUGINS_DIR}/Linux/x86_64" "libBlueprintRuntimeNoLua.so"
     fi
 }
 
@@ -318,13 +339,48 @@ build_bundle_target() {
         "$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 }
 
+# build_nolua_target <build_dir> <build_type>
+# 在已有 build 目录上重新 configure（BLUEPRINT_LUA=OFF），输出名自动为
+# libBlueprintRuntimeNoLua.so / BlueprintRuntimeNoLua.dll
+build_nolua_target() {
+    local bdir="$1" btype="$2"
+    [[ -d "$bdir" ]] || return 0
+    info "  Building BlueprintRuntimeNoLua in ${bdir} ..."
+    # 保留原有 toolchain/generator 设置，仅覆盖 LUA 选项
+    cmake -S "${PROJECT_DIR}" -B "${bdir}" \
+        -DBLUEPRINT_LUA=OFF \
+        -DCMAKE_BUILD_TYPE="${btype}" > /dev/null
+    cmake --build "${bdir}" --target BlueprintRuntime \
+        --config "${btype}" --parallel \
+        "$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+    # 恢复 LUA=ON，保证后续的 collect 拿到的是含 Lua 的版本
+    cmake -S "${PROJECT_DIR}" -B "${bdir}" \
+        -DBLUEPRINT_LUA=ON \
+        -DCMAKE_BUILD_TYPE="${btype}" > /dev/null
+    cmake --build "${bdir}" --target BlueprintRuntime \
+        --config "${btype}" --parallel \
+        "$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+}
+
 # ── 1. 宿主平台 ───────────────────────────────────────────────────────────────
 case "$HOST_OS" in
     Linux)
         run_build "linux" "shared"
+        if [[ "${BUILD_STATUS[linux]:-}" == "OK" ]]; then
+            step "Building BlueprintRuntimeNoLua (linux)"
+            build_nolua_target "${PROJECT_DIR}/build-linux" "${BUILD_TYPE}" \
+                && success "BlueprintRuntimeNoLua (linux) OK" \
+                || warn "BlueprintRuntimeNoLua (linux) failed"
+        fi
         ;;
     Darwin)
         run_build "macos" "shared"
+        if [[ "${BUILD_STATUS[macos]:-}" == "OK" ]]; then
+            step "Building BlueprintRuntimeNoLua (macos)"
+            build_nolua_target "${PROJECT_DIR}/build-macos" "${BUILD_TYPE}" \
+                && success "BlueprintRuntimeNoLua (macos) OK" \
+                || warn "BlueprintRuntimeNoLua (macos) failed"
+        fi
         ;;
     *)
         warn "Unknown host OS '${HOST_OS}', skipping host platform build"
@@ -369,6 +425,12 @@ fi
 if [[ $_ndk_found -eq 1 ]]; then
     ANDROID_ARGS+=("--ndk" "$NDK_PATH" "--api" "$ANDROID_API")
     run_build "android" "${ANDROID_ARGS[@]}"
+    if [[ "${BUILD_STATUS[android]:-}" == "OK" ]]; then
+        step "Building BlueprintRuntimeNoLua (android)"
+        build_nolua_target "${PROJECT_DIR}/build-android" "${BUILD_TYPE}" \
+            && success "BlueprintRuntimeNoLua (android) OK" \
+            || warn "BlueprintRuntimeNoLua (android) failed"
+    fi
 else
     BUILD_STATUS["android"]="NA"
     warn "Android NDK not found – skipping. Pass --ndk <path> to enable."
@@ -395,6 +457,12 @@ fi
 if command -v x86_64-w64-mingw32-gcc &>/dev/null; then
     run_build "windows-dll"
     BUILD_STATUS["windows"]="${BUILD_STATUS[windows-dll]:-NA}"
+    if [[ "${BUILD_STATUS[windows]:-}" == "OK" ]]; then
+        step "Building BlueprintRuntimeNoLua (windows)"
+        build_nolua_target "${PROJECT_DIR}/build-windows-dll" "${BUILD_TYPE}" \
+            && success "BlueprintRuntimeNoLua (windows) OK" \
+            || warn "BlueprintRuntimeNoLua (windows) failed"
+    fi
 else
     BUILD_STATUS["windows"]="NA"
     warn "MinGW-w64 not found – skipping Windows cross-build."
@@ -426,15 +494,23 @@ echo ""
 echo -e "  Unity Plugins : ${CYAN}${UNITY_PLUGINS_DIR}${NC}"
 echo ""
 echo -e "  收集的产物（动态平台）:"
-echo -e "    Windows/x86_64/  BlueprintRuntime.dll  liblua54.dll"
-echo -e "    Android/arm64/   libBlueprintRuntime.so  liblua54.so"
-echo -e "    Linux/x86_64/    libBlueprintRuntime.so  liblua54.so"
-echo -e "    macOS/           libBlueprintRuntime.bundle  liblua54.dylib"
+echo -e "    Windows/x86_64/  BlueprintRuntime.dll        (含 Lua VM)"
+echo -e "                     BlueprintRuntimeNoLua.dll   (无 Lua，配合 xLua/tolua)"
+echo -e "                     liblua54.dll"
+echo -e "    Android/arm64/   libBlueprintRuntime.so      (含 Lua VM)"
+echo -e "                     libBlueprintRuntimeNoLua.so (无 Lua)"
+echo -e "                     liblua54.so"
+echo -e "    Linux/x86_64/    libBlueprintRuntime.so      (含 Lua VM)"
+echo -e "                     libBlueprintRuntimeNoLua.so (无 Lua)"
+echo -e "                     liblua54.so"
+echo -e "    macOS/           libBlueprintRuntime.bundle  (含 Lua VM)"
+echo -e "                     libBlueprintRuntimeNoLua.bundle (无 Lua)"
+echo -e "                     liblua54.dylib"
 echo -e "  收集的产物（静态平台，全合并包）:"
-echo -e "    iOS/             libBlueprintBundle.a      (Runtime+JSON+Lua)"
-echo -e "    iOS/             libBlueprintBundleNoLua.a (Runtime+JSON, 无Lua)"
-echo -e "    WebGL/           libBlueprintBundle.a      (Runtime+JSON+Lua)"
-echo -e "    WebGL/           libBlueprintBundleNoLua.a (Runtime+JSON, 无Lua)"
+echo -e "    iOS/             libBlueprintBundle.a          (Runtime+JSON+Lua)"
+echo -e "                     libBlueprintBundleNoLua.a     (Runtime+JSON, 无Lua)"
+echo -e "    WebGL/           libBlueprintBundle.a          (Runtime+JSON+Lua)"
+echo -e "                     libBlueprintBundleNoLua.a     (Runtime+JSON, 无Lua)"
 echo -e "${BOLD}============================================${NC}"
 
 if [[ $ALL_OK -eq 1 ]]; then

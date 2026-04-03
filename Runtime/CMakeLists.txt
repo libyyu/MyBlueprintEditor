@@ -105,6 +105,19 @@ set(RUNTIME_PUBLIC_HEADERS
 # ---------------------------------------------------------------------------
 option(BLUEPRINT_LUA "Enable Lua scripting support (requires Lua 5.4)" ON)
 
+# RUNTIME_NAME – override the output file name of the BlueprintRuntime library.
+# Default: "BlueprintRuntime"  → libBlueprintRuntime.so / BlueprintRuntime.dll
+# Example: cmake -DRUNTIME_NAME=BlueprintRuntimeNoLua -DBLUEPRINT_LUA=OFF ..
+#          → libBlueprintRuntimeNoLua.so / BlueprintRuntimeNoLua.dll
+# When unset, auto-derived: BLUEPRINT_LUA=OFF → append "NoLua" suffix.
+if(NOT DEFINED RUNTIME_NAME OR RUNTIME_NAME STREQUAL "")
+    if(NOT BLUEPRINT_LUA)
+        set(RUNTIME_NAME "BlueprintRuntimeNoLua")
+    else()
+        set(RUNTIME_NAME "BlueprintRuntime")
+    endif()
+endif()
+
 # LUA_LINK_STATIC – controls how Lua is linked when BlueprintRuntime is SHARED.
 #
 #   ON  (default): Lua is built as STATIC and baked into BlueprintRuntime.dll/so/dylib.
@@ -336,6 +349,10 @@ add_library(BlueprintRuntime ${_RUNTIME_LIB_TYPE}
 
 # Alias so consumers can always write target_link_libraries(... BlueprintRuntime::BlueprintRuntime)
 add_library(BlueprintRuntime::BlueprintRuntime ALIAS BlueprintRuntime)
+
+# Override output file name (e.g. libBlueprintRuntimeNoLua.so when BLUEPRINT_LUA=OFF)
+set_target_properties(BlueprintRuntime PROPERTIES OUTPUT_NAME "${RUNTIME_NAME}")
+message(STATUS "[BlueprintRuntime] Output name: ${RUNTIME_NAME}")
 
 # ---------------------------------------------------------------------------
 # Dependencies
