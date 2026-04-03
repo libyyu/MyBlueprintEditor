@@ -9,6 +9,7 @@
 #include <sstream>
 #include <iomanip>
 #include <ctime>
+#include <cmath>    // std::isinf / std::isnan
 #include <cstdio>   // std::snprintf / ::remove
 #include <iostream>
 #include <algorithm>
@@ -1669,9 +1670,12 @@ std::string JsonBlueprintExporter::variantToJson(const Variant& value) const
         return std::to_string(std::get<int64_t>(value.numericValue));
     case PinDataType::Float:
     {
+        double d = std::get<double>(value.numericValue);
+        // JSON 不允许 Infinity 和 NaN，将其替换为 0 并在调试时可检测
+        if (std::isinf(d) || std::isnan(d)) d = 0.0;
         // %.17g: 最短精确往返表示，去除尾零；不用 std::to_string 的 %.6f
         char buf[64];
-        std::snprintf(buf, sizeof(buf), "%.17g", std::get<double>(value.numericValue));
+        std::snprintf(buf, sizeof(buf), "%.17g", d);
         return std::string(buf);
     }
     case PinDataType::String:
