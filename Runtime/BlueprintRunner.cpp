@@ -1571,7 +1571,18 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     if (++m_flowDepth > kMaxFlowDepth)
     {
         if (m_logCallback)
-            m_logCallback(LogLevel::Error, "Flow depth exceeded limit (" + std::to_string(kMaxFlowDepth) + "), possible infinite loop");
+        {
+            // 给出当前调用链顶层的节点信息，帮助定位无限递归位置
+            std::string nodeInfo;
+            if (m_state.currentNode)
+                nodeInfo = " at node '" + m_state.currentNode->name
+                         + "' (id=" + std::to_string(m_state.currentNode->id)
+                         + ", def=" + m_state.currentNode->definitionId + ")";
+            m_logCallback(LogLevel::Error,
+                "Flow depth exceeded limit (" + std::to_string(kMaxFlowDepth)
+                + ")" + nodeInfo + " — possible infinite loop or deeply nested Branch/Sequence chain. "
+                "Execution stopped to prevent stack overflow.");
+        }
         --m_flowDepth;
         return false;
     }

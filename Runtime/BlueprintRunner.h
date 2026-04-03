@@ -765,7 +765,9 @@ private:
 
     // 递归深度保护
     int m_flowDepth = 0;
-    static const int kMaxFlowDepth = 256;
+    // 控制流递归深度上限（Branch/ForLoop/Sequence 每层 +1）。
+    // 提高到 512 以支持合法的深层嵌套；超出时输出带节点信息的错误日志并终止执行。
+    static const int kMaxFlowDepth = 512;
 
 #ifdef BLUEPRINT_HAS_LUA
     // Lua 脚本引擎（延迟创建：首次 LoadLuaScript 时初始化）
