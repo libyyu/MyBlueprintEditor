@@ -132,18 +132,21 @@ void BlueprintEditor::PushUndoState()
     state.variables = doc->variables;
     state.nextId    = doc->nextId;
 
-    // 捕获所有节点的当前位置（必须在 ed::Begin/End 之间调用才有效；
-    // 如果在 Begin/End 外调用，ed::GetNodePosition 返回 (0,0)，此时位置已记录在
-    // lastNodePositions 里，用它作为 fallback）
+    // 捕获所有节点的当前位置。
+    // ed::GetNodePosition 返回 node->m_Bounds.Min，节点存在时帧内外均有效；
+    // 节点不存在（尚未注册到 node editor）时返回 FLT_MAX，此时用 lastNodePositions fallback。
+    // lastNodePositions 在每帧 ed::End() 后更新，是上一帧确认的位置，
+    // 对于刚新建还未经过一帧 layout 的节点也能提供合理的初始值。
     for (const auto& node : doc->nodes)
     {
         ImVec2 pos = ed::GetNodePosition(node.ID);
-        if (pos.x == 0.0f && pos.y == 0.0f)
+        if (pos.x >= FLT_MAX * 0.5f)  // 节点未注册到 node editor
         {
-            // fallback: 用上一帧追踪到的位置
             auto it = doc->lastNodePositions.find(node.ID);
             if (it != doc->lastNodePositions.end())
                 pos = it->second;
+            else
+                pos = ImVec2(0.f, 0.f);  // 完全未知，用原点占位
         }
         state.nodePositions[node.ID] = pos;
     }
@@ -172,11 +175,10 @@ static void ApplyUndoRedo(BlueprintDocument* doc,
     for (const auto& node : doc->nodes)
     {
         ImVec2 pos = ed::GetNodePosition(node.ID);
-        if (pos.x == 0.0f && pos.y == 0.0f)
+        if (pos.x >= FLT_MAX * 0.5f)
         {
             auto it = doc->lastNodePositions.find(node.ID);
-            if (it != doc->lastNodePositions.end())
-                pos = it->second;
+            pos = (it != doc->lastNodePositions.end()) ? it->second : ImVec2(0.f, 0.f);
         }
         cur.nodePositions[node.ID] = pos;
     }
