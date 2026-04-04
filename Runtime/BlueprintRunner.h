@@ -734,6 +734,11 @@ private:
     NodeId                                              m_pausedAtNodeId = 0;
     // Step 模式标志：为 true 时 executeNodeInternal 跳过断点检测，让节点实际执行
     bool                                                m_bypassBreakpoint = false;
+    // 单步模式标志：为 true 时 executeDownstreamFromPin 只标记 exec 直接下游节点到
+    // m_stepPendingNodes，不递归执行，供下次 StepNextNode 继续步进
+    bool                                                m_stepMode = false;
+    // 单步模式下，exec 输出触达的直接下游节点（下次 StepNext 的候选）
+    std::unordered_set<NodeId>                          m_stepPendingNodes;
 
     // 缓存：拓扑排序结果
     mutable std::vector<NodeId>                         m_topoCache;
