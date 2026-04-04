@@ -1307,21 +1307,36 @@ bool BlueprintRunner::StepNextNode()
     }
     const auto& eventSubgraph = m_eventSubgraphCache;
 
-    // 辅助 lambda：在单步模式下执行一个节点
+    // 辅助 lambda：执行一个节点，执行完后把新增到 m_flowExecutedNodes 的直接
+    // exec 下游节点"借出"到 m_stepPendingNodes，让它们可以在下次 StepNext 时执行
     auto executeOneNode = [&](const NodeInstance* node) -> bool
     {
         if (m_logCallback)
             m_logCallback(LogLevel::Verbose, "[Step] Node '" + node->name +
                 "' (id=" + std::to_string(node->id) + ", def=" + node->definitionId + ")");
 
-        // 开启单步模式：ActivateOutputFlow 不递归执行下游，只记录到 m_stepPendingNodes
-        m_stepMode = true;
+        // 快照执行前的 m_flowExecutedNodes
+        std::unordered_set<NodeId> before = m_flowExecutedNodes;
+
         m_bypassBreakpoint = true;
         executeNodeInternal(*node);
         m_bypassBreakpoint = false;
-        m_stepMode = false;
 
-        // 执行完一个节点后保持 Paused（除非节点内部触发了新的断点/暂停）
+        // 找出执行后新增到 m_flowExecutedNodes 的节点（即本节点的 exec 下游）
+        // 把它们从 m_flowExecutedNodes 移入 m_stepPendingNodes，
+        // 这样它们不会被 StepNext 的 "已执行跳过" 逻辑漏掉
+        for (auto id : m_flowExecutedNodes)
+        {
+            if (!before.count(id) && id != node->id)
+            {
+                m_stepPendingNodes.insert(id);
+            }
+        }
+        // 从 m_flowExecutedNodes 里移除转入 pending 的节点
+        for (auto id : m_stepPendingNodes)
+            m_flowExecutedNodes.erase(id);
+
+        // 执行完一个节点后保持 Paused
         if (m_runState.load() != RunState::Paused)
             m_runState.store(RunState::Paused);
 
@@ -1331,7 +1346,6 @@ bool BlueprintRunner::StepNextNode()
     // 优先从 exec 流触达的待步进节点集合中取下一个执行（按拓扑序选择最靠前的）
     if (!m_stepPendingNodes.empty())
     {
-        // 在拓扑序中找到第一个待步进节点
         for (size_t i = 0; i < order.size(); ++i)
         {
             NodeId nodeId = order[i];
@@ -1342,14 +1356,13 @@ bool BlueprintRunner::StepNextNode()
             if (!node) { m_stepPendingNodes.erase(nodeId); continue; }
 
             m_stepPendingNodes.erase(nodeId);
-            m_stepTopoIndex = i + 1;  // 下次从此节点之后继续
+            m_stepTopoIndex = i + 1;
             return executeOneNode(node);
         }
-        // 待步进节点都在事件子图里或已失效，清空
         m_stepPendingNodes.clear();
     }
 
-    // 从 m_stepTopoIndex 开始找下一个需要执行的节点（兜底：按拓扑序推进）
+    // 从 m_stepTopoIndex 开始按拓扑序找下一个未执行节点（兜底路径）
     while (m_stepTopoIndex < order.size())
     {
         NodeId nodeId = order[m_stepTopoIndex];
@@ -1578,22 +1591,6 @@ bool ExecutionContext::ActivateOutputFlow(const std::string& pinName)
 bool ExecutionContext::ActivateOutputFlow(PinId pinId)
 {
     if (!m_runner) return false;
-
-    // 单步模式下：不递归执行下游，只把直接下游节点记录到 m_stepPendingNodes
-    // 由 StepNextNode 在下次调用时逐个执行
-    if (m_runner->m_stepMode)
-    {
-        m_runner->m_blueprint.ensureIndices();
-        auto downstreamEndPins = m_runner->m_blueprint.getDownstreamPinIds(pinId);
-        for (PinId endPinId : downstreamEndPins)
-        {
-            const NodeInstance* targetNode = m_runner->m_blueprint.findNodeByPin(endPinId);
-            if (targetNode)
-                m_runner->m_stepPendingNodes.insert(targetNode->id);
-        }
-        return true;
-    }
-
     return m_runner->executeDownstreamFromPin(pinId);
 }
 
