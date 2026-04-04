@@ -40,26 +40,29 @@ TEST_F(HandlersTest, BranchTrue)
     BlueprintData bp;
     bp.metadata.name = "BranchTest";
 
+    auto addPin = [](NodeInstance& n, uint64_t id, PinKind k, bool exec, PinDataType dt = PinDataType::Unknown, const char* name = "") {
+        PinInfo p; p.id = id; p.kind = k; p.isExec = exec; p.dataType = dt; p.name = name; n.pins.push_back(p);
+    };
+
+    // OnBeginPlay: execOut=1000 → Branch.execIn=10
+    AddBeginPlayEntry(bp, 100, 1000, 5000, 10);
+
     // Node 1: Branch (exec-in=10, condition=11, true-out=12, false-out=13)
     NodeInstance branch;
     branch.id = 1; branch.definitionId = "Branch";
-    auto addPin = [&](NodeInstance& n, uint64_t id, PinKind k, bool exec, PinDataType dt = PinDataType::Unknown, const char* name = "") {
-        PinInfo p; p.id = id; p.kind = k; p.isExec = exec; p.dataType = dt; p.name = name; n.pins.push_back(p);
-    };
-    addPin(branch, 10, PinKind::Input,  true);   // exec in
+    addPin(branch, 10, PinKind::Input,  true);
     addPin(branch, 11, PinKind::Input,  false, PinDataType::Boolean, "Condition");
     addPin(branch, 12, PinKind::Output, true,  PinDataType::Unknown, "True");
     addPin(branch, 13, PinKind::Output, true,  PinDataType::Unknown, "False");
-    branch.pins[1].defaultValue = Variant(true);  // Condition = true
+    branch.pins[1].defaultValue = Variant(true);
     bp.nodes.push_back(branch);
 
     bp.rebuildIndices();
     ASSERT_TRUE(runner.Load(bp));
 
-    auto result = RunWithTick(runner);
+    auto result = RunWithBeginPlay(runner);
     EXPECT_TRUE(result.success);
-    // Branch 节点本身被执行
-    EXPECT_GE(result.nodesExecuted, 1u);
+    EXPECT_GE(result.nodesExecuted, 1u) << "Branch should execute via OnBeginPlay";
 }
 
 // ── Math: Add ────────────────────────────────────────────────────────────────
@@ -134,19 +137,17 @@ TEST_F(HandlersTest, SetGetVariable)
 
 TEST_F(HandlersTest, ForLoopAccumulation)
 {
-    // TestBP.01.bjson: ForLoop 0..4 累加 counter = 0+1+2+3+4 = 10
-    // 使用独立 runner（LoadFromFile 会重置状态）
+    // TestBP.01.bjson: OnBeginPlay → ForLoop 0..4 累加 counter = 0+1+2+3+4 = 10
     BlueprintRunner fr;
     RegisterBuiltinHandlers(fr, "assets");
 
     bool loaded = fr.LoadFromFile("assets/TestBP.01.bjson");
     ASSERT_TRUE(loaded) << "Failed to load assets/TestBP.01.bjson: " << fr.GetLastError();
 
-    auto result = RunWithTick(fr);
+    auto result = RunWithBeginPlay(fr);
     EXPECT_TRUE(result.success) << fr.GetLastError();
     EXPECT_GT(result.nodesExecuted, 0u);
 
-    // ForLoop 0..4 累加：counter = 0+1+2+3+4 = 10
     Variant counter = fr.GetVariable("counter");
     EXPECT_NE(counter.type, PinDataType::Unknown) << "Variable 'counter' not found";
     EXPECT_EQ(counter.asInt(), 10) << "counter should be 10 after accumulating 0..4";

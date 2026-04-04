@@ -10,6 +10,15 @@
     },
     "nodes": [
         {
+            "id": 200,
+            "definitionId": "OnBeginPlay",
+            "definitionVersion": 1,
+            "name": "On Begin Play",
+            "pins": [
+                { "id": 201, "kind": 1, "dataType": 0, "isExec": true }
+            ]
+        },
+        {
             "id": 1,
             "definitionId": "ForLoop",
             "definitionVersion": 1,
@@ -58,6 +67,7 @@
         }
     ],
     "links": [
+        { "id": 200, "startPinId": 201, "endPinId": 2,   "isEnabled": true },
         { "id": 101, "startPinId": 5,  "endPinId": 31, "isEnabled": true },
         { "id": 102, "startPinId": 12, "endPinId": 21, "isEnabled": true },
         { "id": 103, "startPinId": 6,  "endPinId": 22, "isEnabled": true },

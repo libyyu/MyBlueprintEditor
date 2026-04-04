@@ -777,48 +777,20 @@ ExecutionResult BlueprintRunner::Execute()
     }
     const auto& eventSubgraph = m_eventSubgraphCache;
 
-    // 计算主循环可达节点（缓存）
-    // 入口规则（与 UE4 行为对齐）：
-    //   1. 无任何 exec 输入引脚的节点（纯数据节点）→ 独立入口，无条件执行
-    //   2. exec 输入已连线的节点 → 由 exec 上游链触发，不独立作为入口（BFS 会从上游收集到）
-    //   3. exec 输入悬空 + 有 exec 输出 → 隐式入口（相当于 UE4 里没有事件头的孤立控制链）
-    //   4. exec 输入悬空 + 无 exec 输出（末端节点如 PrintString）→ 不执行（UE4 编译期剔除）
-    // BFS：从入口出发，exec 向下游 + data 向上游，收集所有可达节点
+    // 计算主循环可达节点（缓存）— 全严格模式（与 UE4 编译期行为一致）
+    // 入口 = 所有事件源节点（isEventSourceNode：无 exec 输入、有 exec 输出）
+    // BFS：exec 向下游 + data 向上游，收集所有可达节点
+    // 不在可达集中的节点一律不执行：
+    //   - exec 输入悬空的控制流节点（隐式入口）→ 不执行
+    //   - 孤立纯数据节点（无 exec 节点引用）→ 不执行
+    //   - 只有被事件链路反向 data 引用的数据节点 → 执行
     if (m_reachableDirty)
     {
         std::vector<NodeId> entryNodes;
-        for (NodeId nid : order)
+        for (const auto& node : m_blueprint.nodes)
         {
-            if (eventSubgraph.count(nid)) continue;
-            const NodeInstance* nd = m_blueprint.findNode(nid);
-            if (!nd) continue;
-
-            bool hasExecInput = false, hasConnectedExecInput = false, hasExecOutput = false;
-            for (const auto& pin : nd->pins)
-            {
-                if (pin.kind == PinKind::Input && pin.isExec)
-                {
-                    hasExecInput = true;
-                    if (!m_blueprint.findLinksByPin(pin.id).empty())
-                        hasConnectedExecInput = true;
-                }
-                if (pin.kind == PinKind::Output && pin.isExec)
-                    hasExecOutput = true;
-            }
-
-            if (!hasExecInput)
-            {
-                // 规则1：纯数据节点（无 exec 输入）→ 独立入口
-                entryNodes.push_back(nid);
-            }
-            else if (!hasConnectedExecInput && hasExecOutput)
-            {
-                // 规则3：exec 输入悬空但有 exec 输出（控制流起始节点）→ 隐式入口
-                // e.g. ForLoop、SetVariable 等节点直接放在画布上，未接任何事件源
-                entryNodes.push_back(nid);
-            }
-            // 规则2：exec 输入已连线 → 由上游触发，不作为入口
-            // 规则4：exec 输入悬空且无 exec 输出（如末端 PrintString）→ 不加入口，不可达
+            if (m_blueprint.isEventSourceNode(node.id))
+                entryNodes.push_back(node.id);
         }
         m_reachableCache = m_blueprint.collectReachableNodes(entryNodes);
         m_reachableDirty = false;
