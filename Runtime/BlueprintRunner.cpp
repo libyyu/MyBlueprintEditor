@@ -763,6 +763,7 @@ ExecutionResult BlueprintRunner::Execute()
     m_stepTopoIndex = 0;         // 重置单步索引
     m_stepPendingNodes.clear();  // 清空单步待执行队列
     m_stepMode = false;          // 确保单步模式标志复位（防止异常情况下残留）
+    m_lastSteppedNodeId = 0;     // 重置上次单步节点记录
 
     // 注：m_state.pinValues 在多次 Execute() 之间保留（持久 Runner 语义）。
     // 这允许节点/变量在事件驱动场景下跨调用保持状态。
@@ -1316,6 +1317,8 @@ bool BlueprintRunner::StepNextNode()
         if (m_logCallback)
             m_logCallback(LogLevel::Verbose, "[Step] Node '" + node->name +
                 "' (id=" + std::to_string(node->id) + ", def=" + node->definitionId + ")");
+
+        m_lastSteppedNodeId = node->id;  // 记录本次执行的节点，供 UI 蓝色高亮使用
 
         m_stepMode = true;
         m_bypassBreakpoint = true;

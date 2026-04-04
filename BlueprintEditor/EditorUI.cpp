@@ -1835,11 +1835,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 bool hasMore = runner.StepNextNode();
                 if (hasMore)
                 {
-                    const auto& topo = runner.GetTopoCache();
-                    size_t stepIdx   = runner.GetStepTopoIndex();
-                    if (stepIdx > 0 && stepIdx - 1 < topo.size())
+                    uint64_t nid = static_cast<uint64_t>(runner.GetLastSteppedNodeId());
+                    if (nid != 0)
                     {
-                        uint64_t nid = static_cast<uint64_t>(topo[stepIdx - 1]);
                         BlueprintDocument::NodeHighlight hl;
                         hl.timeLeft = 3.0f;
                         hl.color    = ImColor(80, 200, 255);

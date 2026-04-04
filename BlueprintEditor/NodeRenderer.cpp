@@ -729,10 +729,8 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                 bool isPausedAtThis = false;
                 if (ActiveDoc()->persistentRunner.IsPaused())
                 {
-                    const auto& topo = ActiveDoc()->persistentRunner.GetTopoCache();
-                    size_t stepIdx   = ActiveDoc()->persistentRunner.GetStepTopoIndex();
-                    if (stepIdx < topo.size())
-                        isPausedAtThis = (static_cast<uint64_t>(topo[stepIdx]) == nid);
+                    NodeId nextId = ActiveDoc()->persistentRunner.GetNextStepNodeId();
+                    isPausedAtThis = (nextId != 0 && static_cast<uint64_t>(nextId) == nid);
                 }
 
                 if (isPausedAtThis)

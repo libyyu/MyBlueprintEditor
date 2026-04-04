@@ -566,6 +566,26 @@ public:
     const std::vector<NodeId>& GetTopoCache() const { return m_topoCache; }
     size_t GetStepTopoIndex() const { return m_stepTopoIndex; }
 
+    // 返回下一步将要执行的节点 id（暂停时有效）
+    // 优先从 m_stepPendingNodes 中按拓扑序取最靠前的节点，
+    // 没有则返回 topo[m_stepTopoIndex]（兜底路径），0 表示无
+    NodeId GetNextStepNodeId() const
+    {
+        if (!ensureTopologicalOrder()) return 0;
+        const auto& order = m_topoCache;
+        if (!m_stepPendingNodes.empty())
+        {
+            for (NodeId id : order)
+                if (m_stepPendingNodes.count(id)) return id;
+        }
+        if (m_stepTopoIndex < order.size())
+            return order[m_stepTopoIndex];
+        return 0;
+    }
+
+    // 返回上一次 StepNextNode() 实际执行的节点 id（0 表示未执行过）
+    NodeId GetLastSteppedNodeId() const { return m_lastSteppedNodeId; }
+
     // ------------------------------------------------------------------
     // 主线程计时器（由外部每帧调用 Tick 驱动）
     // ------------------------------------------------------------------
@@ -732,6 +752,8 @@ private:
     size_t                                              m_stepTopoIndex = 0;
     // 断点命中时暂存的节点 id（由 executeDownstreamFromPin 设置，Execute 用于定位 stepTopoIndex）
     NodeId                                              m_pausedAtNodeId = 0;
+    // 上一次 StepNextNode() 实际执行的节点 id（用于 UI 蓝色高亮）
+    NodeId                                              m_lastSteppedNodeId = 0;
     // Step 模式标志：为 true 时 executeNodeInternal 跳过断点检测，让节点实际执行
     bool                                                m_bypassBreakpoint = false;
     // 单步模式标志：StepNextNode 执行期间为 true
