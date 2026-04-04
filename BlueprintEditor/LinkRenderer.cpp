@@ -141,6 +141,7 @@ void BlueprintEditor::DrawLinks()
                         SET_NEW_NODE_PIN(_doc, FindPin(pinId));
                         CLEAR_NEW_LINK_PIN(_doc);
                         ed::Suspend();
+                        _doc->createNodePopupPos = ImGui::GetMousePos();  // 记录弹出时的坐标
                         ImGui::OpenPopup("Create New Node");
                         ed::Resume();
                     }

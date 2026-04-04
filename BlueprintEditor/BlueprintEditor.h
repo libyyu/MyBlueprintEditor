@@ -214,6 +214,7 @@ public:
     // 每帧通过 FindPin(id) 刷新，不直接存储 Pin*（会在 SyncFunctionPinsToNodes 后失效）
     Pin*       newNodeLinkPin     = nullptr;  // 由 newNodeLinkPinId 驱动，勿直接赋值
     Pin*       newLinkPin         = nullptr;  // 由 newLinkPinId 驱动，勿直接赋值
+    ImVec2     createNodePopupPos = {};       // OpenPopup("Create New Node") 时记录的屏幕坐标
 
     // 变量拖拽到画布的待处理状态
     bool           pendingVarDrop     = false;  // 有待处理的拖拽放置

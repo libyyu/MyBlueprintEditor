@@ -23,6 +23,7 @@ void BlueprintEditor::DrawContextMenus(
         ImGui::OpenPopup("Link Context Menu");
     else if (ed::ShowBackgroundContextMenu())
     {
+        ActiveDoc()->createNodePopupPos = ImGui::GetMousePos();  // 记录弹出时的坐标
         ImGui::OpenPopup("Create New Node");
         newNodeLinkPin = nullptr;
         ActiveDoc()->newNodeLinkPinId = 0;
@@ -305,10 +306,9 @@ void BlueprintEditor::DrawContextMenus(
 
     if (ImGui::BeginPopup("Create New Node"))
     {
-        // openPopupPosition 是屏幕坐标（ImGui::GetMousePos()），
-        // ed::SetNodePosition 需要 canvas 坐标，必须先转换。
-        // Popup 打开期间 ed::Suspend() 已调用，此时 ScreenToCanvas 仍有效。
-        const ImVec2 newNodePosition = ed::ScreenToCanvas(openPopupPosition);
+        // 使用 OpenPopup 时记录的鼠标位置（而非每帧更新的 openPopupPosition），
+        // 避免用户在菜单里移动鼠标后节点被放置到错误位置。
+        const ImVec2 newNodePosition = ed::ScreenToCanvas(ActiveDoc()->createNodePopupPos);
 
         // 如果剪贴板中有节点，提供 Paste Here 选项
         if (!m_ClipboardNodes.empty())
