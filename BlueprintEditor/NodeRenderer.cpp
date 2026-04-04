@@ -3,6 +3,37 @@
 #include "BlueprintEditor.h"
 #include <cinttypes>
 
+// 辅助：获取引脚的运行时值字符串
+// 优先从 persistentRunner 的实时 pinValues 取（断点暂停时有正确值），
+// 回退到 lastExecutionResult.outputValues（完整运行后的结果）
+static bool GetRuntimePinValueStr(BlueprintDocument* doc,
+                                   ::NodeEditor::Runtime::PinId pid,
+                                   std::string& outStr)
+{
+    if (!doc) return false;
+
+    // 优先：persistentRunner 实时引脚值（断点/StepNext 时最准确）
+    {
+        auto val = doc->persistentRunner.GetPinValue(pid);
+        if (val.type != ::NodeEditor::Runtime::PinDataType::Unknown)
+        {
+            outStr = val.asString();
+            return true;
+        }
+    }
+    // 回退：lastExecutionResult（完整运行后）
+    {
+        const auto& outVals = doc->lastExecutionResult.outputValues;
+        auto valIt = outVals.find(pid);
+        if (valIt != outVals.end())
+        {
+            outStr = valIt->second.asString();
+            return true;
+        }
+    }
+    return false;
+}
+
 void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
 {
     auto* _doc = ActiveDoc();
@@ -183,16 +214,15 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                     ed::Suspend();
                                     if (ImGui::BeginTooltip())
                                     {
-                                        const auto& outVals = ActiveDoc()->lastExecutionResult.outputValues;
                                         ::NodeEditor::Runtime::PinId pid = reinterpret_cast<uintptr_t>(output.ID.AsPointer());
-                                        auto valIt = outVals.find(pid);
                                         ImGui::TextColored(ImVec4(0.5f, 0.75f, 1.0f, 1.0f), "%s",
                                             output.Name.empty() ? "(output)" : output.Name.c_str());
-                                        if (valIt != outVals.end())
+                                        std::string runtimeStr;
+                                        if (GetRuntimePinValueStr(ActiveDoc(), pid, runtimeStr))
                                         {
                                             ImGui::Separator();
                                             ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Runtime: %s",
-                                                valIt->second.asString().c_str());
+                                                runtimeStr.c_str());
                                         }
                                         else
                                             ImGui::TextDisabled("(no runtime value)");
@@ -277,13 +307,12 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 default: break;
                             }
                         }
-                        // 运行时值
-                        const auto& outVals = ActiveDoc()->lastExecutionResult.outputValues;
+                        // 运行时值：优先 persistentRunner 实时值，回退 lastExecutionResult
                         ::NodeEditor::Runtime::PinId pid = reinterpret_cast<uintptr_t>(input.ID.AsPointer());
-                        auto valIt = outVals.find(pid);
-                        if (valIt != outVals.end()) {
+                        std::string runtimeStr;
+                        if (GetRuntimePinValueStr(ActiveDoc(), pid, runtimeStr)) {
                             pendingPinTip.hasRuntime = true;
-                            pendingPinTip.runtimeVal = valIt->second.asString();
+                            pendingPinTip.runtimeVal = runtimeStr;
                         }
                     }
                     ImGui::PopStyleVar();
