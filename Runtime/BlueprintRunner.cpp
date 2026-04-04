@@ -798,14 +798,26 @@ ExecutionResult BlueprintRunner::Execute()
 
         if (!executeNodeInternal(*node))
         {
-            result.errorMessage = "Execution failed at node '" + node->name +
-                "' (id=" + std::to_string(node->id) + ")";
-            result.nodesExecuted++;
-            result.executedNodeIds.push_back(node->id);
+            // executeNodeInternal 返回 false 时，可能是：
+            // 1. 真正的执行错误
+            // 2. 节点内部（通过 ActivateOutputFlow）触发了断点，RunState 已为 Paused
+            // 必须先检查 Paused，再决定是否当作错误处理
+            if (m_runState.load() == RunState::Paused)
+            {
+                // 断点命中（由子流 executeDownstreamFromPin 触发），走断点处理路径
+                // 注意：此处不 return，让下面统一的 Paused 检测分支处理 m_stepTopoIndex 设置
+            }
+            else
+            {
+                result.errorMessage = "Execution failed at node '" + node->name +
+                    "' (id=" + std::to_string(node->id) + ")";
+                result.nodesExecuted++;
+                result.executedNodeIds.push_back(node->id);
 
-            auto endTime = std::chrono::high_resolution_clock::now();
-            result.elapsedMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
-            return result;
+                auto endTime = std::chrono::high_resolution_clock::now();
+                result.elapsedMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
+                return result;
+            }
         }
 
         result.nodesExecuted++;
