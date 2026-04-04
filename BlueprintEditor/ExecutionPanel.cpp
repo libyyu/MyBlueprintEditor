@@ -251,6 +251,30 @@ void BlueprintEditor::ExecuteBlueprint()
         capturedDoc->executionLogDirty = true;
         return;
     }
+
+    // ── 触发 OnBeginPlay 事件（若蓝图中存在该事件源节点）──────────────────────
+    // Execute() 完成后（数据流节点已求值），再派发 BeginPlay 事件
+    // 这与 UE4 的行为一致：构造（CDO 赋值）先于 BeginPlay
+    try
+    {
+        auto beginPlayResult = ActiveDoc()->persistentRunner.DispatchEvent("OnBeginPlay");
+        if (beginPlayResult.success && !beginPlayResult.executedNodeIds.empty())
+        {
+            // 将 BeginPlay 链执行的节点 ID 合并到 result 中（用于编辑器高亮）
+            for (auto nid : beginPlayResult.executedNodeIds)
+                result.executedNodeIds.push_back(nid);
+            result.nodesExecuted += beginPlayResult.nodesExecuted;
+        }
+        else if (!beginPlayResult.success && !beginPlayResult.errorMessage.empty())
+        {
+            capturedDoc->executionLog.push_back("[WARN] OnBeginPlay: " + beginPlayResult.errorMessage);
+        }
+    }
+    catch (const std::exception& e)
+    {
+        capturedDoc->executionLog.push_back("[ERROR] OnBeginPlay exception: " + std::string(e.what()));
+    }
+
     ActiveDoc()->lastExecutionResult = result;  // 保存执行结果供面板展示
     auto endTime = std::chrono::high_resolution_clock::now();
     double elapsed = std::chrono::duration<double, std::milli>(endTime - startTime).count();

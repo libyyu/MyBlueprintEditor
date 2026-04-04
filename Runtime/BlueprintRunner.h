@@ -422,6 +422,11 @@ public:
     // 执行整个蓝图（按拓扑排序）
     ExecutionResult Execute();
 
+    // 触发指定事件（通过 definitionId 找到事件源节点，执行其 exec 下游）
+    // 例如：DispatchEvent("OnBeginPlay"), DispatchEvent("OnTick")
+    // 若蓝图中没有对应的事件源节点，返回 success=true（静默忽略）
+    ExecutionResult DispatchEvent(const std::string& eventDefinitionId);
+
     // 执行指定节点（及其所有上游依赖节点）
     ExecutionResult ExecuteNode(NodeId nodeId);
 
@@ -761,8 +766,18 @@ private:
     mutable std::unordered_set<NodeId>                  m_eventSubgraphCache;
     mutable bool                                        m_eventSubgraphDirty = true;
 
+    // 缓存：主循环可达节点集合（随拓扑缓存一起失效）
+    // 从 topo 主循环入口节点出发，exec 向下游 + data 向上游 BFS 的可达集
+    mutable std::unordered_set<NodeId>                  m_reachableCache;
+    mutable bool                                        m_reachableDirty = true;
+
     // 标记拓扑缓存失效（图结构变更时调用）
-    void invalidateTopoCache() { m_topoCacheDirty = true; m_eventSubgraphDirty = true; }
+    void invalidateTopoCache()
+    {
+        m_topoCacheDirty     = true;
+        m_eventSubgraphDirty = true;
+        m_reachableDirty     = true;
+    }
 
     // 确保拓扑缓存有效，返回是否无环
     bool ensureTopologicalOrder() const;

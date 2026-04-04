@@ -777,6 +777,54 @@ ExecutionResult BlueprintRunner::Execute()
     }
     const auto& eventSubgraph = m_eventSubgraphCache;
 
+    // 计算主循环可达节点（缓存）
+    // 入口规则（与 UE4 行为对齐）：
+    //   1. 无任何 exec 输入引脚的节点（纯数据节点）→ 独立入口，无条件执行
+    //   2. exec 输入已连线的节点 → 由 exec 上游链触发，不独立作为入口（BFS 会从上游收集到）
+    //   3. exec 输入悬空 + 有 exec 输出 → 隐式入口（相当于 UE4 里没有事件头的孤立控制链）
+    //   4. exec 输入悬空 + 无 exec 输出（末端节点如 PrintString）→ 不执行（UE4 编译期剔除）
+    // BFS：从入口出发，exec 向下游 + data 向上游，收集所有可达节点
+    if (m_reachableDirty)
+    {
+        std::vector<NodeId> entryNodes;
+        for (NodeId nid : order)
+        {
+            if (eventSubgraph.count(nid)) continue;
+            const NodeInstance* nd = m_blueprint.findNode(nid);
+            if (!nd) continue;
+
+            bool hasExecInput = false, hasConnectedExecInput = false, hasExecOutput = false;
+            for (const auto& pin : nd->pins)
+            {
+                if (pin.kind == PinKind::Input && pin.isExec)
+                {
+                    hasExecInput = true;
+                    if (!m_blueprint.findLinksByPin(pin.id).empty())
+                        hasConnectedExecInput = true;
+                }
+                if (pin.kind == PinKind::Output && pin.isExec)
+                    hasExecOutput = true;
+            }
+
+            if (!hasExecInput)
+            {
+                // 规则1：纯数据节点（无 exec 输入）→ 独立入口
+                entryNodes.push_back(nid);
+            }
+            else if (!hasConnectedExecInput && hasExecOutput)
+            {
+                // 规则3：exec 输入悬空但有 exec 输出（控制流起始节点）→ 隐式入口
+                // e.g. ForLoop、SetVariable 等节点直接放在画布上，未接任何事件源
+                entryNodes.push_back(nid);
+            }
+            // 规则2：exec 输入已连线 → 由上游触发，不作为入口
+            // 规则4：exec 输入悬空且无 exec 输出（如末端 PrintString）→ 不加入口，不可达
+        }
+        m_reachableCache = m_blueprint.collectReachableNodes(entryNodes);
+        m_reachableDirty = false;
+    }
+    const auto& reachableNodes = m_reachableCache;
+
     for (size_t i = 0; i < order.size(); ++i)
     {
         NodeId nodeId = order[i];
@@ -787,6 +835,10 @@ ExecutionResult BlueprintRunner::Execute()
 
         // 跳过事件子图中的节点（它们只在被外部触发时执行）
         if (eventSubgraph.count(nodeId))
+            continue;
+
+        // 跳过不可达节点（悬空孤立节点：exec 输入存在但无连线，且不在任何执行链路上）
+        if (!reachableNodes.count(nodeId))
             continue;
 
         const NodeInstance* node = m_blueprint.findNode(nodeId);
@@ -894,6 +946,93 @@ ExecutionResult BlueprintRunner::Execute()
     {
         if (m_flowExecutedNodes.count(nid))
             result.executedNodeIds.push_back(nid);
+    }
+
+    return result;
+}
+
+ExecutionResult BlueprintRunner::DispatchEvent(const std::string& eventDefinitionId)
+{
+    ExecutionResult result;
+
+    if (!m_loaded)
+    {
+        result.errorMessage = "No blueprint loaded";
+        return result;
+    }
+
+    // 找到 definitionId 匹配的事件源节点
+    const NodeInstance* eventNode = nullptr;
+    for (const auto& node : m_blueprint.nodes)
+    {
+        if (node.definitionId == eventDefinitionId &&
+            m_blueprint.isEventSourceNode(node.id))
+        {
+            eventNode = &node;
+            break;
+        }
+    }
+
+    // 蓝图中没有对应事件节点 → 静默成功（不报错）
+    if (!eventNode)
+    {
+        result.success = true;
+        return result;
+    }
+
+    // 设置运行状态
+    RunState prev = m_runState.load();
+    if (prev == RunState::Stopped)
+    {
+        result.errorMessage = "Runner is stopped; call ResetState() before DispatchEvent()";
+        return result;
+    }
+    m_runState.store(RunState::Running);
+
+    auto startTime = std::chrono::high_resolution_clock::now();
+
+    // 执行事件源节点（handler 里 ActivateOutputFlow 会触发 exec 下游链）
+    if (!executeNodeInternal(*eventNode))
+    {
+        if (m_runState.load() != RunState::Paused)
+        {
+            result.errorMessage = "DispatchEvent failed at node '" + eventNode->name + "'";
+            auto endTime = std::chrono::high_resolution_clock::now();
+            result.elapsedMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
+            return result;
+        }
+    }
+
+    result.nodesExecuted++;
+    result.executedNodeIds.push_back(eventNode->id);
+
+    // 追加 flowExecutedNodes（ActivateOutputFlow 触发的下游链）
+    if (!ensureTopologicalOrder())
+    {
+        result.success = true;  // topo 失败也不影响已执行的节点
+    }
+    else
+    {
+        for (NodeId nid : m_topoCache)
+        {
+            if (m_flowExecutedNodes.count(nid))
+                result.executedNodeIds.push_back(nid);
+        }
+        result.nodesExecuted = static_cast<int>(result.executedNodeIds.size());
+    }
+
+    auto endTime = std::chrono::high_resolution_clock::now();
+    result.elapsedMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
+
+    if (m_runState.load() == RunState::Stopped)
+    {
+        result.success = false;
+        result.errorMessage = "Execution stopped by Stop()";
+    }
+    else
+    {
+        result.success = true;
+        m_runState.store(RunState::Idle);
     }
 
     return result;

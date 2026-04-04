@@ -556,6 +556,38 @@ struct BlueprintData
         }
         return result;
     }
+
+    // 辅助方法：从给定的入口节点集合出发，收集所有"可达"节点
+    // 规则：沿 exec 输出向下游走 + 沿 data 输入向上游走（反向追溯数据依赖）
+    // 用于过滤掉孤立的悬空节点（exec 输入存在但无连线，且不在任何事件链路上）
+    std::unordered_set<NodeId> collectReachableNodes(
+        const std::vector<NodeId>& entryNodes) const
+    {
+        std::unordered_set<NodeId> reachable;
+        std::queue<NodeId> q;
+
+        for (auto id : entryNodes)
+        {
+            if (reachable.insert(id).second)
+                q.push(id);
+        }
+
+        while (!q.empty())
+        {
+            NodeId cur = q.front();
+            q.pop();
+
+            // 沿 exec 输出向下游走
+            for (auto downId : getExecOutputNodes(cur))
+                if (reachable.insert(downId).second) q.push(downId);
+
+            // 沿 data 输入向上游走（反向追溯数据依赖）
+            for (auto upId : getDataInputNodes(cur))
+                if (reachable.insert(upId).second) q.push(upId);
+        }
+
+        return reachable;
+    }
     
     // 辅助方法：获取输出节点列表（已去重）
     std::vector<NodeId> getOutputNodes(NodeId nodeId) const
