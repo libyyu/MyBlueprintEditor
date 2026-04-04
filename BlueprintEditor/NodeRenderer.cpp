@@ -77,7 +77,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                     if (input.Name == refPinName)
                     {
                         // 被连线时无法确定运行时值，保守显示
-                        if (IsPinLinked(input.ID))
+                        if (ed::HasAnyLinks(input.ID))
                             break;
 
                         // 根据引脚类型比较值
@@ -205,7 +205,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                     ImGui::TextUnformatted(output.Name.c_str());
                                     ImGui::Spring(0);
                                 }
-                                DrawPinIcon(output, IsPinLinked(output.ID), (int)(alpha * 255));
+                                DrawPinIcon(output, ed::HasAnyLinks(output.ID), (int)(alpha * 255));
                                 // Output pin tooltip：必须先 PopStyleVar 再 Suspend，避免 style 栈跨 context 崩溃
                                 bool outputPinHovered = ImGui::IsItemHovered() && output.Type != PinType::Flow;
                                 ImGui::PopStyleVar();
@@ -214,7 +214,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 {
                                     pendingPinTip.show   = true;
                                     pendingPinTip.name   = output.Name;
-                                    pendingPinTip.linked = IsPinLinked(output.ID);
+                                    pendingPinTip.linked = ed::HasAnyLinks(output.ID);
                                     switch (output.Type) {
                                         case PinType::Bool:     pendingPinTip.typeName = "Bool";     break;
                                         case PinType::Int:      pendingPinTip.typeName = "Int";      break;
@@ -282,14 +282,14 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
 
                     builder.Input(input.ID);
                     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
-                    DrawPinIcon(input, IsPinLinked(input.ID), (int)(alpha * 255));
+                    DrawPinIcon(input, ed::HasAnyLinks(input.ID), (int)(alpha * 255));
                     // 记录 hover 状态和数据，延迟到 builder.End() 之后再显示 tooltip
                     // 不能在 builder.Input()/EndInput() 之间调用 ed::Suspend()，会破坏节点编辑器内部布局栈
                     if (ImGui::IsItemHovered() && input.Type != PinType::Flow && !pendingPinTip.show)
                     {
                         pendingPinTip.show   = true;
                         pendingPinTip.name   = input.Name;
-                        pendingPinTip.linked = IsPinLinked(input.ID);
+                        pendingPinTip.linked = ed::HasAnyLinks(input.ID);
                         switch (input.Type) {
                             case PinType::Bool:     pendingPinTip.typeName = "Bool";     break;
                             case PinType::Int:      pendingPinTip.typeName = "Int";      break;
@@ -338,7 +338,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 IM_COL32(255, 80, 80, (int)(alpha * 255)), 1.0f);
                             ImGui::PopStyleColor();
                         }
-                        else if (input.IsRequired && !IsPinLinked(input.ID))
+                        else if (input.IsRequired && !ed::HasAnyLinks(input.ID))
                         {
                             // 必须连接但未连线：橙色警告
                             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.6f, 0.0f, 1.0f));
@@ -353,22 +353,8 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                     }
 
                     // 当输入引脚未连线时，基础数据类型显示内联编辑控件
-                    // IsPinLinked 基于 cache，兜底再检查 links 列表，确保可靠
-                    bool pinIsLinked = IsPinLinked(input.ID);
-                    if (!pinIsLinked)
-                    {
-                        // 直接遍历 links 兜底（cache 在某些边界帧可能滞后）
-                        uint64_t checkId = reinterpret_cast<uintptr_t>(input.ID.AsPointer());
-                        for (const auto& lk : ActiveDoc()->links)
-                        {
-                            if (reinterpret_cast<uintptr_t>(lk.EndPinID.AsPointer()) == checkId ||
-                                reinterpret_cast<uintptr_t>(lk.StartPinID.AsPointer()) == checkId)
-                            {
-                                pinIsLinked = true;
-                                break;
-                            }
-                        }
-                    }
+                    // 优先用 node-editor 内置 API 判断（在 ed::Begin/End 块内调用最准确）
+                    bool pinIsLinked = ed::HasAnyLinks(input.ID);
                     // 孤立引脚（IsOrphaned）已有红色删除线样式，不再显示输入框
                     if (!pinIsLinked && !input.IsOrphaned && input.Type != PinType::Flow && input.Type != PinType::Delegate)
                     {
@@ -699,13 +685,13 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                         }
                     }
                     ImGui::Spring(0);
-                    DrawPinIcon(output, IsPinLinked(output.ID), (int)(alpha * 255));
+                    DrawPinIcon(output, ed::HasAnyLinks(output.ID), (int)(alpha * 255));
                     // 记录 hover 状态，延迟到 builder.End() 之后显示 tooltip（与输入引脚同路径）
                     if (ImGui::IsItemHovered() && output.Type != PinType::Flow && !pendingPinTip.show)
                     {
                         pendingPinTip.show   = true;
                         pendingPinTip.name   = output.Name;
-                        pendingPinTip.linked = IsPinLinked(output.ID);
+                        pendingPinTip.linked = ed::HasAnyLinks(output.ID);
                         switch (output.Type) {
                             case PinType::Bool:     pendingPinTip.typeName = "Bool";     break;
                             case PinType::Int:      pendingPinTip.typeName = "Int";      break;
