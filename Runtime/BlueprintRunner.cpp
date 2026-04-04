@@ -420,8 +420,9 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
             BlueprintRunner subRunner;
             subRunner.RegisterHandlers(m_handlers);
             subRunner.SetParentTimerManager(m_timerManager);
-            if (m_logCallback)   subRunner.SetLogCallback(m_logCallback);
-            if (m_printCallback) subRunner.SetPrintCallback(m_printCallback);
+            if (m_logCallback)         subRunner.SetLogCallback(m_logCallback);
+            if (m_printCallback)       subRunner.SetPrintCallback(m_printCallback);
+            if (m_nodePreExecuteCb)    subRunner.SetNodePreExecuteCallback(m_nodePreExecuteCb);
             subRunner.RegisterExternalFunctions(GetExternalFunctions());
             subRunner.InheritExternalLibraries(m_externalLibraries);
             // 传递输入引脚值
@@ -433,6 +434,9 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
             if (subRunner.Load(funcBP))
             {
                 subRunner.Execute();
+                // 若子 runner 因断点暂停，将暂停状态传播到父 runner
+                if (subRunner.IsPaused())
+                    Pause();
                 // 回传输出引脚值
                 for (const auto& pin : node.pins)
                 {
@@ -533,8 +537,9 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
             BlueprintRunner subRunner;
             subRunner.RegisterHandlers(m_handlers);
             subRunner.SetParentTimerManager(m_timerManager);
-            if (m_logCallback)   subRunner.SetLogCallback(m_logCallback);
-            if (m_printCallback) subRunner.SetPrintCallback(m_printCallback);
+            if (m_logCallback)         subRunner.SetLogCallback(m_logCallback);
+            if (m_printCallback)       subRunner.SetPrintCallback(m_printCallback);
+            if (m_nodePreExecuteCb)    subRunner.SetNodePreExecuteCallback(m_nodePreExecuteCb);
             subRunner.RegisterExternalFunctions(GetExternalFunctions());
             subRunner.InheritExternalLibraries(m_externalLibraries);
             for (const auto& pin : node.pins)
@@ -546,6 +551,8 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
             if (subRunner.Load(funcBP))
             {
                 subRunner.Execute();
+                if (subRunner.IsPaused())
+                    Pause();
                 for (const auto& pin : node.pins)
                 {
                     if (pin.kind == PinKind::Output && pin.dataType != PinDataType::Unknown && !pin.name.empty())
@@ -638,8 +645,9 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
             BlueprintRunner subRunner;
             subRunner.RegisterHandlers(m_handlers);
             subRunner.SetParentTimerManager(m_timerManager);
-            if (m_logCallback)   subRunner.SetLogCallback(m_logCallback);
-            if (m_printCallback) subRunner.SetPrintCallback(m_printCallback);
+            if (m_logCallback)         subRunner.SetLogCallback(m_logCallback);
+            if (m_printCallback)       subRunner.SetPrintCallback(m_printCallback);
+            if (m_nodePreExecuteCb)    subRunner.SetNodePreExecuteCallback(m_nodePreExecuteCb);
             subRunner.RegisterExternalFunctions(GetExternalFunctions());
             subRunner.InheritExternalLibraries(m_externalLibraries);
             // 传递输入引脚值
@@ -651,6 +659,9 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
             if (subRunner.Load(funcBP))
             {
                 subRunner.Execute();
+                // 若子 runner 因断点暂停，将暂停状态传播到父 runner
+                if (subRunner.IsPaused())
+                    Pause();
                 // 回传输出引脚值
                 for (const auto& pin : node.pins)
                 {
@@ -1000,6 +1011,20 @@ ExecutionResult BlueprintRunner::DispatchEvent(const std::string& eventDefinitio
                 result.executedNodeIds.push_back(nid);
         }
         result.nodesExecuted = static_cast<int>(result.executedNodeIds.size());
+
+        // 若断点命中，同步 m_stepTopoIndex（与 Execute() 主循环行为一致）
+        if (m_runState.load() == RunState::Paused && m_pausedAtNodeId != 0)
+        {
+            for (size_t j = 0; j < m_topoCache.size(); ++j)
+            {
+                if (m_topoCache[j] == m_pausedAtNodeId)
+                {
+                    m_stepTopoIndex = j;
+                    break;
+                }
+            }
+            m_pausedAtNodeId = 0;
+        }
     }
 
     auto endTime = std::chrono::high_resolution_clock::now();
@@ -1009,6 +1034,12 @@ ExecutionResult BlueprintRunner::DispatchEvent(const std::string& eventDefinitio
     {
         result.success = false;
         result.errorMessage = "Execution stopped by Stop()";
+    }
+    else if (m_runState.load() == RunState::Paused)
+    {
+        // 断点命中：success=true，errorMessage 说明原因（与 Execute() 行为一致）
+        result.success = true;
+        result.errorMessage = "Paused at breakpoint";
     }
     else
     {
