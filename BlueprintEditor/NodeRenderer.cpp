@@ -353,8 +353,9 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                     }
 
                     // 当输入引脚未连线时，基础数据类型显示内联编辑控件
-                    // 优先用 node-editor 内置 API 判断（在 ed::Begin/End 块内调用最准确）
-                    bool pinIsLinked = ed::HasAnyLinks(input.ID);
+                    // 使用 IsPinLinked（基于 links 列表的 pinLinkedCache），比 ed::HasAnyLinks 更可靠
+                    // ed::HasAnyLinks 依赖编辑器内部状态，在文件刚加载的头几帧可能未同步
+                    bool pinIsLinked = IsPinLinked(input.ID);
                     // 孤立引脚（IsOrphaned）已有红色删除线样式，不再显示输入框
                     if (!pinIsLinked && !input.IsOrphaned && input.Type != PinType::Flow && input.Type != PinType::Delegate)
                     {
