@@ -227,7 +227,7 @@ namespace BlueprintRuntime
 
     internal static class NativeLib
     {
-#if UNITY_IOS || UNITY_WEBGL
+#if (UNITY_IOS || UNITY_WEBGL) && !UNITY_EDITOR
         internal const string DLL = "__Internal";
 #elif UNITY_ANDROID
         internal const string DLL = "BlueprintRuntime";
