@@ -762,6 +762,7 @@ ExecutionResult BlueprintRunner::Execute()
     m_flowExecutedNodes.clear(); // 清空控制流已执行记录
     m_stepTopoIndex = 0;         // 重置单步索引
     m_stepPendingNodes.clear();  // 清空单步待执行队列
+    m_stepMode = false;          // 确保单步模式标志复位（防止异常情况下残留）
 
     // 注：m_state.pinValues 在多次 Execute() 之间保留（持久 Runner 语义）。
     // 这允许节点/变量在事件驱动场景下跨调用保持状态。
@@ -1307,34 +1308,20 @@ bool BlueprintRunner::StepNextNode()
     }
     const auto& eventSubgraph = m_eventSubgraphCache;
 
-    // 辅助 lambda：执行一个节点，执行完后把新增到 m_flowExecutedNodes 的直接
-    // exec 下游节点"借出"到 m_stepPendingNodes，让它们可以在下次 StepNext 时执行
+    // 辅助 lambda：在单步模式下执行一个节点
+    // m_stepMode=true 期间，顶层 ActivateOutputFlow 只记录下游到 m_stepPendingNodes
+    // 而不递归执行，保证每次 StepNext 只推进一个节点
     auto executeOneNode = [&](const NodeInstance* node) -> bool
     {
         if (m_logCallback)
             m_logCallback(LogLevel::Verbose, "[Step] Node '" + node->name +
                 "' (id=" + std::to_string(node->id) + ", def=" + node->definitionId + ")");
 
-        // 快照执行前的 m_flowExecutedNodes
-        std::unordered_set<NodeId> before = m_flowExecutedNodes;
-
+        m_stepMode = true;
         m_bypassBreakpoint = true;
         executeNodeInternal(*node);
         m_bypassBreakpoint = false;
-
-        // 找出执行后新增到 m_flowExecutedNodes 的节点（即本节点的 exec 下游）
-        // 把它们从 m_flowExecutedNodes 移入 m_stepPendingNodes，
-        // 这样它们不会被 StepNext 的 "已执行跳过" 逻辑漏掉
-        for (auto id : m_flowExecutedNodes)
-        {
-            if (!before.count(id) && id != node->id)
-            {
-                m_stepPendingNodes.insert(id);
-            }
-        }
-        // 从 m_flowExecutedNodes 里移除转入 pending 的节点
-        for (auto id : m_stepPendingNodes)
-            m_flowExecutedNodes.erase(id);
+        m_stepMode = false;
 
         // 执行完一个节点后保持 Paused
         if (m_runState.load() != RunState::Paused)
@@ -1591,6 +1578,23 @@ bool ExecutionContext::ActivateOutputFlow(const std::string& pinName)
 bool ExecutionContext::ActivateOutputFlow(PinId pinId)
 {
     if (!m_runner) return false;
+
+    // 单步模式下，且处于顶层（flowDepth==0，即 StepNext 直接执行的节点发出的 exec 输出）：
+    // 不递归执行下游，只把直接下游节点记录到 m_stepPendingNodes，由下次 StepNext 执行。
+    // 深层嵌套调用（ForLoop 循环体、Branch 分支等，flowDepth>0）不受影响，正常递归执行。
+    if (m_runner->m_stepMode && m_runner->m_flowDepth == 0)
+    {
+        m_runner->m_blueprint.ensureIndices();
+        auto downstreamEndPins = m_runner->m_blueprint.getDownstreamPinIds(pinId);
+        for (PinId endPinId : downstreamEndPins)
+        {
+            const NodeInstance* targetNode = m_runner->m_blueprint.findNodeByPin(endPinId);
+            if (targetNode)
+                m_runner->m_stepPendingNodes.insert(targetNode->id);
+        }
+        return true;
+    }
+
     return m_runner->executeDownstreamFromPin(pinId);
 }
 

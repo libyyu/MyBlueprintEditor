@@ -734,8 +734,12 @@ private:
     NodeId                                              m_pausedAtNodeId = 0;
     // Step 模式标志：为 true 时 executeNodeInternal 跳过断点检测，让节点实际执行
     bool                                                m_bypassBreakpoint = false;
-    // 单步模式下 exec 下游节点暂存集合：执行一个节点后，其 exec 触达的下游节点
-    // 暂存于此，供下次 StepNextNode 优先执行（而不是被 m_flowExecutedNodes 跳过）
+    // 单步模式标志：StepNextNode 执行期间为 true
+    // ActivateOutputFlow 在此模式下且处于顶层（m_flowDepth==0）时，
+    // 只记录 exec 下游到 m_stepPendingNodes，不递归执行（让 StepNext 逐步进入）
+    // ForLoop/Branch 等内部的嵌套调用（m_flowDepth>0）不受影响，正常执行
+    bool                                                m_stepMode = false;
+    // 单步模式下 exec 下游节点暂存集合：供下次 StepNextNode 优先执行
     std::unordered_set<NodeId>                          m_stepPendingNodes;
 
     // 缓存：拓扑排序结果
