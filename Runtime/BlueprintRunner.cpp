@@ -1340,6 +1340,19 @@ bool BlueprintRunner::StepNextNode()
         m_bypassBreakpoint = false;
         m_stepMode = false;
 
+        // 执行完节点后，收集其 exec 输出下游节点放入 m_stepPendingNodes
+        // 分两种情况：
+        // 1. handler 自己调用了 ActivateOutputFlow（如 ForLoop/Branch）
+        //    → m_stepMode 拦截了顶层调用，直接下游已在 m_stepPendingNodes
+        // 2. handler 不调用 ActivateOutputFlow（如 PrintString），exec 输出由框架负责
+        //    → pending 为空，需要在这里手动找 exec 输出下游并加入 pending
+        if (m_stepPendingNodes.empty())
+        {
+            auto execDownstream = m_blueprint.getExecOutputNodes(node->id);
+            for (NodeId downId : execDownstream)
+                m_stepPendingNodes.insert(downId);
+        }
+
         // 执行完一个节点后保持 Paused
         if (m_runState.load() != RunState::Paused)
             m_runState.store(RunState::Paused);
