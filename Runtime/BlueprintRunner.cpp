@@ -888,6 +888,14 @@ ExecutionResult BlueprintRunner::Execute()
         m_runState.store(RunState::Idle);
     }
 
+    // 将控制流递归执行的节点（flowExecutedNodes）按 topo 顺序追加到 executedNodeIds
+    // 这样编辑器高亮能覆盖 ActivateOutputFlow 触发的下游节点（For Loop 内部、Branch 分支等）
+    for (NodeId nid : order)
+    {
+        if (m_flowExecutedNodes.count(nid))
+            result.executedNodeIds.push_back(nid);
+    }
+
     return result;
 }
 
@@ -952,6 +960,15 @@ ExecutionResult BlueprintRunner::ExecuteNodes(const std::vector<NodeId>& nodeIds
     auto endTime = std::chrono::high_resolution_clock::now();
     result.elapsedMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
     result.success = true;
+
+    // 将控制流递归执行的节点（flowExecutedNodes）按 topo 顺序追加到 executedNodeIds
+    // 这样编辑器高亮能覆盖 ActivateOutputFlow 触发的下游节点（For Loop 内部、Branch 分支等）
+    for (NodeId nid : filteredOrder)
+    {
+        if (m_flowExecutedNodes.count(nid))
+            result.executedNodeIds.push_back(nid);
+    }
+
     return result;
 }
 
