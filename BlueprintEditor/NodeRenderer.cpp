@@ -353,7 +353,24 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                     }
 
                     // 当输入引脚未连线时，基础数据类型显示内联编辑控件
-                    if (!IsPinLinked(input.ID) && input.Type != PinType::Flow && input.Type != PinType::Delegate)
+                    // IsPinLinked 基于 cache，兜底再检查 links 列表，确保可靠
+                    bool pinIsLinked = IsPinLinked(input.ID);
+                    if (!pinIsLinked)
+                    {
+                        // 直接遍历 links 兜底（cache 在某些边界帧可能滞后）
+                        uint64_t checkId = reinterpret_cast<uintptr_t>(input.ID.AsPointer());
+                        for (const auto& lk : ActiveDoc()->links)
+                        {
+                            if (reinterpret_cast<uintptr_t>(lk.EndPinID.AsPointer()) == checkId ||
+                                reinterpret_cast<uintptr_t>(lk.StartPinID.AsPointer()) == checkId)
+                            {
+                                pinIsLinked = true;
+                                break;
+                            }
+                        }
+                    }
+                    // 孤立引脚（IsOrphaned）已有红色删除线样式，不再显示输入框
+                    if (!pinIsLinked && !input.IsOrphaned && input.Type != PinType::Flow && input.Type != PinType::Delegate)
                     {
                         ImGui::PushID(input.ID.AsPointer());
 
