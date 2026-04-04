@@ -923,6 +923,12 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
     // （SyncFunctionPinsToNodes 会复用同名同类型的旧引脚，保持现有连线有效）
     for (const auto& func : ActiveDoc()->functions)
         SyncFunctionPinsToNodes(func);
+
+    // 强制重建编辑器索引（pinLinkedCache）：
+    // links 循环内部调用 FindPin 会触发 ensureEditorIndices 提前重建，
+    // 导致 cache 只包含已处理的部分 links，后续 links 不在 cache 中。
+    // 在所有 links 全部建完后 invalidate，确保下帧渲染时重建完整 cache。
+    ActiveDoc()->invalidateEditorIndices();
     
     // 保存加载数据和 ID 映射，用于延迟设置节点位置
     ActiveDoc()->pendingLoadData = data;
