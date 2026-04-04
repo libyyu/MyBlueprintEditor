@@ -9,6 +9,7 @@
 #include "utilities/widgets.h"
 #include "EditorTypes.h"
 #include "IconsFontAwesome6.h"
+#include "PathUtils.h"
 
 #include <imgui_node_editor.h>
 #include <imgui_internal.h>
@@ -339,12 +340,7 @@ public:
     {
         if (filePath.empty())
             return untitledName.empty() ? "New" : untitledName;
-        size_t lastSlash = filePath.find_last_of("/\\");
-        std::string name = (lastSlash != std::string::npos) ? filePath.substr(lastSlash + 1) : filePath;
-        size_t lastDot = name.find_last_of('.');
-        if (lastDot != std::string::npos)
-            name = name.substr(0, lastDot);
-        return name;
+        return BpPath::BaseName(filePath);
     }
 
     // 标签页标题（含修改标记 + 蓝图类型徽章）

@@ -1,6 +1,7 @@
 // ExecutionPanel.cpp -- 蓝图执行 & 执行面板 UI
 #include "BlueprintEditor.h"
 #include "BuiltinHandlers.h"
+#include "PathUtils.h"
 #include <ctime>
 #include <chrono>
 #include <unordered_set>
@@ -9,6 +10,7 @@
 #ifndef __EMSCRIPTEN__
 #include <filesystem>
 #endif
+
 
 // 返回 "HH:MM:SS.mmm" 格式的时间戳字符串
 static std::string NowTimestamp()
@@ -183,9 +185,8 @@ void BlueprintEditor::ExecuteBlueprint()
         else
         {
             // 无工程：扫描蓝图同目录下的库文件
-            const std::string& fp = ActiveDoc()->filePath;
-            auto pos = fp.find_last_of("/\\");
-            std::string dir = (pos != std::string::npos) ? fp.substr(0, pos) : ".";
+            std::string dir = BpPath::ParentDir(ActiveDoc()->filePath);
+            if (dir.empty()) dir = ".";
             tryRegisterLibDir(dir);
         }
     }
@@ -193,13 +194,8 @@ void BlueprintEditor::ExecuteBlueprint()
     // 3. 用当前文件所在目录重新注册 handlers（确保 ExecuteBlueprint 节点能解析子蓝图的相对路径）
     //    basePath 约定为目录路径，需从完整文件路径中提取目录部分
     {
-        std::string basePath;
-        const std::string& fp = ActiveDoc()->filePath;
-        auto pos = fp.find_last_of("/\\");
-        if (pos != std::string::npos)
-            basePath = fp.substr(0, pos);  // "C:/foo/bar/NLoop.bjson" → "C:/foo/bar"
-        else
-            basePath = ".";               // 无目录分隔符时使用当前目录
+        std::string basePath = BpPath::ParentDir(ActiveDoc()->filePath);
+        if (basePath.empty()) basePath = ".";
         ::NodeEditor::Runtime::RegisterBuiltinHandlers(
             ActiveDoc()->persistentRunner, basePath, &m_HandlerRegistry);
 

@@ -1,5 +1,6 @@
 // FileOperations.cpp -- 蓝图文件操作（新建/打开/保存）
 #include "BlueprintEditor.h"
+#include "PathUtils.h"
 // FileDialogs.h 中只是声明，本文件是实现，不需要 include
 
 #ifdef _WIN32
@@ -215,16 +216,8 @@ std::string SaveFileDialog(const char* filter, const char* /*title*/, const char
 
 namespace {
 
-// 从路径中提取文件名（不含扩展名）
-std::string GetFileBaseName(const std::string& path)
-{
-    size_t lastSlash = path.find_last_of("/\\");
-    std::string name = (lastSlash != std::string::npos) ? path.substr(lastSlash + 1) : path;
-    size_t lastDot = name.find_last_of('.');
-    if (lastDot != std::string::npos)
-        name = name.substr(0, lastDot);
-    return name;
-}
+// 从路径中提取文件名（不含扩展名）— 委托给 BpPath::BaseName
+inline std::string GetFileBaseName(const std::string& path) { return BpPath::BaseName(path); }
 
 } // anonymous namespace
 
@@ -369,10 +362,8 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
     // （有工程时由 SyncProjectLibrariesToRegistry 负责）
     if (!m_Project.IsOpen())
     {
-        std::string dir;
-        const std::string& fp = ActiveDoc()->filePath;
-        auto slash = fp.find_last_of("/\\");
-        dir = (slash != std::string::npos) ? fp.substr(0, slash) : ".";
+        std::string dir = BpPath::ParentDir(ActiveDoc()->filePath);
+        if (dir.empty()) dir = ".";
 
         int libCount = ::NodeEditor::Runtime::LoadFunctionLibrary(m_NodeRegistry, dir);
         if (libCount > 0)
@@ -1076,8 +1067,7 @@ void BlueprintEditor::DrawRecentFilesMenu()
     {
         const auto& path = m_RecentFiles[i];
         // 显示文件名 + 完整路径作为 tooltip
-        size_t lastSlash = path.find_last_of("/\\");
-        std::string displayName = (lastSlash != std::string::npos) ? path.substr(lastSlash + 1) : path;
+        std::string displayName = BpPath::BaseName(path) + BpPath::Extension(path);
         std::string label = std::to_string(i + 1) + ". " + displayName;
 
         if (ImGui::MenuItem(label.c_str()))
@@ -1185,11 +1175,7 @@ void BlueprintEditor::DrawRecentProjectsMenu()
     for (int i = 0; i < static_cast<int>(display.size()); ++i)
     {
         const auto& path = display[i];
-        size_t lastSlash = path.find_last_of("/\\");
-        std::string name = (lastSlash != std::string::npos) ? path.substr(lastSlash + 1) : path;
-        // 去掉 .bproj 后缀，显示更干净
-        if (name.size() > 6 && name.substr(name.size() - 6) == ".bproj")
-            name = name.substr(0, name.size() - 6);
+        std::string name = BpPath::Stem(path);  // 去掉目录和 .bproj 扩展名
 
         std::string label = std::to_string(i + 1) + ". " + name;
         if (ImGui::MenuItem(label.c_str()))
@@ -1243,9 +1229,9 @@ void BlueprintEditor::OpenSaveNameDialog(bool isNew, RTBlueprintClass bpClass)
         // 若当前文件已在 assets 下，计算子目录路径
         try {
             fs::path rel = fs::relative(fp.parent_path(), assetsDir);
-            std::string relStr = rel.string();
+            std::string relStr = BpPath::ToStr(rel);
             if (!relStr.empty() && relStr != "." && relStr.find("..") == std::string::npos)
-                stem = (fs::path(relStr) / stem).string();
+                stem = BpPath::ToStr(fs::path(relStr) / stem);
         } catch (...) {}
 
 #ifdef _MSC_VER
@@ -1279,7 +1265,7 @@ std::string BlueprintEditor::ResolveSaveDialogPath() const
     fs::path full      = assetsDir / raw;
 
     // 追加扩展名（去掉用户自己加的，统一加 .bjson）
-    std::string fullStr = full.string();
+    std::string fullStr = BpPath::ToStr(full);  // 保证正斜杠
     if (fullStr.size() > 6 && fullStr.substr(fullStr.size() - 6) == ".bjson")
         fullStr = fullStr.substr(0, fullStr.size() - 6);
 

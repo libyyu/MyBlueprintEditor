@@ -3,6 +3,7 @@
 #include "ThemeManager.h"
 #include "FileDialogs.h"
 #include "BuiltinHandlers.h"
+#include "PathUtils.h"
 #include <filesystem>
 #include <queue>
 #include <unordered_set>
@@ -379,13 +380,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         if (ActiveDoc()->filePath.empty())
             baseName = "[New]";
         else
-        {
-            size_t lastSlash = ActiveDoc()->filePath.find_last_of("/\\");
-            baseName = (lastSlash != std::string::npos) ? ActiveDoc()->filePath.substr(lastSlash + 1) : ActiveDoc()->filePath;
-            size_t lastDot = baseName.find_last_of('.');
-            if (lastDot != std::string::npos)
-                baseName = baseName.substr(0, lastDot);
-        }
+            baseName = BpPath::BaseName(ActiveDoc()->filePath);
         std::string windowTitle = "Blueprint Editor - " + baseName;
         if (ActiveDoc()->isDirty)
             windowTitle += " *";
@@ -571,10 +566,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
         {
             if (!ActiveDoc()->filePath.empty())
             {
-                std::string displayName = ActiveDoc()->filePath;
-                size_t lastSlash = displayName.find_last_of("/\\");
-                if (lastSlash != std::string::npos)
-                    displayName = displayName.substr(lastSlash + 1);
+                std::string displayName = BpPath::BaseName(ActiveDoc()->filePath)
+                                        + BpPath::Extension(ActiveDoc()->filePath);
                 if (ActiveDoc()->isDirty)
                     displayName += " \xe2\x80\xa2";  // bullet
                 ImGui::TextColored(ImVec4(0.55f, 0.75f, 1.0f, 0.90f), "%s", displayName.c_str());
@@ -1282,12 +1275,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
 #endif
                         if (!isAbsolute && !ActiveDoc()->filePath.empty())
                         {
-                            std::string dir = ActiveDoc()->filePath;
-                            size_t lastSlash = dir.find_last_of("/\\");
-                            if (lastSlash != std::string::npos)
-                                dir = dir.substr(0, lastSlash + 1);
-                            else
-                                dir.clear();
+                            std::string dir = BpPath::ParentDir(ActiveDoc()->filePath);
+                            if (!dir.empty()) dir += "/";
                             resolvedPath = dir + filePath;
                         }
                         else
@@ -1986,10 +1975,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
                                     return cap2->breakpoints.count(static_cast<uint64_t>(nid2)) > 0;
                                 });
 
-                            std::string baseDir2;
-                            auto slashPos2 = libAbsPath2.find_last_of("/\\");
-                            if (slashPos2 != std::string::npos)
-                                baseDir2 = libAbsPath2.substr(0, slashPos2);
+                            std::string baseDir2 = BpPath::ParentDir(libAbsPath2);
                             ::NodeEditor::Runtime::RegisterBuiltinHandlers(
                                 libDoc2->persistentRunner, baseDir2, &m_HandlerRegistry);
                             libDoc2->persistentRunner.RegisterExternalFunctions(runner.GetExternalFunctions());

@@ -2,66 +2,24 @@
 #include "BlueprintEditor.h"
 #include "BpLogger.h"
 #include "FileDialogs.h"
+#include "PathUtils.h"
 
 #include <filesystem>
 #include <algorithm>
 #include <functional>
 namespace fs = std::filesystem;
 
-// ============================================================================
-// 路径工具函数（内部使用）
-// ============================================================================
+// 本文件路径工具全部使用 BpPath:: 命名空间（PathUtils.h）
+using BpPath::NormSlash;
+using BpPath::StripAssetsPrefix;
+using BpPath::BuildRelPath;
+using BpPath::SamePath;
 
-// 统一路径分隔符为 '/'
-static std::string NormSlash(std::string s)
-{
-    for (char& c : s) if (c == '\\') c = '/';
-    return s;
-}
+static std::string GetStem(const std::string& p)      { return BpPath::Stem(p); }
+static std::string GetExtension(const std::string& p)  { return BpPath::Extension(p); }
+static std::string GetRelDir(const std::string& p)     { return BpPath::RelDir(p); }
 
-// 去掉 "assets/" 前缀（如果存在）
-static std::string StripAssetsPrefix(std::string rp)
-{
-    rp = NormSlash(std::move(rp));
-    if (rp.size() > 7 && rp.substr(0, 7) == "assets/")
-        rp = rp.substr(7);
-    return rp;
-}
 
-// 取 stem（不含扩展名、不含目录）
-static std::string GetStem(const std::string& path)
-{
-    return fs::path(path).stem().string();
-}
-
-// 取扩展名（含点，如 ".bjson"）
-static std::string GetExtension(const std::string& path)
-{
-    return fs::path(path).extension().string();
-}
-
-// 取目录部分（相对路径，去掉 assets/ 后的目录前缀）
-// e.g. "assets/sub/dir/File.bjson" → "sub/dir"
-static std::string GetRelDir(const std::string& relPath)
-{
-    std::string rp = StripAssetsPrefix(relPath);
-    auto slash = rp.rfind('/');
-    return (slash != std::string::npos) ? rp.substr(0, slash) : "";
-}
-
-// 构建工程相对路径（含 assets/ 前缀）
-// e.g. relNoExt="sub/dir/Foo", ext=".bjson" → "assets/sub/dir/Foo.bjson"
-static std::string BuildRelPath(const std::string& relNoExt, const std::string& ext)
-{
-    return "assets/" + relNoExt + ext;
-}
-
-// 两路径是否指向同一文件（lexically_normal 比较）
-static bool SamePath(const std::string& a, const std::string& b)
-{
-    return fs::path(a).lexically_normal().string() ==
-           fs::path(b).lexically_normal().string();
-}
 
 // ============================================================================
 // 工程 —— 新建
@@ -248,11 +206,9 @@ void BlueprintEditor::UpdateBlueprintReferences(const std::string& oldAbsPath,
     std::string newStem = extractStem(newAbsPath);
 
     // 旧/新相对路径（相对于工程目录，用于 dependencies 数组替换）
+    // RelPath() 已保证返回正斜杠，无需再手动替换
     std::string oldRel = m_Project.RelPath(oldAbsPath);
     std::string newRel = m_Project.RelPath(newAbsPath);
-    // 统一路径分隔符
-    for (char& c : oldRel) if (c == '\\') c = '/';
-    for (char& c : newRel) if (c == '\\') c = '/';
 
     // 收集工程内所有蓝图 JSON 文件（排除被重命名的那个）
     std::vector<std::string> allFiles;
@@ -288,11 +244,9 @@ void BlueprintEditor::UpdateBlueprintReferences(const std::string& oldAbsPath,
         for (auto& dep : data.metadata.dependencies)
         {
             // 规范化比较（去掉 ./ 等）
-            std::string normDep = dep;
-            for (char& c : normDep) if (c == '\\') c = '/';
+            std::string normDep = NormSlash(dep);
             if (normDep == oldRel ||
-                fs::path(m_Project.AbsPath(dep)).lexically_normal() ==
-                fs::path(oldAbsPath).lexically_normal())
+                BpPath::SamePath(m_Project.AbsPath(dep), oldAbsPath))
             {
                 dep = newRel;
                 modified = true;
