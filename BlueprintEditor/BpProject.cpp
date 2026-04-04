@@ -146,8 +146,17 @@ bool LoadBpProject(BpProject& proj, const std::string& filePath)
             BpProjectEntry e;
             e.relativePath = getStr(item, "path");
             e.displayName  = getStr(item, "name");
+            // 规范化路径分隔符为正斜杠（兼容旧版反斜杠存储）
+            for (char& c : e.relativePath) if (c == '\\') c = '/';
             if (!e.relativePath.empty())
-                out.push_back(std::move(e));
+            {
+                // 去重（同一路径可能因新旧版本分隔符不同被重复记录）
+                bool dup = false;
+                for (const auto& existing : out)
+                    if (existing.relativePath == e.relativePath) { dup = true; break; }
+                if (!dup)
+                    out.push_back(std::move(e));
+            }
         }
     };
 
