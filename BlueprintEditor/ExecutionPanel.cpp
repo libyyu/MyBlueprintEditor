@@ -425,7 +425,7 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
 
             ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.082f, 0.086f, 0.102f, 1.0f));
             bool scrollToBottom = false;
-            if (ImGui::BeginChild("##ExecLogChild", ImVec2(paneWidth, logH), ImGuiChildFlags_Border))
+            if (ImGui::BeginChild("##ExecLogChild", ImVec2(paneWidth, logH), ImGuiChildFlags_Borders))
             {
                 const auto& logLines = doc->executionLog;
                 size_t prevCount = doc->logEditorSyncedCount;
