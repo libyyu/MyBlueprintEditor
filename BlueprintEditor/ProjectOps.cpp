@@ -897,6 +897,10 @@ void BlueprintEditor::DrawProjectPanel()
                             : ICON_FA_FILE " New Blueprint Here";
                         if (ImGui::MenuItem(newLabel))
                         {
+                            // 先创建空白文档，再打开命名对话框（与 NewFile() 流程一致）
+                            CreateNewDocument();
+                            ActiveDoc()->blueprintClass = bpClass;
+                            ed::SetCurrentEditor(ActiveDoc()->editorContext);
                             OpenSaveNameDialog(/*isNew=*/true, bpClass);
                             snprintf(m_SaveNameDialog.inputBuf, sizeof(m_SaveNameDialog.inputBuf),
                                      "%s/", fullDirPath.c_str());
