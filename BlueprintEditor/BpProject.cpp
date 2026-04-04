@@ -25,9 +25,12 @@ std::string BpProject::RelPath(const std::string& absPath) const
     if (absPath.empty() || projectDir.empty()) return absPath;
     try
     {
-        return fs::path(absPath)
+        std::string rel = fs::path(absPath)
                .lexically_relative(fs::path(projectDir))
                .string();
+        // 统一使用正斜杠，避免 Windows 下序列化为反斜杠
+        for (char& c : rel) if (c == '\\') c = '/';
+        return rel;
     }
     catch (...) { return absPath; }
 }
