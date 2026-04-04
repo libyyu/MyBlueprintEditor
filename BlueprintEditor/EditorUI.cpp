@@ -356,6 +356,16 @@ void BlueprintEditor::OnFrame(float deltaTime)
     for (auto& doc : m_Documents)
         doc->persistentRunner.Tick(deltaTime);
 
+    // OnTick 事件驱动：对正在执行且有 OnTick 事件源的文档，每帧触发 DispatchEvent
+    for (auto& doc : m_Documents)
+    {
+        if (!doc->isExecuting) continue;
+        if (doc->blueprintClass == RTBlueprintClass::FunctionLibrary) continue;
+        // 注入 deltaTime，OnTick handler 通过 GetVariable("__DeltaTime") 读取
+        doc->persistentRunner.SetVariable("__DeltaTime", ::NodeEditor::Runtime::Variant(static_cast<double>(deltaTime)));
+        doc->persistentRunner.DispatchEvent("OnTick");
+    }
+
     // 衰减执行高亮
     for (auto& doc : m_Documents)
     {

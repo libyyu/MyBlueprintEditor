@@ -1129,6 +1129,10 @@ void BlueprintEditor::OnStop()
     // 保存主题设置
     ThemeManager::Get().SaveToFile("data/theme.json");
 
+    // 先停止所有 runner（让 RunAsync detached 线程的 alive flag 失效，避免进程残留）
+    for (auto& doc : m_Documents)
+        doc->persistentRunner.Stop();
+
     // 销毁所有文档的编辑器上下文
     for (auto& doc : m_Documents)
     {

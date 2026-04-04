@@ -126,8 +126,9 @@ void RegisterHandlers_Action(
     };
 
     handlers["OnTick"] = [](ExecutionContext& ctx) {
-        ctx.Log("  [OnTick] triggered");
-        ctx.SetOutputValue("DeltaTime", Variant(0.0));
+        // 从 __DeltaTime 变量读取编辑器注入的真实帧时间
+        double dt = ctx.GetVariable("__DeltaTime").asFloat();
+        ctx.SetOutputValue("DeltaTime", Variant(dt));
         ctx.ActivateOutputFlow("");
         return true;
     };
