@@ -70,7 +70,7 @@ void BlueprintEditor::CopySelectedNodes()
             cp.kind = PinKind::Input;
             cp.boolValue = pin.BoolValue;
             cp.intValue = static_cast<int64_t>(pin.IntValue);
-            cp.floatValue = pin.FloatValue;
+            cp.floatValue = static_cast<float>(pin.FloatValue);
             cp.stringValue = pin.StringValue;
             cp.objectValue = pin.ObjectValue;
             cp.hiddenWhen = pin.HiddenWhen;
@@ -91,7 +91,7 @@ void BlueprintEditor::CopySelectedNodes()
             cp.kind = PinKind::Output;
             cp.boolValue = pin.BoolValue;
             cp.intValue = static_cast<int64_t>(pin.IntValue);
-            cp.floatValue = pin.FloatValue;
+            cp.floatValue = static_cast<float>(pin.FloatValue);
             cp.stringValue = pin.StringValue;
             cp.objectValue = pin.ObjectValue;
             cp.hiddenWhen = pin.HiddenWhen;

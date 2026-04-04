@@ -271,7 +271,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                             switch (input.Type) {
                                 case PinType::Bool:   pendingPinTip.isBool  = true; pendingPinTip.boolVal  = input.BoolValue;  break;
                                 case PinType::Int:    pendingPinTip.isInt   = true; pendingPinTip.intVal   = input.IntValue;   break;
-                                case PinType::Float:  pendingPinTip.isFloat = true; pendingPinTip.floatVal = input.FloatValue; break;
+                                case PinType::Float:  pendingPinTip.isFloat = true; pendingPinTip.floatVal = static_cast<float>(input.FloatValue); break;
                                 case PinType::String: pendingPinTip.isStr   = true; pendingPinTip.strVal   = input.StringValue; break;
                                 case PinType::Object: pendingPinTip.isObj   = true; pendingPinTip.objVal   = input.ObjectValue; break;
                                 default: break;
