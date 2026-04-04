@@ -378,7 +378,8 @@ struct BlueprintEditor : public Application
 
     // 延迟打开文件（双击节点时使用，不能在 ed::Begin/End 内部调用 DoOpenFile）
     std::string m_PendingOpenFilePath;
-    int         m_PendingSwitchTabIndex = -1;
+    int         m_PendingSwitchTabIndex = -1;  // 待切换 Tab（context + 导航）
+    int         m_PendingTabVisualIndex = -1;  // 待切换 Tab 视觉（SetSelected，下一帧 TabBar 消费）
     std::string m_PendingNavigateToFunc;  // 打开文件后定位的函数名（FuncLib 双击用）
 
     // 工程面板：新建/保存后需要展开并高亮的相对路径

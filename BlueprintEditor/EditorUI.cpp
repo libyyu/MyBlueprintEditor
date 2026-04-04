@@ -1007,15 +1007,14 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
                     bool isOpen = true;
                     ImGuiTabItemFlags flags = 0;
-                    if (m_PendingSwitchTabIndex == i)
+                    if (m_PendingTabVisualIndex == i)
                         flags |= ImGuiTabItemFlags_SetSelected;
 
                     if (ImGui::BeginTabItem((tabTitle + "###tab" + std::to_string(i)).c_str(), &isOpen, flags))
                     {
                         m_ActiveDocIndex = i;
-                        // SetSelected flag 已触发视觉切换；若延迟块已清除 pending，此处为空操作
-                        if (m_PendingSwitchTabIndex == i)
-                            m_PendingSwitchTabIndex = -1;
+                        if (m_PendingTabVisualIndex == i)
+                            m_PendingTabVisualIndex = -1;
 
                         // VS 2022 风格：活跃标签顶部蓝色指示线
                         {
@@ -1617,8 +1616,11 @@ void BlueprintEditor::OnFrame(float deltaTime)
         {
             targetDoc->needNavigateToContent = 1;
         }
-        // 主动切换活跃文档和编辑器上下文，并立即清除 pending。
+        // 主动切换活跃文档和编辑器上下文。
         // ed::End() 已在上方执行完毕，此处调用 SetCurrentEditor 安全。
+        // 同时设 m_PendingTabVisualIndex，让下一帧 TabBar 的 BeginTabItem(SetSelected)
+        // 更新视觉高亮后自行清零，确保 TabBar 视觉与文档切换同步。
+        m_PendingTabVisualIndex = m_PendingSwitchTabIndex;
         m_ActiveDocIndex = m_PendingSwitchTabIndex;
         ed::SetCurrentEditor(targetDoc->editorContext);
         m_PendingSwitchTabIndex = -1;
