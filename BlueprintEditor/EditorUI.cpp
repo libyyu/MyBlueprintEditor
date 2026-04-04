@@ -1721,6 +1721,14 @@ void BlueprintEditor::OnFrame(float deltaTime)
         bool isIdle    = runner.IsIdle();
         bool bpIsLibrary = ActiveDoc()->blueprintClass == RTBlueprintClass::FunctionLibrary;
 
+        // FunctionLibrary：非调试状态（未运行、未暂停）时不显示工具条
+        if (bpIsLibrary && !isRunning && !isPaused && !isStopped)
+        {
+            // 跳过工具条渲染
+        }
+        else
+        {
+
         // DPI 自适应：所有尺寸基于字体行高
         float lineH = ImGui::GetTextLineHeight();
         float tbH   = lineH + ImGui::GetStyle().FramePadding.y * 2.0f + 10.0f;
@@ -2098,6 +2106,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
             // 状态指示结束
         }
         ImGui::End();
+        } // end else (非 FunctionLibrary 隐藏工具条)
     }
 
     // ================================================================
