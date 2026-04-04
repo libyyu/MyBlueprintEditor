@@ -1,0 +1,102 @@
+{
+    "runtime": {
+    "fileType": "runtime",
+    "metadata": {
+        "schemaVersion": 2,
+        "blueprintClass": 0,
+        "name": "Third",
+        "description": "Blueprint Editor file",
+        "version": "",
+        "dependencies": ["CommonLib.bjson"]
+    },
+    "nodes": [
+        {
+            "id": 1,
+            "definitionId": "OnBeginPlay",
+            "definitionVersion": 1,
+            "name": "On Begin Play",
+            "pins": [
+                {
+                    "id": 2,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print String",
+            "pins": [
+                {
+                    "id": 4,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 5,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": "Third BeginPlay"
+                },
+                {
+                    "id": 6,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        }
+    ],
+    "links": [
+        {
+            "id": 7,
+            "startPinId": 2,
+            "endPinId": 4,
+            "isEnabled": true
+        }
+    ]
+},
+    "editor": {
+    "fileType": "editor",
+    "metadata": {
+        "author": "",
+        "createdAt": "",
+        "updatedAt": ""
+    },
+    "nodes": [
+        {
+            "id": 1,
+            "position": {
+                "x": -1777,
+                "y": -148
+            },
+            "size": {
+                "width": 217,
+                "height": 72
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 3,
+            "position": {
+                "x": -1438,
+                "y": -151
+            },
+            "size": {
+                "width": 293,
+                "height": 116
+            },
+            "isCollapsed": false
+        }
+    ],
+    "viewInfo": {
+        "viewPosition": { "x": 0, "y": 0 },
+        "viewScale": 1
+    }
+}
+}
