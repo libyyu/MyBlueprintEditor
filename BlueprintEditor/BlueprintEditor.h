@@ -184,6 +184,7 @@ public:
     std::vector<ed::LinkId>     flowLinks;
     TextEditor                  logTextEditor;             // 彩色日志编辑器（只读，支持选词）
     bool                        logEditorInited = false;   // palette/只读模式是否已初始化
+    size_t                      logEditorSyncedCount = 0;  // 已同步到 logTextEditor 的日志行数（增量追加用）
 
     // 节点位置追踪（用于检测拖拽移动，标记 dirty）
     std::map<ed::NodeId, ImVec2, NodeIdLess> lastNodePositions;

@@ -26,6 +26,7 @@ struct Application
     ImFont* DefaultFont() const;
     ImFont* HeaderFont() const;
     ImFont* IconFont() const;
+    ImFont* MonoFont() const;   // 等宽字体（日志/代码窗口专用）
 
     ImTextureID LoadTexture(const char* path);
     ImTextureID CreateTexture(const void* data, int width, int height);
@@ -55,6 +56,7 @@ private:
     ImFont*                     m_DefaultFont = nullptr;
     ImFont*                     m_HeaderFont = nullptr;
     ImFont*                     m_IconFont = nullptr;
+    ImFont*                     m_MonoFont = nullptr;   // 等宽字体（日志/代码窗口专用）
     float                       m_LastDpiScale = 0.0f;  // 上次 RecreateFontAtlas 时的 DPI 缩放值（用于 Style 增量缩放）
 };
 

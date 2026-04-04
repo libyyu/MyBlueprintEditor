@@ -306,6 +306,15 @@ void Application::RecreateFontAtlas()
         m_IconFont = io.Fonts->AddFontFromFileTTF("data/fa-solid-900.ttf", iFontSize, &iconOnlyConfig, icon_ranges);
     }
 
+    // 6. 等宽字体：使用 ImGui 内置的 ProggyClean（13px 像素等宽字体），用于日志/代码窗口
+    {
+        ImFontConfig monoConfig;
+        monoConfig.OversampleH = 1;
+        monoConfig.OversampleV = 1;
+        monoConfig.PixelSnapH = true;
+        m_MonoFont = io.Fonts->AddFontDefault(&monoConfig);
+    }
+
     io.Fonts->Build();
 }
 
@@ -395,6 +404,11 @@ ImFont* Application::HeaderFont() const
 ImFont* Application::IconFont() const
 {
     return m_IconFont;
+}
+
+ImFont* Application::MonoFont() const
+{
+    return m_MonoFont;
 }
 
 ImTextureID Application::LoadTexture(const char* path)

@@ -472,20 +472,21 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
                 doc->executionLogText.clear();
                 doc->execLogCachedFilter.clear();
                 doc->executionLogDirty = false;
+                doc->logEditorSyncedCount = 0;
                 doc->lastExecutionStatus.clear();
                 doc->lastExecutionResult = RTExecutionResult{};
                 doc->logTextEditor.SetText("");
             }
 
-            // ── 同步 TextEditor 内容（日志更新或过滤条件变化时重建）────────────
+            // ── 同步 TextEditor 内容 ─────────────────────────────────────────
             std::string filter(doc->execLogFilter);
-            bool needRebuild = doc->executionLogDirty
-                             || filterChanged
-                             || (doc->execLogCachedFilter != filter);
-            bool shouldScrollBottom = doc->executionLogDirty;
-            if (needRebuild)
+            bool filterChanged2 = (doc->execLogCachedFilter != filter);
+
+            if (filterChanged2)
             {
+                // 过滤条件变化：必须全量重建（SetText 会滚回顶，这里是用户主动筛选，可接受）
                 doc->execLogCachedFilter = filter;
+                doc->logEditorSyncedCount = 0;
                 std::string txt;
                 txt.reserve(doc->executionLog.size() * 64);
                 for (const auto& line : doc->executionLog)
@@ -499,20 +500,56 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
                 doc->logTextEditor.SetText(txt);
                 doc->executionLogDirty = false;
             }
+            else if (doc->executionLogDirty)
+            {
+                // 有新日志：增量追加，避免 SetText 触发 mScrollToTop
+                doc->executionLogDirty = false;
+                const auto& logLines = doc->executionLog;
+                size_t newCount = logLines.size();
+                if (newCount < doc->logEditorSyncedCount)
+                {
+                    // 日志被外部清空（行数变少），全量重建
+                    doc->logEditorSyncedCount = 0;
+                    doc->logTextEditor.SetText("");
+                }
+                if (doc->logEditorSyncedCount < newCount)
+                {
+                    // 关闭只读，追加新行，再恢复只读
+                    doc->logTextEditor.SetReadOnlyEnabled(false);
+                    std::string appended;
+                    for (size_t i = doc->logEditorSyncedCount; i < newCount; ++i)
+                    {
+                        const auto& line = logLines[i];
+                        if (!filter.empty() && line.find(filter) == std::string::npos)
+                            continue;
+                        appended += line;
+                        appended += '\n';
+                    }
+                    if (!appended.empty())
+                    {
+                        doc->logTextEditor.MoveBottom();
+                        doc->logTextEditor.MoveEnd();
+                        doc->logTextEditor.InsertTextAtCursor(appended.c_str());
+                    }
+                    doc->logEditorSyncedCount = newCount;
+                    doc->logTextEditor.SetReadOnlyEnabled(true);
+
+                    // 追加后滚到底部：MoveBottom 已经移动光标，EnsureCursorVisible 让视图跟上
+                    doc->logTextEditor.MoveBottom();
+                    doc->logTextEditor.EnsureCursorVisible();
+                }
+            }
 
             // ── TextEditor 渲染（只读，支持选词 / Ctrl+C / Ctrl+A）────────────
             float logH = ImGui::GetContentRegionAvail().y - 4.0f;
             if (logH < 40.0f) logH = 40.0f;
 
-            // 自动滚到最后一行
-            if (shouldScrollBottom)
-            {
-                int totalLines = doc->logTextEditor.GetLineCount();   // santaclose API
-                if (totalLines > 0)
-                    doc->logTextEditor.SetCursorPosition(totalLines - 1, 0); // santaclose: (line, col)
-            }
-
+            // 使用等宽字体（ProggyClean）渲染日志，避免比例字体导致字符叠在一起
+            if (ImFont* monoFont = MonoFont())
+                ImGui::PushFont(monoFont, monoFont->LegacySize);
             doc->logTextEditor.Render("##ExecLog", false, ImVec2(paneWidth, logH), true);
+            if (MonoFont())
+                ImGui::PopFont();
             ImGui::EndTabItem();
         }
 
