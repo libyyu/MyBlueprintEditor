@@ -779,11 +779,9 @@ ExecutionResult BlueprintRunner::Execute()
 
     // 计算主循环可达节点（缓存）— 全严格模式（与 UE4 编译期行为一致）
     // 入口 = 所有事件源节点（isEventSourceNode：无 exec 输入、有 exec 输出）
+    // 特殊情况：FuncLib 子图 / ExecuteBlueprint 子图没有事件源节点，
+    //   改用 Function.Entry 作为入口（与 Function.Call 显式调用语义一致）
     // BFS：exec 向下游 + data 向上游，收集所有可达节点
-    // 不在可达集中的节点一律不执行：
-    //   - exec 输入悬空的控制流节点（隐式入口）→ 不执行
-    //   - 孤立纯数据节点（无 exec 节点引用）→ 不执行
-    //   - 只有被事件链路反向 data 引用的数据节点 → 执行
     if (m_reachableDirty)
     {
         std::vector<NodeId> entryNodes;
@@ -792,6 +790,17 @@ ExecutionResult BlueprintRunner::Execute()
             if (m_blueprint.isEventSourceNode(node.id))
                 entryNodes.push_back(node.id);
         }
+
+        // 没有事件源节点（FuncLib 子图 / 子蓝图）→ 用 Function.Entry 作为入口
+        if (entryNodes.empty())
+        {
+            for (const auto& node : m_blueprint.nodes)
+            {
+                if (node.definitionId == "Function.Entry")
+                    entryNodes.push_back(node.id);
+            }
+        }
+
         m_reachableCache = m_blueprint.collectReachableNodes(entryNodes);
         m_reachableDirty = false;
     }

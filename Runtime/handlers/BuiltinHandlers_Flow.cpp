@@ -193,7 +193,8 @@ void RegisterHandlers_Flow(
             // 同时透传完整 Library 数据（shared_ptr 共享，零拷贝），供 FuncLib.* 节点正确执行
             subRunner->InheritExternalLibraries(runner.GetExternalLibraries());
 
-            auto execResult = subRunner->Execute();
+            subRunner->Execute();
+            auto execResult = subRunner->DispatchEvent("OnBeginPlay");
 
             std::string outputText;
             for (const auto& line : *subLog)
