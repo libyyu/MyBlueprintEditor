@@ -1132,6 +1132,20 @@ bool BlueprintRunner::ensureTopologicalOrder() const
     return !m_topoCacheHasCycle;
 }
 
+NodeId BlueprintRunner::GetNextStepNodeId() const
+{
+    if (!ensureTopologicalOrder()) return 0;
+    const auto& order = m_topoCache;
+    if (!m_stepPendingNodes.empty())
+    {
+        for (NodeId id : order)
+            if (m_stepPendingNodes.count(id)) return id;
+    }
+    if (m_stepTopoIndex < order.size())
+        return order[m_stepTopoIndex];
+    return 0;
+}
+
 std::vector<NodeId> BlueprintRunner::GetTopologicalOrder() const
 {
     ensureTopologicalOrder();
