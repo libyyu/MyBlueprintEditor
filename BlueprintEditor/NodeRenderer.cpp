@@ -209,26 +209,31 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 // Output pin tooltip：必须先 PopStyleVar 再 Suspend，避免 style 栈跨 context 崩溃
                                 bool outputPinHovered = ImGui::IsItemHovered() && output.Type != PinType::Flow;
                                 ImGui::PopStyleVar();
-                                if (outputPinHovered)
+                                // 记录 hover 状态，延迟到 builder.End() 之后显示 tooltip（与输入引脚同路径）
+                                if (outputPinHovered && !pendingPinTip.show)
                                 {
-                                    ed::Suspend();
-                                    if (ImGui::BeginTooltip())
-                                    {
-                                        ::NodeEditor::Runtime::PinId pid = reinterpret_cast<uintptr_t>(output.ID.AsPointer());
-                                        ImGui::TextColored(ImVec4(0.5f, 0.75f, 1.0f, 1.0f), "%s",
-                                            output.Name.empty() ? "(output)" : output.Name.c_str());
-                                        std::string runtimeStr;
-                                        if (GetRuntimePinValueStr(ActiveDoc(), pid, runtimeStr))
-                                        {
-                                            ImGui::Separator();
-                                            ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Runtime: %s",
-                                                runtimeStr.c_str());
-                                        }
-                                        else
-                                            ImGui::TextDisabled("(no runtime value)");
-                                        ImGui::EndTooltip();
+                                    pendingPinTip.show   = true;
+                                    pendingPinTip.name   = output.Name;
+                                    pendingPinTip.linked = IsPinLinked(output.ID);
+                                    switch (output.Type) {
+                                        case PinType::Bool:     pendingPinTip.typeName = "Bool";     break;
+                                        case PinType::Int:      pendingPinTip.typeName = "Int";      break;
+                                        case PinType::Float:    pendingPinTip.typeName = "Float";    break;
+                                        case PinType::String:   pendingPinTip.typeName = "String";   break;
+                                        case PinType::Object:   pendingPinTip.typeName = "Object";   break;
+                                        case PinType::Function: pendingPinTip.typeName = "Function"; break;
+                                        case PinType::Array:    pendingPinTip.typeName = "Array";    break;
+                                        case PinType::Map:      pendingPinTip.typeName = "Map";      break;
+                                        case PinType::Delegate: pendingPinTip.typeName = "Delegate"; break;
+                                        default:                pendingPinTip.typeName = "Unknown";  break;
                                     }
-                                    ed::Resume();
+                                    // 运行时值：优先 persistentRunner，回退 lastExecutionResult
+                                    ::NodeEditor::Runtime::PinId pid = reinterpret_cast<uintptr_t>(output.ID.AsPointer());
+                                    std::string runtimeStr;
+                                    if (GetRuntimePinValueStr(ActiveDoc(), pid, runtimeStr)) {
+                                        pendingPinTip.hasRuntime = true;
+                                        pendingPinTip.runtimeVal = runtimeStr;
+                                    }
                                 }
                                 ImGui::Spring(0, ImGui::GetStyle().ItemSpacing.x / 2);
                                 ImGui::EndHorizontal();
