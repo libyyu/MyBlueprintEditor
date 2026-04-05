@@ -1698,7 +1698,7 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
         },
         "6A0572", "Simple");
 
-    // LLM.Chat — OpenAI 兼容 Chat 调用
+    // LLM.Chat — OpenAI 兼容 Chat 调用（支持 tool_calls）
     reg("LLM.Chat", "LLM Chat", "AI/LLM",
         {
             MakeFlowPin(""),
@@ -1709,17 +1709,52 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
             MakePin("SystemPrompt", PinDataType::String),   // 可选，自动插到首条
             MakePin("MaxTokens",    PinDataType::Integer),  // 默认 1024
             MakePin("Temperature",  PinDataType::Float),    // 默认 0.7
+            MakePin("Tools",        PinDataType::String),   // function schema JSON 数组，可选
         },
         {
-            MakeFlowPin("onReply"),
+            MakeFlowPin("onReply"),                          // finish_reason=stop
+            MakeFlowPin("onToolCall"),                       // finish_reason=tool_calls
             MakeFlowPin("onError"),
-            MakePin("Reply",        PinDataType::String),
-            MakePin("FullResponse", PinDataType::String),
-            MakePin("ErrorMessage", PinDataType::String),
+            MakePin("Reply",         PinDataType::String),   // 文本回复
+            MakePin("ToolCallsJSON", PinDataType::String),   // tool_calls 数组 JSON
+            MakePin("FinishReason",  PinDataType::String),   // "stop"|"tool_calls"|"length"|...
+            MakePin("FullResponse",  PinDataType::String),
+            MakePin("ErrorMessage",  PinDataType::String),
         },
         "6A0572");
 
-    // ── Memory.LoadHistory ──────────────────────────────────────────────────
+    // ── JSON.ParseToolCall ──────────────────────────────────────────────────
+    // 从 tool_calls[Index] 中提取 name 和 arguments
+    //   in:  ToolCallsJSON(String) — LLM.Chat 输出的 ToolCallsJSON
+    //        Index(Integer)        — 要取第几个（默认 0）
+    //   out: Name(String)          — function name
+    //        ArgumentsJSON(String) — arguments 对象 JSON 字符串
+    //        ID(String)            — tool_call id（回传给 LLM 时需要）
+    reg("JSON.ParseToolCall", "Parse Tool Call", "AI/JSON",
+        {
+            MakePin("ToolCallsJSON", PinDataType::String),
+            MakePin("Index",         PinDataType::Integer),
+        },
+        {
+            MakePin("Name",          PinDataType::String),
+            MakePin("ArgumentsJSON", PinDataType::String),
+            MakePin("ID",            PinDataType::String),
+        },
+        "2E86AB");
+
+    // ── JSON.MakeToolResult ─────────────────────────────────────────────────
+    // 构造 tool role 消息，把工具结果反馈给 LLM
+    //   in:  ToolCallID(String), Content(String)
+    //   out: JSON(String) — {"role":"tool","tool_call_id":"...","content":"..."}
+    reg("JSON.MakeToolResult", "Make Tool Result", "AI/JSON",
+        {
+            MakePin("ToolCallID", PinDataType::String),
+            MakePin("Content",    PinDataType::String),
+        },
+        {
+            MakePin("JSON", PinDataType::String),
+        },
+        "2E86AB");
     // 从文件加载对话历史 JSON 数组
     // WebGL：直接 onNew + 空数组
     reg("Memory.LoadHistory", "Memory Load History", "AI/Memory",
@@ -1779,6 +1814,10 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     addCat("Function",   "Functions");
     addCat("Network",    "Network");
     addCat("AI",         "AI / LLM");
+    addCat("AI/JSON",    "AI / JSON");
+    addCat("AI/LLM",     "AI / LLM");
+    addCat("AI/String",  "AI / String");
+    addCat("AI/Memory",  "AI / Memory");
     addCat("File",       "File I/O");
 
     // --- 注册各分类的节点定义 ---

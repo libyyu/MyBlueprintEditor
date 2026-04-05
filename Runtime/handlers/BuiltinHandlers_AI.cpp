@@ -380,6 +380,14 @@ void RegisterHandlers_AI(
         body["max_tokens"]  = crude_json::value(static_cast<double>(maxTokens));
         body["temperature"] = crude_json::value(temperature);
 
+        // ── Tools（function calling schema）──────────────────────────
+        std::string toolsStr = ctx.GetInputValue("Tools").asString();
+        if (!toolsStr.empty()) {
+            crude_json::value toolsJson = crude_json::value::parse(toolsStr);
+            if (toolsJson.is_array())
+                body["tools"] = toolsJson;
+        }
+
         HttpRequest req;
         req.url    = baseURL + "/chat/completions";
         req.method = "POST";
@@ -389,10 +397,12 @@ void RegisterHandlers_AI(
             req.headers["Authorization"] = "Bearer " + apiKey;
         req.timeoutSeconds = 120;  // LLM 可能慢
 
-        PinId replyPinId = ctx.GetPinId("onReply");
-        PinId errorPinId = ctx.GetPinId("onError");
+        PinId replyPinId    = ctx.GetPinId("onReply");
+        PinId toolPinId     = ctx.GetPinId("onToolCall");
+        PinId errorPinId    = ctx.GetPinId("onError");
 
         ctx.MarkDownstreamAsHandled("onReply");
+        ctx.MarkDownstreamAsHandled("onToolCall");
         ctx.MarkDownstreamAsHandled("onError");
 
         auto sharedResp = std::make_shared<HttpResponse>();
@@ -407,7 +417,7 @@ void RegisterHandlers_AI(
         };
 
         // onComplete：主线程 Tick 上下文，解析回复并激活下游
-        auto onComplete = [sharedResp, replyPinId, errorPinId](ExecutionContext& c) mutable {
+        auto onComplete = [sharedResp, replyPinId, toolPinId, errorPinId](ExecutionContext& c) mutable {
             const HttpResponse& resp = *sharedResp;
 
             c.SetOutputValue("FullResponse", Variant(resp.body));
@@ -416,7 +426,6 @@ void RegisterHandlers_AI(
                 std::string errMsg = resp.error.empty()
                     ? ("HTTP " + std::to_string(resp.statusCode))
                     : resp.error;
-                // 尝试从响应体中提取 error.message
                 if (!resp.body.empty()) {
                     crude_json::value j = crude_json::value::parse(resp.body);
                     if (j.is_object() && j.contains("error")) {
@@ -425,30 +434,73 @@ void RegisterHandlers_AI(
                             errMsg = e["message"].get<std::string>();
                     }
                 }
-                c.SetOutputValue("Reply",        Variant(std::string("")));
-                c.SetOutputValue("ErrorMessage", Variant(errMsg));
+                c.SetOutputValue("Reply",         Variant(std::string("")));
+                c.SetOutputValue("ToolCallsJSON", Variant(std::string("[]")));
+                c.SetOutputValue("FinishReason",  Variant(std::string("error")));
+                c.SetOutputValue("ErrorMessage",  Variant(errMsg));
                 c.LogError("[LLM.Chat] " + errMsg);
                 c.ActivateOutputFlow(errorPinId);
                 return;
             }
 
-            // 解析 choices[0].message.content
-            std::string reply;
             crude_json::value j = crude_json::value::parse(resp.body);
+
+            // finish_reason
+            std::string finishReason;
+            if (j.is_object() && j.contains("choices")) {
+                const auto& choices = j["choices"];
+                if (choices.is_array() && !choices.get<crude_json::array>().empty()) {
+                    const auto& first = choices.get<crude_json::array>()[0];
+                    if (first.is_object() && first.contains("finish_reason")) {
+                        const auto& fr = first["finish_reason"];
+                        if (fr.is_string()) finishReason = fr.get<std::string>();
+                    }
+                }
+            }
+            c.SetOutputValue("FinishReason", Variant(finishReason));
+
+            // ── tool_calls 分支 ──────────────────────────────────────
+            if (finishReason == "tool_calls") {
+                std::string toolCallsJson = "[]";
+                if (j.is_object() && j.contains("choices")) {
+                    const auto& choices = j["choices"];
+                    if (choices.is_array() && !choices.get<crude_json::array>().empty()) {
+                        const auto& first = choices.get<crude_json::array>()[0];
+                        if (first.is_object() && first.contains("message")) {
+                            const auto& msg = first["message"];
+                            if (msg.is_object() && msg.contains("tool_calls")) {
+                                toolCallsJson = msg["tool_calls"].dump();
+                            }
+                        }
+                    }
+                }
+                c.SetOutputValue("Reply",         Variant(std::string("")));
+                c.SetOutputValue("ToolCallsJSON", Variant(toolCallsJson));
+                c.SetOutputValue("ErrorMessage",  Variant(std::string("")));
+                c.Log("[LLM.Chat] tool_calls: " + toolCallsJson.substr(0, 120));
+                c.ActivateOutputFlow(toolPinId);
+                return;
+            }
+
+            // ── 普通文本回复 ─────────────────────────────────────────
+            std::string reply;
             if (j.is_object() && j.contains("choices")) {
                 const auto& choices = j["choices"];
                 if (choices.is_array() && !choices.get<crude_json::array>().empty()) {
                     const auto& first = choices.get<crude_json::array>()[0];
                     if (first.is_object() && first.contains("message")) {
                         const auto& msg = first["message"];
-                        if (msg.is_object() && msg.contains("content"))
-                            reply = msg["content"].get<std::string>();
+                        if (msg.is_object() && msg.contains("content")) {
+                            const auto& content = msg["content"];
+                            if (content.is_string())
+                                reply = content.get<std::string>();
+                        }
                     }
                 }
             }
-
-            c.SetOutputValue("Reply",        Variant(reply));
-            c.SetOutputValue("ErrorMessage", Variant(std::string("")));
+            c.SetOutputValue("Reply",         Variant(reply));
+            c.SetOutputValue("ToolCallsJSON", Variant(std::string("[]")));
+            c.SetOutputValue("ErrorMessage",  Variant(std::string("")));
             c.Log("[LLM.Chat] reply length=" + std::to_string(reply.size()));
             c.ActivateOutputFlow(replyPinId);
         };
@@ -458,7 +510,71 @@ void RegisterHandlers_AI(
     };
 
     // ================================================================
-    // Memory.LoadHistory
+    // JSON.ParseToolCall
+    //   从 LLM 返回的 tool_calls 数组中取出指定位置的调用信息
+    //   in:  ToolCallsJSON(String), Index(Integer, default=0)
+    //   out: Name(String), ArgumentsJSON(String), ID(String)
+    //   纯数据节点（无 exec flow）
+    // ================================================================
+    handlers["JSON.ParseToolCall"] = [](ExecutionContext& ctx) {
+        std::string json = ctx.GetInputValue("ToolCallsJSON").asString();
+        int index = (int)ctx.GetInputValue("Index").asInt();
+
+        auto v = crude_json::value::parse(json);
+        if (!v.is_array()) {
+            ctx.SetOutputValue("Name",          Variant(std::string("")));
+            ctx.SetOutputValue("ArgumentsJSON", Variant(std::string("{}")));
+            ctx.SetOutputValue("ID",            Variant(std::string("")));
+            return true;
+        }
+        const auto& arr = v.get<crude_json::array>();
+        if (index < 0 || index >= (int)arr.size()) {
+            ctx.SetOutputValue("Name",          Variant(std::string("")));
+            ctx.SetOutputValue("ArgumentsJSON", Variant(std::string("{}")));
+            ctx.SetOutputValue("ID",            Variant(std::string("")));
+            return true;
+        }
+        const auto& tc = arr[index];
+        std::string name, argsJson, id;
+        if (tc.is_object()) {
+            if (tc.contains("id") && tc["id"].is_string())
+                id = tc["id"].get<std::string>();
+            if (tc.contains("function") && tc["function"].is_object()) {
+                const auto& fn = tc["function"];
+                if (fn.contains("name") && fn["name"].is_string())
+                    name = fn["name"].get<std::string>();
+                if (fn.contains("arguments") && fn["arguments"].is_string())
+                    argsJson = fn["arguments"].get<std::string>();
+                else if (fn.contains("arguments") && fn["arguments"].is_object())
+                    argsJson = fn["arguments"].dump();
+            }
+        }
+        ctx.SetOutputValue("Name",          Variant(name));
+        ctx.SetOutputValue("ArgumentsJSON", Variant(argsJson.empty() ? std::string("{}") : argsJson));
+        ctx.SetOutputValue("ID",            Variant(id));
+        return true;
+    };
+
+    // ================================================================
+    // JSON.MakeToolResult
+    //   构造一条 tool role 的消息，用于把工具执行结果返回给 LLM
+    //   in:  ToolCallID(String), Content(String)
+    //   out: JSON(String)  — {"role":"tool","tool_call_id":"...","content":"..."}
+    //   纯数据节点（无 exec flow）
+    // ================================================================
+    handlers["JSON.MakeToolResult"] = [](ExecutionContext& ctx) {
+        std::string toolCallId = ctx.GetInputValue("ToolCallID").asString();
+        std::string content    = ctx.GetInputValue("Content").asString();
+
+        crude_json::object obj;
+        obj["role"]         = crude_json::value(std::string("tool"));
+        obj["tool_call_id"] = crude_json::value(toolCallId);
+        obj["content"]      = crude_json::value(content);
+        ctx.SetOutputValue("JSON", Variant(crude_json::value(std::move(obj)).dump()));
+        return true;
+    };
+
+    // ================================================================
     //   从文件加载对话历史（JSON 数组字符串）
     //   exec in → onSuccess / onError / onNew（文件不存在时）
     //   in:  Path(String)        — 历史文件路径

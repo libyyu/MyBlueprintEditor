@@ -437,3 +437,96 @@ TEST_F(HandlersTest, StringTemplate_ReplacesPlaceholders)
     EXPECT_TRUE(result.success);
     EXPECT_EQ(runner.GetPinValue(13).asString(), "Hello Alice, today is Monday!");
 }
+
+// ============================================================================
+// JSON.ParseToolCall
+// ============================================================================
+TEST_F(HandlersTest, ParseToolCall_ExtractsNameAndArgs)
+{
+    const std::string toolCallsJson = R"([
+        {
+            "id": "call_abc123",
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "arguments": "{\"location\":\"Beijing\",\"unit\":\"celsius\"}"
+            }
+        }
+    ])";
+
+    BlueprintData bp;
+    bp.metadata.name = "ParseToolCallTest";
+    NodeInstance node;
+    node.id = 1; node.definitionId = "JSON.ParseToolCall";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id = id; p.kind = k; p.dataType = dt; p.name = name; p.defaultValue = dv;
+        node.pins.push_back(p);
+    };
+    addPin(10, PinKind::Input,  PinDataType::String,  "ToolCallsJSON", Variant(toolCallsJson));
+    addPin(11, PinKind::Input,  PinDataType::Integer, "Index",         Variant((int64_t)0));
+    addPin(12, PinKind::Output, PinDataType::String,  "Name");
+    addPin(13, PinKind::Output, PinDataType::String,  "ArgumentsJSON");
+    addPin(14, PinKind::Output, PinDataType::String,  "ID");
+    bp.nodes.push_back(node);
+    bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto result = runner.ExecuteNode(1);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(runner.GetPinValue(12).asString(), "get_weather");
+    EXPECT_NE(runner.GetPinValue(13).asString().find("Beijing"), std::string::npos);
+    EXPECT_EQ(runner.GetPinValue(14).asString(), "call_abc123");
+}
+
+TEST_F(HandlersTest, ParseToolCall_OutOfBoundsReturnsEmpty)
+{
+    BlueprintData bp;
+    bp.metadata.name = "ParseToolCallOOB";
+    NodeInstance node;
+    node.id = 1; node.definitionId = "JSON.ParseToolCall";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id = id; p.kind = k; p.dataType = dt; p.name = name; p.defaultValue = dv;
+        node.pins.push_back(p);
+    };
+    addPin(10, PinKind::Input,  PinDataType::String,  "ToolCallsJSON", Variant(std::string("[]")));
+    addPin(11, PinKind::Input,  PinDataType::Integer, "Index",         Variant((int64_t)0));
+    addPin(12, PinKind::Output, PinDataType::String,  "Name");
+    addPin(13, PinKind::Output, PinDataType::String,  "ArgumentsJSON");
+    addPin(14, PinKind::Output, PinDataType::String,  "ID");
+    bp.nodes.push_back(node);
+    bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto result = runner.ExecuteNode(1);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(runner.GetPinValue(12).asString(), "");
+    EXPECT_EQ(runner.GetPinValue(13).asString(), "{}");
+}
+
+// ============================================================================
+// JSON.MakeToolResult
+// ============================================================================
+TEST_F(HandlersTest, MakeToolResult_BuildsCorrectJSON)
+{
+    BlueprintData bp;
+    bp.metadata.name = "MakeToolResultTest";
+    NodeInstance node;
+    node.id = 1; node.definitionId = "JSON.MakeToolResult";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id = id; p.kind = k; p.dataType = dt; p.name = name; p.defaultValue = dv;
+        node.pins.push_back(p);
+    };
+    addPin(10, PinKind::Input,  PinDataType::String, "ToolCallID", Variant(std::string("call_abc123")));
+    addPin(11, PinKind::Input,  PinDataType::String, "Content",    Variant(std::string("28°C, sunny")));
+    addPin(12, PinKind::Output, PinDataType::String, "JSON");
+    bp.nodes.push_back(node);
+    bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto result = runner.ExecuteNode(1);
+    EXPECT_TRUE(result.success);
+    const std::string out = runner.GetPinValue(12).asString();
+    EXPECT_NE(out.find("\"tool\""),        std::string::npos) << "role should be 'tool'";
+    EXPECT_NE(out.find("\"call_abc123\""), std::string::npos) << "tool_call_id mismatch";
+    EXPECT_NE(out.find("28"),              std::string::npos) << "content mismatch";
+}
