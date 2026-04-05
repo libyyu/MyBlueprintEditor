@@ -67,7 +67,7 @@ class LuaScriptEngine;
 //   · 可独立构造，便于单元测试
 // ============================================================================
 
-struct BLUEPRINT_API NodeExecutionState
+struct NodeExecutionState  // 不加 BLUEPRINT_API：通过 ExecutionContext 方法访问，无需直接 DLL 导出
 {
     // 所有引脚的当前值（输入和输出共用，通过链接传播）
     std::unordered_map<PinId, Variant>              pinValues;

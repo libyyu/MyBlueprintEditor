@@ -23,8 +23,12 @@ namespace Runtime {
 // ============================================================================
 // HttpRequest / HttpResponse
 // ============================================================================
+// 注意：这两个 struct 不加 BLUEPRINT_API —— 它们是纯数据结构，
+//       通过值/引用在同一模块内传递；避免 MSVC C4251 (std::map/string
+//       没有 __declspec 导出时触发的 DLL 接口警告)。
+// ============================================================================
 
-struct BLUEPRINT_API HttpRequest {
+struct HttpRequest {
     std::string url;
     std::string method      = "POST";   // "GET" | "POST" | "PUT" | "DELETE" ...
     std::string body;
@@ -32,7 +36,7 @@ struct BLUEPRINT_API HttpRequest {
     int timeoutSeconds      = 30;
 };
 
-struct BLUEPRINT_API HttpResponse {
+struct HttpResponse {
     int         statusCode  = 0;
     std::string body;
     std::string error;      // 非空 = 网络/连接错误
@@ -42,7 +46,7 @@ struct BLUEPRINT_API HttpResponse {
 using HttpCallback = std::function<void(HttpResponse)>;
 
 // ============================================================================
-// IHttpClient — 纯虚接口
+// IHttpClient — 纯虚接口（只有接口类本身需要 DLL 导出）
 // ============================================================================
 
 class BLUEPRINT_API IHttpClient {
