@@ -2098,10 +2098,8 @@ void BlueprintRunner::Tick(float deltaTime)
             return;
     }
 
-#ifndef __EMSCRIPTEN__
-    // 先消费后台线程 dispatch 回来的主线程任务
+    // 消费后台线程（或 emscripten_fetch）dispatch 回来的主线程任务
     MainThreadDispatcher::Get().DrainQueue();
-#endif
 
     m_timerManager->Tick(deltaTime);
 

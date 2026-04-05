@@ -1,14 +1,18 @@
 // Runtime/Http/HttpClient_Emscripten.cpp
 // emscripten_fetch 实现（WebGL）
 //
-// 特点：
-//   - 浏览器沙盒内唯一合法的网络方式
-//   - emscripten_fetch 本身是异步的，回调在主线程触发 → 不需要 MainThreadDispatcher
-//   - 需要在 emcc 链接参数加上 -sFETCH
+// 关键设计：
+//   fetch 回调触发在浏览器事件循环（主线程），但不是 BlueprintRunner::Tick() 上下文。
+//   直接在回调里调 ActivateOutputFlow 会绕过 Tick 调度，导致重入风险。
+//   修复：回调里把 HttpCallback Post 到 MainThreadDispatcher，
+//   由 Tick() → DrainQueue() 在安全上下文里统一消费。
+//
+// Emscripten 链接参数需加：-sFETCH
 
 #ifdef __EMSCRIPTEN__
 
 #include "IHttpClient.h"
+#include "../MainThreadDispatcher.h"
 #include <emscripten/fetch.h>
 #include <cstring>
 #include <vector>
@@ -27,8 +31,18 @@ struct FetchContext {
 };
 
 // ============================================================================
-// 回调
+// 统一派发：把响应 Post 到 MainThreadDispatcher，由 Tick/DrainQueue 消费
 // ============================================================================
+
+static void dispatchResponse(FetchContext* ctx, HttpResponse resp)
+{
+    HttpCallback cb = std::move(ctx->cb);
+    delete ctx;
+    MainThreadDispatcher::Get().Post(
+        [cb = std::move(cb), resp = std::move(resp)]() mutable {
+            cb(std::move(resp));
+        });
+}
 
 static void onFetchSuccess(emscripten_fetch_t* fetch)
 {
@@ -36,9 +50,8 @@ static void onFetchSuccess(emscripten_fetch_t* fetch)
     HttpResponse resp;
     resp.statusCode = fetch->status;
     resp.body.assign(fetch->data, static_cast<size_t>(fetch->numBytes));
-    ctx->cb(std::move(resp));
-    delete ctx;
     emscripten_fetch_close(fetch);
+    dispatchResponse(ctx, std::move(resp));
 }
 
 static void onFetchError(emscripten_fetch_t* fetch)
@@ -47,9 +60,8 @@ static void onFetchError(emscripten_fetch_t* fetch)
     HttpResponse resp;
     resp.statusCode = fetch->status;
     resp.error = "fetch error (status " + std::to_string(fetch->status) + ")";
-    ctx->cb(std::move(resp));
-    delete ctx;
     emscripten_fetch_close(fetch);
+    dispatchResponse(ctx, std::move(resp));
 }
 
 // ============================================================================
@@ -66,7 +78,6 @@ public:
         emscripten_fetch_attr_t attr;
         emscripten_fetch_attr_init(&attr);
 
-        // method
         strncpy(attr.requestMethod, req.method.c_str(), sizeof(attr.requestMethod) - 1);
         attr.requestMethod[sizeof(attr.requestMethod) - 1] = '\0';
 
@@ -75,10 +86,9 @@ public:
         attr.onerror    = onFetchError;
         attr.userData   = ctx;
 
-        // headers：emscripten_fetch 需要 null-terminated 字符串数组 [k, v, k, v, ..., nullptr]
+        // headers：null-terminated 字符串数组 [k, v, k, v, ..., nullptr]
         std::vector<std::string> hdrStorage;
         std::vector<const char*> hdrPtrs;
-        // 默认 Content-Type
         bool hasContentType = false;
         for (const auto& kv : req.headers) {
             if (kv.first == "Content-Type" || kv.first == "content-type")
@@ -95,14 +105,14 @@ public:
         hdrPtrs.push_back(nullptr);
         attr.requestHeaders = hdrPtrs.data();
 
-        // body
         if (!req.body.empty()) {
             attr.requestData     = req.body.c_str();
             attr.requestDataSize = req.body.size();
         }
 
+        // emscripten_fetch 立即返回，请求在浏览器事件循环里异步执行
         emscripten_fetch(&attr, req.url.c_str());
-        // hdrStorage / hdrPtrs 在 fetch 发起后可以销毁（emscripten_fetch 内部已复制）
+        // hdrStorage/hdrPtrs 的生命周期：emscripten_fetch 内部会复制 headers，安全销毁
     }
 };
 
