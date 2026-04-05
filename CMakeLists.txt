@@ -385,7 +385,7 @@ if(NOT BUILD_RUNTIME_ONLY)
             ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintEditor/utilities
     )
 
-    target_link_libraries(BlueprintEditor PRIVATE Application ImGuiColorTextEdit)
+    target_link_libraries(BlueprintEditor PRIVATE Application ImGuiColorTextEdit BlueprintRuntime)
 
     # Phase 3: 若 Runtime 开启了 Lua，Editor 也需要链接 Lua 库（LuaNodeRegistrar.cpp 使用 lua.hpp）
     # LuaNodeRegistrar.cpp 属于 BlueprintEditor，必须显式传递 BLUEPRINT_HAS_LUA 和 Lua include。
