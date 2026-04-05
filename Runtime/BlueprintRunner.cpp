@@ -744,8 +744,8 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
             else
             {
                 // 输出引脚：从 outputPinNameToId 查 PinId，再从 pinValues 读值
-                auto it = m_state.outputPinNameToId.find(pin.name);
-                if (it != m_state.outputPinNameToId.end())
+                auto oit = m_state.outputPinNameToId.find(pin.name);
+                if (oit != m_state.outputPinNameToId.end())
                 {
                     auto vit = m_state.pinValues.find(it->second);
                     if (vit != m_state.pinValues.end()) v = vit->second;
