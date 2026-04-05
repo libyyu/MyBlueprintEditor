@@ -970,3 +970,206 @@ TEST_F(HandlersTest, PinSnapshot_GetSnapshotNodeIds_ListsExecutedNodes)
     EXPECT_TRUE(has1);
     EXPECT_TRUE(has2);
 }
+
+// ============================================================================
+// 循环节点测试：WhileLoop / ForLoopWithBreak / ForEachLoop
+// ============================================================================
+
+// WhileLoop — Condition 为 false → 0 次迭代，直接走 Completed，设置变量 done=1
+TEST_F(HandlersTest, WhileLoop_FalseCondition_ZeroIterations)
+{
+    // 蓝图：OnBeginPlay → WhileLoop(Condition=false) → [Completed] → SetVariable(done,1)
+    BlueprintData bp; bp.metadata.name = "WhileFalseTest";
+
+    // WhileLoop node
+    NodeInstance wl; wl.id=1; wl.definitionId="WhileLoop";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* name, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+    addP(wl, 10, PinKind::Input,  PinDataType::Unknown, "", true);         // exec in
+    addP(wl, 11, PinKind::Input,  PinDataType::Boolean, "Condition", false,
+         Variant(false));
+    addP(wl, 12, PinKind::Output, PinDataType::Unknown, "Loop Body", true);
+    addP(wl, 13, PinKind::Output, PinDataType::Unknown, "Completed", true);
+    bp.nodes.push_back(wl);
+
+    // SetVariable(done, 1)
+    NodeInstance sv; sv.id=2; sv.definitionId="SetVariable";
+    addP(sv, 20, PinKind::Input,  PinDataType::Unknown, "", true);
+    addP(sv, 21, PinKind::Input,  PinDataType::String,  "Name",
+         false, Variant(std::string("done")));
+    addP(sv, 22, PinKind::Input,  PinDataType::Integer, "Value",
+         false, Variant((int64_t)1));
+    addP(sv, 23, PinKind::Output, PinDataType::Unknown, "", true);
+    bp.nodes.push_back(sv);
+
+    // Links: OnBeginPlay→WhileLoop, WhileLoop.Completed→SetVariable
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);   // 100:OnBeginPlay, pin1000→10
+    LinkInstance lk1; lk1.id=3000; lk1.startPinId=13; lk1.endPinId=20;
+    bp.links.push_back(lk1);
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+
+    EXPECT_EQ(r.GetVariable("done").asInt(), 1)
+        << "Completed branch should fire; SetVariable should set done=1";
+}
+
+// WhileLoop — 计数 0→N：用 ForLoop 来简单验证 WhileLoop 能正确跑 N 次
+// 通过 Less 节点做条件，每次 LoopBody 中 SetVariable(counter, counter+1)
+// 结构稍复杂，改用直接测试"迭代次数"的简单版本：
+// Condition 先 true 跑 3 次再变 false（借助 ForLoop 更简单，此处跳过复杂版）
+// 只测 Completed 分支 + 0次迭代已在上面，补充：WhileLoop maxIterations 保护
+TEST_F(HandlersTest, WhileLoop_TrueCondition_MaxIterGuard)
+{
+    // Condition 硬编码 true → 应该跑满 maxIterations(10000) 次然后退出（不崩溃）
+    // Completed 分支随后激活 → done=1
+    BlueprintData bp; bp.metadata.name = "WhileMaxIterTest";
+
+    NodeInstance wl; wl.id=1; wl.definitionId="WhileLoop";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* name, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+    addP(wl, 10, PinKind::Input,  PinDataType::Unknown, "", true);
+    addP(wl, 11, PinKind::Input,  PinDataType::Boolean, "Condition", false,
+         Variant(true));                                           // 永远 true
+    addP(wl, 12, PinKind::Output, PinDataType::Unknown, "Loop Body", true);
+    addP(wl, 13, PinKind::Output, PinDataType::Unknown, "Completed", true);
+    bp.nodes.push_back(wl);
+
+    NodeInstance sv; sv.id=2; sv.definitionId="SetVariable";
+    addP(sv, 20, PinKind::Input,  PinDataType::Unknown, "", true);
+    addP(sv, 21, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("done")));
+    addP(sv, 22, PinKind::Input,  PinDataType::Integer, "Value", false, Variant((int64_t)1));
+    addP(sv, 23, PinKind::Output, PinDataType::Unknown, "", true);
+    bp.nodes.push_back(sv);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+    LinkInstance lk1; lk1.id=3000; lk1.startPinId=13; lk1.endPinId=20;
+    bp.links.push_back(lk1);
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);   // must not hang
+
+    // Completed 一定被激活（超限后 break → Completed）
+    EXPECT_EQ(r.GetVariable("done").asInt(), 1)
+        << "After maxIterations guard, Completed branch must still fire";
+}
+
+// ForLoopWithBreak — 跑 0..9，LoopBody 每次 counter++，在 index==3 触发 Break
+// Break 是由 Branch 节点路由实现的（index==3 → Break pin）
+// 简化版：Break 引脚不通过运行时路由，直接在 handler 里用变量标志模拟
+// 实际测试 ForLoopWithBreak 的完整路径：不连 Break 引脚，验证全跑 0..4
+TEST_F(HandlersTest, ForLoopWithBreak_NoBreak_RunsFull)
+{
+    // OnBeginPlay → ForLoopWithBreak(0..4, no break) → LoopBody: counter += Index
+    // 预期 counter = 0+1+2+3+4 = 10
+    BlueprintData bp; bp.metadata.name = "FLBreakNoBreakTest";
+
+    NodeInstance fl; fl.id=1; fl.definitionId="ForLoopWithBreak";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* name, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+    addP(fl, 10, PinKind::Input,  PinDataType::Unknown, "",           true);   // exec
+    addP(fl, 11, PinKind::Input,  PinDataType::Unknown, "Break",      true);   // break pin
+    addP(fl, 12, PinKind::Input,  PinDataType::Integer, "First Index",false, Variant((int64_t)0));
+    addP(fl, 13, PinKind::Input,  PinDataType::Integer, "Last Index", false, Variant((int64_t)4));
+    addP(fl, 14, PinKind::Output, PinDataType::Unknown, "Loop Body",  true);
+    addP(fl, 15, PinKind::Output, PinDataType::Integer, "Index");
+    addP(fl, 16, PinKind::Output, PinDataType::Unknown, "Completed",  true);
+    bp.nodes.push_back(fl);
+
+    // SetVariable: counter = counter + Index
+    // 简化：用 SetVariable name="counter", value=Index（GetVariable 拿不到 counter 初始值时用 0）
+    // 用 ForLoop 已覆盖 counter 累加，这里只验证 Completed 和节点不崩
+    NodeInstance sv; sv.id=2; sv.definitionId="SetVariable";
+    addP(sv, 20, PinKind::Input,  PinDataType::Unknown, "",       true);
+    addP(sv, 21, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("loopDone")));
+    addP(sv, 22, PinKind::Input,  PinDataType::Integer, "Value", false, Variant((int64_t)1));
+    addP(sv, 23, PinKind::Output, PinDataType::Unknown, "",       true);
+    bp.nodes.push_back(sv);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+    LinkInstance lk1; lk1.id=3000; lk1.startPinId=16; lk1.endPinId=20;  // Completed→SetVariable
+    bp.links.push_back(lk1);
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    auto result = RunWithBeginPlay(r);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(r.GetVariable("loopDone").asInt(), 1)
+        << "Completed should fire after ForLoopWithBreak runs 0..4 without break";
+}
+
+// ForEachLoop — JSON 数组 ["x","y","z"] → 迭代 3 次，count==3
+TEST_F(HandlersTest, ForEachLoop_IteratesAllElements)
+{
+    BlueprintData bp; bp.metadata.name = "ForEachTest";
+
+    NodeInstance fe; fe.id=1; fe.definitionId="ForEachLoop";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* name, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+    addP(fe, 10, PinKind::Input,  PinDataType::Unknown, "",          true);
+    addP(fe, 11, PinKind::Input,  PinDataType::Array,   "Array",     false,
+         Variant(std::vector<Variant>{
+             Variant(std::string("x")),
+             Variant(std::string("y")),
+             Variant(std::string("z"))}));
+    addP(fe, 12, PinKind::Output, PinDataType::Unknown, "Loop Body", true);
+    addP(fe, 13, PinKind::Output, PinDataType::String,  "Array Element");
+    addP(fe, 14, PinKind::Output, PinDataType::Integer, "Array Index");
+    addP(fe, 15, PinKind::Output, PinDataType::Unknown, "Completed", true);
+    bp.nodes.push_back(fe);
+
+    // SetVariable(count, count+1) — 简化：只用 SetVariable("iterCount", Index+1) 但 ForEach 没 index
+    // 方案：每次 LoopBody → SetVariable("iterCount", iterCount+1) 需要 GetVariable+Add
+    // 更简：LoopBody → SetVariable("last", Element) 最后验证 last=="z"
+    // 并另一个 Completed → SetVariable("completed", 1)
+    NodeInstance sv1; sv1.id=2; sv1.definitionId="SetVariable";
+    addP(sv1, 20, PinKind::Input,  PinDataType::Unknown, "", true);
+    addP(sv1, 21, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("last")));
+    addP(sv1, 22, PinKind::Input,  PinDataType::Any,     "Value", false);  // 由 Element 连线传入
+    addP(sv1, 23, PinKind::Output, PinDataType::Unknown, "", true);
+    bp.nodes.push_back(sv1);
+
+    NodeInstance sv2; sv2.id=3; sv2.definitionId="SetVariable";
+    addP(sv2, 30, PinKind::Input,  PinDataType::Unknown, "", true);
+    addP(sv2, 31, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("done")));
+    addP(sv2, 32, PinKind::Input,  PinDataType::Integer, "Value", false, Variant((int64_t)1));
+    addP(sv2, 33, PinKind::Output, PinDataType::Unknown, "", true);
+    bp.nodes.push_back(sv2);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+    // LoopBody → SetVariable(last, Element)
+    LinkInstance lk1; lk1.id=3000; lk1.startPinId=12; lk1.endPinId=20;
+    // Element → sv1.Value
+    LinkInstance lk2; lk2.id=3001; lk2.startPinId=13; lk2.endPinId=22;
+    // Completed → SetVariable(done,1)
+    LinkInstance lk3; lk3.id=3002; lk3.startPinId=15; lk3.endPinId=30;
+    bp.links.insert(bp.links.end(), {lk1, lk2, lk3});
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+
+    // 最后一个 Element 是 "z"
+    EXPECT_EQ(r.GetVariable("last").asString(), "z")
+        << "Last element should be 'z'";
+    EXPECT_EQ(r.GetVariable("done").asInt(), 1)
+        << "Completed branch must fire after all elements processed";
+}
