@@ -60,14 +60,21 @@ target_include_directories(blueprint_tests PRIVATE
     $<TARGET_PROPERTY:BlueprintRuntime,INTERFACE_INCLUDE_DIRECTORIES>
 )
 
-# Lua headers (baked into BlueprintRuntime; expose include path for test files)
-if(TARGET lua54_static)
-    target_include_directories(blueprint_tests PRIVATE $<TARGET_PROPERTY:lua54_static,INTERFACE_INCLUDE_DIRECTORIES>)
-elseif(TARGET lua54)
-    target_include_directories(blueprint_tests PRIVATE $<TARGET_PROPERTY:lua54,INTERFACE_INCLUDE_DIRECTORIES>)
-endif()
-
+# ---------------------------------------------------------------------------
+# Lua：Windows 上 Lua 是 static lib，符号不从 BlueprintRuntime.lib 传递；
+#      必须显式 link，否则 LNK2019 (lua_settop / lua_type / lua_getglobal …)
+# ---------------------------------------------------------------------------
 if(BLUEPRINT_LUA)
+    # 优先 lua54_static（LUA_LINK_STATIC=ON，默认路径）
+    if(TARGET lua54_static)
+        target_link_libraries(blueprint_tests PRIVATE lua54_static)
+        target_include_directories(blueprint_tests PRIVATE
+            $<TARGET_PROPERTY:lua54_static,INTERFACE_INCLUDE_DIRECTORIES>)
+    elseif(TARGET lua54)
+        target_link_libraries(blueprint_tests PRIVATE lua54)
+        target_include_directories(blueprint_tests PRIVATE
+            $<TARGET_PROPERTY:lua54,INTERFACE_INCLUDE_DIRECTORIES>)
+    endif()
     target_compile_definitions(blueprint_tests PRIVATE BLUEPRINT_HAS_LUA)
 endif()
 
