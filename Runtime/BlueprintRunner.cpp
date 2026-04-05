@@ -1542,6 +1542,45 @@ bool BlueprintRunner::StepNextNode()
 
         m_lastSteppedNodeId = node->id;  // 记录本次执行的节点，供 UI 蓝色高亮使用
 
+        // ── 先执行数据上游依赖（纯数据节点，不在 exec 流中）──────────────────
+        // Step 模式只步进 exec 节点，数据依赖节点（如 AppendString、IntToString 等）
+        // 不在 m_stepPendingNodes 中，需要在执行本节点前先求值，确保输入引脚正确。
+        {
+            std::unordered_set<NodeId> dataDepSet;
+            std::queue<NodeId> depQueue;
+            auto dataInputs = m_blueprint.getDataInputNodes(node->id);
+            for (auto depId : dataInputs)
+            {
+                if (!m_blueprint.isEventSourceNode(depId) &&
+                    !m_flowExecutedNodes.count(depId) &&
+                    dataDepSet.insert(depId).second)
+                    depQueue.push(depId);
+            }
+            while (!depQueue.empty())
+            {
+                NodeId cur = depQueue.front(); depQueue.pop();
+                auto upstream = m_blueprint.getDataInputNodes(cur);
+                for (auto upId : upstream)
+                {
+                    if (!m_blueprint.isEventSourceNode(upId) &&
+                        !m_flowExecutedNodes.count(upId) &&
+                        dataDepSet.insert(upId).second)
+                        depQueue.push(upId);
+                }
+            }
+            // 按 topo 顺序执行数据依赖节点（关闭 stepMode，不拦截 ActivateOutputFlow）
+            for (NodeId depId : order)
+            {
+                if (!dataDepSet.count(depId)) continue;
+                const NodeInstance* depNode = m_blueprint.findNode(depId);
+                if (!depNode) continue;
+                m_bypassBreakpoint = true;
+                executeNodeInternal(*depNode);
+                m_bypassBreakpoint = false;
+                propagatePinValues(*depNode);
+            }
+        }
+
         m_stepMode = true;
         m_bypassBreakpoint = true;
         executeNodeInternal(*node);
