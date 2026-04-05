@@ -1458,6 +1458,49 @@ static void RegisterNodeDefs_EventBus(INodeRegistry& registry)
 // File I/O 节点定义
 // 颜色：4CAF50（绿色，区别于 Network 蓝 / AI 紫）
 // ============================================================================
+// ============================================================================
+// Retry 节点定义
+// ============================================================================
+static void RegisterNodeDefs_Retry(INodeRegistry& registry)
+{
+    // MakePin / MakeFlowPin 使用文件顶部的自由函数
+    auto MakePinDef = [](const char* n, PinDataType t, Variant dv) {
+        PinDefinition p = MakePin(n, t);
+        p.defaultValue = dv;
+        return p;
+    };
+
+    // Retry.Backoff — 同步重试循环，支持指数退避（退避为元数据，实际 Delay 需配合 Delay 节点）
+    {
+        NodeDefinition d;
+        d.id       = "Retry.Backoff";
+        d.name     = "Retry Backoff";
+        d.category = "Flow/Retry";
+        d.color    = "E67E22";  // 橙色
+
+        d.inputPins = {
+            MakeFlowPin(""),
+            MakePinDef("MaxRetries",        PinDataType::Integer, Variant((int64_t)3)),
+            MakePinDef("InitialDelayMs",    PinDataType::Float,   Variant(500.0)),
+            MakePinDef("BackoffMultiplier", PinDataType::Float,   Variant(2.0)),
+            MakePinDef("MaxDelayMs",        PinDataType::Float,   Variant(10000.0)),
+        };
+        d.outputPins = {
+            MakeFlowPin("onTry"),
+            MakePin("AttemptIndex", PinDataType::Integer),
+            MakePin("DelayMs",      PinDataType::Float),
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onExceeded"),
+        };
+        d.description =
+            "Retry loop with exponential backoff. "
+            "Each attempt activates onTry. Set blueprint variable "
+            "'__retry_succeeded'=true inside the onTry body to exit early "
+            "via onSuccess. All retries exhausted → onExceeded.";
+        registry.registerNode(d);
+    }
+}
+
 static void RegisterNodeDefs_File(INodeRegistry& registry)
 {
     auto reg = [&registry](const char* id, const char* name, const char* category,
@@ -1872,6 +1915,7 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     RegisterNodeDefs_Network(registry);
     RegisterNodeDefs_AI(registry);
     RegisterNodeDefs_File(registry);
+    RegisterNodeDefs_Retry(registry);
 }
 
 } // namespace Runtime

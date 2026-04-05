@@ -1173,3 +1173,211 @@ TEST_F(HandlersTest, ForEachLoop_IteratesAllElements)
     EXPECT_EQ(r.GetVariable("done").asInt(), 1)
         << "Completed branch must fire after all elements processed";
 }
+
+// ============================================================================
+// Retry.Backoff 节点测试
+// ============================================================================
+
+TEST_F(HandlersTest, RetryBackoff_SucceedOnFirstAttempt)
+{
+    // OnBeginPlay → Retry.Backoff(MaxRetries=3)
+    //   onTry → SetVariable(__retry_succeeded, true)  # 立即成功
+    //   onSuccess → SetVariable(result, "ok")
+    //   onExceeded → SetVariable(result, "fail")
+    BlueprintData bp; bp.metadata.name = "RetrySucceedFirstTest";
+
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* name, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+
+    // Retry.Backoff node (id=1)
+    NodeInstance rb; rb.id=1; rb.definitionId="Retry.Backoff";
+    addP(rb, 10, PinKind::Input,  PinDataType::Unknown, "", true);
+    addP(rb, 11, PinKind::Input,  PinDataType::Integer, "MaxRetries",        false, Variant((int64_t)3));
+    addP(rb, 12, PinKind::Input,  PinDataType::Float,   "InitialDelayMs",    false, Variant(0.0));
+    addP(rb, 13, PinKind::Input,  PinDataType::Float,   "BackoffMultiplier", false, Variant(2.0));
+    addP(rb, 14, PinKind::Input,  PinDataType::Float,   "MaxDelayMs",        false, Variant(10000.0));
+    addP(rb, 15, PinKind::Output, PinDataType::Unknown, "onTry",     true);
+    addP(rb, 16, PinKind::Output, PinDataType::Integer, "AttemptIndex");
+    addP(rb, 17, PinKind::Output, PinDataType::Float,   "DelayMs");
+    addP(rb, 18, PinKind::Output, PinDataType::Unknown, "onSuccess", true);
+    addP(rb, 19, PinKind::Output, PinDataType::Unknown, "onExceeded",true);
+    bp.nodes.push_back(rb);
+
+    // SetVariable(__retry_succeeded, true)  id=2
+    NodeInstance sv1; sv1.id=2; sv1.definitionId="SetVariable";
+    addP(sv1, 20, PinKind::Input,  PinDataType::Unknown, "", true);
+    addP(sv1, 21, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("__retry_succeeded")));
+    addP(sv1, 22, PinKind::Input,  PinDataType::Boolean, "Value", false, Variant(true));
+    addP(sv1, 23, PinKind::Output, PinDataType::Unknown, "", true);
+    bp.nodes.push_back(sv1);
+
+    // SetVariable(result, "ok")  id=3  (onSuccess branch)
+    NodeInstance sv2; sv2.id=3; sv2.definitionId="SetVariable";
+    addP(sv2, 30, PinKind::Input,  PinDataType::Unknown, "", true);
+    addP(sv2, 31, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("result")));
+    addP(sv2, 32, PinKind::Input,  PinDataType::String,  "Value", false, Variant(std::string("ok")));
+    addP(sv2, 33, PinKind::Output, PinDataType::Unknown, "", true);
+    bp.nodes.push_back(sv2);
+
+    // SetVariable(result, "fail")  id=4  (onExceeded branch)
+    NodeInstance sv3; sv3.id=4; sv3.definitionId="SetVariable";
+    addP(sv3, 40, PinKind::Input,  PinDataType::Unknown, "", true);
+    addP(sv3, 41, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("result")));
+    addP(sv3, 42, PinKind::Input,  PinDataType::String,  "Value", false, Variant(std::string("fail")));
+    addP(sv3, 43, PinKind::Output, PinDataType::Unknown, "", true);
+    bp.nodes.push_back(sv3);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);            // OnBeginPlay→Retry
+    LinkInstance lk1; lk1.id=3001; lk1.startPinId=15; lk1.endPinId=20;  // onTry→SetSucceeded
+    LinkInstance lk2; lk2.id=3002; lk2.startPinId=18; lk2.endPinId=30;  // onSuccess→SetOk
+    LinkInstance lk3; lk3.id=3003; lk3.startPinId=19; lk3.endPinId=40;  // onExceeded→SetFail
+    bp.links.insert(bp.links.end(), {lk1, lk2, lk3});
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+
+    EXPECT_EQ(r.GetVariable("result").asString(), "ok")
+        << "Should succeed on first attempt → result='ok'";
+}
+
+TEST_F(HandlersTest, RetryBackoff_ExhaustsAllRetries)
+{
+    // __retry_succeeded never set to true → all 3 retries exhausted → onExceeded
+    BlueprintData bp; bp.metadata.name = "RetryExhaustedTest";
+
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* name, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+
+    NodeInstance rb; rb.id=1; rb.definitionId="Retry.Backoff";
+    addP(rb, 10, PinKind::Input,  PinDataType::Unknown, "", true);
+    addP(rb, 11, PinKind::Input,  PinDataType::Integer, "MaxRetries",        false, Variant((int64_t)3));
+    addP(rb, 12, PinKind::Input,  PinDataType::Float,   "InitialDelayMs",    false, Variant(0.0));
+    addP(rb, 13, PinKind::Input,  PinDataType::Float,   "BackoffMultiplier", false, Variant(2.0));
+    addP(rb, 14, PinKind::Input,  PinDataType::Float,   "MaxDelayMs",        false, Variant(10000.0));
+    addP(rb, 15, PinKind::Output, PinDataType::Unknown, "onTry",     true);
+    addP(rb, 16, PinKind::Output, PinDataType::Integer, "AttemptIndex");
+    addP(rb, 17, PinKind::Output, PinDataType::Float,   "DelayMs");
+    addP(rb, 18, PinKind::Output, PinDataType::Unknown, "onSuccess", true);
+    addP(rb, 19, PinKind::Output, PinDataType::Unknown, "onExceeded",true);
+    bp.nodes.push_back(rb);
+
+    // onTry → SetVariable(attempts, attempts+1) — just increment counter
+    NodeInstance sv1; sv1.id=2; sv1.definitionId="SetVariable";
+    addP(sv1, 20, PinKind::Input,  PinDataType::Unknown, "", true);
+    addP(sv1, 21, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("attempts")));
+    addP(sv1, 22, PinKind::Input,  PinDataType::Integer, "Value", false, Variant((int64_t)0));  // overwritten by AttemptIndex+1
+    addP(sv1, 23, PinKind::Output, PinDataType::Unknown, "", true);
+    bp.nodes.push_back(sv1);
+
+    // onExceeded → SetVariable(result, "exceeded")
+    NodeInstance sv2; sv2.id=3; sv2.definitionId="SetVariable";
+    addP(sv2, 30, PinKind::Input,  PinDataType::Unknown, "", true);
+    addP(sv2, 31, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("result")));
+    addP(sv2, 32, PinKind::Input,  PinDataType::String,  "Value", false, Variant(std::string("exceeded")));
+    addP(sv2, 33, PinKind::Output, PinDataType::Unknown, "", true);
+    bp.nodes.push_back(sv2);
+
+    // AttemptIndex → sv1.Value (each onTry sets attempts = AttemptIndex+1 implicitly)
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+    LinkInstance lk1; lk1.id=3001; lk1.startPinId=15; lk1.endPinId=20;  // onTry→sv1
+    LinkInstance lk2; lk2.id=3002; lk2.startPinId=16; lk2.endPinId=22;  // AttemptIndex→sv1.Value
+    LinkInstance lk3; lk3.id=3003; lk3.startPinId=19; lk3.endPinId=30;  // onExceeded→sv2
+    bp.links.insert(bp.links.end(), {lk1, lk2, lk3});
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+
+    EXPECT_EQ(r.GetVariable("result").asString(), "exceeded")
+        << "All 3 retries exhausted → result='exceeded'";
+    // Last attempt index should be 2 (0-based, 3 attempts)
+    EXPECT_EQ(r.GetVariable("attempts").asInt(), 2)
+        << "AttemptIndex at last onTry should be 2";
+}
+
+TEST_F(HandlersTest, RetryBackoff_SucceedOnSecondAttempt)
+{
+    // Set __retry_succeeded=true only after first attempt (attempt index 1)
+    // Achieved by: onTry → Branch(AttemptIndex >= 1) → SetSucceeded=true
+    // Using: AttemptIndex output + SetVariable pattern
+    // Simpler: just use a counter variable
+    BlueprintData bp; bp.metadata.name = "RetrySucceedSecondTest";
+
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* name, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+
+    NodeInstance rb; rb.id=1; rb.definitionId="Retry.Backoff";
+    addP(rb, 10, PinKind::Input,  PinDataType::Unknown, "", true);
+    addP(rb, 11, PinKind::Input,  PinDataType::Integer, "MaxRetries",        false, Variant((int64_t)5));
+    addP(rb, 12, PinKind::Input,  PinDataType::Float,   "InitialDelayMs",    false, Variant(0.0));
+    addP(rb, 13, PinKind::Input,  PinDataType::Float,   "BackoffMultiplier", false, Variant(1.0));  // no growth
+    addP(rb, 14, PinKind::Input,  PinDataType::Float,   "MaxDelayMs",        false, Variant(0.0));
+    addP(rb, 15, PinKind::Output, PinDataType::Unknown, "onTry",     true);
+    addP(rb, 16, PinKind::Output, PinDataType::Integer, "AttemptIndex");
+    addP(rb, 17, PinKind::Output, PinDataType::Float,   "DelayMs");
+    addP(rb, 18, PinKind::Output, PinDataType::Unknown, "onSuccess", true);
+    addP(rb, 19, PinKind::Output, PinDataType::Unknown, "onExceeded",true);
+    bp.nodes.push_back(rb);
+
+    // Branch: AttemptIndex >= 1 → true branch → SetSucceeded
+    NodeInstance br; br.id=2; br.definitionId="Branch";
+    addP(br, 20, PinKind::Input,  PinDataType::Unknown, "",          true);
+    addP(br, 21, PinKind::Input,  PinDataType::Boolean, "Condition", false, Variant(false));
+    addP(br, 22, PinKind::Output, PinDataType::Unknown, "True",  true);
+    addP(br, 23, PinKind::Output, PinDataType::Unknown, "False", true);
+    bp.nodes.push_back(br);
+
+    // Greater (AttemptIndex, 0): AttemptIndex > 0 → true from attempt 1
+    NodeInstance gt; gt.id=5; gt.definitionId="GreaterEqual";
+    addP(gt, 50, PinKind::Input,  PinDataType::Integer, "A", false);  // AttemptIndex
+    addP(gt, 51, PinKind::Input,  PinDataType::Integer, "B", false, Variant((int64_t)1));
+    addP(gt, 52, PinKind::Output, PinDataType::Boolean, "Result");
+    bp.nodes.push_back(gt);
+
+    NodeInstance sv; sv.id=3; sv.definitionId="SetVariable";
+    addP(sv, 30, PinKind::Input,  PinDataType::Unknown, "", true);
+    addP(sv, 31, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("__retry_succeeded")));
+    addP(sv, 32, PinKind::Input,  PinDataType::Boolean, "Value", false, Variant(true));
+    addP(sv, 33, PinKind::Output, PinDataType::Unknown, "", true);
+    bp.nodes.push_back(sv);
+
+    NodeInstance sv2; sv2.id=4; sv2.definitionId="SetVariable";
+    addP(sv2, 40, PinKind::Input,  PinDataType::Unknown, "", true);
+    addP(sv2, 41, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("result")));
+    addP(sv2, 42, PinKind::Input,  PinDataType::String,  "Value", false, Variant(std::string("ok")));
+    addP(sv2, 43, PinKind::Output, PinDataType::Unknown, "", true);
+    bp.nodes.push_back(sv2);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+    // onTry → Branch
+    LinkInstance lk1; lk1.id=3001; lk1.startPinId=15; lk1.endPinId=20;
+    // AttemptIndex → GreaterEqual.A
+    LinkInstance lk2; lk2.id=3002; lk2.startPinId=16; lk2.endPinId=50;
+    // GreaterEqual.Result → Branch.Condition
+    LinkInstance lk3; lk3.id=3003; lk3.startPinId=52; lk3.endPinId=21;
+    // Branch.True → SetSucceeded
+    LinkInstance lk4; lk4.id=3004; lk4.startPinId=22; lk4.endPinId=30;
+    // onSuccess → SetOk
+    LinkInstance lk5; lk5.id=3005; lk5.startPinId=18; lk5.endPinId=40;
+    bp.links.insert(bp.links.end(), {lk1, lk2, lk3, lk4, lk5});
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+
+    EXPECT_EQ(r.GetVariable("result").asString(), "ok")
+        << "Should succeed on attempt index 1 → result='ok'";
+}

@@ -546,6 +546,53 @@ void RegisterHandlers_Flow(
         ctx.ActivateOutputFlow("Default");
         return true;
     };
+
+    // ── Retry.Backoff ──────────────────────────────────────────────────────────
+    handlers["Retry.Backoff"] = [](ExecutionContext& ctx) {
+        int64_t maxRetries        = ctx.GetInputValue("MaxRetries").asInt();
+        double  initialDelayMs    = ctx.GetInputValue("InitialDelayMs").asFloat();
+        double  backoffMultiplier = ctx.GetInputValue("BackoffMultiplier").asFloat();
+        double  maxDelayMs        = ctx.GetInputValue("MaxDelayMs").asFloat();
+
+        if (maxRetries < 1) maxRetries = 1;
+        if (backoffMultiplier < 1.0) backoffMultiplier = 1.0;
+
+        double currentDelayMs = initialDelayMs;
+        bool succeeded = false;
+
+        ctx.SetVariable("__retry_succeeded", Variant(false));
+
+        for (int64_t attempt = 0; attempt < maxRetries; ++attempt)
+        {
+            ctx.SetOutputValue("AttemptIndex", Variant(attempt));
+            ctx.SetOutputValue("DelayMs",      Variant(currentDelayMs));
+
+            ctx.Log("  [Retry.Backoff] attempt " + std::to_string(attempt) +
+                    ", delay=" + std::to_string(currentDelayMs) + "ms");
+
+            if (!ctx.ActivateOutputFlow("onTry"))
+                return false;
+
+            if (ctx.GetVariable("__retry_succeeded").asBool())
+            {
+                succeeded = true;
+                ctx.Log("  [Retry.Backoff] succeeded at attempt " + std::to_string(attempt));
+                break;
+            }
+
+            currentDelayMs *= backoffMultiplier;
+            if (currentDelayMs > maxDelayMs) currentDelayMs = maxDelayMs;
+        }
+
+        if (succeeded)
+            ctx.ActivateOutputFlow("onSuccess");
+        else
+        {
+            ctx.Log("  [Retry.Backoff] all retries exhausted");
+            ctx.ActivateOutputFlow("onExceeded");
+        }
+        return true;
+    };
 }
 
 } // namespace Runtime
