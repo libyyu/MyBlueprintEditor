@@ -65,7 +65,6 @@ public:
         attr.onerror    = onFetchError;
         attr.userData   = ctx;
 
-        // headers：null-terminated 字符串数组 [k, v, k, v, ..., nullptr]
         std::vector<std::string> hdrStorage;
         std::vector<const char*> hdrPtrs;
         bool hasContentType = false;
@@ -90,6 +89,25 @@ public:
         }
 
         emscripten_fetch(&attr, req.url.c_str());
+    }
+
+    // WebGL：Streaming 降级为普通 SendAsync（浏览器 CORS/fetch 限制）
+    // onChunk 在 onDone 时一次性触发
+    void StreamAsync(const HttpRequest& req,
+                     HttpChunkCallback onChunk,
+                     HttpDoneCallback  onDone) override
+    {
+        SendAsync(req, [onChunk = std::move(onChunk),
+                        onDone  = std::move(onDone)](HttpResponse resp) mutable {
+            if (!resp.ok()) {
+                onDone(resp.error.empty()
+                    ? ("HTTP " + std::to_string(resp.statusCode))
+                    : resp.error);
+                return;
+            }
+            onChunk(resp.body);
+            onDone("");
+        });
     }
 };
 

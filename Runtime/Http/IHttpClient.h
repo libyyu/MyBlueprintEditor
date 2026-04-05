@@ -4,11 +4,12 @@
 // 用法：
 //   启动时注入实现：BP_SetHttpClient(CreateDefaultHttpClient());
 //   节点内使用：    BP_GetHttpClient()->SendAsync(req, cb);
+//                  BP_GetHttpClient()->StreamAsync(req, onChunk, onDone);
 //
 // 平台实现：
 //   HttpClient_Default    — cpp-httplib（Windows/macOS/Linux/Android/iOS）
-//   HttpClient_Emscripten — emscripten_fetch（WebGL）
-//   外部注入              — 通过 BP_SetHttpClient 注入自定义实现（Unity C# 侧）
+//   HttpClient_Emscripten — emscripten_fetch（WebGL，Streaming 降级为非流式）
+//   外部注入              — 通过 BP_SetHttpClient 注入自定义实现
 #pragma once
 
 #include "../BlueprintExport.h"
@@ -23,52 +24,73 @@ namespace Runtime {
 // ============================================================================
 // HttpRequest / HttpResponse
 // ============================================================================
-// 注意：这两个 struct 不加 BLUEPRINT_API —— 它们是纯数据结构，
-//       通过值/引用在同一模块内传递；避免 MSVC C4251 (std::map/string
-//       没有 __declspec 导出时触发的 DLL 接口警告)。
-// ============================================================================
+// 注意：不加 BLUEPRINT_API — 纯数据结构，避免 MSVC C4251
 
 struct HttpRequest {
     std::string url;
-    std::string method      = "POST";   // "GET" | "POST" | "PUT" | "DELETE" ...
+    std::string method      = "POST";
     std::string body;
     std::map<std::string, std::string> headers;
-    int timeoutSeconds      = 30;
+    int timeoutSeconds      = 120;
 };
 
 struct HttpResponse {
     int         statusCode  = 0;
     std::string body;
-    std::string error;      // 非空 = 网络/连接错误
-    bool        ok() const { return error.empty() && statusCode >= 200 && statusCode < 300; }
+    std::string error;
+    bool ok() const { return error.empty() && statusCode >= 200 && statusCode < 300; }
 };
 
 using HttpCallback = std::function<void(HttpResponse)>;
 
+// SSE Streaming 回调类型
+//   onChunk(token)  — 每收到一个 delta.content 就调一次，在主线程（MainThreadDispatcher）
+//   onDone(error)   — 流结束或出错；error 为空表示正常结束
+using HttpChunkCallback = std::function<void(const std::string& token)>;
+using HttpDoneCallback  = std::function<void(const std::string& error)>;
+
 // ============================================================================
-// IHttpClient — 纯虚接口（只有接口类本身需要 DLL 导出）
+// IHttpClient
 // ============================================================================
 
 class BLUEPRINT_API IHttpClient {
 public:
     virtual ~IHttpClient() = default;
 
-    // 异步发送请求，回调在"安全上下文"触发（由 Tick → DrainQueue 消费）：
-    //   - 桌面：后台线程发送，回调 Post 到 MainThreadDispatcher
-    //   - WebGL：emscripten_fetch 回调 Post 到 MainThreadDispatcher
+    // 非流式异步请求（原有接口，保持不变）
     virtual void SendAsync(const HttpRequest& req, HttpCallback cb) = 0;
+
+    // 流式 SSE 请求
+    //   onChunk: 每个 delta.content token（主线程回调）
+    //   onDone:  流结束或出错（主线程回调，error=""表示正常）
+    // 默认实现：降级为非流式 SendAsync，onDone 时把整个 body 当作一个 chunk
+    virtual void StreamAsync(const HttpRequest& req,
+                             HttpChunkCallback onChunk,
+                             HttpDoneCallback  onDone)
+    {
+        SendAsync(req, [onChunk = std::move(onChunk),
+                        onDone  = std::move(onDone)](HttpResponse resp) mutable {
+            if (!resp.ok()) {
+                onDone(resp.error.empty()
+                    ? ("HTTP " + std::to_string(resp.statusCode))
+                    : resp.error);
+                return;
+            }
+            // 尝试解析 choices[0].message.content 作为单个 chunk
+            // 如果无法解析就把整个 body 当 chunk
+            onChunk(resp.body);
+            onDone("");
+        });
+    }
 };
 
 // ============================================================================
-// 全局注册 / 获取（线程安全：仅在初始化阶段写，运行时只读）
+// 全局注册 / 获取
 // ============================================================================
 
 BLUEPRINT_API void BP_SetHttpClient(std::shared_ptr<IHttpClient> client);
-BLUEPRINT_API IHttpClient* BP_GetHttpClient();   // 可能返回 nullptr（未注册时）
+BLUEPRINT_API IHttpClient* BP_GetHttpClient();
 
-// 工厂函数：按当前平台创建默认实现
-// - 非 Emscripten：HttpClient_Default（cpp-httplib）
-// - Emscripten：HttpClient_Emscripten（emscripten_fetch）
 BLUEPRINT_API std::shared_ptr<IHttpClient> CreateDefaultHttpClient();
 
 } // namespace Runtime

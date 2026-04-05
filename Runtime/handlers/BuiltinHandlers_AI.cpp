@@ -510,6 +510,154 @@ void RegisterHandlers_AI(
     };
 
     // ================================================================
+    // LLM.StreamChat
+    //   流式 OpenAI 兼容 Chat（SSE，批量聚合模式）
+    //   in:  BaseURL / ApiKey / Model / Messages / SystemPrompt /
+    //        MaxTokens / Temperature / Tools（同 LLM.Chat）
+    //   exec out:
+    //     onChunk(Token)  — 后台流结束后在主线程逐 token 批量激活
+    //     onDone          — 全部 chunk 激活完毕后触发
+    //     onError(ErrorMessage)
+    //   out: Token(String)    — 当前 chunk 文本（onChunk 时有效）
+    //        FullText(String) — 完整拼合文本（onDone 时有效）
+    //        ErrorMessage(String)
+    //
+    // 实现说明：
+    //   用 RunAsync dispatcher/onComplete 模型，后台线程通过 StreamAsync
+    //   收集所有 SSE chunks，流结束后 resolve()，onComplete（主线程）批量
+    //   逐 token 激活 onChunk，最后激活 onDone。完全复用已有 RunAsync 机制。
+    // ================================================================
+    handlers["LLM.StreamChat"] = [](ExecutionContext& ctx) {
+        auto* client = BP_GetHttpClient();
+        if (!client) {
+            ctx.SetOutputValue("Token",        Variant(std::string("")));
+            ctx.SetOutputValue("FullText",     Variant(std::string("")));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HTTP client registered")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        // ── 读取参数 ────────────────────────────────────────────────
+        std::string baseURL      = ctx.GetInputValue("BaseURL").asString();
+        std::string apiKey       = ctx.GetInputValue("ApiKey").asString();
+        std::string model        = ctx.GetInputValue("Model").asString();
+        std::string messagesStr  = ctx.GetInputValue("Messages").asString();
+        std::string systemPrompt = ctx.GetInputValue("SystemPrompt").asString();
+        std::string toolsStr     = ctx.GetInputValue("Tools").asString();
+
+        if (baseURL.empty()) baseURL = "https://api.openai.com/v1";
+        if (model.empty())   model   = "gpt-4o";
+
+        int64_t maxTokens   = 1024;
+        double  temperature = 0.7;
+        {
+            auto mt = ctx.GetInputValue("MaxTokens");
+            if (mt.type == PinDataType::Integer || mt.type == PinDataType::Float)
+                maxTokens = mt.asInt();
+            auto tp = ctx.GetInputValue("Temperature");
+            if (tp.type == PinDataType::Float || tp.type == PinDataType::Integer)
+                temperature = tp.asFloat();
+        }
+
+        crude_json::array messages;
+        if (!systemPrompt.empty()) {
+            crude_json::object sys;
+            sys["role"]    = crude_json::value(std::string("system"));
+            sys["content"] = crude_json::value(systemPrompt);
+            messages.push_back(crude_json::value(std::move(sys)));
+        }
+        if (!messagesStr.empty()) {
+            crude_json::value parsed = crude_json::value::parse(messagesStr);
+            if (parsed.is_array())
+                for (const auto& m : parsed.get<crude_json::array>()) messages.push_back(m);
+            else if (parsed.is_object())
+                messages.push_back(parsed);
+        }
+
+        crude_json::object body;
+        body["model"]       = crude_json::value(model);
+        body["messages"]    = crude_json::value(std::move(messages));
+        body["max_tokens"]  = crude_json::value(static_cast<double>(maxTokens));
+        body["temperature"] = crude_json::value(temperature);
+        if (!toolsStr.empty()) {
+            crude_json::value tv = crude_json::value::parse(toolsStr);
+            if (tv.is_array()) body["tools"] = tv;
+        }
+
+        HttpRequest req;
+        req.url    = baseURL + "/chat/completions";
+        req.method = "POST";
+        req.body   = crude_json::value(std::move(body)).dump();
+        req.headers["Content-Type"] = "application/json";
+        if (!apiKey.empty())
+            req.headers["Authorization"] = "Bearer " + apiKey;
+        req.timeoutSeconds = 120;
+
+        PinId chunkPinId = ctx.GetPinId("onChunk");
+        PinId donePinId  = ctx.GetPinId("onDone");
+        PinId errorPinId = ctx.GetPinId("onError");
+
+        ctx.MarkDownstreamAsHandled("onChunk");
+        ctx.MarkDownstreamAsHandled("onDone");
+        ctx.MarkDownstreamAsHandled("onError");
+
+        // 共享状态：后台线程收集 chunks
+        struct StreamResult {
+            std::vector<std::string> chunks;
+            std::string              errorMsg;
+        };
+        auto shared = std::make_shared<StreamResult>();
+
+        // dispatcher：StreamAsync 收集所有 chunk，结束后 resolve
+        auto dispatcher = [client, req, shared](ExecutionContext::AsyncResolve resolve) mutable {
+            client->StreamAsync(req,
+                // onChunk — 可能在后台线程（Default）或主线程（Emscripten），
+                // 此处仅追加到 vector，不直接访问蓝图状态
+                [shared](const std::string& token) {
+                    shared->chunks.push_back(token);
+                },
+                // onDone — Default实现在主线程（MainThreadDispatcher），
+                // Emscripten 在 fetch 回调中，均可安全 resolve()
+                [shared, resolve = std::move(resolve)](const std::string& error) mutable {
+                    shared->errorMsg = error;
+                    resolve();
+                });
+        };
+
+        // onComplete：主线程，批量激活
+        auto onComplete = [shared, chunkPinId, donePinId, errorPinId](ExecutionContext& c) mutable {
+            if (!shared->errorMsg.empty()) {
+                c.SetOutputValue("Token",        Variant(std::string("")));
+                c.SetOutputValue("FullText",     Variant(std::string("")));
+                c.SetOutputValue("ErrorMessage", Variant(shared->errorMsg));
+                c.LogError("[LLM.StreamChat] " + shared->errorMsg);
+                c.ActivateOutputFlow(errorPinId);
+                return;
+            }
+
+            std::string fullText;
+            for (const auto& t : shared->chunks) fullText += t;
+
+            c.SetOutputValue("FullText",     Variant(fullText));
+            c.SetOutputValue("ErrorMessage", Variant(std::string("")));
+            c.Log("[LLM.StreamChat] " + std::to_string(shared->chunks.size())
+                  + " chunks, total=" + std::to_string(fullText.size()) + " chars");
+
+            // 逐 token 激活 onChunk
+            for (const auto& tok : shared->chunks) {
+                c.SetOutputValue("Token", Variant(tok));
+                c.ActivateOutputFlow(chunkPinId);
+            }
+            // onDone
+            c.SetOutputValue("Token", Variant(std::string("")));
+            c.ActivateOutputFlow(donePinId);
+        };
+
+        ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
+        return true;
+    };
+
+    // ================================================================
     // JSON.ParseToolCall
     //   从 LLM 返回的 tool_calls 数组中取出指定位置的调用信息
     //   in:  ToolCallsJSON(String), Index(Integer, default=0)

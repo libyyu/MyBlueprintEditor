@@ -2,12 +2,9 @@
 // cpp-httplib 实现（Windows / macOS / Linux / Android / iOS）
 //
 // 策略：
-//   - 在后台线程执行同步 HTTP，结果通过 MainThreadDispatcher 回到主线程触发回调
-//   - HTTPS 需要 OpenSSL；如果编译时未定义 CPPHTTPLIB_OPENSSL_SUPPORT，则 HTTPS 不可用
-//
-// Unity/Android 接入说明：
-//   在 Native 初始化时调用：
-//   BP_SetHttpClient(std::make_shared<HttpClient_Default>());
+//   SendAsync  — 后台线程同步 HTTP，结果 dispatch 到主线程
+//   StreamAsync— cpp-httplib ContentReceiver 解析 SSE，每个 delta.content
+//                通过 MainThreadDispatcher.Post() 派回主线程触发 onChunk
 
 #ifndef __EMSCRIPTEN__
 
@@ -15,9 +12,11 @@
 #include "../BlueprintRunner.h"
 #include "../MainThreadDispatcher.h"
 
-// 禁用 httplib 的 zlib / brotli 依赖（不需要压缩支持）
 #define CPPHTTPLIB_NO_EXCEPTIONS
 #include "httplib.h"
+
+// crude_json 用于解析 SSE data 行中的 delta.content
+#include "../../Utils/Json/crude_json.h"
 
 #include <thread>
 #include <sstream>
@@ -30,16 +29,15 @@ namespace Runtime {
 // ============================================================================
 
 struct ParsedUrl {
-    std::string scheme;   // "http" | "https"
+    std::string scheme;
     std::string host;
     int         port = 0;
-    std::string path;     // 含 query string
+    std::string path;
 };
 
 static ParsedUrl parseUrl(const std::string& url)
 {
     ParsedUrl result;
-    // scheme
     auto schemeEnd = url.find("://");
     if (schemeEnd == std::string::npos) {
         result.scheme = "http";
@@ -48,7 +46,6 @@ static ParsedUrl parseUrl(const std::string& url)
         result.scheme = url.substr(0, schemeEnd);
         result.host   = url.substr(schemeEnd + 3);
     }
-    // path
     auto pathPos = result.host.find('/');
     if (pathPos != std::string::npos) {
         result.path = result.host.substr(pathPos);
@@ -56,7 +53,6 @@ static ParsedUrl parseUrl(const std::string& url)
     } else {
         result.path = "/";
     }
-    // port
     auto portPos = result.host.rfind(':');
     if (portPos != std::string::npos) {
         result.port = std::stoi(result.host.substr(portPos + 1));
@@ -68,23 +64,159 @@ static ParsedUrl parseUrl(const std::string& url)
 }
 
 // ============================================================================
+// SSE 行解析辅助
+//   从 "data: {...}" 行提取 choices[0].delta.content
+//   返回 token；[DONE] 行返回 "" 并设置 isDone=true
+// ============================================================================
+
+static std::string parseSseLine(const std::string& line, bool& isDone)
+{
+    isDone = false;
+    if (line.empty() || line[0] == ':') return ""; // comment or empty
+    if (line.rfind("data:", 0) != 0) return "";
+
+    std::string data = line.substr(5);
+    // 去前导空格
+    size_t s = data.find_first_not_of(' ');
+    if (s != std::string::npos) data = data.substr(s);
+
+    if (data == "[DONE]") { isDone = true; return ""; }
+
+    crude_json::value j = crude_json::value::parse(data);
+    if (!j.is_object()) return "";
+    if (!j.contains("choices")) return "";
+    const auto& choices = j["choices"];
+    if (!choices.is_array() || choices.get<crude_json::array>().empty()) return "";
+    const auto& first = choices.get<crude_json::array>()[0];
+    if (!first.is_object()) return "";
+
+    // finish_reason — 如果存在且非 null，标记 done
+    if (first.contains("finish_reason")) {
+        const auto& fr = first["finish_reason"];
+        if (!fr.is_null()) isDone = (fr.is_string() && fr.get<std::string>() != "");
+    }
+
+    if (!first.contains("delta")) return "";
+    const auto& delta = first["delta"];
+    if (!delta.is_object()) return "";
+    if (!delta.contains("content")) return "";
+    const auto& content = delta["content"];
+    if (content.is_string()) return content.get<std::string>();
+    return "";
+}
+
+// ============================================================================
 // HttpClient_Default
 // ============================================================================
 
 class HttpClient_Default : public IHttpClient
 {
 public:
+    // ── 非流式 ────────────────────────────────────────────────────────────
     void SendAsync(const HttpRequest& req, HttpCallback cb) override
     {
-        // 后台线程执行同步 HTTP
-        std::thread([req, cb]() mutable
-        {
+        std::thread([req, cb]() mutable {
             HttpResponse resp = doSend(req);
+            MainThreadDispatcher::Get().Post(
+                [cb = std::move(cb), resp = std::move(resp)]() mutable {
+                    cb(std::move(resp));
+                });
+        }).detach();
+    }
 
-            // 回调 dispatch 到主线程（与 RunAsync 机制保持一致）
-            MainThreadDispatcher::Get().Post([cb = std::move(cb), resp = std::move(resp)]() mutable {
-                cb(std::move(resp));
-            });
+    // ── SSE 流式 ──────────────────────────────────────────────────────────
+    void StreamAsync(const HttpRequest& baseReq,
+                     HttpChunkCallback onChunk,
+                     HttpDoneCallback  onDone) override
+    {
+        // 修改 body 加 "stream": true
+        HttpRequest req = baseReq;
+        {
+            crude_json::value body = crude_json::value::parse(req.body);
+            if (body.is_object())
+                body.get<crude_json::object>()["stream"] = crude_json::value(true);
+            req.body = body.dump();
+        }
+
+        std::thread([req,
+                     onChunk = std::move(onChunk),
+                     onDone  = std::move(onDone)]() mutable
+        {
+            auto parsed = parseUrl(req.url);
+
+            httplib::Headers headers;
+            for (const auto& kv : req.headers)
+                headers.emplace(kv.first, kv.second);
+            if (req.headers.find("Content-Type") == req.headers.end() &&
+                req.headers.find("content-type") == req.headers.end())
+                headers.emplace("Content-Type", "application/json");
+
+            // SSE 缓冲区（跨 ContentReceiver 调用累积不完整行）
+            std::string buf;
+            std::string errorMsg;
+            bool streamDone = false;
+
+            auto contentReceiver = [&](const char* data, size_t len) -> bool {
+                buf.append(data, len);
+                // 按行处理
+                size_t pos = 0;
+                while (true) {
+                    size_t nl = buf.find('\n', pos);
+                    if (nl == std::string::npos) break;
+                    std::string line = buf.substr(pos, nl - pos);
+                    // 去掉末尾 \r
+                    if (!line.empty() && line.back() == '\r')
+                        line.pop_back();
+                    pos = nl + 1;
+
+                    bool isDone = false;
+                    std::string token = parseSseLine(line, isDone);
+                    if (!token.empty()) {
+                        // 每个 token dispatch 到主线程
+                        MainThreadDispatcher::Get().Post(
+                            [onChunk, tok = std::move(token)]() {
+                                onChunk(tok);
+                            });
+                    }
+                    if (isDone) { streamDone = true; }
+                }
+                buf.erase(0, pos);
+                return true; // 继续接收
+            };
+
+            auto doStream = [&](auto& cli) {
+                cli.set_connection_timeout(req.timeoutSeconds);
+                cli.set_read_timeout(req.timeoutSeconds);
+                cli.set_write_timeout(req.timeoutSeconds);
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+                cli.enable_server_certificate_verification(false);
+#endif
+                auto res = cli.Post(parsed.path.c_str(), headers,
+                                    req.body, "application/json",
+                                    contentReceiver);
+                if (!res) {
+                    errorMsg = httplib::to_string(res.error());
+                } else if (res->status < 200 || res->status >= 300) {
+                    errorMsg = "HTTP " + std::to_string(res->status);
+                    if (!res->body.empty()) errorMsg += ": " + res->body.substr(0, 200);
+                }
+            };
+
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+            if (parsed.scheme == "https") {
+                httplib::SSLClient cli(parsed.host, parsed.port);
+                doStream(cli);
+            } else
+#endif
+            {
+                httplib::Client cli(parsed.host, parsed.port);
+                doStream(cli);
+            }
+
+            // 流结束 → 主线程通知 onDone
+            MainThreadDispatcher::Get().Post(
+                [onDone, errorMsg]() { onDone(errorMsg); });
+
         }).detach();
     }
 
@@ -97,38 +229,29 @@ private:
         httplib::Headers headers;
         for (const auto& kv : req.headers)
             headers.emplace(kv.first, kv.second);
-
-        // Content-Type 默认 application/json（如果没有显式指定）
         if (req.headers.find("Content-Type") == req.headers.end() &&
             req.headers.find("content-type") == req.headers.end())
-        {
             headers.emplace("Content-Type", "application/json");
-        }
 
         auto doRequest = [&](auto& cli) {
             cli.set_connection_timeout(req.timeoutSeconds);
             cli.set_read_timeout(req.timeoutSeconds);
             cli.set_write_timeout(req.timeoutSeconds);
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
-            cli.enable_server_certificate_verification(false); // 简化部署
+            cli.enable_server_certificate_verification(false);
 #endif
             httplib::Result res;
             std::string method = req.method;
             for (auto& c : method) c = static_cast<char>(toupper((unsigned char)c));
-
             if (method == "GET" || method == "DELETE") {
                 res = (method == "GET")
                     ? cli.Get(parsed.path.c_str(), headers)
                     : cli.Delete(parsed.path.c_str(), headers);
             } else {
-                // POST / PUT / PATCH
-                res = cli.Post(parsed.path.c_str(), headers,
-                               req.body, "application/json");
+                res = cli.Post(parsed.path.c_str(), headers, req.body, "application/json");
                 if (method == "PUT")
-                    res = cli.Put(parsed.path.c_str(), headers,
-                                  req.body, "application/json");
+                    res = cli.Put(parsed.path.c_str(), headers, req.body, "application/json");
             }
-
             if (res) {
                 resp.statusCode = res->status;
                 resp.body       = res->body;
@@ -151,7 +274,7 @@ private:
 };
 
 // ============================================================================
-// 工厂函数（供外部调用）
+// 工厂函数
 // ============================================================================
 
 std::shared_ptr<IHttpClient> CreateDefaultHttpClient()
