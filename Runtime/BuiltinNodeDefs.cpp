@@ -1454,6 +1454,45 @@ static void RegisterNodeDefs_EventBus(INodeRegistry& registry)
         "FF8060");
 }
 
+static void RegisterNodeDefs_Network(INodeRegistry& registry)
+{
+    auto reg = [&registry](const char* id, const char* name, const char* category,
+                  std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
+                  const char* color = "", const char* edType = "")
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
+
+    // HTTP.Request
+    reg("HTTP.Request", "HTTP Request", "Network",
+        {
+            MakeFlowPin(""),
+            MakePin("URL",            PinDataType::String),
+            MakePin("Method",         PinDataType::String),  // GET / POST / PUT / DELETE
+            MakePin("Body",           PinDataType::String),
+            MakePin("Headers",        PinDataType::String),  // JSON 格式 {"Key":"Value"}
+            MakePin("TimeoutSeconds", PinDataType::Integer),
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("StatusCode",   PinDataType::Integer),
+            MakePin("ResponseBody", PinDataType::String),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "2E86AB");  // 蓝色
+
+    // JSON.GetPath — 支持 choices[0].message.content 路径
+    reg("JSON.GetPath", "JSON Get Path", "Network",
+        {
+            MakePin("JSON", PinDataType::String),
+            MakePin("Path", PinDataType::String),   // e.g. "choices[0].message.content"
+        },
+        {
+            MakePin("Value", PinDataType::String),
+            MakePin("Found", PinDataType::Boolean),
+        },
+        "2E86AB");
+}
+
 void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
 {
     // --- 注册分类 ---
@@ -1475,6 +1514,7 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     addCat("Conversion", "Conversion");
     addCat("Event",      "Events");
     addCat("Function",   "Functions");
+    addCat("Network",    "Network");
 
     // --- 注册各分类的节点定义 ---
     RegisterNodeDefs_Flow(registry);
@@ -1493,6 +1533,7 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     RegisterNodeDefs_Event(registry);
     RegisterNodeDefs_Function(registry);
     RegisterNodeDefs_EventBus(registry);
+    RegisterNodeDefs_Network(registry);
 }
 
 } // namespace Runtime
