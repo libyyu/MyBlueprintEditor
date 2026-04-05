@@ -1864,6 +1864,77 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
             MakePin("ErrorMessage", PinDataType::String),
         },
         "6A0572");
+
+    // ── Tool.ForEach ────────────────────────────────────────────────────────
+    reg("Tool.ForEach", "Tool For Each", "AI/Tool",
+        {
+            MakeFlowPin(""),
+            MakePin("ToolCallsJSON", PinDataType::String),
+        },
+        {
+            MakeFlowPin("onTool"),     // 每个 tool call 触发一次
+            MakeFlowPin("onDone"),     // 全部遍历完毕
+            MakePin("ToolName",   PinDataType::String),
+            MakePin("Arguments",  PinDataType::String),
+            MakePin("ToolCallId", PinDataType::String),
+            MakePin("Index",      PinDataType::Integer),
+        },
+        "6A0572");
+
+    // ── Tool.Match ──────────────────────────────────────────────────────────
+    reg("Tool.Match", "Tool Match", "AI/Tool",
+        {
+            MakeFlowPin(""),
+            MakePin("ToolName", PinDataType::String),
+            MakePin("Case0",    PinDataType::String),
+            MakePin("Case1",    PinDataType::String),
+            MakePin("Case2",    PinDataType::String),
+            MakePin("Case3",    PinDataType::String),
+            MakePin("Case4",    PinDataType::String),
+            MakePin("Case5",    PinDataType::String),
+            MakePin("Case6",    PinDataType::String),
+            MakePin("Case7",    PinDataType::String),
+        },
+        {
+            MakeFlowPin("Match0"),
+            MakeFlowPin("Match1"),
+            MakeFlowPin("Match2"),
+            MakeFlowPin("Match3"),
+            MakeFlowPin("Match4"),
+            MakeFlowPin("Match5"),
+            MakeFlowPin("Match6"),
+            MakeFlowPin("Match7"),
+            MakeFlowPin("Default"),
+            MakePin("MatchedIndex", PinDataType::Integer),
+        },
+        "6A0572");
+
+    // ── JSON.Extract ────────────────────────────────────────────────────────
+    reg("JSON.Extract", "JSON Extract", "AI/JSON",
+        {
+            MakePin("Text", PinDataType::String),
+        },
+        {
+            MakePin("JSON",  PinDataType::String),
+            MakePin("Found", PinDataType::Boolean),
+        },
+        "6A0572", "Simple");
+
+    // ── JSON.Validate ───────────────────────────────────────────────────────
+    reg("JSON.Validate", "JSON Validate", "AI/JSON",
+        {
+            MakeFlowPin(""),
+            MakePin("JSON",         PinDataType::String),
+            MakePin("RequiredKeys", PinDataType::String),
+        },
+        {
+            MakeFlowPin("onValid"),
+            MakeFlowPin("onInvalid"),
+            MakePin("IsValid",      PinDataType::Boolean),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "6A0572");
+
 }
 
 void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)

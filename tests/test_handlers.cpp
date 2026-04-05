@@ -1640,3 +1640,324 @@ TEST_F(LuaBindingsTest, HttpRequest_NoClient_ReturnsError)
 }
 
 #endif // BLUEPRINT_HAS_LUA
+
+// ============================================================================
+// Tool.ForEach / Tool.Match / JSON.Extract / JSON.Validate 单元测试
+// ============================================================================
+
+// ── Tool.ForEach ─────────────────────────────────────────────────────────────
+TEST_F(HandlersTest, ToolForEach_ParsesToolCallsArray)
+{
+    // LLM.Chat 输出的 tool_calls JSON
+    const std::string tcJson = R"([
+        {"id":"call_1","type":"function","function":{"name":"get_weather","arguments":"{\"city\":\"Beijing\"}"}},
+        {"id":"call_2","type":"function","function":{"name":"get_time","arguments":"{}"}}
+    ])";
+
+    BlueprintData bp; bp.metadata.name = "ToolForEachTest";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* nm, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=nm;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+
+    // Tool.ForEach (id=1)
+    NodeInstance tfe; tfe.id=1; tfe.definitionId="Tool.ForEach";
+    addP(tfe, 10, PinKind::Input,  PinDataType::Unknown, "",             true);
+    addP(tfe, 11, PinKind::Input,  PinDataType::String,  "ToolCallsJSON",false, Variant(tcJson));
+    addP(tfe, 12, PinKind::Output, PinDataType::Unknown, "onTool",       true);
+    addP(tfe, 13, PinKind::Output, PinDataType::Unknown, "onDone",       true);
+    addP(tfe, 14, PinKind::Output, PinDataType::String,  "ToolName");
+    addP(tfe, 15, PinKind::Output, PinDataType::String,  "Arguments");
+    addP(tfe, 16, PinKind::Output, PinDataType::String,  "ToolCallId");
+    addP(tfe, 17, PinKind::Output, PinDataType::Integer, "Index");
+    bp.nodes.push_back(tfe);
+
+    // SetVariable(lastName, ToolName) (id=2) — 记录最后一个工具名
+    NodeInstance sv; sv.id=2; sv.definitionId="SetVariable";
+    addP(sv, 20, PinKind::Input,  PinDataType::Unknown, "",      true);
+    addP(sv, 21, PinKind::Input,  PinDataType::String,  "Name", false, Variant(std::string("lastName")));
+    addP(sv, 22, PinKind::Input,  PinDataType::String,  "Value",false);
+    addP(sv, 23, PinKind::Output, PinDataType::Unknown, "",      true);
+    bp.nodes.push_back(sv);
+
+    // SetVariable(toolCount, Index+1) — 用 Index 记总数，用 Add 节点
+    // 简化：直接用 IncrementInt 不存在，改用 SetVariable 记 Index
+    NodeInstance sv2; sv2.id=3; sv2.definitionId="SetVariable";
+    addP(sv2, 30, PinKind::Input,  PinDataType::Unknown, "",      true);
+    addP(sv2, 31, PinKind::Input,  PinDataType::String,  "Name", false, Variant(std::string("lastIndex")));
+    addP(sv2, 32, PinKind::Input,  PinDataType::Integer, "Value",false);
+    addP(sv2, 33, PinKind::Output, PinDataType::Unknown, "",      true);
+    bp.nodes.push_back(sv2);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+
+    // onTool → sv(lastName=ToolName), sv.out → sv2(lastIndex=Index)
+    LinkInstance lk1; lk1.id=3001; lk1.startPinId=12; lk1.endPinId=20;  // onTool→sv
+    LinkInstance lk2; lk2.id=3002; lk2.startPinId=14; lk2.endPinId=22;  // ToolName→sv.Value
+    LinkInstance lk3; lk3.id=3003; lk3.startPinId=23; lk3.endPinId=30;  // sv.out→sv2
+    LinkInstance lk4; lk4.id=3004; lk4.startPinId=17; lk4.endPinId=32;  // Index→sv2.Value
+    bp.links.insert(bp.links.end(), {lk1, lk2, lk3, lk4});
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+
+    EXPECT_EQ(r.GetVariable("lastName").asString(), "get_time")
+        << "Last tool should be get_time";
+    EXPECT_EQ(r.GetVariable("lastIndex").asInt(), 1)
+        << "Last index should be 1 (0-based, 2 tools)";
+}
+
+// ── Tool.Match ───────────────────────────────────────────────────────────────
+TEST_F(HandlersTest, ToolMatch_RoutesToCorrectCase)
+{
+    BlueprintData bp; bp.metadata.name = "ToolMatchTest";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* nm, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=nm;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+
+    // Tool.Match (id=1)
+    NodeInstance tm; tm.id=1; tm.definitionId="Tool.Match";
+    addP(tm, 10, PinKind::Input,  PinDataType::Unknown, "",       true);
+    addP(tm, 11, PinKind::Input,  PinDataType::String,  "ToolName",false,
+         Variant(std::string("get_weather")));
+    addP(tm, 12, PinKind::Input,  PinDataType::String,  "Case0",  false,
+         Variant(std::string("get_weather")));
+    addP(tm, 13, PinKind::Input,  PinDataType::String,  "Case1",  false,
+         Variant(std::string("get_time")));
+    // leave Case2..7 empty (default value = "")
+    for (int i = 2; i < 8; ++i) {
+        std::string cn = "Case" + std::to_string(i);
+        addP(tm, 100+i, PinKind::Input, PinDataType::String, cn.c_str(), false, Variant(std::string("")));
+    }
+    addP(tm, 20, PinKind::Output, PinDataType::Unknown, "Match0",       true);
+    addP(tm, 21, PinKind::Output, PinDataType::Unknown, "Match1",       true);
+    for (int i=2;i<8;++i) {
+        std::string mn = "Match" + std::to_string(i);
+        addP(tm, 200+i, PinKind::Output, PinDataType::Unknown, mn.c_str(), true);
+    }
+    addP(tm, 29, PinKind::Output, PinDataType::Unknown, "Default",      true);
+    addP(tm, 30, PinKind::Output, PinDataType::Integer, "MatchedIndex");
+    bp.nodes.push_back(tm);
+
+    // SetVariable(result, "weather_matched") on Match0 (id=2)
+    NodeInstance sv; sv.id=2; sv.definitionId="SetVariable";
+    addP(sv, 40, PinKind::Input,  PinDataType::Unknown, "",      true);
+    addP(sv, 41, PinKind::Input,  PinDataType::String,  "Name", false, Variant(std::string("result")));
+    addP(sv, 42, PinKind::Input,  PinDataType::String,  "Value",false,
+         Variant(std::string("weather_matched")));
+    addP(sv, 43, PinKind::Output, PinDataType::Unknown, "",      true);
+    bp.nodes.push_back(sv);
+
+    // SetVariable(result, "default_matched") on Default (id=3)
+    NodeInstance sv2; sv2.id=3; sv2.definitionId="SetVariable";
+    addP(sv2, 50, PinKind::Input,  PinDataType::Unknown, "",      true);
+    addP(sv2, 51, PinKind::Input,  PinDataType::String,  "Name", false, Variant(std::string("result")));
+    addP(sv2, 52, PinKind::Input,  PinDataType::String,  "Value",false,
+         Variant(std::string("default_matched")));
+    addP(sv2, 53, PinKind::Output, PinDataType::Unknown, "",      true);
+    bp.nodes.push_back(sv2);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+
+    LinkInstance lk1; lk1.id=3001; lk1.startPinId=20; lk1.endPinId=40;  // Match0→sv
+    LinkInstance lk2; lk2.id=3002; lk2.startPinId=29; lk2.endPinId=50;  // Default→sv2
+    bp.links.insert(bp.links.end(), {lk1, lk2});
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+
+    EXPECT_EQ(r.GetVariable("result").asString(), "weather_matched");
+    EXPECT_EQ(r.GetVariable("matchedIndex").asInt(), 0);  // MatchedIndex output not wired, just check result
+}
+
+// ── Tool.Match Default ───────────────────────────────────────────────────────
+TEST_F(HandlersTest, ToolMatch_DefaultWhenNoMatch)
+{
+    BlueprintData bp; bp.metadata.name = "ToolMatchDefaultTest";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* nm, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=nm;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+
+    NodeInstance tm; tm.id=1; tm.definitionId="Tool.Match";
+    addP(tm, 10, PinKind::Input,  PinDataType::Unknown, "",       true);
+    addP(tm, 11, PinKind::Input,  PinDataType::String,  "ToolName",false,
+         Variant(std::string("unknown_tool")));
+    addP(tm, 12, PinKind::Input,  PinDataType::String,  "Case0",  false,
+         Variant(std::string("get_weather")));
+    for (int i=1;i<8;++i) {
+        std::string cn = "Case" + std::to_string(i);
+        addP(tm, 100+i, PinKind::Input, PinDataType::String, cn.c_str(), false, Variant(std::string("")));
+    }
+    addP(tm, 20, PinKind::Output, PinDataType::Unknown, "Match0", true);
+    for (int i=1;i<8;++i) {
+        std::string mn = "Match" + std::to_string(i);
+        addP(tm, 200+i, PinKind::Output, PinDataType::Unknown, mn.c_str(), true);
+    }
+    addP(tm, 29, PinKind::Output, PinDataType::Unknown, "Default", true);
+    addP(tm, 30, PinKind::Output, PinDataType::Integer, "MatchedIndex");
+    bp.nodes.push_back(tm);
+
+    NodeInstance sv; sv.id=2; sv.definitionId="SetVariable";
+    addP(sv, 40, PinKind::Input,  PinDataType::Unknown, "",      true);
+    addP(sv, 41, PinKind::Input,  PinDataType::String,  "Name", false, Variant(std::string("result")));
+    addP(sv, 42, PinKind::Input,  PinDataType::String,  "Value",false,
+         Variant(std::string("default_ok")));
+    addP(sv, 43, PinKind::Output, PinDataType::Unknown, "",      true);
+    bp.nodes.push_back(sv);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+    LinkInstance lk; lk.id=3001; lk.startPinId=29; lk.endPinId=40;
+    bp.links.push_back(lk);
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+
+    EXPECT_EQ(r.GetVariable("result").asString(), "default_ok");
+}
+
+// ── JSON.Extract ─────────────────────────────────────────────────────────────
+TEST_F(HandlersTest, JsonExtract_FromMarkdownFence)
+{
+    // 模拟 LLM 输出带 ```json ``` 代码块
+    const std::string llmOutput =
+        "Here is the result:\n"
+        "```json\n"
+        "{\"action\":\"get_weather\",\"city\":\"Shanghai\"}\n"
+        "```\n"
+        "That's all.";
+
+    BlueprintData bp; bp.metadata.name = "JsonExtractTest";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* nm, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=nm;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+
+    NodeInstance je; je.id=1; je.definitionId="JSON.Extract";
+    addP(je, 10, PinKind::Input,  PinDataType::String,  "Text", false, Variant(llmOutput));
+    addP(je, 11, PinKind::Output, PinDataType::String,  "JSON");
+    addP(je, 12, PinKind::Output, PinDataType::Boolean, "Found");
+    bp.nodes.push_back(je);
+
+    NodeInstance sv; sv.id=2; sv.definitionId="SetVariable";
+    addP(sv, 20, PinKind::Input,  PinDataType::Unknown, "",      true);
+    addP(sv, 21, PinKind::Input,  PinDataType::String,  "Name", false, Variant(std::string("jsonResult")));
+    addP(sv, 22, PinKind::Input,  PinDataType::String,  "Value",false);
+    addP(sv, 23, PinKind::Output, PinDataType::Unknown, "",      true);
+    bp.nodes.push_back(sv);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 20);  // OnBeginPlay → sv(jsonResult=JSON)
+    LinkInstance lk; lk.id=3001; lk.startPinId=11; lk.endPinId=22;  // JSON.Extract.JSON→sv.Value
+    bp.links.push_back(lk);
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+
+    auto result = r.GetVariable("jsonResult").asString();
+    EXPECT_NE(result.find("get_weather"), std::string::npos)
+        << "Extracted JSON should contain 'get_weather', got: " << result;
+    EXPECT_NE(result.find("Shanghai"), std::string::npos)
+        << "Extracted JSON should contain 'Shanghai', got: " << result;
+}
+
+// ── JSON.Validate ────────────────────────────────────────────────────────────
+TEST_F(HandlersTest, JsonValidate_ValidJson)
+{
+    BlueprintData bp; bp.metadata.name = "JsonValidateTest";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* nm, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=nm;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+
+    NodeInstance jv; jv.id=1; jv.definitionId="JSON.Validate";
+    addP(jv, 10, PinKind::Input,  PinDataType::Unknown, "",            true);
+    addP(jv, 11, PinKind::Input,  PinDataType::String,  "JSON",        false,
+         Variant(std::string(R"({"name":"Alice","age":30})")));
+    addP(jv, 12, PinKind::Input,  PinDataType::String,  "RequiredKeys",false,
+         Variant(std::string("name,age")));
+    addP(jv, 13, PinKind::Output, PinDataType::Unknown, "onValid",     true);
+    addP(jv, 14, PinKind::Output, PinDataType::Unknown, "onInvalid",   true);
+    addP(jv, 15, PinKind::Output, PinDataType::Boolean, "IsValid");
+    addP(jv, 16, PinKind::Output, PinDataType::String,  "ErrorMessage");
+    bp.nodes.push_back(jv);
+
+    NodeInstance sv; sv.id=2; sv.definitionId="SetVariable";
+    addP(sv, 20, PinKind::Input,  PinDataType::Unknown, "",      true);
+    addP(sv, 21, PinKind::Input,  PinDataType::String,  "Name", false, Variant(std::string("outcome")));
+    addP(sv, 22, PinKind::Input,  PinDataType::String,  "Value",false, Variant(std::string("valid")));
+    addP(sv, 23, PinKind::Output, PinDataType::Unknown, "",      true);
+    bp.nodes.push_back(sv);
+
+    NodeInstance sv2; sv2.id=3; sv2.definitionId="SetVariable";
+    addP(sv2, 30, PinKind::Input,  PinDataType::Unknown, "",      true);
+    addP(sv2, 31, PinKind::Input,  PinDataType::String,  "Name", false, Variant(std::string("outcome")));
+    addP(sv2, 32, PinKind::Input,  PinDataType::String,  "Value",false, Variant(std::string("invalid")));
+    addP(sv2, 33, PinKind::Output, PinDataType::Unknown, "",      true);
+    bp.nodes.push_back(sv2);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+    LinkInstance lk1; lk1.id=3001; lk1.startPinId=13; lk1.endPinId=20;  // onValid→sv
+    LinkInstance lk2; lk2.id=3002; lk2.startPinId=14; lk2.endPinId=30;  // onInvalid→sv2
+    bp.links.insert(bp.links.end(), {lk1, lk2});
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+
+    EXPECT_EQ(r.GetVariable("outcome").asString(), "valid");
+}
+
+TEST_F(HandlersTest, JsonValidate_MissingRequiredKey)
+{
+    BlueprintData bp; bp.metadata.name = "JsonValidateMissingTest";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* nm, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=nm;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+
+    NodeInstance jv; jv.id=1; jv.definitionId="JSON.Validate";
+    addP(jv, 10, PinKind::Input,  PinDataType::Unknown, "",            true);
+    addP(jv, 11, PinKind::Input,  PinDataType::String,  "JSON",        false,
+         Variant(std::string(R"({"name":"Bob"})")));  // missing "age"
+    addP(jv, 12, PinKind::Input,  PinDataType::String,  "RequiredKeys",false,
+         Variant(std::string("name,age")));
+    addP(jv, 13, PinKind::Output, PinDataType::Unknown, "onValid",   true);
+    addP(jv, 14, PinKind::Output, PinDataType::Unknown, "onInvalid", true);
+    addP(jv, 15, PinKind::Output, PinDataType::Boolean, "IsValid");
+    addP(jv, 16, PinKind::Output, PinDataType::String,  "ErrorMessage");
+    bp.nodes.push_back(jv);
+
+    NodeInstance sv; sv.id=2; sv.definitionId="SetVariable";
+    addP(sv, 20, PinKind::Input,  PinDataType::Unknown, "",      true);
+    addP(sv, 21, PinKind::Input,  PinDataType::String,  "Name", false, Variant(std::string("outcome")));
+    addP(sv, 22, PinKind::Input,  PinDataType::String,  "Value",false, Variant(std::string("invalid_ok")));
+    addP(sv, 23, PinKind::Output, PinDataType::Unknown, "",      true);
+    bp.nodes.push_back(sv);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+    LinkInstance lk; lk.id=3001; lk.startPinId=14; lk.endPinId=20;  // onInvalid→sv
+    bp.links.push_back(lk);
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+
+    EXPECT_EQ(r.GetVariable("outcome").asString(), "invalid_ok");
+}

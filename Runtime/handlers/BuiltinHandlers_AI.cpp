@@ -869,6 +869,228 @@ void RegisterHandlers_AI(
         return true;
 #endif
     };
+
+    // ========================================================================
+    // Tool.ForEach — 遍历 tool_calls JSON 数组，逐个激活 onTool
+    // 输入：  ToolCallsJSON (string)  — LLM.Chat 输出的 tool_calls JSON 数组
+    // 输出：  onTool   exec           — 每个 tool call 触发一次
+    //         onDone   exec           — 全部遍历完毕
+    //         ToolName  string        — 当前工具名
+    //         Arguments string        — 当前工具参数 JSON
+    //         ToolCallId string       — 当前 tool_call id
+    //         Index     integer       — 0-based 索引
+    // ========================================================================
+    handlers["Tool.ForEach"] = [](ExecutionContext& ctx) {
+        auto tcJson = ctx.GetInputValue("ToolCallsJSON").asString();
+        if (tcJson.empty()) {
+            ctx.ActivateOutputFlow("onDone");
+            return true;
+        }
+
+        crude_json::value root = crude_json::value::parse(tcJson);
+        if (!root.is_array()) {
+            // 可能是完整 response，尝试提取 choices[0].message.tool_calls
+            if (root.is_object() && root.contains("choices")) {
+                const auto& choices = root["choices"];
+                if (choices.is_array() && !choices.get<crude_json::array>().empty()) {
+                    const auto& msg = choices.get<crude_json::array>()[0];
+                    if (msg.is_object() && msg.contains("message")) {
+                        const auto& m = msg["message"];
+                        if (m.is_object() && m.contains("tool_calls"))
+                            root = m["tool_calls"];
+                    }
+                }
+            }
+        }
+
+        if (!root.is_array()) {
+            ctx.ActivateOutputFlow("onDone");
+            return true;
+        }
+
+        const auto& arr = root.get<crude_json::array>();
+        for (int i = 0; i < (int)arr.size(); ++i) {
+            const auto& tc = arr[i];
+            std::string name, args, id;
+            if (tc.is_object()) {
+                if (tc.contains("id") && tc["id"].is_string())
+                    id = tc["id"].get<std::string>();
+                if (tc.contains("function") && tc["function"].is_object()) {
+                    const auto& fn = tc["function"];
+                    if (fn.contains("name") && fn["name"].is_string())
+                        name = fn["name"].get<std::string>();
+                    if (fn.contains("arguments") && fn["arguments"].is_string())
+                        args = fn["arguments"].get<std::string>();
+                    else if (fn.contains("arguments"))
+                        args = fn["arguments"].dump();
+                }
+            }
+            ctx.SetOutputValue("ToolName",   Variant(name));
+            ctx.SetOutputValue("Arguments",  Variant(args));
+            ctx.SetOutputValue("ToolCallId", Variant(id));
+            ctx.SetOutputValue("Index",      Variant((int64_t)i));
+            ctx.ActivateOutputFlow("onTool");
+        }
+        ctx.ActivateOutputFlow("onDone");
+        return true;
+    };
+
+    // ========================================================================
+    // Tool.Match — 按工具名路由到对应 exec 分支（最多 8 个 Case）
+    // 输入：  ToolName string
+    //         Case0..Case7 string（空 = 不使用）
+    // 输出：  Match0..Match7 exec — 对应 Case 匹配时激活
+    //         Default exec        — 无匹配时激活
+    //         MatchedIndex integer — 匹配到的索引，-1=无匹配
+    // ========================================================================
+    handlers["Tool.Match"] = [](ExecutionContext& ctx) {
+        auto toolName = ctx.GetInputValue("ToolName").asString();
+        int matched = -1;
+        for (int i = 0; i < 8; ++i) {
+            std::string caseKey = "Case" + std::to_string(i);
+            auto caseVal = ctx.GetInputValue(caseKey).asString();
+            if (!caseVal.empty() && caseVal == toolName) {
+                matched = i;
+                break;
+            }
+        }
+        ctx.SetOutputValue("MatchedIndex", Variant((int64_t)matched));
+        if (matched >= 0) {
+            ctx.ActivateOutputFlow("Match" + std::to_string(matched));
+        } else {
+            ctx.ActivateOutputFlow("Default");
+        }
+        return true;
+    };
+
+    // ========================================================================
+    // JSON.Extract — 从文本中提取 ```json ... ``` 代码块内容
+    // 输入：  Text string
+    // 输出：  JSON string   — 提取到的 JSON（若无代码块则尝试直接 parse）
+    //         Found boolean — 是否找到代码块
+    // ========================================================================
+    handlers["JSON.Extract"] = [](ExecutionContext& ctx) {
+        auto text = ctx.GetInputValue("Text").asString();
+
+        // 尝试提取 ```json ... ``` 或 ``` ... ```
+        auto tryExtract = [&](const std::string& fence) -> std::string {
+            auto pos = text.find(fence);
+            if (pos == std::string::npos) return "";
+            pos += fence.size();
+            // skip newline
+            if (pos < text.size() && (text[pos] == '\n' || text[pos] == '\r')) pos++;
+            auto end = text.find("```", pos);
+            if (end == std::string::npos) return "";
+            // trim trailing whitespace
+            while (end > pos && (text[end-1] == '\n' || text[end-1] == '\r' || text[end-1] == ' '))
+                --end;
+            return text.substr(pos, end - pos);
+        };
+
+        std::string extracted = tryExtract("```json");
+        if (extracted.empty()) extracted = tryExtract("```JSON");
+        if (extracted.empty()) extracted = tryExtract("```");
+
+        if (!extracted.empty()) {
+            // 验证是合法 JSON
+            auto v = crude_json::value::parse(extracted);
+            if (!v.is_null() || extracted.find("null") != std::string::npos) {
+                ctx.SetOutputValue("JSON",  Variant(extracted));
+                ctx.SetOutputValue("Found", Variant(true));
+                return true;
+            }
+        }
+
+        // 没有代码块，尝试直接把整段文本当 JSON parse
+        auto trimmed = text;
+        while (!trimmed.empty() && (trimmed.front() == ' ' || trimmed.front() == '\n' || trimmed.front() == '\r'))
+            trimmed.erase(trimmed.begin());
+        while (!trimmed.empty() && (trimmed.back() == ' ' || trimmed.back() == '\n' || trimmed.back() == '\r'))
+            trimmed.pop_back();
+
+        auto v2 = crude_json::value::parse(trimmed);
+        bool looksJson = !trimmed.empty() && (trimmed.front() == '{' || trimmed.front() == '[');
+        if (looksJson && !v2.is_null()) {
+            ctx.SetOutputValue("JSON",  Variant(trimmed));
+            ctx.SetOutputValue("Found", Variant(true));
+        } else {
+            ctx.SetOutputValue("JSON",  Variant(std::string("")));
+            ctx.SetOutputValue("Found", Variant(false));
+        }
+        return true;
+    };
+
+    // ========================================================================
+    // JSON.Validate — 验证 JSON 字符串是否合法，可选按 key 列表校验必填字段
+    // 输入：  JSON string
+    //         RequiredKeys string  — 逗号分隔，如 "name,age"（空=只验证格式）
+    // 输出：  onValid  exec
+    //         onInvalid exec
+    //         IsValid  boolean
+    //         ErrorMessage string
+    // ========================================================================
+    handlers["JSON.Validate"] = [](ExecutionContext& ctx) {
+        auto jsonStr     = ctx.GetInputValue("JSON").asString();
+        auto requiredRaw = ctx.GetInputValue("RequiredKeys").asString();
+
+        if (jsonStr.empty()) {
+            ctx.SetOutputValue("IsValid",      Variant(false));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("Empty JSON string")));
+            ctx.ActivateOutputFlow("onInvalid");
+            return true;
+        }
+
+        auto v = crude_json::value::parse(jsonStr);
+        bool isNull = v.is_null();
+        // crude_json returns null for parse errors, but "null" is valid JSON
+        bool looksJson = jsonStr.find_first_not_of(" \t\r\n") != std::string::npos &&
+                         (jsonStr[jsonStr.find_first_not_of(" \t\r\n")] == '{' ||
+                          jsonStr[jsonStr.find_first_not_of(" \t\r\n")] == '[' ||
+                          jsonStr.find("null") != std::string::npos ||
+                          jsonStr.find("true") != std::string::npos ||
+                          jsonStr.find("false") != std::string::npos);
+
+        if (isNull && jsonStr.find("null") == std::string::npos) {
+            ctx.SetOutputValue("IsValid",      Variant(false));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("JSON parse error")));
+            ctx.ActivateOutputFlow("onInvalid");
+            return true;
+        }
+
+        // 检查必填 keys（仅对 object 有意义）
+        if (!requiredRaw.empty() && v.is_object()) {
+            std::vector<std::string> missing;
+            size_t pos = 0;
+            while (pos < requiredRaw.size()) {
+                auto comma = requiredRaw.find(',', pos);
+                auto key = requiredRaw.substr(pos, comma == std::string::npos ? std::string::npos : comma - pos);
+                // trim
+                while (!key.empty() && key.front() == ' ') key.erase(key.begin());
+                while (!key.empty() && key.back()  == ' ') key.pop_back();
+                if (!key.empty() && !v.contains(key))
+                    missing.push_back(key);
+                if (comma == std::string::npos) break;
+                pos = comma + 1;
+            }
+            if (!missing.empty()) {
+                std::string errMsg = "Missing required keys: ";
+                for (size_t i = 0; i < missing.size(); ++i) {
+                    if (i) errMsg += ", ";
+                    errMsg += missing[i];
+                }
+                ctx.SetOutputValue("IsValid",      Variant(false));
+                ctx.SetOutputValue("ErrorMessage", Variant(errMsg));
+                ctx.ActivateOutputFlow("onInvalid");
+                return true;
+            }
+        }
+
+        ctx.SetOutputValue("IsValid",      Variant(true));
+        ctx.SetOutputValue("ErrorMessage", Variant(std::string("")));
+        ctx.ActivateOutputFlow("onValid");
+        return true;
+    };
+
 }
 
 } // namespace Runtime
