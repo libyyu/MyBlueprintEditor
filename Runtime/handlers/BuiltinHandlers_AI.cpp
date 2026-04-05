@@ -14,6 +14,10 @@
 #include "../../Utils/Json/crude_json.h"
 #include <sstream>
 #include <regex>
+#ifndef __EMSCRIPTEN__
+#  include <fstream>
+#  include <filesystem>
+#endif
 
 namespace NodeEditor {
 namespace Runtime {
@@ -451,6 +455,155 @@ void RegisterHandlers_AI(
 
         ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
         return true;
+    };
+
+    // ================================================================
+    // Memory.LoadHistory
+    //   从文件加载对话历史（JSON 数组字符串）
+    //   exec in → onSuccess / onError / onNew（文件不存在时）
+    //   in:  Path(String)        — 历史文件路径
+    //        MaxMessages(Integer)— 最多保留最近 N 条，0=不限制
+    //   out: Messages(String)    — JSON 数组字符串
+    //        Count(Integer)      — 实际消息条数
+    //        ErrorMessage(String)
+    //
+    // WebGL：直接走 onNew，返回空数组（无磁盘可用）
+    // ================================================================
+    handlers["Memory.LoadHistory"] = [](ExecutionContext& ctx) {
+        std::string path = ctx.GetInputValue("Path").asString();
+        int maxMsg = (int)ctx.GetInputValue("MaxMessages").asInt();
+
+#ifdef __EMSCRIPTEN__
+        ctx.SetOutputValue("Messages",     Variant(std::string("[]")));
+        ctx.SetOutputValue("Count",        Variant((int64_t)0));
+        ctx.SetOutputValue("ErrorMessage", Variant(std::string("")));
+        ctx.ActivateOutputFlow("onNew");
+        return true;
+#else
+        if (path.empty()) {
+            ctx.SetOutputValue("Messages",     Variant(std::string("[]")));
+            ctx.SetOutputValue("Count",        Variant((int64_t)0));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("Path is empty")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        // 文件不存在 → onNew（正常首次启动）
+        {
+            std::error_code ec;
+            if (!std::filesystem::exists(std::filesystem::path(path), ec)) {
+                ctx.SetOutputValue("Messages",     Variant(std::string("[]")));
+                ctx.SetOutputValue("Count",        Variant((int64_t)0));
+                ctx.SetOutputValue("ErrorMessage", Variant(std::string("")));
+                ctx.ActivateOutputFlow("onNew");
+                return true;
+            }
+        }
+
+        // 读取文件
+        std::ifstream f(path, std::ios::binary);
+        if (!f.is_open()) {
+            ctx.SetOutputValue("Messages",     Variant(std::string("[]")));
+            ctx.SetOutputValue("Count",        Variant((int64_t)0));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string(
+                "Cannot open history file: " + path)));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+        std::ostringstream ss; ss << f.rdbuf();
+        std::string raw = ss.str();
+
+        // 解析 JSON 数组
+        auto v = crude_json::value::parse(raw);
+        if (!v.is_array()) {
+            // 文件损坏，当新建处理
+            ctx.SetOutputValue("Messages",     Variant(std::string("[]")));
+            ctx.SetOutputValue("Count",        Variant((int64_t)0));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string(
+                "History file is not a JSON array, starting fresh")));
+            ctx.ActivateOutputFlow("onNew");
+            return true;
+        }
+
+        auto& arr = v.get<crude_json::array>();
+
+        // MaxMessages 截断（保留最近 N 条）
+        if (maxMsg > 0 && (int)arr.size() > maxMsg) {
+            crude_json::array trimmed(arr.end() - maxMsg, arr.end());
+            arr = std::move(trimmed);
+        }
+
+        std::string result = v.dump();
+        int64_t count = (int64_t)arr.size();
+        ctx.SetOutputValue("Messages",     Variant(result));
+        ctx.SetOutputValue("Count",        Variant(count));
+        ctx.SetOutputValue("ErrorMessage", Variant(std::string("")));
+        ctx.ActivateOutputFlow("onSuccess");
+        return true;
+#endif
+    };
+
+    // ================================================================
+    // Memory.SaveHistory
+    //   把 messages JSON 数组写回文件
+    //   exec in → onSuccess / onError
+    //   in:  Path(String)           — 文件路径
+    //        Messages(String)       — JSON 数组字符串
+    //        MaxMessages(Integer)   — 写入前截断，0=不限
+    //   out: ErrorMessage(String)
+    //
+    // WebGL：直接走 onSuccess（no-op）
+    // ================================================================
+    handlers["Memory.SaveHistory"] = [](ExecutionContext& ctx) {
+        std::string path     = ctx.GetInputValue("Path").asString();
+        std::string messages = ctx.GetInputValue("Messages").asString();
+        int maxMsg = (int)ctx.GetInputValue("MaxMessages").asInt();
+
+#ifdef __EMSCRIPTEN__
+        ctx.SetOutputValue("ErrorMessage", Variant(std::string("")));
+        ctx.ActivateOutputFlow("onSuccess");
+        return true;
+#else
+        if (path.empty()) {
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("Path is empty")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        // 可选截断
+        std::string toWrite = messages;
+        if (maxMsg > 0) {
+            auto v = crude_json::value::parse(messages);
+            if (v.is_array()) {
+                auto& arr = v.get<crude_json::array>();
+                if ((int)arr.size() > maxMsg) {
+                    crude_json::array trimmed(arr.end() - maxMsg, arr.end());
+                    arr = std::move(trimmed);
+                }
+                toWrite = v.dump();
+            }
+        }
+
+        // 自动建父目录
+        {
+            std::error_code ec2;
+            std::filesystem::path p(path);
+            if (p.has_parent_path())
+                std::filesystem::create_directories(p.parent_path(), ec2);
+        }
+
+        std::ofstream f(path, std::ios::out | std::ios::trunc | std::ios::binary);
+        if (!f.is_open()) {
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string(
+                "Cannot write history file: " + path)));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+        f << toWrite;
+        ctx.SetOutputValue("ErrorMessage", Variant(std::string("")));
+        ctx.ActivateOutputFlow("onSuccess");
+        return true;
+#endif
     };
 }
 

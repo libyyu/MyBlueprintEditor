@@ -74,10 +74,11 @@ void RegisterHandlers_File(
         if (append) mode |= std::ios::app;
         else        mode |= std::ios::trunc;
 
-        try {
+        {
+            std::error_code ec2;
             fs::path p(path);
-            if (p.has_parent_path()) fs::create_directories(p.parent_path());
-        } catch (...) {}
+            if (p.has_parent_path()) fs::create_directories(p.parent_path(), ec2);
+        }
 
         std::ofstream f(path, mode);
         if (!f.is_open()) {
@@ -96,10 +97,11 @@ void RegisterHandlers_File(
     handlers["File.AppendText"] = [](ExecutionContext& ctx) {
         std::string path    = ctx.GetInputValue("Path").asString();
         std::string content = ctx.GetInputValue("Content").asString();
-        try {
+        {
+            std::error_code ec2;
             fs::path p(path);
-            if (p.has_parent_path()) fs::create_directories(p.parent_path());
-        } catch (...) {}
+            if (p.has_parent_path()) fs::create_directories(p.parent_path(), ec2);
+        }
         std::ofstream f(path, std::ios::app | std::ios::binary);
         if (!f.is_open()) {
             ctx.SetOutputValue("ErrorMessage", Variant(std::string(

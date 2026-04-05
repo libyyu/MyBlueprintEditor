@@ -1718,6 +1718,42 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
             MakePin("ErrorMessage", PinDataType::String),
         },
         "6A0572");
+
+    // ── Memory.LoadHistory ──────────────────────────────────────────────────
+    // 从文件加载对话历史 JSON 数组
+    // WebGL：直接 onNew + 空数组
+    reg("Memory.LoadHistory", "Memory Load History", "AI/Memory",
+        {
+            MakeFlowPin("In"),
+            MakePin("Path",        PinDataType::String),   // 历史文件路径
+            MakePin("MaxMessages", PinDataType::Integer),  // 0=不限，截断最旧的
+        },
+        {
+            MakeFlowPin("onSuccess"),                      // 文件存在且解析成功
+            MakeFlowPin("onNew"),                          // 文件不存在（首次启动）
+            MakeFlowPin("onError"),
+            MakePin("Messages",     PinDataType::String),  // JSON 数组字符串
+            MakePin("Count",        PinDataType::Integer),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "6A0572");
+
+    // ── Memory.SaveHistory ──────────────────────────────────────────────────
+    // 把 messages 数组写回文件（含可选截断）
+    // WebGL：no-op，直接 onSuccess
+    reg("Memory.SaveHistory", "Memory Save History", "AI/Memory",
+        {
+            MakeFlowPin("In"),
+            MakePin("Path",        PinDataType::String),   // 历史文件路径
+            MakePin("Messages",    PinDataType::String),   // JSON 数组字符串
+            MakePin("MaxMessages", PinDataType::Integer),  // 0=不限，写入前截断
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "6A0572");
 }
 
 void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
