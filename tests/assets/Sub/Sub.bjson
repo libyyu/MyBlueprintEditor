@@ -78,26 +78,26 @@
             ]
         },
         {
-            "id": 12,
+            "id": 11,
             "definitionId": "PrintString",
             "definitionVersion": 1,
             "name": "Print String",
             "pins": [
                 {
-                    "id": 13,
+                    "id": 12,
                     "kind": 0,
                     "dataType": 0,
                     "isExec": true
                 },
                 {
-                    "id": 14,
+                    "id": 13,
                     "kind": 0,
                     "dataType": 4,
                     "name": "In String",
                     "defaultValue": "Delay Continue"
                 },
                 {
-                    "id": 15,
+                    "id": 14,
                     "kind": 1,
                     "dataType": 0,
                     "isExec": true
@@ -105,26 +105,40 @@
             ]
         },
         {
-            "id": 17,
+            "id": 15,
             "definitionId": "PrintString",
             "definitionVersion": 1,
             "name": "Print String",
             "pins": [
                 {
-                    "id": 18,
+                    "id": 16,
                     "kind": 0,
                     "dataType": 0,
                     "isExec": true
                 },
                 {
-                    "id": 19,
+                    "id": 17,
                     "kind": 0,
                     "dataType": 4,
                     "name": "In String",
                     "defaultValue": "Delay Reached"
                 },
                 {
-                    "id": 20,
+                    "id": 18,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 22,
+            "definitionId": "OnBeginPlay",
+            "definitionVersion": 1,
+            "name": "On Begin Play",
+            "pins": [
+                {
+                    "id": 23,
                     "kind": 1,
                     "dataType": 0,
                     "isExec": true
@@ -134,21 +148,27 @@
     ],
     "links": [
         {
-            "id": 11,
+            "id": 19,
             "startPinId": 4,
             "endPinId": 6,
             "isEnabled": true
         },
         {
-            "id": 16,
+            "id": 20,
             "startPinId": 8,
-            "endPinId": 13,
+            "endPinId": 12,
             "isEnabled": true
         },
         {
             "id": 21,
             "startPinId": 9,
-            "endPinId": 18,
+            "endPinId": 16,
+            "isEnabled": true
+        },
+        {
+            "id": 24,
+            "startPinId": 23,
+            "endPinId": 2,
             "isEnabled": true
         }
     ]
@@ -168,8 +188,8 @@
                 "y": 126
             },
             "size": {
-                "width": 263,
-                "height": 103
+                "width": 293,
+                "height": 116
             },
             "isCollapsed": false
         },
@@ -180,32 +200,44 @@
                 "y": 124
             },
             "size": {
-                "width": 344,
-                "height": 128
+                "width": 419,
+                "height": 137
             },
             "isCollapsed": false
         },
         {
-            "id": 12,
+            "id": 11,
             "position": {
                 "x": 1160,
                 "y": 126
             },
             "size": {
-                "width": 263,
-                "height": 103
+                "width": 293,
+                "height": 116
             },
             "isCollapsed": false
         },
         {
-            "id": 17,
+            "id": 15,
             "position": {
                 "x": 1128,
                 "y": 318
             },
             "size": {
-                "width": 263,
-                "height": 103
+                "width": 293,
+                "height": 116
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 22,
+            "position": {
+                "x": -337,
+                "y": 92
+            },
+            "size": {
+                "width": 217,
+                "height": 72
             },
             "isCollapsed": false
         }
