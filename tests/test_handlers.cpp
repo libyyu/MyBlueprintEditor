@@ -826,3 +826,147 @@ TEST_F(HandlersTest, Memory_RoundTrip_SaveThenLoad)
 
     std::filesystem::remove(path);
 }
+
+// ============================================================================
+// Pin 快照（调试器）测试
+//   验证 SetSnapshotEnabled + GetNodePinSnapshot / GetSnapshotPinValue
+// ============================================================================
+TEST_F(HandlersTest, PinSnapshot_DisabledByDefault_NoRecording)
+{
+    // 默认关闭，执行后 snapshot 为空
+    BlueprintData bp; bp.metadata.name = "SnapDisabledTest";
+    NodeInstance node; node.id = 1; node.definitionId = "Add";
+    auto addP = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name; p.defaultValue=dv;
+        node.pins.push_back(p);
+    };
+    addP(1, PinKind::Input,  PinDataType::Float, "A", Variant(3.0));
+    addP(2, PinKind::Input,  PinDataType::Float, "B", Variant(4.0));
+    addP(3, PinKind::Output, PinDataType::Float, "Result");
+    bp.nodes.push_back(node); bp.rebuildIndices();
+
+    ASSERT_FALSE(runner.IsSnapshotEnabled());
+    ASSERT_TRUE(runner.Load(bp));
+    runner.Execute();
+
+    auto snap = runner.GetNodePinSnapshot(1);
+    EXPECT_TRUE(snap.empty()) << "Snapshot should be empty when disabled";
+}
+
+TEST_F(HandlersTest, PinSnapshot_Enabled_RecordsOutputValue)
+{
+    // 启用后，Add 节点的 Result 应该被快照
+    BlueprintData bp; bp.metadata.name = "SnapEnabledTest";
+    NodeInstance node; node.id = 1; node.definitionId = "Add";
+    auto addP = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name; p.defaultValue=dv;
+        node.pins.push_back(p);
+    };
+    addP(1, PinKind::Input,  PinDataType::Float, "A", Variant(3.0));
+    addP(2, PinKind::Input,  PinDataType::Float, "B", Variant(4.0));
+    addP(3, PinKind::Output, PinDataType::Float, "Result");
+    bp.nodes.push_back(node); bp.rebuildIndices();
+
+    runner.SetSnapshotEnabled(true);
+    ASSERT_TRUE(runner.Load(bp));
+    runner.ExecuteNode(1);
+
+    auto snap = runner.GetNodePinSnapshot(1);
+    EXPECT_FALSE(snap.empty()) << "Snapshot should contain entries when enabled";
+
+    // A、B 输入引脚应被记录
+    EXPECT_EQ(snap.count("A"),      1u);
+    EXPECT_EQ(snap.count("B"),      1u);
+    EXPECT_EQ(snap.count("Result"), 1u);
+
+    EXPECT_DOUBLE_EQ(snap["A"].value.asFloat(),      3.0);
+    EXPECT_DOUBLE_EQ(snap["B"].value.asFloat(),      4.0);
+    EXPECT_DOUBLE_EQ(snap["Result"].value.asFloat(), 7.0);
+}
+
+TEST_F(HandlersTest, PinSnapshot_GetSnapshotPinValue_FastAccess)
+{
+    BlueprintData bp; bp.metadata.name = "SnapFastTest";
+    NodeInstance node; node.id = 42; node.definitionId = "Multiply";
+    auto addP = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name; p.defaultValue=dv;
+        node.pins.push_back(p);
+    };
+    addP(1, PinKind::Input,  PinDataType::Float, "A", Variant(6.0));
+    addP(2, PinKind::Input,  PinDataType::Float, "B", Variant(7.0));
+    addP(3, PinKind::Output, PinDataType::Float, "Result");
+    bp.nodes.push_back(node); bp.rebuildIndices();
+
+    runner.SetSnapshotEnabled(true);
+    ASSERT_TRUE(runner.Load(bp));
+    runner.ExecuteNode(42);
+
+    // 快速单引脚访问
+    EXPECT_DOUBLE_EQ(runner.GetSnapshotPinValue(42, "Result").asFloat(), 42.0);
+    // 不存在的节点/引脚返回空 Variant
+    EXPECT_EQ(runner.GetSnapshotPinValue(99,  "Result").type, PinDataType::Unknown);
+    EXPECT_EQ(runner.GetSnapshotPinValue(42,  "NoPin").type,  PinDataType::Unknown);
+}
+
+TEST_F(HandlersTest, PinSnapshot_ClearSnapshots)
+{
+    BlueprintData bp; bp.metadata.name = "SnapClearTest";
+    NodeInstance node; node.id = 1; node.definitionId = "Add";
+    auto addP = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name; p.defaultValue=dv;
+        node.pins.push_back(p);
+    };
+    addP(1, PinKind::Input,  PinDataType::Float, "A", Variant(1.0));
+    addP(2, PinKind::Input,  PinDataType::Float, "B", Variant(2.0));
+    addP(3, PinKind::Output, PinDataType::Float, "Result");
+    bp.nodes.push_back(node); bp.rebuildIndices();
+
+    runner.SetSnapshotEnabled(true);
+    ASSERT_TRUE(runner.Load(bp));
+    runner.ExecuteNode(1);
+
+    EXPECT_FALSE(runner.GetNodePinSnapshot(1).empty());
+
+    runner.ClearSnapshots();
+    EXPECT_TRUE(runner.GetNodePinSnapshot(1).empty()) << "After clear, snapshot should be empty";
+
+    // GetSnapshotNodeIds 也应为空
+    EXPECT_TRUE(runner.GetSnapshotNodeIds().empty());
+}
+
+TEST_F(HandlersTest, PinSnapshot_GetSnapshotNodeIds_ListsExecutedNodes)
+{
+    // 两个节点的蓝图，两个都应该出现在 snapshot ids 里
+    BlueprintData bp; bp.metadata.name = "SnapNodeIdsTest";
+    auto addPin = [&](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                      const char* name, Variant dv = {}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name; p.defaultValue=dv;
+        n.pins.push_back(p);
+    };
+
+    NodeInstance n1; n1.id=1; n1.definitionId="Add";
+    addPin(n1, 10, PinKind::Input,  PinDataType::Float, "A", Variant(1.0));
+    addPin(n1, 11, PinKind::Input,  PinDataType::Float, "B", Variant(2.0));
+    addPin(n1, 12, PinKind::Output, PinDataType::Float, "Result");
+    bp.nodes.push_back(n1);
+
+    NodeInstance n2; n2.id=2; n2.definitionId="Negate";
+    addPin(n2, 20, PinKind::Input,  PinDataType::Float, "A", Variant(5.0));
+    addPin(n2, 21, PinKind::Output, PinDataType::Float, "Result");
+    bp.nodes.push_back(n2);
+
+    bp.rebuildIndices();
+
+    runner.SetSnapshotEnabled(true);
+    ASSERT_TRUE(runner.Load(bp));
+    runner.ExecuteNode(1);
+    runner.ExecuteNode(2);
+
+    auto ids = runner.GetSnapshotNodeIds();
+    EXPECT_EQ(ids.size(), 2u) << "Both nodes should appear in snapshot";
+
+    bool has1 = std::find(ids.begin(), ids.end(), NodeId(1)) != ids.end();
+    bool has2 = std::find(ids.begin(), ids.end(), NodeId(2)) != ids.end();
+    EXPECT_TRUE(has1);
+    EXPECT_TRUE(has2);
+}

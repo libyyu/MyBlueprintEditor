@@ -725,7 +725,38 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
         // handler 内部因断点暂停而返回 false（ActivateOutputFlow 返回 false）
         // 这不是真正的执行错误，让调用层通过 RunState::Paused 检测来停止
         propagatePinValues(node);
-        return true;
+        ok = true;
+    }
+
+    // ── Pin 快照（调试模式）──────────────────────────────────────────────────
+    if (m_snapshotEnabled && ok)
+    {
+        auto now = std::chrono::steady_clock::now();
+        NodePinMap snap;
+        for (const auto& pin : node.pins)
+        {
+            if (pin.name.empty()) continue;
+            Variant v;
+            if (pin.kind == PinKind::Input)
+            {
+                v = m_context.GetInputValue(pin.name);
+            }
+            else
+            {
+                // 输出引脚：从 outputPinNameToId 查 PinId，再从 pinValues 读值
+                auto it = m_state.outputPinNameToId.find(pin.name);
+                if (it != m_state.outputPinNameToId.end())
+                {
+                    auto vit = m_state.pinValues.find(it->second);
+                    if (vit != m_state.pinValues.end()) v = vit->second;
+                }
+            }
+            snap[pin.name] = PinSnapshot{ std::move(v), now };
+        }
+        {
+            std::lock_guard<std::mutex> lk(m_snapshotMutex);
+            m_pinSnapshots[node.id] = std::move(snap);
+        }
     }
 
     return ok;

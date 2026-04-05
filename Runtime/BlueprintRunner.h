@@ -619,6 +619,55 @@ public:
     // 返回上一次 StepNextNode() 实际执行的节点 id（0 表示未执行过）
     NodeId GetLastSteppedNodeId() const { return m_lastSteppedNodeId; }
 
+    // ── Pin 快照（调试/可视化）──────────────────────────────────────────────
+    // 启用后，每个节点执行完毕时自动记录所有输入/输出引脚的当前值快照。
+    // 编辑器可读取这些值，在节点上方悬停显示"上次执行时的引脚值"。
+
+    struct PinSnapshot {
+        Variant                               value;
+        std::chrono::steady_clock::time_point timestamp;
+    };
+    using NodePinMap = std::unordered_map<std::string, PinSnapshot>;
+
+    // 开关（默认关闭，避免生产运行时内存开销）
+    void  SetSnapshotEnabled(bool enabled) { m_snapshotEnabled = enabled; }
+    bool  IsSnapshotEnabled()  const       { return m_snapshotEnabled;    }
+
+    // 清空全部快照
+    void ClearSnapshots()
+    {
+        std::lock_guard<std::mutex> lk(m_snapshotMutex);
+        m_pinSnapshots.clear();
+    }
+
+    // 读取某节点的全部引脚快照（线程安全拷贝）
+    NodePinMap GetNodePinSnapshot(NodeId nodeId) const
+    {
+        std::lock_guard<std::mutex> lk(m_snapshotMutex);
+        auto it = m_pinSnapshots.find(nodeId);
+        return it != m_pinSnapshots.end() ? it->second : NodePinMap{};
+    }
+
+    // 快速读取单个引脚值（找不到返回空 Variant）
+    Variant GetSnapshotPinValue(NodeId nodeId, const std::string& pinName) const
+    {
+        std::lock_guard<std::mutex> lk(m_snapshotMutex);
+        auto nit = m_pinSnapshots.find(nodeId);
+        if (nit == m_pinSnapshots.end()) return {};
+        auto pit = nit->second.find(pinName);
+        return pit != nit->second.end() ? pit->second.value : Variant{};
+    }
+
+    // 返回所有有快照的节点 id 列表
+    std::vector<NodeId> GetSnapshotNodeIds() const
+    {
+        std::lock_guard<std::mutex> lk(m_snapshotMutex);
+        std::vector<NodeId> ids;
+        ids.reserve(m_pinSnapshots.size());
+        for (const auto& kv : m_pinSnapshots) ids.push_back(kv.first);
+        return ids;
+    }
+
     // ------------------------------------------------------------------
     // 主线程计时器（由外部每帧调用 Tick 驱动）
     // ------------------------------------------------------------------
@@ -776,6 +825,11 @@ private:
     // AcquireAsync/ReleaseAsync 维护；Tick() 用于判断是否可回收
     // 使用 atomic：AcquireAsync/ReleaseAsync 可能从后台线程调用
     std::atomic<int>                                    m_pendingAsyncCount { 0 };
+
+    // ── Pin 快照存储 ─────────────────────────────────────────────────────────
+    bool                                                m_snapshotEnabled { false };
+    mutable std::mutex                                  m_snapshotMutex;
+    std::unordered_map<NodeId, NodePinMap>              m_pinSnapshots;
 
     // 运行时控制状态
     enum class RunState { Idle, Running, Paused, Stopped };
