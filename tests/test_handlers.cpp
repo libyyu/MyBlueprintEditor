@@ -530,3 +530,297 @@ TEST_F(HandlersTest, MakeToolResult_BuildsCorrectJSON)
     EXPECT_NE(out.find("\"call_abc123\""), std::string::npos) << "tool_call_id mismatch";
     EXPECT_NE(out.find("28"),              std::string::npos) << "content mismatch";
 }
+
+// ============================================================================
+// Memory.LoadHistory / Memory.SaveHistory
+// ============================================================================
+#include <fstream>
+#include <filesystem>
+#include <cstdio>
+
+namespace {
+// 生成一个进程内唯一的临时文件路径（不创建文件）
+std::string TempHistoryPath(const char* suffix = "") {
+    std::filesystem::path tmp = std::filesystem::temp_directory_path();
+    return (tmp / ("bp_test_history_" + std::to_string(
+        std::hash<std::string>{}(std::string(suffix) +
+            std::to_string(reinterpret_cast<uintptr_t>(&suffix)))) + ".json")).string();
+}
+} // namespace
+
+// ── SaveHistory ──────────────────────────────────────────────────────────────
+TEST_F(HandlersTest, MemorySaveHistory_WritesFile)
+{
+    std::string path = TempHistoryPath("save_basic");
+    std::filesystem::remove(path); // 确保不存在
+
+    BlueprintData bp; bp.metadata.name = "MemSaveTest";
+    NodeInstance node; node.id = 1; node.definitionId = "Memory.SaveHistory";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name; p.defaultValue=dv;
+        node.pins.push_back(p);
+    };
+    const std::string msgs = R"([{"role":"user","content":"hi"}])";
+    addPin(1, PinKind::Input,  PinDataType::Any,     "",            {});
+    addPin(2, PinKind::Input,  PinDataType::String,  "Path",        Variant(path));
+    addPin(3, PinKind::Input,  PinDataType::String,  "Messages",    Variant(msgs));
+    addPin(4, PinKind::Input,  PinDataType::Integer, "MaxMessages", Variant((int64_t)0));
+    addPin(5, PinKind::Output, PinDataType::Any,     "onSuccess",   {});
+    addPin(6, PinKind::Output, PinDataType::Any,     "onError",     {});
+    addPin(7, PinKind::Output, PinDataType::String,  "ErrorMessage",{});
+    bp.nodes.push_back(node); bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto res = runner.ExecuteNode(1);
+    EXPECT_TRUE(res.success);
+    EXPECT_EQ(runner.GetPinValue(7).asString(), ""); // no error
+
+    // 验证文件内容
+    std::ifstream f(path);
+    ASSERT_TRUE(f.is_open()) << "file should have been created";
+    std::string content((std::istreambuf_iterator<char>(f)), {});
+    EXPECT_NE(content.find("user"), std::string::npos);
+    EXPECT_NE(content.find("hi"),   std::string::npos);
+
+    std::filesystem::remove(path);
+}
+
+TEST_F(HandlersTest, MemorySaveHistory_TrimsToMaxMessages)
+{
+    std::string path = TempHistoryPath("save_trim");
+    std::filesystem::remove(path);
+
+    // 5 条消息，MaxMessages=2，期望只保留最后 2 条
+    std::string msgs = R"([
+        {"role":"user","content":"1"},
+        {"role":"assistant","content":"2"},
+        {"role":"user","content":"3"},
+        {"role":"assistant","content":"4"},
+        {"role":"user","content":"5"}
+    ])";
+
+    BlueprintData bp; bp.metadata.name = "MemSaveTrimTest";
+    NodeInstance node; node.id = 1; node.definitionId = "Memory.SaveHistory";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name; p.defaultValue=dv;
+        node.pins.push_back(p);
+    };
+    addPin(1, PinKind::Input,  PinDataType::Any,     "",            {});
+    addPin(2, PinKind::Input,  PinDataType::String,  "Path",        Variant(path));
+    addPin(3, PinKind::Input,  PinDataType::String,  "Messages",    Variant(msgs));
+    addPin(4, PinKind::Input,  PinDataType::Integer, "MaxMessages", Variant((int64_t)2));
+    addPin(5, PinKind::Output, PinDataType::Any,     "onSuccess",   {});
+    addPin(6, PinKind::Output, PinDataType::Any,     "onError",     {});
+    addPin(7, PinKind::Output, PinDataType::String,  "ErrorMessage",{});
+    bp.nodes.push_back(node); bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto res = runner.ExecuteNode(1);
+    EXPECT_TRUE(res.success);
+
+    // 解析写入的文件，期望恰好 2 条
+    std::ifstream f(path);
+    ASSERT_TRUE(f.is_open());
+    std::string content((std::istreambuf_iterator<char>(f)), {});
+    // 最后两条是 "4" 和 "5"
+    EXPECT_NE(content.find("\"4\""), std::string::npos) << "should contain msg 4";
+    EXPECT_NE(content.find("\"5\""), std::string::npos) << "should contain msg 5";
+    EXPECT_EQ(content.find("\"1\""), std::string::npos) << "msg 1 should be trimmed";
+
+    std::filesystem::remove(path);
+}
+
+// ── LoadHistory ──────────────────────────────────────────────────────────────
+TEST_F(HandlersTest, MemoryLoadHistory_ReturnsOnNewWhenFileMissing)
+{
+    std::string path = TempHistoryPath("load_missing");
+    std::filesystem::remove(path); // 确保不存在
+
+    BlueprintData bp; bp.metadata.name = "MemLoadMissingTest";
+    NodeInstance node; node.id = 1; node.definitionId = "Memory.LoadHistory";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name; p.defaultValue=dv;
+        node.pins.push_back(p);
+    };
+    addPin(1, PinKind::Input,  PinDataType::Any,     "In",          {});
+    addPin(2, PinKind::Input,  PinDataType::String,  "Path",        Variant(path));
+    addPin(3, PinKind::Input,  PinDataType::Integer, "MaxMessages", Variant((int64_t)0));
+    addPin(4, PinKind::Output, PinDataType::Any,     "onSuccess",   {});
+    addPin(5, PinKind::Output, PinDataType::Any,     "onNew",       {});
+    addPin(6, PinKind::Output, PinDataType::Any,     "onError",     {});
+    addPin(7, PinKind::Output, PinDataType::String,  "Messages",    {});
+    addPin(8, PinKind::Output, PinDataType::Integer, "Count",       {});
+    addPin(9, PinKind::Output, PinDataType::String,  "ErrorMessage",{});
+    bp.nodes.push_back(node); bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto res = runner.ExecuteNode(1);
+    EXPECT_TRUE(res.success);
+    EXPECT_EQ(runner.GetPinValue(7).asString(), "[]");
+    EXPECT_EQ(runner.GetPinValue(8).asInt(), 0);
+}
+
+TEST_F(HandlersTest, MemoryLoadHistory_LoadsExistingFile)
+{
+    std::string path = TempHistoryPath("load_existing");
+    // 先写一个历史文件
+    {
+        std::ofstream f(path);
+        f << R"([{"role":"user","content":"hello"},{"role":"assistant","content":"hi there"}])";
+    }
+
+    BlueprintData bp; bp.metadata.name = "MemLoadExistTest";
+    NodeInstance node; node.id = 1; node.definitionId = "Memory.LoadHistory";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name; p.defaultValue=dv;
+        node.pins.push_back(p);
+    };
+    addPin(1, PinKind::Input,  PinDataType::Any,     "In",          {});
+    addPin(2, PinKind::Input,  PinDataType::String,  "Path",        Variant(path));
+    addPin(3, PinKind::Input,  PinDataType::Integer, "MaxMessages", Variant((int64_t)0));
+    addPin(4, PinKind::Output, PinDataType::Any,     "onSuccess",   {});
+    addPin(5, PinKind::Output, PinDataType::Any,     "onNew",       {});
+    addPin(6, PinKind::Output, PinDataType::Any,     "onError",     {});
+    addPin(7, PinKind::Output, PinDataType::String,  "Messages",    {});
+    addPin(8, PinKind::Output, PinDataType::Integer, "Count",       {});
+    addPin(9, PinKind::Output, PinDataType::String,  "ErrorMessage",{});
+    bp.nodes.push_back(node); bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto res = runner.ExecuteNode(1);
+    EXPECT_TRUE(res.success);
+    EXPECT_EQ(runner.GetPinValue(8).asInt(), 2);
+    EXPECT_NE(runner.GetPinValue(7).asString().find("hello"), std::string::npos);
+
+    std::filesystem::remove(path);
+}
+
+TEST_F(HandlersTest, MemoryLoadHistory_TrimsToMaxMessages)
+{
+    std::string path = TempHistoryPath("load_trim");
+    {
+        std::ofstream f(path);
+        f << R"([
+            {"role":"user","content":"A"},
+            {"role":"assistant","content":"B"},
+            {"role":"user","content":"C"},
+            {"role":"assistant","content":"D"}
+        ])";
+    }
+
+    BlueprintData bp; bp.metadata.name = "MemLoadTrimTest";
+    NodeInstance node; node.id = 1; node.definitionId = "Memory.LoadHistory";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name; p.defaultValue=dv;
+        node.pins.push_back(p);
+    };
+    addPin(1, PinKind::Input,  PinDataType::Any,     "In",          {});
+    addPin(2, PinKind::Input,  PinDataType::String,  "Path",        Variant(path));
+    addPin(3, PinKind::Input,  PinDataType::Integer, "MaxMessages", Variant((int64_t)2));
+    addPin(4, PinKind::Output, PinDataType::Any,     "onSuccess",   {});
+    addPin(5, PinKind::Output, PinDataType::Any,     "onNew",       {});
+    addPin(6, PinKind::Output, PinDataType::Any,     "onError",     {});
+    addPin(7, PinKind::Output, PinDataType::String,  "Messages",    {});
+    addPin(8, PinKind::Output, PinDataType::Integer, "Count",       {});
+    addPin(9, PinKind::Output, PinDataType::String,  "ErrorMessage",{});
+    bp.nodes.push_back(node); bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto res = runner.ExecuteNode(1);
+    EXPECT_TRUE(res.success);
+    EXPECT_EQ(runner.GetPinValue(8).asInt(), 2);                              // 截断到 2
+    EXPECT_NE(runner.GetPinValue(7).asString().find("\"C\""), std::string::npos); // 保留最近
+    EXPECT_NE(runner.GetPinValue(7).asString().find("\"D\""), std::string::npos);
+    EXPECT_EQ(runner.GetPinValue(7).asString().find("\"A\""), std::string::npos); // 最旧被丢弃
+
+    std::filesystem::remove(path);
+}
+
+TEST_F(HandlersTest, MemoryLoadHistory_CorruptFileReturnsOnNew)
+{
+    std::string path = TempHistoryPath("load_corrupt");
+    { std::ofstream f(path); f << "not valid json {{{{"; }
+
+    BlueprintData bp; bp.metadata.name = "MemLoadCorruptTest";
+    NodeInstance node; node.id = 1; node.definitionId = "Memory.LoadHistory";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name; p.defaultValue=dv;
+        node.pins.push_back(p);
+    };
+    addPin(1, PinKind::Input,  PinDataType::Any,     "In",          {});
+    addPin(2, PinKind::Input,  PinDataType::String,  "Path",        Variant(path));
+    addPin(3, PinKind::Input,  PinDataType::Integer, "MaxMessages", Variant((int64_t)0));
+    addPin(4, PinKind::Output, PinDataType::Any,     "onSuccess",   {});
+    addPin(5, PinKind::Output, PinDataType::Any,     "onNew",       {});
+    addPin(6, PinKind::Output, PinDataType::Any,     "onError",     {});
+    addPin(7, PinKind::Output, PinDataType::String,  "Messages",    {});
+    addPin(8, PinKind::Output, PinDataType::Integer, "Count",       {});
+    addPin(9, PinKind::Output, PinDataType::String,  "ErrorMessage",{});
+    bp.nodes.push_back(node); bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto res = runner.ExecuteNode(1);
+    EXPECT_TRUE(res.success);
+    EXPECT_EQ(runner.GetPinValue(7).asString(), "[]"); // 降级为空数组
+
+    std::filesystem::remove(path);
+}
+
+// ── RoundTrip ────────────────────────────────────────────────────────────────
+TEST_F(HandlersTest, Memory_RoundTrip_SaveThenLoad)
+{
+    std::string path = TempHistoryPath("roundtrip");
+    std::filesystem::remove(path);
+
+    const std::string msgs = R"([{"role":"user","content":"ping"},{"role":"assistant","content":"pong"}])";
+
+    // Save
+    {
+        BlueprintData bp; bp.metadata.name = "SaveRT";
+        NodeInstance node; node.id = 1; node.definitionId = "Memory.SaveHistory";
+        auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+            PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name; p.defaultValue=dv;
+            node.pins.push_back(p);
+        };
+        addPin(1, PinKind::Input,  PinDataType::Any,     "",            {});
+        addPin(2, PinKind::Input,  PinDataType::String,  "Path",        Variant(path));
+        addPin(3, PinKind::Input,  PinDataType::String,  "Messages",    Variant(msgs));
+        addPin(4, PinKind::Input,  PinDataType::Integer, "MaxMessages", Variant((int64_t)0));
+        addPin(5, PinKind::Output, PinDataType::Any,     "onSuccess",   {});
+        addPin(6, PinKind::Output, PinDataType::Any,     "onError",     {});
+        addPin(7, PinKind::Output, PinDataType::String,  "ErrorMessage",{});
+        bp.nodes.push_back(node); bp.rebuildIndices();
+        BlueprintRunner saver; RegisterBuiltinHandlers(saver, ".");
+        ASSERT_TRUE(saver.Load(bp));
+        EXPECT_TRUE(saver.ExecuteNode(1).success);
+    }
+
+    // Load
+    {
+        BlueprintData bp; bp.metadata.name = "LoadRT";
+        NodeInstance node; node.id = 1; node.definitionId = "Memory.LoadHistory";
+        auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+            PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=name; p.defaultValue=dv;
+            node.pins.push_back(p);
+        };
+        addPin(1, PinKind::Input,  PinDataType::Any,     "In",          {});
+        addPin(2, PinKind::Input,  PinDataType::String,  "Path",        Variant(path));
+        addPin(3, PinKind::Input,  PinDataType::Integer, "MaxMessages", Variant((int64_t)0));
+        addPin(4, PinKind::Output, PinDataType::Any,     "onSuccess",   {});
+        addPin(5, PinKind::Output, PinDataType::Any,     "onNew",       {});
+        addPin(6, PinKind::Output, PinDataType::Any,     "onError",     {});
+        addPin(7, PinKind::Output, PinDataType::String,  "Messages",    {});
+        addPin(8, PinKind::Output, PinDataType::Integer, "Count",       {});
+        addPin(9, PinKind::Output, PinDataType::String,  "ErrorMessage",{});
+        bp.nodes.push_back(node); bp.rebuildIndices();
+        BlueprintRunner loader; RegisterBuiltinHandlers(loader, ".");
+        ASSERT_TRUE(loader.Load(bp));
+        auto res = loader.ExecuteNode(1);
+        EXPECT_TRUE(res.success);
+        EXPECT_EQ(loader.GetPinValue(8).asInt(), 2);
+        EXPECT_NE(loader.GetPinValue(7).asString().find("ping"), std::string::npos);
+        EXPECT_NE(loader.GetPinValue(7).asString().find("pong"), std::string::npos);
+    }
+
+    std::filesystem::remove(path);
+}
