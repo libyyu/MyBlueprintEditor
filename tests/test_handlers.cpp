@@ -1483,3 +1483,160 @@ TEST_F(HandlersTest, ForLoopWithBreak_BreaksAtIndex3)
         << "Completed branch should fire after break";
 }
 
+
+// ============================================================================
+// Lua json.* / http.* 绑定测试
+// ============================================================================
+#ifdef BLUEPRINT_HAS_LUA
+#include "LuaScriptEngine.h"
+extern "C" {
+#include <lua.h>
+#include <lualib.h>
+#include <lauxlib.h>
+}
+
+class LuaBindingsTest : public ::testing::Test
+{
+protected:
+    BlueprintRunner runner;
+    LuaScriptEngine engine;
+
+    void SetUp() override
+    {
+        RegisterBuiltinHandlers(runner, ".");
+        ASSERT_TRUE(engine.Initialize(&runner));
+    }
+};
+
+// json.encode: Lua table → JSON 字符串
+TEST_F(LuaBindingsTest, JsonEncode_TableToString)
+{
+    bool ok = engine.LoadString(R"(
+        local t = {name="Alice", score=42}
+        result = json.stringify(t)
+    )");
+    ASSERT_TRUE(ok) << engine.GetLastError();
+
+    // 读 Lua 全局变量 result
+    lua_State* L = engine.GetState();
+    lua_getglobal(L, "result");
+    ASSERT_EQ(lua_type(L, -1), LUA_TSTRING);
+    std::string res = lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    // 结果应包含 "Alice" 和 "42"
+    EXPECT_NE(res.find("Alice"), std::string::npos) << "encoded: " << res;
+    EXPECT_NE(res.find("42"),    std::string::npos) << "encoded: " << res;
+}
+
+// json.encode: array
+TEST_F(LuaBindingsTest, JsonEncode_ArrayToString)
+{
+    bool ok = engine.LoadString(R"(
+        result = json.stringify({"a", "b", "c"})
+    )");
+    ASSERT_TRUE(ok) << engine.GetLastError();
+
+    lua_State* L = engine.GetState();
+    lua_getglobal(L, "result");
+    std::string res = lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    EXPECT_NE(res.find("\"a\""), std::string::npos) << res;
+    EXPECT_NE(res.find("\"c\""), std::string::npos) << res;
+}
+
+// json.decode: JSON 字符串 → Lua table
+TEST_F(LuaBindingsTest, JsonDecode_StringToTable)
+{
+    bool ok = engine.LoadString(R"(
+        local t = json.parse('{"x":10,"y":20}')
+        result_x = t.x
+        result_y = t.y
+    )");
+    ASSERT_TRUE(ok) << engine.GetLastError();
+
+    lua_State* L = engine.GetState();
+    lua_getglobal(L, "result_x");
+    double x = lua_tonumber(L, -1); lua_pop(L, 1);
+    lua_getglobal(L, "result_y");
+    double y = lua_tonumber(L, -1); lua_pop(L, 1);
+
+    EXPECT_DOUBLE_EQ(x, 10.0);
+    EXPECT_DOUBLE_EQ(y, 20.0);
+}
+
+// json.decode: JSON 数组
+TEST_F(LuaBindingsTest, JsonDecode_ArrayToTable)
+{
+    bool ok = engine.LoadString(R"(
+        local arr = json.parse('[1,2,3]')
+        result = arr[2]   -- Lua 下标从 1 开始
+    )");
+    ASSERT_TRUE(ok) << engine.GetLastError();
+
+    lua_State* L = engine.GetState();
+    lua_getglobal(L, "result");
+    double v = lua_tonumber(L, -1); lua_pop(L, 1);
+    EXPECT_DOUBLE_EQ(v, 2.0);
+}
+
+// json.get: JSON 路径提取
+TEST_F(LuaBindingsTest, JsonGet_NestedPath)
+{
+    bool ok = engine.LoadString(R"(
+        local jstr = '{"choices":[{"message":{"content":"hello"}}]}'
+        result = json.get(jstr, "choices[0].message.content")
+    )");
+    ASSERT_TRUE(ok) << engine.GetLastError();
+
+    lua_State* L = engine.GetState();
+    lua_getglobal(L, "result");
+    ASSERT_EQ(lua_type(L, -1), LUA_TSTRING);
+    std::string res = lua_tostring(L, -1); lua_pop(L, 1);
+    EXPECT_EQ(res, "hello");
+}
+
+// json roundtrip: encode(decode(s)) should preserve value
+TEST_F(LuaBindingsTest, JsonRoundTrip)
+{
+    bool ok = engine.LoadString(R"(
+        local src = '{"val":99,"flag":true}'
+        local t = json.parse(src)
+        roundtrip = json.stringify(t)
+    )");
+    ASSERT_TRUE(ok) << engine.GetLastError();
+
+    lua_State* L = engine.GetState();
+    lua_getglobal(L, "roundtrip");
+    std::string res = lua_tostring(L, -1); lua_pop(L, 1);
+    // Must contain 99 and true
+    EXPECT_NE(res.find("99"),   std::string::npos) << res;
+    EXPECT_NE(res.find("true"), std::string::npos) << res;
+}
+
+// http.* 没有注册 HttpClient 时应返回 nil + error（不崩溃）
+TEST_F(LuaBindingsTest, HttpRequest_NoClient_ReturnsError)
+{
+    // 不注册 HttpClient，直接调 http.get
+    bool ok = engine.LoadString(R"(
+        local body, status, err = http.get("http://localhost:9999/test")
+        result_body   = body
+        result_status = status
+        result_err    = err
+    )");
+    ASSERT_TRUE(ok) << engine.GetLastError();
+
+    lua_State* L = engine.GetState();
+
+    lua_getglobal(L, "result_body");
+    bool isNil = lua_isnil(L, -1); lua_pop(L, 1);
+    EXPECT_TRUE(isNil) << "body should be nil when no client";
+
+    lua_getglobal(L, "result_err");
+    ASSERT_EQ(lua_type(L, -1), LUA_TSTRING);
+    std::string err = lua_tostring(L, -1); lua_pop(L, 1);
+    EXPECT_FALSE(err.empty()) << "error string should not be empty";
+}
+
+#endif // BLUEPRINT_HAS_LUA

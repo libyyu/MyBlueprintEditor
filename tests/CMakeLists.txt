@@ -57,7 +57,19 @@ target_compile_definitions(blueprint_tests PRIVATE
 
 target_include_directories(blueprint_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/Utils/Json
+    $<TARGET_PROPERTY:BlueprintRuntime,INTERFACE_INCLUDE_DIRECTORIES>
 )
+
+# Lua headers (baked into BlueprintRuntime; expose include path for test files)
+if(TARGET lua54_static)
+    target_include_directories(blueprint_tests PRIVATE $<TARGET_PROPERTY:lua54_static,INTERFACE_INCLUDE_DIRECTORIES>)
+elseif(TARGET lua54)
+    target_include_directories(blueprint_tests PRIVATE $<TARGET_PROPERTY:lua54,INTERFACE_INCLUDE_DIRECTORIES>)
+endif()
+
+if(BLUEPRINT_LUA)
+    target_compile_definitions(blueprint_tests PRIVATE BLUEPRINT_HAS_LUA)
+endif()
 
 set_target_properties(blueprint_tests PROPERTIES
     CXX_STANDARD 17
