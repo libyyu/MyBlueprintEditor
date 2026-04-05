@@ -73,7 +73,10 @@ struct BLUEPRINT_API NodeExecutionState
     std::unordered_map<PinId, Variant>              pinValues;
 
     // 当前节点的引脚名到ID的映射（每次执行节点前重建）
-    std::unordered_map<std::string, PinId>          pinNameToId;
+    // 注意：输入/输出分开，防止同名引脚（如 "JSON" 同时作为 in/out）互相覆盖
+    std::unordered_map<std::string, PinId>          pinNameToId;         // 兼容旧代码（输出优先）
+    std::unordered_map<std::string, PinId>          inputPinNameToId;    // 仅输入引脚
+    std::unordered_map<std::string, PinId>          outputPinNameToId;   // 仅输出引脚
 
     // 当前节点的自定义数据
     std::unordered_map<std::string, Variant>        nodeData;
@@ -119,12 +122,17 @@ public:
         return (it != m_state->pinValues.end()) ? it->second : Variant();
     }
 
-    // 获取输入引脚的值（按名称，在当前节点的输入引脚中搜索）
+    // 获取输入引脚的值（按名称，优先在输入引脚 map 中搜索，降级到全量 map）
     Variant GetInputValue(const std::string& pinName) const
     {
-        auto it = m_state->pinNameToId.find(pinName);
-        if (it != m_state->pinNameToId.end())
+        // 优先从 inputPinNameToId 查，避免与同名 output 引脚冲突
+        auto it = m_state->inputPinNameToId.find(pinName);
+        if (it != m_state->inputPinNameToId.end())
             return GetInputValue(it->second);
+        // 降级兼容：旧节点可能只注册了 pinNameToId
+        auto it2 = m_state->pinNameToId.find(pinName);
+        if (it2 != m_state->pinNameToId.end())
+            return GetInputValue(it2->second);
         return Variant();
     }
 
@@ -134,12 +142,32 @@ public:
         m_state->pinValues[pinId] = value;
     }
 
-    // 设置输出引脚的值（按名称）
+    // 设置输出引脚的值（按名称，优先在输出引脚 map 中搜索，降级到全量 map）
     void SetOutputValue(const std::string& pinName, const Variant& value)
     {
-        auto it = m_state->pinNameToId.find(pinName);
-        if (it != m_state->pinNameToId.end())
+        // 优先从 outputPinNameToId 查，避免与同名 input 引脚冲突
+        auto it = m_state->outputPinNameToId.find(pinName);
+        if (it != m_state->outputPinNameToId.end()) {
             SetOutputValue(it->second, value);
+            return;
+        }
+        // 降级兼容
+        auto it2 = m_state->pinNameToId.find(pinName);
+        if (it2 != m_state->pinNameToId.end())
+            SetOutputValue(it2->second, value);
+    }
+
+    // 获取当前节点指定引脚名对应的 PinId（优先输出引脚，用于 ActivateOutputFlow）
+    PinId GetPinId(const std::string& pinName) const
+    {
+        // exec output 引脚优先（用于 ActivateOutputFlow）
+        auto it = m_state->outputPinNameToId.find(pinName);
+        if (it != m_state->outputPinNameToId.end()) return it->second;
+        auto it2 = m_state->inputPinNameToId.find(pinName);
+        if (it2 != m_state->inputPinNameToId.end()) return it2->second;
+        // 兼容旧路径
+        auto it3 = m_state->pinNameToId.find(pinName);
+        return (it3 != m_state->pinNameToId.end()) ? it3->second : InvalidPinId;
     }
 
     // 获取节点自定义数据
@@ -167,13 +195,6 @@ public:
 
     // 获取蓝图元数据
     const BlueprintMetadata& GetMetadata() const { return m_state->metadata; }
-
-    // 获取当前节点指定引脚名对应的 PinId（用于在异步回调中捕获引脚ID）
-    PinId GetPinId(const std::string& pinName) const
-    {
-        auto it = m_state->pinNameToId.find(pinName);
-        return (it != m_state->pinNameToId.end()) ? it->second : InvalidPinId;
-    }
 
     // 获取触发当前节点执行的输入引脚 ID
     PinId GetActivatedInputPinId() const { return m_state->activatedInputPinId; }

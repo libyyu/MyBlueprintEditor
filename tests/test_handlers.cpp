@@ -296,3 +296,144 @@ TEST_F(HandlersTest, JSONGetPath_DeepPath)
     EXPECT_EQ(runner.GetPinValue(12).asString(), "Hello AI")
         << "choices[0].message.content should equal 'Hello AI'";
 }
+
+// ============================================================================
+// AI 节点测试
+// ============================================================================
+
+// JSON.Build
+TEST_F(HandlersTest, JSONBuild_BasicObject)
+{
+    BlueprintData bp;
+    bp.metadata.name = "JSONBuildTest";
+    NodeInstance node;
+    node.id = 1; node.definitionId = "JSON.Build";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id = id; p.kind = k; p.dataType = dt; p.name = name; p.defaultValue = dv;
+        node.pins.push_back(p);
+    };
+    // Keys = ["model", "temperature"]
+    std::vector<Variant> keys = { Variant(std::string("model")), Variant(std::string("temperature")) };
+    // Values = ["gpt-4o", 0.7]
+    std::vector<Variant> vals = { Variant(std::string("gpt-4o")), Variant(0.7) };
+    addPin(10, PinKind::Input,  PinDataType::Array, "Keys",   Variant(keys));
+    addPin(11, PinKind::Input,  PinDataType::Array, "Values", Variant(vals));
+    addPin(12, PinKind::Output, PinDataType::String,"JSON");
+    bp.nodes.push_back(node);
+    bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto result = runner.ExecuteNode(1);
+    EXPECT_TRUE(result.success);
+    std::string json = runner.GetPinValue(12).asString();
+    EXPECT_FALSE(json.empty()) << "JSON.Build should produce non-empty JSON";
+    EXPECT_NE(json.find("gpt-4o"), std::string::npos) << "JSON should contain model value";
+    EXPECT_NE(json.find("model"),  std::string::npos) << "JSON should contain 'model' key";
+}
+
+// JSON.SetPath
+TEST_F(HandlersTest, JSONSetPath_CreateNestedField)
+{
+    BlueprintData bp;
+    bp.metadata.name = "JSONSetPathTest";
+    NodeInstance node;
+    node.id = 1; node.definitionId = "JSON.SetPath";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id = id; p.kind = k; p.dataType = dt; p.name = name; p.defaultValue = dv;
+        node.pins.push_back(p);
+    };
+    addPin(10, PinKind::Input,  PinDataType::String, "JSON",  Variant(std::string("{}")));
+    addPin(11, PinKind::Input,  PinDataType::String, "Path",  Variant(std::string("message.content")));
+    addPin(12, PinKind::Input,  PinDataType::Any,    "Value", Variant(std::string("Hello")));
+    addPin(13, PinKind::Output, PinDataType::String, "JSON");
+    bp.nodes.push_back(node);
+    bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto result = runner.ExecuteNode(1);
+    EXPECT_TRUE(result.success);
+    std::string out = runner.GetPinValue(13).asString();
+    EXPECT_NE(out.find("Hello"),   std::string::npos) << "JSON.SetPath should set value";
+    EXPECT_NE(out.find("content"), std::string::npos) << "JSON.SetPath should create nested key";
+}
+
+// JSON.ArrayPush
+TEST_F(HandlersTest, JSONArrayPush_AppendsElement)
+{
+    BlueprintData bp;
+    bp.metadata.name = "JSONArrayPushTest";
+    NodeInstance node;
+    node.id = 1; node.definitionId = "JSON.ArrayPush";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id = id; p.kind = k; p.dataType = dt; p.name = name; p.defaultValue = dv;
+        node.pins.push_back(p);
+    };
+    // exec flow pins (required for exec nodes)
+    { PinInfo p; p.id = 9;  p.kind = PinKind::Input;  p.isExec = true;  p.name = ""; node.pins.push_back(p); }
+    { PinInfo p; p.id = 99; p.kind = PinKind::Output; p.isExec = true;  p.name = ""; node.pins.push_back(p); }
+    addPin(10, PinKind::Input,  PinDataType::String,  "JSON",    Variant(std::string("[\"a\"]")));
+    addPin(11, PinKind::Input,  PinDataType::Any,     "Element", Variant(std::string("b")));
+    addPin(12, PinKind::Output, PinDataType::String,  "JSON");
+    addPin(13, PinKind::Output, PinDataType::Integer, "Length");
+    bp.nodes.push_back(node);
+    bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto result = runner.ExecuteNode(1);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(runner.GetPinValue(13).asInt(), 2) << "Length should be 2 after push";
+    std::string out = runner.GetPinValue(12).asString();
+    EXPECT_NE(out.find("\"b\""), std::string::npos) << "Pushed element should appear in JSON";
+}
+
+// JSON.MakeMessage
+TEST_F(HandlersTest, JSONMakeMessage_BuildsChatMessage)
+{
+    BlueprintData bp;
+    bp.metadata.name = "JSONMakeMessageTest";
+    NodeInstance node;
+    node.id = 1; node.definitionId = "JSON.MakeMessage";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id = id; p.kind = k; p.dataType = dt; p.name = name; p.defaultValue = dv;
+        node.pins.push_back(p);
+    };
+    addPin(10, PinKind::Input,  PinDataType::String, "Role",    Variant(std::string("user")));
+    addPin(11, PinKind::Input,  PinDataType::String, "Content", Variant(std::string("Hello AI")));
+    addPin(12, PinKind::Output, PinDataType::String, "JSON");
+    bp.nodes.push_back(node);
+    bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto result = runner.ExecuteNode(1);
+    EXPECT_TRUE(result.success);
+    std::string out = runner.GetPinValue(12).asString();
+    EXPECT_NE(out.find("\"user\""),     std::string::npos) << "role should be 'user'";
+    EXPECT_NE(out.find("\"Hello AI\""), std::string::npos) << "content should be 'Hello AI'";
+}
+
+// String.Template
+TEST_F(HandlersTest, StringTemplate_ReplacesPlaceholders)
+{
+    BlueprintData bp;
+    bp.metadata.name = "StringTemplateTest";
+    NodeInstance node;
+    node.id = 1; node.definitionId = "String.Template";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id = id; p.kind = k; p.dataType = dt; p.name = name; p.defaultValue = dv;
+        node.pins.push_back(p);
+    };
+    addPin(10, PinKind::Input,  PinDataType::String, "Template",
+           Variant(std::string("Hello {{name}}, today is {{day}}!")));
+    std::vector<Variant> keys = { Variant(std::string("name")), Variant(std::string("day")) };
+    std::vector<Variant> vals = { Variant(std::string("Alice")), Variant(std::string("Monday")) };
+    addPin(11, PinKind::Input,  PinDataType::Array,  "Keys",   Variant(keys));
+    addPin(12, PinKind::Input,  PinDataType::Array,  "Values", Variant(vals));
+    addPin(13, PinKind::Output, PinDataType::String, "Result");
+    bp.nodes.push_back(node);
+    bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto result = runner.ExecuteNode(1);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(runner.GetPinValue(13).asString(), "Hello Alice, today is Monday!");
+}

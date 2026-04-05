@@ -1493,6 +1493,101 @@ static void RegisterNodeDefs_Network(INodeRegistry& registry)
         "2E86AB");
 }
 
+// ============================================================================
+// AI / LLM 节点定义
+// 颜色：6A0572（紫色，区别于网络蓝）
+// ============================================================================
+static void RegisterNodeDefs_AI(INodeRegistry& registry)
+{
+    auto reg = [&registry](const char* id, const char* name, const char* category,
+                  std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
+                  const char* color = "", const char* edType = "")
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
+
+    // JSON.Build — 从 Keys/Values 数组构建 JSON 对象字符串
+    reg("JSON.Build", "JSON Build", "AI/JSON",
+        {
+            MakePin("Keys",   PinDataType::Array),   // Array<String>
+            MakePin("Values", PinDataType::Array),   // Array<Any>
+        },
+        {
+            MakePin("JSON", PinDataType::String),
+        },
+        "6A0572", "Simple");
+
+    // JSON.SetPath — 向 JSON 对象设置嵌套路径
+    reg("JSON.SetPath", "JSON Set Path", "AI/JSON",
+        {
+            MakeFlowPin(""),
+            MakePin("JSON",  PinDataType::String),
+            MakePin("Path",  PinDataType::String),   // e.g. "choices[0].message.content"
+            MakePin("Value", PinDataType::Any),
+        },
+        {
+            MakeFlowPin(""),
+            MakePin("JSON",  PinDataType::String),
+        },
+        "6A0572");
+
+    // JSON.ArrayPush — 向 JSON 数组追加元素
+    reg("JSON.ArrayPush", "JSON Array Push", "AI/JSON",
+        {
+            MakeFlowPin(""),
+            MakePin("JSON",    PinDataType::String),
+            MakePin("Element", PinDataType::Any),
+        },
+        {
+            MakeFlowPin(""),
+            MakePin("JSON",   PinDataType::String),
+            MakePin("Length", PinDataType::Integer),
+        },
+        "6A0572");
+
+    // JSON.MakeMessage — 构造 {"role":"...","content":"..."} 消息对象
+    reg("JSON.MakeMessage", "Make Message", "AI/JSON",
+        {
+            MakePin("Role",    PinDataType::String),   // "user" | "assistant" | "system"
+            MakePin("Content", PinDataType::String),
+        },
+        {
+            MakePin("JSON", PinDataType::String),
+        },
+        "6A0572", "Simple");
+
+    // String.Template — {{key}} 占位符替换
+    reg("String.Template", "String Template", "AI/String",
+        {
+            MakePin("Template", PinDataType::String),
+            MakePin("Keys",     PinDataType::Array),   // Array<String>
+            MakePin("Values",   PinDataType::Array),   // Array<String>
+        },
+        {
+            MakePin("Result", PinDataType::String),
+        },
+        "6A0572", "Simple");
+
+    // LLM.Chat — OpenAI 兼容 Chat 调用
+    reg("LLM.Chat", "LLM Chat", "AI/LLM",
+        {
+            MakeFlowPin(""),
+            MakePin("BaseURL",      PinDataType::String),   // 默认 https://api.openai.com/v1
+            MakePin("ApiKey",       PinDataType::String),
+            MakePin("Model",        PinDataType::String),   // 默认 gpt-4o
+            MakePin("Messages",     PinDataType::String),   // JSON 数组字符串
+            MakePin("SystemPrompt", PinDataType::String),   // 可选，自动插到首条
+            MakePin("MaxTokens",    PinDataType::Integer),  // 默认 1024
+            MakePin("Temperature",  PinDataType::Float),    // 默认 0.7
+        },
+        {
+            MakeFlowPin("onReply"),
+            MakeFlowPin("onError"),
+            MakePin("Reply",        PinDataType::String),
+            MakePin("FullResponse", PinDataType::String),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "6A0572");
+}
+
 void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
 {
     // --- 注册分类 ---
@@ -1515,6 +1610,7 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     addCat("Event",      "Events");
     addCat("Function",   "Functions");
     addCat("Network",    "Network");
+    addCat("AI",         "AI / LLM");
 
     // --- 注册各分类的节点定义 ---
     RegisterNodeDefs_Flow(registry);
@@ -1534,6 +1630,7 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     RegisterNodeDefs_Function(registry);
     RegisterNodeDefs_EventBus(registry);
     RegisterNodeDefs_Network(registry);
+    RegisterNodeDefs_AI(registry);
 }
 
 } // namespace Runtime

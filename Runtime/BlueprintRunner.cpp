@@ -325,10 +325,19 @@ void BlueprintRunner::prepareNodeContext(const NodeInstance& node)
     m_state.currentNode = &node;
     m_state.nodeData = node.nodeData;
     m_state.pinNameToId.clear();
+    m_state.inputPinNameToId.clear();
+    m_state.outputPinNameToId.clear();
 
     for (const auto& pin : node.pins)
     {
+        // 全量 map（后者覆盖前者，保留旧行为作为降级路径）
         m_state.pinNameToId[pin.name] = pin.id;
+
+        // 分向 map：输入/输出引脚分开存，同名不冲突
+        if (pin.kind == PinKind::Input)
+            m_state.inputPinNameToId[pin.name] = pin.id;
+        else
+            m_state.outputPinNameToId[pin.name] = pin.id;
     }
 }
 

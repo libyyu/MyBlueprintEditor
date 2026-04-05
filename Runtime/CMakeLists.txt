@@ -78,6 +78,7 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Data.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Misc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Network.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_AI.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Http/IHttpClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Http/HttpClient_Default.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Http/HttpClient_Emscripten.cpp
