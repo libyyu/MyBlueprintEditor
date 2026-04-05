@@ -38,6 +38,7 @@ add_executable(blueprint_tests
     test_serialization.cpp
     test_topology.cpp
     test_handlers.cpp
+    test_agent_demo.cpp
 )
 
 target_link_libraries(blueprint_tests
@@ -45,6 +46,13 @@ target_link_libraries(blueprint_tests
         BlueprintRuntime
         crude_json
         GTest::gtest_main
+)
+
+# TEST_ASSETS_DIR：指向 tests/assets，供 test_handlers 等定位 bjson 文件
+# TEST_PROJECT_DIR：指向项目根目录，供 test_agent_demo 定位 examples/
+target_compile_definitions(blueprint_tests PRIVATE
+    TEST_ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets"
+    TEST_PROJECT_DIR="${CMAKE_SOURCE_DIR}"
 )
 
 target_include_directories(blueprint_tests PRIVATE
