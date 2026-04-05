@@ -1381,3 +1381,105 @@ TEST_F(HandlersTest, RetryBackoff_SucceedOnSecondAttempt)
     EXPECT_EQ(r.GetVariable("result").asString(), "ok")
         << "Should succeed on attempt index 1 → result='ok'";
 }
+
+// ForLoopWithBreak — 在 LoopBody 内通过 SetVariable 设置 __forloopbreak_1=true 触发 Break
+// （不通过 Break exec 引脚连线，避免拓扑排序误判循环）
+TEST_F(HandlersTest, ForLoopWithBreak_BreaksAtIndex3)
+{
+    // 蓝图：
+    //  OnBeginPlay
+    //    → ForLoopWithBreak(0..9)  [id=1]
+    //      LoopBody → SetVariable(lastIdx, Index)
+    //               → Branch(Index >= 3)
+    //                 True  → SetVariable(__forloopbreak_1, true)  # 触发 break
+    //                 False → (nothing, loop continues)
+    //      Completed → SetVariable(completed, 1)
+
+    BlueprintData bp; bp.metadata.name = "FLBreakAt3Test";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* nm, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=nm;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+
+    // ForLoopWithBreak node (id=1)
+    NodeInstance fl; fl.id=1; fl.definitionId="ForLoopWithBreak";
+    addP(fl, 10, PinKind::Input,  PinDataType::Unknown, "",           true);
+    addP(fl, 11, PinKind::Input,  PinDataType::Unknown, "Break",      true);  // not wired
+    addP(fl, 12, PinKind::Input,  PinDataType::Integer, "First Index",false, Variant((int64_t)0));
+    addP(fl, 13, PinKind::Input,  PinDataType::Integer, "Last Index", false, Variant((int64_t)9));
+    addP(fl, 14, PinKind::Output, PinDataType::Unknown, "Loop Body",  true);
+    addP(fl, 15, PinKind::Output, PinDataType::Integer, "Index");
+    addP(fl, 16, PinKind::Output, PinDataType::Unknown, "Completed",  true);
+    bp.nodes.push_back(fl);
+
+    // SetVariable(lastIdx, Index)  [id=2]
+    NodeInstance sv1; sv1.id=2; sv1.definitionId="SetVariable";
+    addP(sv1, 20, PinKind::Input,  PinDataType::Unknown, "",       true);
+    addP(sv1, 21, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("lastIdx")));
+    addP(sv1, 22, PinKind::Input,  PinDataType::Integer, "Value", false);  // from Index
+    addP(sv1, 23, PinKind::Output, PinDataType::Unknown, "",       true);
+    bp.nodes.push_back(sv1);
+
+    // GreaterEqual(Index, 3) [id=3]
+    NodeInstance ge; ge.id=3; ge.definitionId="GreaterEqual";
+    addP(ge, 30, PinKind::Input,  PinDataType::Integer, "A", false);
+    addP(ge, 31, PinKind::Input,  PinDataType::Integer, "B", false, Variant((int64_t)3));
+    addP(ge, 32, PinKind::Output, PinDataType::Boolean, "Result");
+    bp.nodes.push_back(ge);
+
+    // Branch(Index >= 3) [id=4]
+    NodeInstance br; br.id=4; br.definitionId="Branch";
+    addP(br, 40, PinKind::Input,  PinDataType::Unknown, "",          true);
+    addP(br, 41, PinKind::Input,  PinDataType::Boolean, "Condition", false);
+    addP(br, 42, PinKind::Output, PinDataType::Unknown, "True",  true);
+    addP(br, 43, PinKind::Output, PinDataType::Unknown, "False", true);
+    bp.nodes.push_back(br);
+
+    // SetVariable(__forloopbreak_1, true)  [id=5]  — signals ForLoopWithBreak to stop
+    NodeInstance sv2; sv2.id=5; sv2.definitionId="SetVariable";
+    addP(sv2, 50, PinKind::Input,  PinDataType::Unknown, "",       true);
+    addP(sv2, 51, PinKind::Input,  PinDataType::String,  "Name",  false,
+         Variant(std::string("__forloopbreak_1")));          // matches breakKey in handler
+    addP(sv2, 52, PinKind::Input,  PinDataType::Boolean, "Value", false, Variant(true));
+    addP(sv2, 53, PinKind::Output, PinDataType::Unknown, "",       true);
+    bp.nodes.push_back(sv2);
+
+    // SetVariable(completed, 1) [id=6]
+    NodeInstance sv3; sv3.id=6; sv3.definitionId="SetVariable";
+    addP(sv3, 60, PinKind::Input,  PinDataType::Unknown, "",       true);
+    addP(sv3, 61, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("completed")));
+    addP(sv3, 62, PinKind::Input,  PinDataType::Integer, "Value", false, Variant((int64_t)1));
+    addP(sv3, 63, PinKind::Output, PinDataType::Unknown, "",       true);
+    bp.nodes.push_back(sv3);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+
+    // LoopBody → sv1(lastIdx=Index), sv1.out → Branch exec
+    LinkInstance lk1; lk1.id=3001; lk1.startPinId=14; lk1.endPinId=20;   // LoopBody→sv1
+    LinkInstance lk2; lk2.id=3002; lk2.startPinId=15; lk2.endPinId=22;   // Index→sv1.Value
+    LinkInstance lk3; lk3.id=3003; lk3.startPinId=23; lk3.endPinId=40;   // sv1.out→Branch
+    // Index → GreaterEqual.A
+    LinkInstance lk4; lk4.id=3004; lk4.startPinId=15; lk4.endPinId=30;
+    // GreaterEqual.Result → Branch.Condition
+    LinkInstance lk5; lk5.id=3005; lk5.startPinId=32; lk5.endPinId=41;
+    // Branch.True → SetVariable(__forloopbreak_1, true)
+    LinkInstance lk6; lk6.id=3006; lk6.startPinId=42; lk6.endPinId=50;
+    // ForLoopWithBreak.Completed → SetVariable(completed, 1)
+    LinkInstance lk7; lk7.id=3007; lk7.startPinId=16; lk7.endPinId=60;
+
+    bp.links.insert(bp.links.end(), {lk1, lk2, lk3, lk4, lk5, lk6, lk7});
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    auto result = RunWithBeginPlay(r);
+
+    // lastIdx should be 3 (loop ran 0,1,2,3; at index 3, break flag set)
+    EXPECT_EQ(r.GetVariable("lastIdx").asInt(), 3)
+        << "Loop should have run indices 0-3 and broken at 3";
+    // Completed fires after break
+    EXPECT_EQ(r.GetVariable("completed").asInt(), 1)
+        << "Completed branch should fire after break";
+}
+

@@ -3,6 +3,9 @@
 // RunWithTick:        Execute() 后驱动实时 Tick 循环直到所有异步节点完成。
 // RunWithBeginPlay:   Execute() + DispatchEvent("OnBeginPlay") + Tick 循环。
 // AddBeginPlayEntry:  给 BlueprintData 添加 OnBeginPlay 事件源节点，并连接到指定 execIn 引脚。
+// 注意：ForLoopWithBreak 的 Break 引脚不可通过 exec 连线直接连回 ForLoopWithBreak 本身，
+//       否则会触发拓扑排序的循环检测。正确做法：在 LoopBody 内用 SetVariable 设置
+//       blueprint 变量 "__forloopbreak_<nodeId>=true"，handler 会自动检测并退出循环。
 #pragma once
 
 #include <chrono>
