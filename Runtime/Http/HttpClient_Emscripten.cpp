@@ -1,18 +1,15 @@
 // Runtime/Http/HttpClient_Emscripten.cpp
 // emscripten_fetch 实现（WebGL）
 //
-// 关键设计：
-//   fetch 回调触发在浏览器事件循环（主线程），但不是 BlueprintRunner::Tick() 上下文。
-//   直接在回调里调 ActivateOutputFlow 会绕过 Tick 调度，导致重入风险。
-//   修复：回调里把 HttpCallback Post 到 MainThreadDispatcher，
-//   由 Tick() → DrainQueue() 在安全上下文里统一消费。
+// SendAsync 的 callback 就是 RunAsync dispatcher 传入的 resolve()。
+// resolve() 内部已经把 onComplete Post 到 MainThreadDispatcher，
+// 由 Tick() → DrainQueue() 消费，所以这里直接调 cb 即可。
 //
 // Emscripten 链接参数需加：-sFETCH
 
 #ifdef __EMSCRIPTEN__
 
 #include "IHttpClient.h"
-#include "../MainThreadDispatcher.h"
 #include <emscripten/fetch.h>
 #include <cstring>
 #include <vector>
@@ -21,28 +18,10 @@
 namespace NodeEditor {
 namespace Runtime {
 
-// ============================================================================
-// 请求上下文（传给 fetch 回调）
-// ============================================================================
-
 struct FetchContext {
     HttpRequest  req;
     HttpCallback cb;
 };
-
-// ============================================================================
-// 统一派发：把响应 Post 到 MainThreadDispatcher，由 Tick/DrainQueue 消费
-// ============================================================================
-
-static void dispatchResponse(FetchContext* ctx, HttpResponse resp)
-{
-    HttpCallback cb = std::move(ctx->cb);
-    delete ctx;
-    MainThreadDispatcher::Get().Post(
-        [cb = std::move(cb), resp = std::move(resp)]() mutable {
-            cb(std::move(resp));
-        });
-}
 
 static void onFetchSuccess(emscripten_fetch_t* fetch)
 {
@@ -51,7 +30,9 @@ static void onFetchSuccess(emscripten_fetch_t* fetch)
     resp.statusCode = fetch->status;
     resp.body.assign(fetch->data, static_cast<size_t>(fetch->numBytes));
     emscripten_fetch_close(fetch);
-    dispatchResponse(ctx, std::move(resp));
+    HttpCallback cb = std::move(ctx->cb);
+    delete ctx;
+    cb(std::move(resp));   // 即 resolve()，内部 Post 到 MainThreadDispatcher
 }
 
 static void onFetchError(emscripten_fetch_t* fetch)
@@ -61,12 +42,10 @@ static void onFetchError(emscripten_fetch_t* fetch)
     resp.statusCode = fetch->status;
     resp.error = "fetch error (status " + std::to_string(fetch->status) + ")";
     emscripten_fetch_close(fetch);
-    dispatchResponse(ctx, std::move(resp));
+    HttpCallback cb = std::move(ctx->cb);
+    delete ctx;
+    cb(std::move(resp));   // 即 resolve()
 }
-
-// ============================================================================
-// HttpClient_Emscripten
-// ============================================================================
 
 class HttpClient_Emscripten : public IHttpClient
 {
@@ -110,15 +89,9 @@ public:
             attr.requestDataSize = req.body.size();
         }
 
-        // emscripten_fetch 立即返回，请求在浏览器事件循环里异步执行
         emscripten_fetch(&attr, req.url.c_str());
-        // hdrStorage/hdrPtrs 的生命周期：emscripten_fetch 内部会复制 headers，安全销毁
     }
 };
-
-// ============================================================================
-// 工厂函数
-// ============================================================================
 
 std::shared_ptr<IHttpClient> CreateDefaultHttpClient()
 {

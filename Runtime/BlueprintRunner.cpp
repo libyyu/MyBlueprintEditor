@@ -1665,52 +1665,40 @@ TimerHandle ExecutionContext::Delay(float seconds, const std::function<void()>& 
 }
 
 // ============================================================================
-// RunAsync — 后台线程执行 + 主线程回调
+// RunAsync — 跨平台异步执行框架
 // ============================================================================
 
 void ExecutionContext::RunAsync(
-    std::function<void()>                  background,
-    std::function<void(ExecutionContext&)> onComplete)
+    AsyncDispatcher                          dispatcher,
+    std::function<void(ExecutionContext&)>   onComplete)
 {
-#ifdef __EMSCRIPTEN__
-    // Emscripten：单线程，直接同步执行
-    if (background) background();
-    if (onComplete) onComplete(*this);
-#else
     if (!m_runner) return;
 
-    // 保存执行上下文快照（与 wrapCallbackWithContextRestore 逻辑一致）
     auto savedNode        = m_state->currentNode;
     auto savedPinNameToId = m_state->pinNameToId;
     auto savedNodeData    = m_state->nodeData;
 
     m_runner->AcquireAsync();
-    BlueprintRunner* runner = m_runner;
-    // 捕获 alive 标志的 shared_ptr 副本，用于在回调时检查 runner 是否仍存活
-    auto alive = runner->GetAliveFlag();
-    NodeExecutionState* state = m_state;
-    ExecutionContext* ctx = this;
+    BlueprintRunner*    runner = m_runner;
+    auto                alive  = runner->GetAliveFlag();
+    NodeExecutionState* state  = m_state;
+    ExecutionContext*   ctx    = this;
 
-    // 后台线程：只执行纯计算，不接触 ctx
-    std::thread([ctx, state, runner, alive,
-                 bg       = std::move(background),
-                 done     = std::move(onComplete),
-                 savedNode, savedPinNameToId, savedNodeData]() mutable
+    // resolve：无论哪个平台，都 Post 到 MainThreadDispatcher，
+    // 由 Tick() → DrainQueue() 在安全上下文中执行 onComplete。
+    auto resolve = [ctx, state, runner, alive, onComplete,
+                    savedNode, savedPinNameToId, savedNodeData]() mutable
     {
-        if (bg) bg();
-
-        // 完成后 dispatch 回主线程
         MainThreadDispatcher::Get().Post(
-            [ctx, state, runner, alive, done = std::move(done),
+            [ctx, state, runner, alive, onComplete = std::move(onComplete),
              savedNode, savedPinNameToId, savedNodeData]() mutable
             {
-                // 检查 runner 是否已析构
                 if (!alive->load(std::memory_order_acquire))
                 {
-                    return; // runner 已销毁，放弃执行
+                    runner->ReleaseAsync();
+                    return;
                 }
 
-                // 恢复执行上下文状态（同 wrapCallbackWithContextRestore）
                 auto prevNode        = state->currentNode;
                 auto prevPinNameToId = state->pinNameToId;
                 auto prevNodeData    = state->nodeData;
@@ -1719,16 +1707,43 @@ void ExecutionContext::RunAsync(
                 state->pinNameToId  = savedPinNameToId;
                 state->nodeData     = savedNodeData;
 
-                if (done) done(*ctx);
+                if (onComplete) onComplete(*ctx);
 
                 state->currentNode  = prevNode;
                 state->pinNameToId  = prevPinNameToId;
                 state->nodeData     = prevNodeData;
 
-                if (runner) runner->ReleaseAsync();
+                runner->ReleaseAsync();
             });
+    };
+
+#ifdef __EMSCRIPTEN__
+    // WebGL：dispatcher 在当前（主）线程调用。
+    // 调用方负责在 dispatcher 内用 emscripten_fetch 等原生异步 API，
+    // 完成时调 resolve()，resolve 再 Post onComplete 到 Tick。
+    // 不在这里同步执行 onComplete，保证与桌面行为一致。
+    if (dispatcher) dispatcher(std::move(resolve));
+#else
+    // 桌面/移动：dispatcher 在后台线程中运行，完成后调 resolve()。
+    std::thread([dispatcher = std::move(dispatcher),
+                 resolve    = std::move(resolve)]() mutable
+    {
+        if (dispatcher) dispatcher(std::move(resolve));
     }).detach();
 #endif
+}
+
+// 兼容旧签名：background() 在后台线程/当前线程同步执行后自动 resolve
+void ExecutionContext::RunAsync(
+    std::function<void()>                    background,
+    std::function<void(ExecutionContext&)>   onComplete)
+{
+    RunAsync(
+        [bg = std::move(background)](AsyncResolve resolve) {
+            if (bg) bg();
+            resolve();
+        },
+        std::move(onComplete));
 }
 
 TimerHandle ExecutionContext::SetTimer(float seconds, TimerCallback callback)

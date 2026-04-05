@@ -244,17 +244,36 @@ public:
     // 行为层：异步调度
     // ------------------------------------------------------------------
 
-    // 在后台线程执行 background()，完成后将 onComplete(ctx) dispatch 回主线程执行。
+    // 跨平台异步执行框架
+    //
+    // dispatcher(resolve) 负责发起异步操作，完成时调用 resolve()。
+    // onComplete(ctx)     在主线程 Tick/DrainQueue 上下文中执行，可安全访问蓝图状态。
+    //
+    // 语义在所有平台完全一致：
+    //   - 非 Emscripten：dispatcher 在后台线程中调用；resolve() 将 onComplete Post 到
+    //                     MainThreadDispatcher，由 Tick() → DrainQueue() 消费。
+    //   - Emscripten：    dispatcher 在当前（主）线程中调用；调用方在 dispatcher 内用
+    //                     emscripten_fetch 等原生异步 API，完成回调里调 resolve()；
+    //                     resolve() 同样 Post 到 MainThreadDispatcher，由 Tick() 消费。
+    //                     这样无论哪个平台，onComplete 都不在 dispatcher 内同步执行，
+    //                     避免了 WebGL 下的重入风险。
     //
     // 规则：
-    //   - background 不能访问 ExecutionContext / 任何蓝图状态（线程不安全）
-    //   - background 只操作通过捕获传入的纯数据（shared_ptr 等）
+    //   - dispatcher 不能访问 ExecutionContext / 任何蓝图状态（线程不安全）
     //   - onComplete 在主线程 Tick 期间执行，可安全访问 ctx
     //   - AcquireAsync / ReleaseAsync 由 RunAsync 内部自动管理，无需手动调用
     //
-    // Emscripten 下：background() 和 onComplete(*this) 在当前线程同步执行。
-    // 非 Emscripten 下：background() 在新线程执行，完成后通过
-    //   MainThreadDispatcher 投递 onComplete，由 BlueprintRunner::Tick 消费。
+    // 旧签名（background, onComplete）已废弃，保留为重载以兼容现有调用方，
+    // 内部桥接到新签名（background 包装成 dispatcher，不使用 resolve）。
+    using AsyncResolve = std::function<void()>;
+    using AsyncDispatcher = std::function<void(AsyncResolve resolve)>;
+
+    void RunAsync(
+        AsyncDispatcher                          dispatcher,
+        std::function<void(ExecutionContext&)>   onComplete);
+
+    // 兼容旧签名：background() 在后台线程同步执行后自动 resolve
+    // WebGL 下等价于同步执行 background() + 将 onComplete Post 到下一帧
     void RunAsync(
         std::function<void()>                    background,
         std::function<void(ExecutionContext&)>   onComplete);
