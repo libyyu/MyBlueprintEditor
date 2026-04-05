@@ -1779,6 +1779,14 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
             MakePin("JSON", PinDataType::String),
         },
         "2E86AB");
+
+    // ── JSON.ToolCallCount ──────────────────────────────────────────────────
+    // 返回 tool_calls 数组长度（用于并行工具调用循环）
+    reg("JSON.ToolCallCount", "Tool Call Count", "AI/JSON",
+        { MakePin("ToolCallsJSON", PinDataType::String), },
+        { MakePin("Count",         PinDataType::Integer), },
+        "2E86AB");
+
     // 从文件加载对话历史 JSON 数组
     // WebGL：直接 onNew + 空数组
     reg("Memory.LoadHistory", "Memory Load History", "AI/Memory",

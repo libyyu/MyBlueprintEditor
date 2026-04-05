@@ -646,6 +646,279 @@ void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner)
     lua_setfield(L, -2, "HasNodeDef");
 
     lua_setglobal(L, "Blueprint");
+
+    // ================================================================
+    // json.* 全局库
+    //   json.encode(value) → string      将 Lua 值序列化为 JSON 字符串
+    //   json.decode(str)   → table/value 将 JSON 字符串解析为 Lua 值
+    //   json.get(str, path)→ value       按点路径（含数组下标）取值
+    // ================================================================
+    {
+        // ── json.encode ─────────────────────────────────────────────
+        auto l_json_encode = [](lua_State* LS) -> int {
+            // 把栈顶 Lua 值转成 crude_json::value，再 dump
+            std::function<crude_json::value(lua_State*, int)> toJson;
+            toJson = [&toJson](lua_State* LS2, int idx) -> crude_json::value {
+                int t = lua_type(LS2, idx);
+                if (t == LUA_TNIL)     return crude_json::value(); // null
+                if (t == LUA_TBOOLEAN) return crude_json::value((bool)lua_toboolean(LS2, idx));
+                if (t == LUA_TNUMBER) {
+                    if (lua_isinteger(LS2, idx))
+                        return crude_json::value((double)lua_tointeger(LS2, idx));
+                    return crude_json::value(lua_tonumber(LS2, idx));
+                }
+                if (t == LUA_TSTRING)
+                    return crude_json::value(std::string(lua_tostring(LS2, idx)));
+                if (t == LUA_TTABLE) {
+                    // 检测是数组还是对象：key 全为连续整数 1..N → array
+                    bool isArray = true;
+                    lua_Integer arrLen = (lua_Integer)lua_rawlen(LS2, idx);
+                    if (arrLen == 0) {
+                        // 看第一个 key 是否是整数
+                        lua_pushnil(LS2);
+                        if (lua_next(LS2, idx < 0 ? idx - 1 : idx) != 0) {
+                            if (lua_type(LS2, -2) != LUA_TNUMBER) isArray = false;
+                            lua_pop(LS2, 2);
+                        }
+                    }
+                    int absIdx = idx < 0
+                        ? lua_gettop(LS2) + idx + 1
+                        : idx;
+                    if (isArray && arrLen > 0) {
+                        crude_json::array arr;
+                        for (lua_Integer i = 1; i <= arrLen; i++) {
+                            lua_rawgeti(LS2, absIdx, i);
+                            arr.push_back(toJson(LS2, -1));
+                            lua_pop(LS2, 1);
+                        }
+                        return crude_json::value(std::move(arr));
+                    } else {
+                        crude_json::object obj;
+                        lua_pushnil(LS2);
+                        while (lua_next(LS2, absIdx) != 0) {
+                            std::string key;
+                            if (lua_type(LS2, -2) == LUA_TSTRING)
+                                key = lua_tostring(LS2, -2);
+                            else
+                                key = std::to_string((int)lua_tonumber(LS2, -2));
+                            obj[key] = toJson(LS2, -1);
+                            lua_pop(LS2, 1);
+                        }
+                        return crude_json::value(std::move(obj));
+                    }
+                }
+                return crude_json::value(); // null for unsupported types
+            };
+
+            if (lua_gettop(LS) < 1) {
+                lua_pushstring(LS, "null");
+                return 1;
+            }
+            std::string s = toJson(LS, 1).dump();
+            lua_pushstring(LS, s.c_str());
+            return 1;
+        };
+
+        // ── json.decode ─────────────────────────────────────────────
+        auto l_json_decode = [](lua_State* LS) -> int {
+            const char* str = lua_tostring(LS, 1);
+            if (!str) { lua_pushnil(LS); return 1; }
+
+            crude_json::value v = crude_json::value::parse(std::string(str));
+
+            std::function<void(lua_State*, const crude_json::value&)> pushVal;
+            pushVal = [&pushVal](lua_State* LS2, const crude_json::value& v2) {
+                if (v2.is_null())    { lua_pushnil(LS2); return; }
+                if (v2.is_boolean())    { lua_pushboolean(LS2, (bool)v2.get<crude_json::boolean>() ? 1 : 0); return; }
+                if (v2.is_number())  { lua_pushnumber(LS2, v2.get<double>()); return; }
+                if (v2.is_string())  { lua_pushstring(LS2, v2.get<std::string>().c_str()); return; }
+                if (v2.is_array()) {
+                    const auto& arr = v2.get<crude_json::array>();
+                    lua_createtable(LS2, (int)arr.size(), 0);
+                    for (int i = 0; i < (int)arr.size(); i++) {
+                        pushVal(LS2, arr[i]);
+                        lua_rawseti(LS2, -2, i + 1);
+                    }
+                    return;
+                }
+                if (v2.is_object()) {
+                    const auto& obj = v2.get<crude_json::object>();
+                    lua_createtable(LS2, 0, (int)obj.size());
+                    for (const auto& kv : obj) {
+                        lua_pushstring(LS2, kv.first.c_str());
+                        pushVal(LS2, kv.second);
+                        lua_rawset(LS2, -3);
+                    }
+                    return;
+                }
+                lua_pushnil(LS2);
+            };
+
+            pushVal(LS, v);
+            return 1;
+        };
+
+        // ── json.get ────────────────────────────────────────────────
+        // json.get(jsonStr, "choices[0].message.content") → value
+        auto l_json_get = [](lua_State* LS) -> int {
+            const char* jsonStr  = lua_tostring(LS, 1);
+            const char* pathStr  = lua_tostring(LS, 2);
+            if (!jsonStr || !pathStr) { lua_pushnil(LS); return 1; }
+
+            crude_json::value v = crude_json::value::parse(std::string(jsonStr));
+
+            // 路径遍历（复用 JSON.GetPath 节点的逻辑）
+            std::string path(pathStr);
+            size_t pos = 0;
+            while (pos < path.size() && !v.is_null()) {
+                // 数组下标 [N]
+                if (path[pos] == '[') {
+                    size_t end = path.find(']', pos);
+                    if (end == std::string::npos) { v = crude_json::value(); break; }
+                    int idx = std::stoi(path.substr(pos + 1, end - pos - 1));
+                    pos = end + 1;
+                    if (path[pos] == '.') pos++;
+                    if (!v.is_array()) { v = crude_json::value(); break; }
+                    const auto& arr = v.get<crude_json::array>();
+                    if (idx < 0 || idx >= (int)arr.size()) { v = crude_json::value(); break; }
+                    v = arr[idx];
+                    continue;
+                }
+                size_t dot   = path.find('.', pos);
+                size_t brack = path.find('[', pos);
+                size_t end   = std::min(dot, brack);
+                std::string key = path.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
+                pos = (end == std::string::npos) ? path.size() : end;
+                if (path[pos] == '.') pos++;
+                if (!v.is_object() || !v.contains(key)) { v = crude_json::value(); break; }
+                v = v[key];
+            }
+
+            if (v.is_null())   { lua_pushnil(LS); return 1; }
+            if (v.is_boolean())   { lua_pushboolean(LS, (bool)v.get<crude_json::boolean>() ? 1 : 0); return 1; }
+            if (v.is_number()) { lua_pushnumber(LS, v.get<double>()); return 1; }
+            if (v.is_string()) { lua_pushstring(LS, v.get<std::string>().c_str()); return 1; }
+            // 复杂类型 → dump 为字符串
+            std::string dumped = v.dump();
+            lua_pushstring(LS, dumped.c_str());
+            return 1;
+        };
+
+        lua_newtable(L);
+        lua_pushcfunction(L, l_json_encode); lua_setfield(L, -2, "encode");
+        lua_pushcfunction(L, l_json_decode); lua_setfield(L, -2, "decode");
+        lua_pushcfunction(L, l_json_get);    lua_setfield(L, -2, "get");
+        lua_setglobal(L, "json");
+    }
+
+    // ================================================================
+    // http.* 全局库（同步，仅非 Emscripten；WebGL 下返回 nil + error）
+    //   http.request(url, method, body, headers) → body, statusCode, error
+    //   http.get(url, headers)                   → body, statusCode, error
+    //   http.post(url, body, headers)            → body, statusCode, error
+    // ================================================================
+    {
+        // ── lua_http_doRequest：静态辅助，lua_CFunction 兼容（无捕获）──
+        // 读取 headers table（栈位置 headersIdx，0=没有）
+        static auto readHeaders = [](lua_State* LS, int headersIdx) {
+            std::map<std::string,std::string> h;
+            if (headersIdx > 0 && lua_istable(LS, headersIdx)) {
+                lua_pushnil(LS);
+                while (lua_next(LS, headersIdx)) {
+                    if (lua_type(LS, -2) == LUA_TSTRING && lua_type(LS, -1) == LUA_TSTRING)
+                        h[lua_tostring(LS, -2)] = lua_tostring(LS, -1);
+                    lua_pop(LS, 1);
+                }
+            }
+            return h;
+        };
+
+        // 内部同步请求实现（文件作用域静态 lambda，可退化为函数指针）
+        static auto doHttpRequest = [](
+            lua_State* LS,
+            const std::string& url,
+            const std::string& method,
+            const std::string& body,
+            const std::map<std::string,std::string>& headers) -> int
+        {
+#ifdef __EMSCRIPTEN__
+            lua_pushnil(LS);
+            lua_pushinteger(LS, 0);
+            lua_pushstring(LS, "http.* not available on WebGL (use HTTP.Request node)");
+            return 3;
+#else
+            auto* client = BP_GetHttpClient();
+            if (!client) {
+                lua_pushnil(LS);
+                lua_pushinteger(LS, 0);
+                lua_pushstring(LS, "No HTTP client registered");
+                return 3;
+            }
+            struct SyncResult {
+                HttpResponse resp;
+                bool done = false;
+                std::mutex mu;
+                std::condition_variable cv;
+            };
+            auto result = std::make_shared<SyncResult>();
+
+            HttpRequest req;
+            req.url     = url;
+            req.method  = method;
+            req.body    = body;
+            req.headers = headers;
+            if (req.headers.find("Content-Type") == req.headers.end() && !body.empty())
+                req.headers["Content-Type"] = "application/json";
+
+            client->SendAsync(req, [result](HttpResponse r) {
+                std::unique_lock<std::mutex> lk(result->mu);
+                result->resp = std::move(r);
+                result->done = true;
+                result->cv.notify_one();
+            });
+            {
+                std::unique_lock<std::mutex> lk(result->mu);
+                result->cv.wait(lk, [&result]{ return result->done; });
+            }
+            const auto& resp = result->resp;
+            if (!resp.error.empty()) {
+                lua_pushnil(LS);
+                lua_pushinteger(LS, resp.statusCode);
+                lua_pushstring(LS, resp.error.c_str());
+                return 3;
+            }
+            lua_pushstring(LS, resp.body.c_str());
+            lua_pushinteger(LS, resp.statusCode);
+            lua_pushnil(LS);
+            return 3;
+#endif
+        };
+
+        // 无捕获 lambda → 可隐式转 lua_CFunction
+        static const lua_CFunction l_http_request = [](lua_State* LS) -> int {
+            std::string url    = lua_tostring(LS, 1) ? lua_tostring(LS, 1) : "";
+            std::string method = lua_tostring(LS, 2) ? lua_tostring(LS, 2) : "GET";
+            std::string body   = lua_tostring(LS, 3) ? lua_tostring(LS, 3) : "";
+            return doHttpRequest(LS, url, method, body, readHeaders(LS, 4));
+        };
+
+        static const lua_CFunction l_http_get = [](lua_State* LS) -> int {
+            std::string url = lua_tostring(LS, 1) ? lua_tostring(LS, 1) : "";
+            return doHttpRequest(LS, url, "GET", "", readHeaders(LS, 2));
+        };
+
+        static const lua_CFunction l_http_post = [](lua_State* LS) -> int {
+            std::string url  = lua_tostring(LS, 1) ? lua_tostring(LS, 1) : "";
+            std::string body = lua_tostring(LS, 2) ? lua_tostring(LS, 2) : "";
+            return doHttpRequest(LS, url, "POST", body, readHeaders(LS, 3));
+        };
+
+        lua_newtable(L);
+        lua_pushcfunction(L, l_http_request); lua_setfield(L, -2, "request");
+        lua_pushcfunction(L, l_http_get);     lua_setfield(L, -2, "get");
+        lua_pushcfunction(L, l_http_post);    lua_setfield(L, -2, "post");
+        lua_setglobal(L, "http");
+    }
 }
 
 

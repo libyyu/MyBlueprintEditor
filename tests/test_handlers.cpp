@@ -575,13 +575,14 @@ TEST_F(HandlersTest, MemorySaveHistory_WritesFile)
     EXPECT_TRUE(res.success);
     EXPECT_EQ(runner.GetPinValue(7).asString(), ""); // no error
 
-    // 验证文件内容
-    std::ifstream f(path);
-    ASSERT_TRUE(f.is_open()) << "file should have been created";
-    std::string content((std::istreambuf_iterator<char>(f)), {});
-    EXPECT_NE(content.find("user"), std::string::npos);
-    EXPECT_NE(content.find("hi"),   std::string::npos);
-
+    // 验证文件内容（ifstream 放独立作用域，确保析构后文件锁释放再 remove）
+    {
+        std::ifstream f(path);
+        ASSERT_TRUE(f.is_open()) << "file should have been created";
+        std::string content((std::istreambuf_iterator<char>(f)), {});
+        EXPECT_NE(content.find("user"), std::string::npos);
+        EXPECT_NE(content.find("hi"),   std::string::npos);
+    } // f 析构，Windows 文件锁释放
     std::filesystem::remove(path);
 }
 
@@ -619,14 +620,15 @@ TEST_F(HandlersTest, MemorySaveHistory_TrimsToMaxMessages)
     EXPECT_TRUE(res.success);
 
     // 解析写入的文件，期望恰好 2 条
-    std::ifstream f(path);
-    ASSERT_TRUE(f.is_open());
-    std::string content((std::istreambuf_iterator<char>(f)), {});
-    // 最后两条是 "4" 和 "5"
-    EXPECT_NE(content.find("\"4\""), std::string::npos) << "should contain msg 4";
-    EXPECT_NE(content.find("\"5\""), std::string::npos) << "should contain msg 5";
-    EXPECT_EQ(content.find("\"1\""), std::string::npos) << "msg 1 should be trimmed";
-
+    {
+        std::ifstream f(path);
+        ASSERT_TRUE(f.is_open());
+        std::string content((std::istreambuf_iterator<char>(f)), {});
+        // 最后两条是 "4" 和 "5"
+        EXPECT_NE(content.find("\"4\""), std::string::npos) << "should contain msg 4";
+        EXPECT_NE(content.find("\"5\""), std::string::npos) << "should contain msg 5";
+        EXPECT_EQ(content.find("\"1\""), std::string::npos) << "msg 1 should be trimmed";
+    } // f 析构，Windows 文件锁释放
     std::filesystem::remove(path);
 }
 
