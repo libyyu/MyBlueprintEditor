@@ -747,7 +747,7 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
                 auto oit = m_state.outputPinNameToId.find(pin.name);
                 if (oit != m_state.outputPinNameToId.end())
                 {
-                    auto vit = m_state.pinValues.find(it->second);
+                    auto vit = m_state.pinValues.find(oit->second);
                     if (vit != m_state.pinValues.end()) v = vit->second;
                 }
             }
@@ -930,7 +930,14 @@ ExecutionResult BlueprintRunner::Execute()
             }
             else
             {
-                m_stepTopoIndex = i;  // 主循环直接命中，指向当前断点节点
+                // 主循环直接命中（executeNodeInternal 返回 false 且 handler 内部 Pause）
+                // 注意：若 handler 返回 true 但内部的 ActivateOutputFlow 命中了断点
+                // （如 ForLoop Completed 出口的 PrintString），此时 m_pausedAtNodeId==0
+                // 但当前 node（i）是触发断点的"父节点"而非断点节点本身。
+                // 为此，优先在 m_stepPendingNodes 中找断点节点（executeDownstreamFromPin
+                // 在断点前会将已命中的节点追踪到 m_flowExecutedNodes，断点节点未被加入）。
+                // 兜底：用 i（当前节点）。
+                m_stepTopoIndex = i;
             }
             // 统计总执行节点数（主循环顶层 + 子流执行的节点）
             result.nodesExecuted = static_cast<int>(m_flowExecutedNodes.size()) + result.nodesExecuted;
@@ -2069,8 +2076,11 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
         // 断点命中：executeNodeInternal 已调用 Pause()，立即停止当前流执行
         if (m_runState.load() == RunState::Paused)
         {
-            // 记录断点所在的节点 id，供主循环 Execute() 设置 m_stepTopoIndex
-            m_pausedAtNodeId = node->id;
+            // 记录断点所在的节点 id，供主循环 Execute() / DispatchEvent() 设置 m_stepTopoIndex
+            // 注意：只在 m_pausedAtNodeId 尚未被更深层的递归调用设置时才赋值，
+            // 避免覆盖更精确的断点位置（如 ForLoop Completed 出口下游节点的断点）。
+            if (m_pausedAtNodeId == 0)
+                m_pausedAtNodeId = node->id;
             ok = false;
             break;
         }
