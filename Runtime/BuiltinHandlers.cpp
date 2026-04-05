@@ -33,6 +33,7 @@
 #include "handlers/BuiltinHandlers_Misc.h"
 #include "handlers/BuiltinHandlers_Network.h"
 #include "handlers/BuiltinHandlers_AI.h"
+#include "handlers/BuiltinHandlers_File.h"
 
 namespace NodeEditor {
 namespace Runtime {
@@ -59,6 +60,7 @@ void RegisterBuiltinHandlers(
     RegisterHandlers_Misc(allHandlers);
     RegisterHandlers_Network(allHandlers, runner);
     RegisterHandlers_AI(allHandlers, runner);
+    RegisterHandlers_File(allHandlers);
 
     // 设置默认处理器
     runner.SetDefaultHandler([](ExecutionContext& ctx) {

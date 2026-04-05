@@ -6,17 +6,24 @@
 //   · Variant ↔ Lua 类型双向转换（pushVariant / toVariant）
 //   · Blueprint.RegisterHandler(definitionId, luaFunction)
 //   · wrapLuaHandler: Lua function → C++ NodeHandler
+//   · json.*  全局库（parse/stringify/get/set）
+//   · http.*  全局库（get/post — 同步包装，仅限非 Emscripten）
 
 #ifdef BLUEPRINT_HAS_LUA
 
 #include "LuaBindings.h"
 #include "BlueprintRunner.h"
+#include "Http/IHttpClient.h"
+#include "../../Utils/Json/crude_json.h"
 
 #include <lua.hpp>
 #include <new>       // placement new
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <mutex>
+#include <condition_variable>
+#include <functional>
 
 namespace NodeEditor {
 namespace Runtime {
@@ -640,6 +647,7 @@ void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner)
 
     lua_setglobal(L, "Blueprint");
 }
+
 
 } // namespace Runtime
 } // namespace NodeEditor

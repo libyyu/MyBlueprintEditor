@@ -1454,6 +1454,138 @@ static void RegisterNodeDefs_EventBus(INodeRegistry& registry)
         "FF8060");
 }
 
+// ============================================================================
+// File I/O 节点定义
+// 颜色：4CAF50（绿色，区别于 Network 蓝 / AI 紫）
+// ============================================================================
+static void RegisterNodeDefs_File(INodeRegistry& registry)
+{
+    auto reg = [&registry](const char* id, const char* name, const char* category,
+                  std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
+                  const char* color = "", const char* edType = "")
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
+
+    const char* kColor = "4CAF50";  // 绿色
+
+    // ── File.ReadText ──────────────────────────────────────────────────
+    reg("File.ReadText", "File Read Text", "File",
+        {
+            MakeFlowPin(""),
+            MakePin("Path", PinDataType::String),
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("Content",      PinDataType::String),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        kColor);
+
+    // ── File.WriteText ─────────────────────────────────────────────────
+    reg("File.WriteText", "File Write Text", "File",
+        {
+            MakeFlowPin(""),
+            MakePin("Path",    PinDataType::String),
+            MakePin("Content", PinDataType::String),
+            MakePin("Append",  PinDataType::Boolean),   // false=覆盖, true=追加
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        kColor);
+
+    // ── File.AppendText ────────────────────────────────────────────────
+    reg("File.AppendText", "File Append Text", "File",
+        {
+            MakeFlowPin(""),
+            MakePin("Path",    PinDataType::String),
+            MakePin("Content", PinDataType::String),
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        kColor);
+
+    // ── File.Exists (纯数据) ───────────────────────────────────────────
+    reg("File.Exists", "File Exists", "File",
+        { MakePin("Path", PinDataType::String) },
+        { MakePin("Exists", PinDataType::Boolean) },
+        kColor);
+
+    // ── File.Delete ────────────────────────────────────────────────────
+    reg("File.Delete", "File Delete", "File",
+        {
+            MakeFlowPin(""),
+            MakePin("Path",           PinDataType::String),
+            MakePin("IgnoreNotFound", PinDataType::Boolean),
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        kColor);
+
+    // ── File.ListDir ───────────────────────────────────────────────────
+    reg("File.ListDir", "File List Dir", "File",
+        {
+            MakeFlowPin(""),
+            MakePin("Path",    PinDataType::String),
+            MakePin("Pattern", PinDataType::String),  // 子串过滤（空=全部）
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("Files",        PinDataType::String),   // JSON 数组字符串
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        kColor);
+
+    // ── File.MakeDir ───────────────────────────────────────────────────
+    reg("File.MakeDir", "File Make Dir", "File",
+        {
+            MakeFlowPin(""),
+            MakePin("Path", PinDataType::String),
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        kColor);
+
+    // ── File.GetBaseName (纯数据) ──────────────────────────────────────
+    reg("File.GetBaseName", "File Get Base Name", "File",
+        { MakePin("Path", PinDataType::String) },
+        { MakePin("BaseName", PinDataType::String) },
+        kColor);
+
+    // ── File.GetDirName (纯数据) ───────────────────────────────────────
+    reg("File.GetDirName", "File Get Dir Name", "File",
+        { MakePin("Path", PinDataType::String) },
+        { MakePin("DirName", PinDataType::String) },
+        kColor);
+
+    // ── File.JoinPath (纯数据) ─────────────────────────────────────────
+    reg("File.JoinPath", "File Join Path", "File",
+        {
+            MakePin("Base", PinDataType::String),
+            MakePin("Part", PinDataType::String),
+        },
+        { MakePin("Result", PinDataType::String) },
+        kColor);
+
+    // ── File.GetSize (纯数据) ──────────────────────────────────────────
+    reg("File.GetSize", "File Get Size", "File",
+        { MakePin("Path", PinDataType::String) },
+        { MakePin("Size", PinDataType::Integer) },
+        kColor);
+}
+
 static void RegisterNodeDefs_Network(INodeRegistry& registry)
 {
     auto reg = [&registry](const char* id, const char* name, const char* category,
@@ -1611,6 +1743,7 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     addCat("Function",   "Functions");
     addCat("Network",    "Network");
     addCat("AI",         "AI / LLM");
+    addCat("File",       "File I/O");
 
     // --- 注册各分类的节点定义 ---
     RegisterNodeDefs_Flow(registry);
@@ -1631,6 +1764,7 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     RegisterNodeDefs_EventBus(registry);
     RegisterNodeDefs_Network(registry);
     RegisterNodeDefs_AI(registry);
+    RegisterNodeDefs_File(registry);
 }
 
 } // namespace Runtime

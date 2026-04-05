@@ -74,6 +74,9 @@ bool LuaScriptEngine::Initialize(BlueprintRunner* runner)
     // 注册 Blueprint.* API 和 metatable
     RegisterLuaBindings(m_L, m_runner);
 
+    // 注册 json.* 和 http.* 全局库
+    RegisterLuaJsonHttpLibs(m_L);
+
     m_lastError.clear();
     return true;
 }
@@ -101,8 +104,9 @@ bool LuaScriptEngine::InitializeWithExternalState(lua_State* L, BlueprintRunner*
     m_ownsState = false;  // 不拥有这个 VM，Shutdown 时不 close
 
     // 不调用 luaL_openlibs（外部 VM 已初始化，重复 open 可能覆盖全局表）
-    // 只注册 Blueprint.* 绑定
+    // 只注册 Blueprint.* 绑定 + json/http 库
     RegisterLuaBindings(m_L, m_runner);
+    RegisterLuaJsonHttpLibs(m_L);
 
     m_lastError.clear();
     return true;

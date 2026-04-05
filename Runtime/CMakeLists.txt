@@ -79,6 +79,7 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Misc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Network.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_AI.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_File.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Http/IHttpClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Http/HttpClient_Default.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Http/HttpClient_Emscripten.cpp
@@ -337,6 +338,7 @@ if(BLUEPRINT_LUA)
     list(APPEND RUNTIME_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/LuaScriptEngine.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/LuaBindings.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/LuaLib_JsonHttp.cpp
     )
     list(APPEND RUNTIME_PUBLIC_HEADERS
         ${CMAKE_CURRENT_SOURCE_DIR}/LuaScriptEngine.h

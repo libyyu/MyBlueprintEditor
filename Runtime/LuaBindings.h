@@ -1,10 +1,4 @@
 // Runtime/LuaBindings.h -- Lua ↔ C++ 绑定（ExecutionContext / Variant / Blueprint API）
-//
-// 职责：
-//   · Variant ↔ Lua 类型双向转换
-//   · ExecutionContext Lua metatable 绑定
-//   · Blueprint.RegisterHandler() Lua API
-//
 #pragma once
 
 #ifdef BLUEPRINT_HAS_LUA
@@ -18,9 +12,11 @@ namespace Runtime {
 
 class BlueprintRunner;
 
-// 注册所有 Lua 绑定（Variant metatable + ExecutionContext metatable + Blueprint 全局表）
-// 在 LuaScriptEngine::Initialize 中调用
+// 注册 Variant/ExecutionContext metatable + Blueprint 全局表
 BLUEPRINT_API void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner);
+
+// 注册 json.* 和 http.* Lua 全局库（需在 RegisterLuaBindings 之后调用）
+BLUEPRINT_API void RegisterLuaJsonHttpLibs(lua_State* L);
 
 } // namespace Runtime
 } // namespace NodeEditor
