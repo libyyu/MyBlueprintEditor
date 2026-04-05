@@ -1531,13 +1531,6 @@ bool BlueprintRunner::StepNextNode()
         return false;
     const auto& order = m_topoCache;
 
-    if (m_eventSubgraphDirty)
-    {
-        m_eventSubgraphCache = m_blueprint.collectEventSubgraphs();
-        m_eventSubgraphDirty = false;
-    }
-    const auto& eventSubgraph = m_eventSubgraphCache;
-
     // 辅助 lambda：在单步模式下执行一个节点
     // m_stepMode=true 期间，顶层 ActivateOutputFlow 只记录下游到 m_stepPendingNodes
     // 而不递归执行，保证每次 StepNext 只推进一个节点
@@ -1582,7 +1575,7 @@ bool BlueprintRunner::StepNextNode()
         {
             NodeId nodeId = order[i];
             if (!m_stepPendingNodes.count(nodeId)) continue;
-            if (eventSubgraph.count(nodeId))       continue;
+            // 注意：Step 模式下不过滤 eventSubgraph，exec 流已明确指向该节点
 
             const NodeInstance* node = m_blueprint.findNode(nodeId);
             if (!node) { m_stepPendingNodes.erase(nodeId); continue; }
@@ -1595,13 +1588,30 @@ bool BlueprintRunner::StepNextNode()
     }
 
     // 从 m_stepTopoIndex 开始按拓扑序找下一个未执行节点（兜底路径）
+    // 确保可达节点缓存有效
+    if (m_reachableDirty)
+    {
+        std::vector<NodeId> entryNodes;
+        for (const auto& node : m_blueprint.nodes)
+            if (m_blueprint.isEventSourceNode(node.id))
+                entryNodes.push_back(node.id);
+        if (entryNodes.empty())
+            for (const auto& node : m_blueprint.nodes)
+                if (node.definitionId == "Function.Entry")
+                    entryNodes.push_back(node.id);
+        m_reachableCache = m_blueprint.collectReachableNodes(entryNodes);
+        m_reachableDirty = false;
+    }
+    const auto& reachableNodes = m_reachableCache;
+
     while (m_stepTopoIndex < order.size())
     {
         NodeId nodeId = order[m_stepTopoIndex];
         ++m_stepTopoIndex;
 
         if (m_flowExecutedNodes.count(nodeId)) continue;
-        if (eventSubgraph.count(nodeId))       continue;
+        // 兜底路径：跳过不可达节点（悬空孤立节点），但不跳过 eventSubgraph 节点
+        if (!reachableNodes.empty() && !reachableNodes.count(nodeId)) continue;
 
         const NodeInstance* node = m_blueprint.findNode(nodeId);
         if (!node) continue;
