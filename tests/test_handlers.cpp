@@ -180,3 +180,119 @@ TEST_F(HandlersTest, PrintStringProducesLog)
     EXPECT_TRUE(found) << "PrintString should produce a log containing 'HELLO_TEST'";
 }
 
+
+// ── FromJSON: 嵌套对象 ────────────────────────────────────────────────────────
+
+TEST_F(HandlersTest, FromJSON_NestedObject)
+{
+    BlueprintData bp;
+    bp.metadata.name = "FromJSONNestedTest";
+
+    NodeInstance node;
+    node.id = 1; node.definitionId = "FromJSON";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id = id; p.kind = k; p.dataType = dt; p.name = name; p.defaultValue = dv; node.pins.push_back(p);
+    };
+    addPin(10, PinKind::Input,  PinDataType::String, "JSON",
+           Variant(std::string(R"({"name":"Alice","score":42,"active":true})")));
+    addPin(11, PinKind::Output, PinDataType::Any,    "Value");
+    addPin(12, PinKind::Output, PinDataType::Boolean,"Valid");
+    bp.nodes.push_back(node);
+    bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto result = runner.ExecuteNode(1);
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(runner.GetPinValue(12).asBool()) << "Valid should be true for valid JSON";
+    // Value 应该是 Map 类型
+    Variant val = runner.GetPinValue(11);
+    EXPECT_EQ(val.type, PinDataType::Map) << "Parsed object should be Map type";
+}
+
+// ── FromJSON: 数组 ────────────────────────────────────────────────────────────
+
+TEST_F(HandlersTest, FromJSON_Array)
+{
+    BlueprintData bp;
+    bp.metadata.name = "FromJSONArrayTest";
+
+    NodeInstance node;
+    node.id = 1; node.definitionId = "FromJSON";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id = id; p.kind = k; p.dataType = dt; p.name = name; p.defaultValue = dv; node.pins.push_back(p);
+    };
+    addPin(10, PinKind::Input,  PinDataType::String, "JSON",
+           Variant(std::string(R"([1, 2, 3])")));
+    addPin(11, PinKind::Output, PinDataType::Any,    "Value");
+    addPin(12, PinKind::Output, PinDataType::Boolean,"Valid");
+    bp.nodes.push_back(node);
+    bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto result = runner.ExecuteNode(1);
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(runner.GetPinValue(12).asBool());
+    Variant val = runner.GetPinValue(11);
+    EXPECT_EQ(val.type, PinDataType::Array) << "Parsed array should be Array type";
+    EXPECT_EQ(val.arraySize(), 3u);
+    EXPECT_EQ(val.arrayGet(1).asInt(), 2);
+}
+
+// ── GetField: 嵌套对象字段 ────────────────────────────────────────────────────
+
+TEST_F(HandlersTest, GetField_NestedObject)
+{
+    BlueprintData bp;
+    bp.metadata.name = "GetFieldTest";
+
+    NodeInstance node;
+    node.id = 1; node.definitionId = "GetField";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id = id; p.kind = k; p.dataType = dt; p.name = name; p.defaultValue = dv; node.pins.push_back(p);
+    };
+    addPin(10, PinKind::Input,  PinDataType::String, "JSON",
+           Variant(std::string(R"({"choices":[{"message":{"content":"Hello AI"}}]})")));
+    addPin(11, PinKind::Input,  PinDataType::String, "Key",
+           Variant(std::string("choices")));
+    addPin(12, PinKind::Output, PinDataType::String, "Value");
+    addPin(13, PinKind::Output, PinDataType::Boolean,"Found");
+    bp.nodes.push_back(node);
+    bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto result = runner.ExecuteNode(1);
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(runner.GetPinValue(13).asBool()) << "choices key should be found";
+    // GetField 返回顶层字段，choices 是数组，Value 应被序列化为 JSON 字符串
+    std::string val = runner.GetPinValue(12).asString();
+    EXPECT_FALSE(val.empty()) << "choices value should not be empty";
+}
+
+// ── JSON.GetPath: 深层路径 ────────────────────────────────────────────────────
+
+TEST_F(HandlersTest, JSONGetPath_DeepPath)
+{
+    BlueprintData bp;
+    bp.metadata.name = "JSONGetPathTest";
+
+    NodeInstance node;
+    node.id = 1; node.definitionId = "JSON.GetPath";
+    auto addPin = [&](uint64_t id, PinKind k, PinDataType dt, const char* name, Variant dv = {}) {
+        PinInfo p; p.id = id; p.kind = k; p.dataType = dt; p.name = name; p.defaultValue = dv; node.pins.push_back(p);
+    };
+    addPin(10, PinKind::Input,  PinDataType::String, "JSON",
+           Variant(std::string(R"({"choices":[{"message":{"content":"Hello AI"}}]})")));
+    addPin(11, PinKind::Input,  PinDataType::String, "Path",
+           Variant(std::string("choices[0].message.content")));
+    addPin(12, PinKind::Output, PinDataType::String, "Value");
+    addPin(13, PinKind::Output, PinDataType::Boolean,"Found");
+    bp.nodes.push_back(node);
+    bp.rebuildIndices();
+    ASSERT_TRUE(runner.Load(bp));
+
+    auto result = runner.ExecuteNode(1);
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(runner.GetPinValue(13).asBool()) << "Path should be found";
+    EXPECT_EQ(runner.GetPinValue(12).asString(), "Hello AI")
+        << "choices[0].message.content should equal 'Hello AI'";
+}

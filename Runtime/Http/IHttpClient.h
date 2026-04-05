@@ -61,5 +61,10 @@ public:
 void BP_SetHttpClient(std::shared_ptr<IHttpClient> client);
 IHttpClient* BP_GetHttpClient();   // 可能返回 nullptr（未注册时）
 
+// 工厂函数：按当前平台创建默认实现
+// - 非 Emscripten：HttpClient_Default（cpp-httplib）
+// - Emscripten：HttpClient_Emscripten（emscripten_fetch）
+std::shared_ptr<IHttpClient> CreateDefaultHttpClient();
+
 } // namespace Runtime
 } // namespace NodeEditor

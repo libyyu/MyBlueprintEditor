@@ -8,6 +8,7 @@
 #include <filesystem>
 #endif
 #include "../Runtime/ScriptNodeLoader.h"
+#include "../Runtime/Http/IHttpClient.h"
 
 // ============================================================================
 // ID 管理
@@ -1026,6 +1027,12 @@ void BlueprintEditor::OnStart()
     // Initialize node definition registry (全局共享)
     RegisterBuiltinNodeDefinitions();
     RegisterBuiltinHandlers();
+
+    // 注册 HTTP 客户端（跨平台：桌面用 cpp-httplib，WebGL 用 emscripten_fetch）
+    {
+        namespace BpRuntime = ::NodeEditor::Runtime;
+        BpRuntime::BP_SetHttpClient(BpRuntime::CreateDefaultHttpClient());
+    }
 
     // Phase 3：初始化 Lua 节点注册器
     m_LuaNodeRegistrar.Initialize(&m_NodeRegistry, &m_HandlerRegistry);
