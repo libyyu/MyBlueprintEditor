@@ -8,11 +8,15 @@
 #include "../Runtime/BlueprintRunner.h"  // NodeHandler / ExecutionContext
 #include "../Runtime/Types.h"
 #include "../Runtime/LuaBindings.h"
-
+#include "BpLogger.h"
 #include <lua.hpp>
 #include <filesystem>
 #include <chrono>
 #include <sstream>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 namespace fs = std::filesystem;
 
@@ -296,7 +300,9 @@ static int l_panic(lua_State* L)
         registrar->GetLogCallback()(2, "[LUA PANIC] " + reason);
     else
         BPERROR("[LUA PANIC] " + reason);
-
+#if defined(_WIN32) && defined(_DEBUG)
+	OutputDebugStringA(("[LUA PANIC] " + reason + "\n").c_str());
+#endif
 	throw std::runtime_error(reason);
 	return 0;
 }
@@ -311,6 +317,11 @@ static int l_print(lua_State* L)
         registrar->GetLogCallback()(0, "[Lua] " + s);
     else
         BPLOG("[Lua] " + s);
+
+#if defined(_WIN32) && defined(_DEBUG)
+	OutputDebugStringA(("[Lua] " + s + "\n").c_str());
+#endif
+
 	return 0;
 }
 static int l_warn(lua_State* L)
@@ -324,6 +335,11 @@ static int l_warn(lua_State* L)
         registrar->GetLogCallback()(1, "[Lua WARN] " + s);
     else
         BPWARN("[Lua WARN] " + s);
+
+#if defined(_WIN32) && defined(_DEBUG)
+	OutputDebugStringA(("[Lua] " + s + "\n").c_str());
+#endif
+
 	return 0;
 }
 
