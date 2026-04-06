@@ -380,6 +380,18 @@ if(BLUEPRINT_LUA)
     message(STATUS "[BlueprintRuntime] Lua scripting enabled (${_LUA_LIB_TYPE}, include: ${LUA_INCLUDE_DIR})")
 endif()
 
+# HTTPS support via OpenSSL (桌面平台；Emscripten 用浏览器 fetch，不需要)
+if(NOT EMSCRIPTEN)
+    find_package(OpenSSL QUIET)
+    if(OpenSSL_FOUND OR OPENSSL_FOUND)
+        target_compile_definitions(BlueprintRuntime PUBLIC CPPHTTPLIB_OPENSSL_SUPPORT)
+        target_link_libraries(BlueprintRuntime PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+        message(STATUS "[BlueprintRuntime] OpenSSL found (${OPENSSL_VERSION}) → HTTPS enabled")
+    else()
+        message(STATUS "[BlueprintRuntime] OpenSSL not found → HTTPS disabled (HTTP only)")
+    endif()
+endif()
+
 # ---------------------------------------------------------------------------
 # Include directories
 # ---------------------------------------------------------------------------
