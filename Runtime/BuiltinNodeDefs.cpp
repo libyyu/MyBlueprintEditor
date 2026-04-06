@@ -1746,7 +1746,7 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
             MakePin("ToolCallId", PinDataType::String),   // optional; for role="tool" responses
         },
         {
-            MakePin("JSON", PinDataType::String),
+            MakePin("Message", PinDataType::String),
         },
         "6A0572", "Simple");
 

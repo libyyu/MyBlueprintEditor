@@ -260,7 +260,7 @@ void RegisterHandlers_AI(
         // Add tool_call_id when present (required for role="tool" messages)
         if (!toolCallId.empty())
             obj["tool_call_id"] = crude_json::value(toolCallId);
-        ctx.SetOutputValue("JSON", Variant(crude_json::value(std::move(obj)).dump()));
+        ctx.SetOutputValue("Message", Variant(crude_json::value(std::move(obj)).dump()));
         return true;
     };
 

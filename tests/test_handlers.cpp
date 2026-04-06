@@ -397,9 +397,9 @@ TEST_F(HandlersTest, JSONMakeMessage_BuildsChatMessage)
         PinInfo p; p.id = id; p.kind = k; p.dataType = dt; p.name = name; p.defaultValue = dv;
         node.pins.push_back(p);
     };
-    addPin(10, PinKind::Input,  PinDataType::String, "Role",    Variant(std::string("user")));
-    addPin(11, PinKind::Input,  PinDataType::String, "Content", Variant(std::string("Hello AI")));
-    addPin(12, PinKind::Output, PinDataType::String, "JSON");
+    addPin(10, PinKind::Input,  PinDataType::String, "Role",       Variant(std::string("user")));
+    addPin(11, PinKind::Input,  PinDataType::String, "Content",    Variant(std::string("Hello AI")));
+    addPin(12, PinKind::Output, PinDataType::String, "Message");
     bp.nodes.push_back(node);
     bp.rebuildIndices();
     ASSERT_TRUE(runner.Load(bp));
