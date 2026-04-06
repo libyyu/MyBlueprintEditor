@@ -1618,25 +1618,30 @@ TEST_F(LuaBindingsTest, JsonRoundTrip)
 // http.* 没有注册 HttpClient 时应返回 nil + error（不崩溃）
 TEST_F(LuaBindingsTest, HttpRequest_NoClient_ReturnsError)
 {
-    // 不注册 HttpClient，直接调 http.get
+    // 不注册 HttpClient，调 http.get 时 callback 应立即收到错误
     bool ok = engine.LoadString(R"(
-        local body, status, err = http.get("http://localhost:9999/test")
-        result_body   = body
-        result_status = status
-        result_err    = err
+        result_body   = nil
+        result_status = nil
+        result_err    = nil
+        http.get("http://localhost:9999/test", function(body, status, err)
+            result_body   = body
+            result_status = status
+            result_err    = err
+        end)
     )");
     ASSERT_TRUE(ok) << engine.GetLastError();
 
     lua_State* L = engine.GetState();
 
-    lua_getglobal(L, "result_body");
-    bool isNil = lua_isnil(L, -1); lua_pop(L, 1);
-    EXPECT_TRUE(isNil) << "body should be nil when no client";
-
+    // 无 HttpClient 时 callback 被同步调用（在 asyncRequest 内立即触发）
     lua_getglobal(L, "result_err");
     ASSERT_EQ(lua_type(L, -1), LUA_TSTRING);
     std::string err = lua_tostring(L, -1); lua_pop(L, 1);
     EXPECT_FALSE(err.empty()) << "error string should not be empty";
+
+    lua_getglobal(L, "result_body");
+    bool isNil = lua_isnil(L, -1); lua_pop(L, 1);
+    EXPECT_TRUE(isNil) << "body should be nil when no client";
 }
 
 #endif // BLUEPRINT_HAS_LUA

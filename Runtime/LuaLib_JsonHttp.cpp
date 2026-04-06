@@ -17,18 +17,12 @@
 
 #include "LuaBindings.h"
 #include "Http/IHttpClient.h"
+#include "MainThreadDispatcher.h"
 #include "../../Utils/Json/crude_json.h"
 
 #include <lua.hpp>
 #include <string>
 #include <map>
-#ifndef __EMSCRIPTEN__
-// mutex/condition_variable 在后台线程 lambda 内部使用，此处只需 future/thread
-#  include <mutex>
-#  include <condition_variable>
-#  include <future>
-#  include <thread>
-#endif
 
 namespace NodeEditor {
 namespace Runtime {
@@ -146,18 +140,19 @@ static const crude_json::value* getJsonPath(const crude_json::value& root,
 }
 
 // ============================================================================
-// http 同步辅助（非 Emscripten）
+// http 异步辅助
 //
 // 设计说明：
-//   Lua 脚本在 Blueprint 主线程（或其异步回调）中运行。
-//   若直接在当前线程用 mutex+cv 等待 SendAsync 回调，而 SendAsync 的回调
-//   又需要 Post 到主线程执行，会形成死锁。
+//   所有 http.* 均为异步回调式，调用后立即返回 0。
+//   HTTP 完成后由 MainThreadDispatcher::Post 回到主线程，再调用 Lua callback。
 //
-//   解法：在独立后台线程中调用 SendAsync 并阻塞等待，主线程只是把任务
-//   提交给该后台线程然后等待 std::future，不占用 MainThreadDispatcher。
+//   Lua 用法：
+//     http.get(url [, headers_table], function(body, status, err) ... end)
+//     http.post(url, body [, headers_table], function(body, status, err) ... end)
+//     http.request(method, url, body, headers_table_or_str, function(...) end)
 // ============================================================================
-#ifndef __EMSCRIPTEN__
 
+// 把 Lua table（栈上 idx）转为 JSON headers 字符串 {"K":"V",...}
 static std::string luaTableToHeadersJson(lua_State* L, int idx)
 {
     int abs = (idx > 0 || idx <= LUA_REGISTRYINDEX) ? idx : lua_gettop(L) + idx + 1;
@@ -166,72 +161,69 @@ static std::string luaTableToHeadersJson(lua_State* L, int idx)
     while (lua_next(L, abs)) {
         if (!first) h += ","; first = false;
         h += "\"";
-        if (lua_type(L, -2) == LUA_TSTRING) {
+        if (lua_type(L, -2) == LUA_TSTRING)
             for (char c : std::string(lua_tostring(L, -2)))
-                h += (c == '"' ? "\\\"" : std::string(1,c));
-        }
+                h += (c == '"' ? "\\\"" : std::string(1, c));
         h += "\":\"";
-        if (lua_type(L, -1) == LUA_TSTRING) {
+        if (lua_type(L, -1) == LUA_TSTRING)
             for (char c : std::string(lua_tostring(L, -1)))
-                h += (c == '"' ? "\\\"" : std::string(1,c));
-        }
+                h += (c == '"' ? "\\\"" : std::string(1, c));
         h += "\"";
         lua_pop(L, 1);
     }
     return h + "}";
 }
 
-// 在独立线程里发请求，阻塞该线程直到完成，然后将结果推回 Lua 栈。
-// 不会阻塞 MainThreadDispatcher / Blueprint 主线程。
-static int syncRequest(lua_State* L,
-                       const std::string& method,
-                       const std::string& url,
-                       const std::string& body,
-                       const std::string& headers)
+// 通用异步分发：构造 HttpRequest，调用 SendAsync；
+// 回调由 MainThreadDispatcher::Post 派回主线程，再 lua_rawcall callback。
+// cbRef：LUA_REGISTRY 里的 callback 函数引用（调用后自动 unref）。
+static void asyncRequest(lua_State* L,
+                         const std::string& method,
+                         const std::string& url,
+                         const std::string& body,
+                         const std::string& headersJson,
+                         int cbRef)
 {
     auto* client = BP_GetHttpClient();
     if (!client) {
+        // 立即以错误调用 callback
+        lua_rawgeti(L, LUA_REGISTRYINDEX, cbRef);
+        luaL_unref(L, LUA_REGISTRYINDEX, cbRef);
         lua_pushnil(L);
         lua_pushinteger(L, 0);
-        lua_pushstring(L, "No HttpClient registered; call BP_SetHttpClient first");
-        return 3;
+        lua_pushstring(L, "No HttpClient registered");
+        lua_pcall(L, 3, 0, 0);
+        return;
     }
 
     HttpRequest req;
     req.method = method; req.url = url; req.body = body;
     {
-        auto hj = crude_json::value::parse(headers);
-        if (hj.is_object()) {
+        auto hj = crude_json::value::parse(headersJson);
+        if (hj.is_object())
             for (const auto& kv : hj.get<crude_json::object>())
                 if (kv.second.is_string())
                     req.headers[kv.first] = kv.second.get<std::string>();
-        }
     }
 
-    // 用 promise/future 在后台线程里等待，避免阻塞主线程的 event loop
-    std::promise<HttpResponse> promise;
-    auto future = promise.get_future();
-
-    std::thread([client, req = std::move(req), p = std::move(promise)]() mutable {
-        std::mutex mtx;
-        std::condition_variable cv;
-        bool done = false;
-        HttpResponse resp;
-        client->SendAsync(req, [&](HttpResponse r) {
-            { std::unique_lock<std::mutex> lk(mtx); resp = std::move(r); done = true; }
-            cv.notify_one();
+    // 把 lua_State* 和 cbRef 捕获进 SendAsync 回调，
+    // 回调经 MainThreadDispatcher::Post 在主线程执行 → 安全调用 Lua
+    client->SendAsync(req, [L, cbRef](HttpResponse resp) {
+        MainThreadDispatcher::Get().Post([L, cbRef, resp = std::move(resp)]() {
+            lua_rawgeti(L, LUA_REGISTRYINDEX, cbRef);
+            luaL_unref(L, LUA_REGISTRYINDEX, cbRef);
+            lua_pushstring(L, resp.body.c_str());
+            lua_pushinteger(L, resp.statusCode);
+            lua_pushstring(L, resp.error.c_str());
+            if (lua_pcall(L, 3, 0, 0) != LUA_OK) {
+                // Lua 回调出错，打印到 stderr，不崩溃
+                const char* err = lua_tostring(L, -1);
+                fprintf(stderr, "[http callback] Lua error: %s\n", err ? err : "(unknown)");
+                lua_pop(L, 1);
+            }
         });
-        { std::unique_lock<std::mutex> lk(mtx); cv.wait(lk, [&]{ return done; }); }
-        p.set_value(std::move(resp));
-    }).detach();
-
-    HttpResponse resp = future.get();   // 等后台线程完成（阻塞的是调用 http.* 的 Lua 协程线程）
-    lua_pushstring(L, resp.body.c_str());
-    lua_pushinteger(L, resp.statusCode);
-    lua_pushstring(L, resp.error.c_str());
-    return 3;
+    });
 }
-#endif // !__EMSCRIPTEN__
 
 // ============================================================================
 // 公开入口：注册 json.* 和 http.* 全局表
@@ -286,40 +278,75 @@ void RegisterLuaJsonHttpLibs(lua_State* L)
     lua_setglobal(L, "json");
 
     // ── http ─────────────────────────────────────────────────────────────────
+    // 全部异步回调式，调用后立即返回，HTTP 完成时在主线程调用 callback。
+    //
+    //   http.get(url [, headers], callback)
+    //   http.post(url, body [, headers], callback)
+    //   http.request(method, url, body, headers, callback)
+    //
+    //   callback(body: string, statusCode: int, error: string)
+    //
     lua_newtable(L);  // http 表
 
 #ifdef __EMSCRIPTEN__
     auto stub = [](lua_State* Lx) -> int {
-        lua_pushnil(Lx);
-        lua_pushinteger(Lx, 0);
-        lua_pushstring(Lx, "http.* not supported on WebGL; use HTTP.Request node instead");
-        return 3;
+        // Emscripten 不支持同步/异步 http.*，需用 HTTP.Request 节点
+        int cbIdx = lua_gettop(Lx);
+        if (lua_isfunction(Lx, cbIdx)) {
+            lua_pushvalue(Lx, cbIdx);
+            lua_pushnil(Lx);
+            lua_pushinteger(Lx, 0);
+            lua_pushstring(Lx, "http.* not supported on WebGL; use HTTP.Request node instead");
+            lua_pcall(Lx, 3, 0, 0);
+        }
+        return 0;
     };
     lua_pushcfunction(L, stub); lua_setfield(L, -2, "get");
     lua_pushcfunction(L, stub); lua_setfield(L, -2, "post");
     lua_pushcfunction(L, stub); lua_setfield(L, -2, "request");
 #else
+    // http.get(url [, headers_table], callback)
     lua_pushcfunction(L, [](lua_State* Lx) -> int {
         const char* url = luaL_checkstring(Lx, 1);
-        std::string hdrs = lua_istable(Lx, 2) ? luaTableToHeadersJson(Lx, 2) : "{}";
-        return syncRequest(Lx, "GET", url, "", hdrs);
+        std::string hdrs = "{}";
+        int cbIdx = 2;
+        if (lua_istable(Lx, 2)) { hdrs = luaTableToHeadersJson(Lx, 2); cbIdx = 3; }
+        luaL_checktype(Lx, cbIdx, LUA_TFUNCTION);
+        lua_pushvalue(Lx, cbIdx);
+        int ref = luaL_ref(Lx, LUA_REGISTRYINDEX);
+        asyncRequest(Lx, "GET", url, "", hdrs, ref);
+        return 0;
     });
     lua_setfield(L, -2, "get");
 
+    // http.post(url, body [, headers_table], callback)
     lua_pushcfunction(L, [](lua_State* Lx) -> int {
         const char* url  = luaL_checkstring(Lx, 1);
         const char* body = luaL_optstring(Lx, 2, "");
-        std::string hdrs = lua_istable(Lx, 3) ? luaTableToHeadersJson(Lx, 3) : "{}";
-        return syncRequest(Lx, "POST", url, body, hdrs);
+        std::string hdrs = "{}";
+        int cbIdx = 3;
+        if (lua_istable(Lx, 3)) { hdrs = luaTableToHeadersJson(Lx, 3); cbIdx = 4; }
+        luaL_checktype(Lx, cbIdx, LUA_TFUNCTION);
+        lua_pushvalue(Lx, cbIdx);
+        int ref = luaL_ref(Lx, LUA_REGISTRYINDEX);
+        asyncRequest(Lx, "POST", url, body, hdrs, ref);
+        return 0;
     });
     lua_setfield(L, -2, "post");
 
+    // http.request(method, url, body, headers_table_or_jsonstr, callback)
     lua_pushcfunction(L, [](lua_State* Lx) -> int {
-        const char* method  = luaL_checkstring(Lx, 1);
-        const char* url     = luaL_checkstring(Lx, 2);
-        const char* body    = luaL_optstring(Lx, 3, "");
-        const char* headers = luaL_optstring(Lx, 4, "{}");
-        return syncRequest(Lx, method, url, body, headers);
+        const char* method = luaL_checkstring(Lx, 1);
+        const char* url    = luaL_checkstring(Lx, 2);
+        const char* body   = luaL_optstring(Lx, 3, "");
+        std::string hdrs   = "{}";
+        if (lua_istable(Lx, 4))       hdrs = luaTableToHeadersJson(Lx, 4);
+        else if (lua_isstring(Lx, 4)) hdrs = lua_tostring(Lx, 4);
+        luaL_checktype(Lx, 5, LUA_TFUNCTION);
+        lua_pushvalue(Lx, 5);
+        int ref = luaL_ref(Lx, LUA_REGISTRYINDEX);
+        asyncRequest(Lx, method, url, body, hdrs, ref);
+        return 0;
     });
     lua_setfield(L, -2, "request");
 #endif
