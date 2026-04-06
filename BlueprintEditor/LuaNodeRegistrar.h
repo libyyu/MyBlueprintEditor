@@ -80,6 +80,17 @@ public:
     void PollFileChanges();
     void SetAutoReload(bool enable) { m_autoReload = enable; }
 
+    // ── 心跳 Tick ─────────────────────────────────────────────────────
+    // 每帧调用，驱动 Lua 全局 OnGlobalTick(dt) 函数（若存在）。
+    void Tick(float deltaTime);
+
+    // ── 日志回调 ──────────────────────────────────────────────────────
+    // 注入后，Lua 的 print()/warn() 会调用此 callback 而非写文件。
+    // level: 0=info, 1=warn, 2=error
+    using LogCallback = std::function<void(int level, const std::string& msg)>;
+    void SetLogCallback(LogCallback cb) { m_logCallback = std::move(cb); }
+    const LogCallback& GetLogCallback() const { return m_logCallback; }
+
     // 供 l_registerNode 回调使用（内部用）
     std::unordered_set<std::string>& GetRegisteredIds_Mutable() { return m_registeredIds; }
     std::unordered_map<std::string, std::unordered_set<std::string>>& GetFileNodeIds_Mutable() { return m_fileNodeIds; }
@@ -100,6 +111,7 @@ private:
     std::vector<std::string>        m_loadedFiles;
     std::unordered_set<std::string> m_registeredIds;
     std::string                     m_lastError;
+    LogCallback                     m_logCallback;   // Lua print/warn 输出目标
 
     std::unordered_map<std::string, int64_t> m_fileModTimes;
     // 每个文件注册的节点 id 集合（用于单文件精确热重载）

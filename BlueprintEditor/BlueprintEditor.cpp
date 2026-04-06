@@ -1037,6 +1037,24 @@ void BlueprintEditor::OnStart()
     // Phase 3：初始化 Lua 节点注册器
     m_LuaNodeRegistrar.Initialize(&m_NodeRegistry, &m_HandlerRegistry);
 
+    // 注入日志回调：Lua print/warn 输出到活跃文档的 executionLog（编辑器控制台）
+#ifdef BLUEPRINT_HAS_LUA
+    m_LuaNodeRegistrar.SetLogCallback([this](int level, const std::string& msg) {
+        // 同时写 BpLogger 文件日志
+        if (level == 0)      BpLogger::Get().Info(msg);
+        else if (level == 1) BpLogger::Get().Warn(msg);
+        else                 BpLogger::Get().Error(msg);
+
+        // 写入活跃文档的执行日志（显示在编辑器控制台面板）
+        BlueprintDocument* doc = ActiveDoc();
+        if (doc)
+        {
+            doc->executionLog.push_back(msg);
+            doc->executionLogDirty = true;
+        }
+    });
+#endif
+
     // ── Lua 搜索路径：追加 exe 所在目录 + 静默加载全局 BlueprintEntry ──────
     {
 #ifndef __EMSCRIPTEN__

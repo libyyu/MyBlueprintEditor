@@ -350,6 +350,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
         if (newCount != m_CachedDefCount)
             m_CachedDefCount = 0;  // 触发下一帧重建
     }
+    // 驱动 Lua 全局 OnGlobalTick(dt)
+    if (m_LuaNodeRegistrar.IsInitialized())
+        m_LuaNodeRegistrar.Tick(deltaTime);
 #endif
 
     // 驱动所有文档的计时器

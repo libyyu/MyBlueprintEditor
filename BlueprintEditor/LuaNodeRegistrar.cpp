@@ -285,22 +285,45 @@ static int l_panic(lua_State* L)
 	std::string reason(sL);
 	reason += "unprotected error in call to Lua API (";
 	const char* s = lua_tostring(L, -1);
-	reason += s;
-	reason += ")\n";
-    //TODO: 记录日志文件
+	reason += s ? s : "?";
+	reason += ")";
+
+    // 尝试通过 registrar 的 logCallback 输出
+    lua_getfield(L, LUA_REGISTRYINDEX, "__editor_registrar");
+    auto* registrar = static_cast<LuaNodeRegistrar*>(lua_touserdata(L, -1));
+    lua_pop(L, 1);
+    if (registrar && registrar->GetLogCallback())
+        registrar->GetLogCallback()(2, "[LUA PANIC] " + reason);
+    else
+        BPERROR("[LUA PANIC] " + reason);
+
 	throw std::runtime_error(reason);
 	return 0;
 }
 static int l_print(lua_State* L)
 {
-	std::string s = "[LUA]" + on_print_handler(L);
-	//TODO: 接管日志系统，输出到编辑器控制台
+	std::string s = on_print_handler(L);
+
+    lua_getfield(L, LUA_REGISTRYINDEX, "__editor_registrar");
+    auto* registrar = static_cast<LuaNodeRegistrar*>(lua_touserdata(L, -1));
+    lua_pop(L, 1);
+    if (registrar && registrar->GetLogCallback())
+        registrar->GetLogCallback()(0, "[Lua] " + s);
+    else
+        BPLOG("[Lua] " + s);
 	return 0;
 }
 static int l_warn(lua_State* L)
 {
-	std::string s = "[LUA]" + on_print_handler(L);
-    //TODO: 接管日志系统，输出到编辑器控制台
+	std::string s = on_print_handler(L);
+
+    lua_getfield(L, LUA_REGISTRYINDEX, "__editor_registrar");
+    auto* registrar = static_cast<LuaNodeRegistrar*>(lua_touserdata(L, -1));
+    lua_pop(L, 1);
+    if (registrar && registrar->GetLogCallback())
+        registrar->GetLogCallback()(1, "[Lua WARN] " + s);
+    else
+        BPWARN("[Lua WARN] " + s);
 	return 0;
 }
 
@@ -700,6 +723,30 @@ void LuaNodeRegistrar::PollFileChanges()
                 w.loaded = true;
             }
         } catch (...) {}
+    }
+}
+
+void LuaNodeRegistrar::Tick(float deltaTime)
+{
+    if (!m_L) return;
+
+    lua_getglobal(m_L, "OnGlobalTick");
+    if (!lua_isfunction(m_L, -1))
+    {
+        lua_pop(m_L, 1);
+        return;
+    }
+
+    lua_pushnumber(m_L, static_cast<double>(deltaTime));
+    if (lua_pcall(m_L, 1, 0, 0) != LUA_OK)
+    {
+        const char* err = lua_tostring(m_L, -1);
+        std::string msg = err ? err : "OnGlobalTick error";
+        if (m_logCallback)
+            m_logCallback(2, "[Lua ERROR] " + msg);
+        else
+            BPERROR("[Lua ERROR] " + msg);
+        lua_pop(m_L, 1);
     }
 }
 
