@@ -17,7 +17,6 @@
 
 #include "LuaBindings.h"
 #include "Http/IHttpClient.h"
-#include "MainThreadDispatcher.h"
 #include "../../Utils/Json/crude_json.h"
 
 #include <lua.hpp>
@@ -206,22 +205,21 @@ static void asyncRequest(lua_State* L,
                     req.headers[kv.first] = kv.second.get<std::string>();
     }
 
-    // 把 lua_State* 和 cbRef 捕获进 SendAsync 回调，
-    // 回调经 MainThreadDispatcher::Post 在主线程执行 → 安全调用 Lua
+    // SendAsync 的 cb 在各平台均于主线程（或等效主线程）调用：
+    //   native:      HttpClient_Default 通过 MainThreadDispatcher::Post 派回主线程
+    //   Emscripten:  emscripten_fetch 回调本身在浏览器主线程
+    // 因此此处直接调用 Lua callback，无需再套一层 Post。
     client->SendAsync(req, [L, cbRef](HttpResponse resp) {
-        MainThreadDispatcher::Get().Post([L, cbRef, resp = std::move(resp)]() {
-            lua_rawgeti(L, LUA_REGISTRYINDEX, cbRef);
-            luaL_unref(L, LUA_REGISTRYINDEX, cbRef);
-            lua_pushstring(L, resp.body.c_str());
-            lua_pushinteger(L, resp.statusCode);
-            lua_pushstring(L, resp.error.c_str());
-            if (lua_pcall(L, 3, 0, 0) != LUA_OK) {
-                // Lua 回调出错，打印到 stderr，不崩溃
-                const char* err = lua_tostring(L, -1);
-                fprintf(stderr, "[http callback] Lua error: %s\n", err ? err : "(unknown)");
-                lua_pop(L, 1);
-            }
-        });
+        lua_rawgeti(L, LUA_REGISTRYINDEX, cbRef);
+        luaL_unref(L, LUA_REGISTRYINDEX, cbRef);
+        lua_pushstring(L, resp.body.c_str());
+        lua_pushinteger(L, resp.statusCode);
+        lua_pushstring(L, resp.error.c_str());
+        if (lua_pcall(L, 3, 0, 0) != LUA_OK) {
+            const char* err = lua_tostring(L, -1);
+            fprintf(stderr, "[http callback] Lua error: %s\n", err ? err : "(unknown)");
+            lua_pop(L, 1);
+        }
     });
 }
 
@@ -288,23 +286,7 @@ void RegisterLuaJsonHttpLibs(lua_State* L)
     //
     lua_newtable(L);  // http 表
 
-#ifdef __EMSCRIPTEN__
-    auto stub = [](lua_State* Lx) -> int {
-        // Emscripten 不支持同步/异步 http.*，需用 HTTP.Request 节点
-        int cbIdx = lua_gettop(Lx);
-        if (lua_isfunction(Lx, cbIdx)) {
-            lua_pushvalue(Lx, cbIdx);
-            lua_pushnil(Lx);
-            lua_pushinteger(Lx, 0);
-            lua_pushstring(Lx, "http.* not supported on WebGL; use HTTP.Request node instead");
-            lua_pcall(Lx, 3, 0, 0);
-        }
-        return 0;
-    };
-    lua_pushcfunction(L, stub); lua_setfield(L, -2, "get");
-    lua_pushcfunction(L, stub); lua_setfield(L, -2, "post");
-    lua_pushcfunction(L, stub); lua_setfield(L, -2, "request");
-#else
+// WebGL 和 native 共用同一套回调注册，SendAsync 底层各平台自行实现
     // http.get(url [, headers_table], callback)
     lua_pushcfunction(L, [](lua_State* Lx) -> int {
         const char* url = luaL_checkstring(Lx, 1);
@@ -349,7 +331,6 @@ void RegisterLuaJsonHttpLibs(lua_State* L)
         return 0;
     });
     lua_setfield(L, -2, "request");
-#endif
 
     lua_setglobal(L, "http");
 }
