@@ -98,11 +98,22 @@ include(GoogleTest)
 if(BUILD_SHARED_LIBS)
     set(_lib_dir "$<TARGET_FILE_DIR:BlueprintRuntime>")
     if(WIN32)
-        gtest_discover_tests(blueprint_tests
-            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-            PROPERTIES ENVIRONMENT "PATH=${_lib_dir};$ENV{PATH}"
-            DISCOVERY_MODE PRE_TEST
-        )
+        # ENVIRONMENT_MODIFICATION (CMake 3.22+) prepends to PATH without
+        # clobbering the system PATH that contains MSVC runtime DLLs.
+        # Fall back to ENVIRONMENT for older CMake (but include system PATH).
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.22")
+            gtest_discover_tests(blueprint_tests
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${_lib_dir}"
+                DISCOVERY_MODE PRE_TEST
+            )
+        else()
+            gtest_discover_tests(blueprint_tests
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                PROPERTIES ENVIRONMENT "PATH=${_lib_dir};$ENV{PATH}"
+                DISCOVERY_MODE PRE_TEST
+            )
+        endif()
     else()
         gtest_discover_tests(blueprint_tests
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"

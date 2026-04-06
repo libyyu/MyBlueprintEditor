@@ -32,18 +32,16 @@ jobs:
       - name: Run tests
         run: |
           $testBin = "${{ github.workspace }}\build\bin\Release"
-          Write-Host "=== Searching for lua54.dll ==="
-          Get-ChildItem -Path "${{ github.workspace }}\build" -Filter "lua54.dll" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-            Write-Host "Found: $($_.FullName)"
-            Copy-Item $_.FullName -Destination $testBin -Force
-          }
-          # Also copy from install/bin
-          $installBin = "${{ github.workspace }}\install\bin"
-          if (Test-Path $installBin) {
-            Copy-Item "$installBin\*.dll" -Destination $testBin -Force -ErrorAction SilentlyContinue
+
+          # Copy every DLL found anywhere under build/ to the test exe directory
+          Write-Host "=== Copying all DLLs from build/ to test bin ==="
+          Get-ChildItem -Path "${{ github.workspace }}\build" -Filter "*.dll" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "  $($_.FullName) -> $testBin"
+            Copy-Item $_.FullName -Destination $testBin -Force -ErrorAction SilentlyContinue
           }
           Write-Host "=== DLLs in test bin ==="
-          Get-ChildItem $testBin -Filter "*.dll" | Select-Object Name
+          Get-ChildItem $testBin -Filter "*.dll" | Select-Object -ExpandProperty Name
+
           ctest --test-dir build -C Release --output-on-failure
         shell: pwsh
 
