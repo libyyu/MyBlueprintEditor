@@ -1,0 +1,954 @@
+{
+  "runtime": {
+    "fileType": "blueprint",
+    "metadata": {
+      "name": "ReActAgent",
+      "version": "2.0.0",
+      "description": "ReAct-style agent with parallel tool calls. Uses FireEvent + CustomEventNode for async loop (no exec cycle). Supports multiple tool calls per round via Tool.ForEach + Tool.Match. Edit ApiKey/BaseURL/Model before running.",
+      "blueprintClass": "Normal"
+    },
+    "nodes": [
+      {
+        "id": 1,
+        "definitionId": "OnBeginPlay",
+        "name": "On Begin Play",
+        "pins": [
+          {
+            "id": 1001,
+            "kind": 1,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "definitionId": "JSON.MakeMessage",
+        "name": "User Message",
+        "pins": [
+          {
+            "id": 3001,
+            "kind": 0,
+            "name": "Role",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "user"
+          },
+          {
+            "id": 3002,
+            "kind": 0,
+            "name": "Content",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "What's the weather in Beijing and Shanghai today?"
+          },
+          {
+            "id": 3010,
+            "kind": 1,
+            "name": "Message",
+            "dataType": 9,
+            "isExec": false
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "definitionId": "JSON.ArrayPush",
+        "name": "Push User Msg",
+        "pins": [
+          {
+            "id": 5001,
+            "kind": 0,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 5002,
+            "kind": 0,
+            "name": "JSON",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "[]"
+          },
+          {
+            "id": 5003,
+            "kind": 0,
+            "name": "Element",
+            "dataType": 9,
+            "isExec": false
+          },
+          {
+            "id": 5010,
+            "kind": 1,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 5011,
+            "kind": 1,
+            "name": "JSON",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 5012,
+            "kind": 1,
+            "name": "Length",
+            "dataType": 2,
+            "isExec": false
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "definitionId": "SetVariable",
+        "name": "Save messages",
+        "pins": [
+          {
+            "id": 6001,
+            "kind": 0,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 6002,
+            "kind": 0,
+            "name": "Name",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "messages"
+          },
+          {
+            "id": 6003,
+            "kind": 0,
+            "name": "Value",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 6010,
+            "kind": 1,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "definitionId": "FireEvent",
+        "name": "Start Agent Loop",
+        "pins": [
+          {
+            "id": 7001,
+            "kind": 0,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 7002,
+            "kind": 0,
+            "name": "EventName",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "AgentLoop"
+          },
+          {
+            "id": 7010,
+            "kind": 1,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "definitionId": "CustomEventNode",
+        "name": "AgentLoop",
+        "nodeData": {
+          "EventName": "AgentLoop"
+        },
+        "pins": [
+          {
+            "id": 10010,
+            "kind": 1,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 10011,
+            "kind": 1,
+            "name": "EventName",
+            "dataType": 4,
+            "isExec": false
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "definitionId": "GetVariable",
+        "name": "Get messages",
+        "pins": [
+          {
+            "id": 11001,
+            "kind": 0,
+            "name": "Name",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "messages"
+          },
+          {
+            "id": 11010,
+            "kind": 1,
+            "name": "Value",
+            "dataType": 4,
+            "isExec": false
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "definitionId": "LLM.Chat",
+        "name": "LLM Call",
+        "pins": [
+          {
+            "id": 12001,
+            "kind": 0,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 12002,
+            "kind": 0,
+            "name": "BaseURL",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "https://api.openai.com/v1"
+          },
+          {
+            "id": 12003,
+            "kind": 0,
+            "name": "ApiKey",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "sk-your-api-key-here"
+          },
+          {
+            "id": 12004,
+            "kind": 0,
+            "name": "Model",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "gpt-4o"
+          },
+          {
+            "id": 12005,
+            "kind": 0,
+            "name": "Messages",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 12006,
+            "kind": 0,
+            "name": "SystemPrompt",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "You are a helpful assistant with access to weather tools."
+          },
+          {
+            "id": 12007,
+            "kind": 0,
+            "name": "MaxTokens",
+            "dataType": 2,
+            "isExec": false,
+            "defaultValue": 1024
+          },
+          {
+            "id": 12008,
+            "kind": 0,
+            "name": "Temperature",
+            "dataType": 3,
+            "isExec": false,
+            "defaultValue": 0.7
+          },
+          {
+            "id": 12009,
+            "kind": 0,
+            "name": "Tools",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "[{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"description\":\"Get weather for a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\"}},\"required\":[\"location\"]}}}]"
+          },
+          {
+            "id": 12010,
+            "kind": 1,
+            "name": "onReply",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 12011,
+            "kind": 1,
+            "name": "onToolCall",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 12012,
+            "kind": 1,
+            "name": "onError",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 12020,
+            "kind": 1,
+            "name": "Reply",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 12021,
+            "kind": 1,
+            "name": "ToolCallsJSON",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 12022,
+            "kind": 1,
+            "name": "FinishReason",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 12023,
+            "kind": 1,
+            "name": "FullResponse",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 12024,
+            "kind": 1,
+            "name": "ErrorMessage",
+            "dataType": 4,
+            "isExec": false
+          }
+        ]
+      },
+      {
+        "id": 20,
+        "definitionId": "SetVariable",
+        "name": "Save Final Reply",
+        "pins": [
+          {
+            "id": 20001,
+            "kind": 0,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 20002,
+            "kind": 0,
+            "name": "Name",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "finalReply"
+          },
+          {
+            "id": 20003,
+            "kind": 0,
+            "name": "Value",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 20010,
+            "kind": 1,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      },
+      {
+        "id": 21,
+        "definitionId": "PrintString",
+        "name": "Print Final Answer",
+        "pins": [
+          {
+            "id": 21001,
+            "kind": 0,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 21002,
+            "kind": 0,
+            "name": "In String",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 21010,
+            "kind": 1,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      },
+      {
+        "id": 30,
+        "definitionId": "Tool.ForEach",
+        "name": "For Each Tool Call",
+        "pins": [
+          {
+            "id": 30001,
+            "kind": 0,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 30002,
+            "kind": 0,
+            "name": "ToolCallsJSON",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 30010,
+            "kind": 1,
+            "name": "onTool",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 30011,
+            "kind": 1,
+            "name": "onDone",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 30020,
+            "kind": 1,
+            "name": "ToolName",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 30021,
+            "kind": 1,
+            "name": "Arguments",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 30022,
+            "kind": 1,
+            "name": "ToolCallId",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 30023,
+            "kind": 1,
+            "name": "Index",
+            "dataType": 2,
+            "isExec": false
+          }
+        ]
+      },
+      {
+        "id": 31,
+        "definitionId": "Tool.Match",
+        "name": "Route Tool",
+        "pins": [
+          {
+            "id": 31001,
+            "kind": 0,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 31002,
+            "kind": 0,
+            "name": "ToolName",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 31003,
+            "kind": 0,
+            "name": "Case0",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "get_weather"
+          },
+          {
+            "id": 31010,
+            "kind": 1,
+            "name": "Match0",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 31011,
+            "kind": 1,
+            "name": "Default",
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      },
+      {
+        "id": 32,
+        "definitionId": "JSON.GetPath",
+        "name": "Get Location",
+        "pins": [
+          {
+            "id": 32001,
+            "kind": 0,
+            "name": "JSON",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 32002,
+            "kind": 0,
+            "name": "Path",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "location"
+          },
+          {
+            "id": 32010,
+            "kind": 1,
+            "name": "Value",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 32011,
+            "kind": 1,
+            "name": "Found",
+            "dataType": 1,
+            "isExec": false
+          }
+        ]
+      },
+      {
+        "id": 33,
+        "definitionId": "FormatString",
+        "name": "Mock Weather Result",
+        "pins": [
+          {
+            "id": 33001,
+            "kind": 0,
+            "name": "Format",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "Weather in {city}: Sunny 25\u00b0C"
+          },
+          {
+            "id": 33002,
+            "kind": 0,
+            "name": "city",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 33010,
+            "kind": 1,
+            "name": "Result",
+            "dataType": 4,
+            "isExec": false
+          }
+        ]
+      },
+      {
+        "id": 34,
+        "definitionId": "JSON.MakeMessage",
+        "name": "Tool Result Message",
+        "pins": [
+          {
+            "id": 34001,
+            "kind": 0,
+            "name": "Role",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "tool"
+          },
+          {
+            "id": 34002,
+            "kind": 0,
+            "name": "Content",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 34003,
+            "kind": 0,
+            "name": "ToolCallId",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 34010,
+            "kind": 1,
+            "name": "Message",
+            "dataType": 9,
+            "isExec": false
+          }
+        ]
+      },
+      {
+        "id": 35,
+        "definitionId": "GetVariable",
+        "name": "Get messages for push",
+        "pins": [
+          {
+            "id": 35001,
+            "kind": 0,
+            "name": "Name",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "messages"
+          },
+          {
+            "id": 35010,
+            "kind": 1,
+            "name": "Value",
+            "dataType": 4,
+            "isExec": false
+          }
+        ]
+      },
+      {
+        "id": 36,
+        "definitionId": "JSON.ArrayPush",
+        "name": "Append Tool Result",
+        "pins": [
+          {
+            "id": 36001,
+            "kind": 0,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 36002,
+            "kind": 0,
+            "name": "JSON",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 36003,
+            "kind": 0,
+            "name": "Element",
+            "dataType": 9,
+            "isExec": false
+          },
+          {
+            "id": 36010,
+            "kind": 1,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 36011,
+            "kind": 1,
+            "name": "JSON",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 36012,
+            "kind": 1,
+            "name": "Length",
+            "dataType": 2,
+            "isExec": false
+          }
+        ]
+      },
+      {
+        "id": 37,
+        "definitionId": "SetVariable",
+        "name": "Update messages",
+        "pins": [
+          {
+            "id": 37001,
+            "kind": 0,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 37002,
+            "kind": 0,
+            "name": "Name",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "messages"
+          },
+          {
+            "id": 37003,
+            "kind": 0,
+            "name": "Value",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 37010,
+            "kind": 1,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      },
+      {
+        "id": 40,
+        "definitionId": "FireEvent",
+        "name": "Next Agent Round",
+        "pins": [
+          {
+            "id": 40001,
+            "kind": 0,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 40002,
+            "kind": 0,
+            "name": "EventName",
+            "dataType": 4,
+            "isExec": false,
+            "defaultValue": "AgentLoop"
+          },
+          {
+            "id": 40010,
+            "kind": 1,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      },
+      {
+        "id": 50,
+        "definitionId": "PrintString",
+        "name": "Print Error",
+        "pins": [
+          {
+            "id": 50001,
+            "kind": 0,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 50002,
+            "kind": 0,
+            "name": "In String",
+            "dataType": 4,
+            "isExec": false
+          },
+          {
+            "id": 50010,
+            "kind": 1,
+            "name": "",
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "id": 1010,
+        "startPinId": 3010,
+        "endPinId": 5003,
+        "isEnabled": true
+      },
+      {
+        "id": 1020,
+        "startPinId": 5010,
+        "endPinId": 6001,
+        "isEnabled": true
+      },
+      {
+        "id": 1021,
+        "startPinId": 5011,
+        "endPinId": 6003,
+        "isEnabled": true
+      },
+      {
+        "id": 1030,
+        "startPinId": 6010,
+        "endPinId": 7001,
+        "isEnabled": true
+      },
+      {
+        "id": 2001,
+        "startPinId": 10010,
+        "endPinId": 12001,
+        "isEnabled": true
+      },
+      {
+        "id": 2002,
+        "startPinId": 11010,
+        "endPinId": 12005,
+        "isEnabled": true
+      },
+      {
+        "id": 2010,
+        "startPinId": 12010,
+        "endPinId": 20001,
+        "isEnabled": true
+      },
+      {
+        "id": 2011,
+        "startPinId": 12020,
+        "endPinId": 20003,
+        "isEnabled": true
+      },
+      {
+        "id": 2020,
+        "startPinId": 20010,
+        "endPinId": 21001,
+        "isEnabled": true
+      },
+      {
+        "id": 2021,
+        "startPinId": 20003,
+        "endPinId": 21002,
+        "isEnabled": true
+      },
+      {
+        "id": 2030,
+        "startPinId": 12011,
+        "endPinId": 30001,
+        "isEnabled": true
+      },
+      {
+        "id": 2031,
+        "startPinId": 12021,
+        "endPinId": 30002,
+        "isEnabled": true
+      },
+      {
+        "id": 3001,
+        "startPinId": 30010,
+        "endPinId": 31001,
+        "isEnabled": true
+      },
+      {
+        "id": 3002,
+        "startPinId": 30020,
+        "endPinId": 31002,
+        "isEnabled": true
+      },
+      {
+        "id": 3010,
+        "startPinId": 31010,
+        "endPinId": 36001,
+        "isEnabled": true
+      },
+      {
+        "id": 3020,
+        "startPinId": 30021,
+        "endPinId": 32001,
+        "isEnabled": true
+      },
+      {
+        "id": 3021,
+        "startPinId": 32010,
+        "endPinId": 33002,
+        "isEnabled": true
+      },
+      {
+        "id": 3022,
+        "startPinId": 33010,
+        "endPinId": 34002,
+        "isEnabled": true
+      },
+      {
+        "id": 3023,
+        "startPinId": 30022,
+        "endPinId": 34003,
+        "isEnabled": true
+      },
+      {
+        "id": 3024,
+        "startPinId": 34010,
+        "endPinId": 36003,
+        "isEnabled": true
+      },
+      {
+        "id": 3025,
+        "startPinId": 35010,
+        "endPinId": 36002,
+        "isEnabled": true
+      },
+      {
+        "id": 3030,
+        "startPinId": 36010,
+        "endPinId": 37001,
+        "isEnabled": true
+      },
+      {
+        "id": 3031,
+        "startPinId": 36011,
+        "endPinId": 37003,
+        "isEnabled": true
+      },
+      {
+        "id": 4001,
+        "startPinId": 30011,
+        "endPinId": 40001,
+        "isEnabled": true
+      },
+      {
+        "id": 5001,
+        "startPinId": 12012,
+        "endPinId": 50001,
+        "isEnabled": true
+      },
+      {
+        "id": 5002,
+        "startPinId": 12024,
+        "endPinId": 50002,
+        "isEnabled": true
+      },
+      {
+        "id": 9001,
+        "startPinId": 1001,
+        "endPinId": 5001,
+        "isEnabled": true
+      }
+    ],
+    "variables": []
+  },
+  "editor": {
+    "nodePositions": {}
+  }
+}
