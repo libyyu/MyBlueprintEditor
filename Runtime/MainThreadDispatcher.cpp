@@ -1,5 +1,6 @@
 // MainThreadDispatcher.cpp
 #include "MainThreadDispatcher.h"
+#include <cstdio>
 
 namespace NodeEditor {
 namespace Runtime {
@@ -31,6 +32,7 @@ void MainThreadDispatcher::Post(std::function<void()> task)
     if (!task) return;
     std::lock_guard<std::mutex> lock(m_mutex);
     m_queue.push_back(std::move(task));
+    fprintf(stderr, "[MainThreadDispatcher] Post: queue size=%zu\n", m_queue.size());
 }
 
 void MainThreadDispatcher::DrainQueue()
@@ -40,6 +42,9 @@ void MainThreadDispatcher::DrainQueue()
         std::lock_guard<std::mutex> lock(m_mutex);
         m_draining.swap(m_queue);
     }
+
+    if (!m_draining.empty())
+        fprintf(stderr, "[MainThreadDispatcher] DrainQueue: executing %zu tasks\n", m_draining.size());
 
     for (auto& task : m_draining)
     {

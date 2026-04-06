@@ -156,6 +156,7 @@ void RegisterHandlers_Action(
             MainThreadDispatcher::Get().Post([r, eventName]() {
                 r->DispatchEvent(eventName);
             });
+            ctx.Log("  [FireEvent] posted to queue, pending dispatch");
         }
         return true;
     };
