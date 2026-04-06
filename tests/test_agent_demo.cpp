@@ -816,3 +816,136 @@ TEST_F(AgentDemoTest, ParallelToolCalls_AllToolsProcessed)
 
     BP_SetHttpClient(nullptr);
 }
+
+// ============================================================================
+// ReActAgent.bjson 完整流程测试
+// 第一轮 LLM：返回 tool_call（get_weather，location=Beijing）
+// 第二轮 LLM：返回 final answer
+// ============================================================================
+class ReActAgentTest : public ::testing::Test
+{
+protected:
+    BlueprintRunner runner;
+    std::vector<std::string> logs;
+    std::vector<std::string> prints;
+
+    void SetUp() override {
+        RegisterBuiltinHandlers(runner, ".");
+        runner.SetLogCallback([this](LogLevel, const std::string& msg) {
+            logs.push_back(msg);
+        });
+        runner.SetPrintCallback([this](LogLevel, const std::string& msg) {
+            prints.push_back(msg);
+        });
+    }
+
+    static std::string reactPath() {
+        return std::string(TEST_PROJECT_DIR) + "/examples/ReActAgent.bjson";
+    }
+};
+
+TEST_F(ReActAgentTest, FullReActLoop_ToolCall_ThenFinalAnswer)
+{
+    // 轮次1：tool_call（get_weather，location=Beijing）
+    std::string round1 = R"({
+        "id": "chatcmpl-round1",
+        "object": "chat.completion",
+        "choices": [{
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": null,
+                "tool_calls": [{
+                    "id": "call_abc1",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": "{\"location\": \"Beijing\"}"
+                    }
+                }]
+            },
+            "finish_reason": "tool_calls"
+        }]
+    })";
+
+    // 轮次2：final answer
+    std::string round2 = R"({
+        "id": "chatcmpl-round2",
+        "object": "chat.completion",
+        "choices": [{
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "根据工具返回结果，Beijing 当前天气晴，25°C，适合出行。"
+            },
+            "finish_reason": "stop"
+        }]
+    })";
+
+    // 两轮顺序 mock
+    class SeqMock : public IHttpClient {
+    public:
+        std::vector<std::string> bodies;
+        std::atomic<int> callCount{0};
+        SeqMock(std::string r1, std::string r2) { bodies.push_back(std::move(r1)); bodies.push_back(std::move(r2)); }
+        void SendAsync(const HttpRequest&, HttpCallback cb) override {
+            int n = callCount.fetch_add(1);
+            std::string body = (n < (int)bodies.size()) ? bodies[n] : bodies.back();
+            std::thread([body, cb = std::move(cb)]() mutable {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                HttpResponse r; r.statusCode = 200; r.body = body;
+                cb(std::move(r));
+            }).detach();
+        }
+    };
+    auto multiMock = std::make_shared<SeqMock>(round1, round2);
+    BP_SetHttpClient(multiMock);
+
+    JsonBlueprintExporter exp;
+    auto result = exp.importRuntimeFromFile(reactPath());
+    ASSERT_TRUE(result.success) << "importRuntimeFromFile failed: " << result.errorMessage;
+    ASSERT_TRUE(runner.Load(result.data)) << "runner.Load failed";
+
+    runner.Execute();
+    runner.DispatchEvent("OnBeginPlay");
+
+    // 等待两轮 LLM 异步完成
+    auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < 2000; ++i) {
+        MainThreadDispatcher::Get().DrainQueue();
+        if (multiMock->callCount.load() >= 2 &&
+            !runner.HasPendingAsync())
+            break;
+        if (std::chrono::steady_clock::now() - start > std::chrono::milliseconds(5000)) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    MainThreadDispatcher::Get().DrainQueue();
+
+    // 打印所有输出（测试目的：对比编辑器实际输出）
+    std::cout << "\n===== ReActAgent execution trace =====\n";
+    std::cout << "--- logs (" << logs.size() << ") ---\n";
+    for (const auto& l : logs)   std::cout << "  [LOG]   " << l << "\n";
+    std::cout << "--- prints (" << prints.size() << ") ---\n";
+    for (const auto& p : prints) std::cout << "  [PRINT] " << p << "\n";
+    std::cout << "--- LLM call count: " << multiMock->callCount.load() << " ---\n";
+    std::cout << "======================================\n";
+
+    EXPECT_EQ(multiMock->callCount.load(), 2)
+        << "Should call LLM twice: tool_call round + final answer round";
+
+    // PrintString 节点（Print Final Answer）应打印含 Beijing 的文字
+    bool foundFinalAnswer = false;
+    for (const auto& p : prints) {
+        if (p.find("Beijing") != std::string::npos ||
+            p.find("北京") != std::string::npos ||
+            p.find("天气") != std::string::npos) {
+            foundFinalAnswer = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(foundFinalAnswer)
+        << "Final PrintString should contain weather result for Beijing";
+
+    BP_SetHttpClient(nullptr);
+}
+

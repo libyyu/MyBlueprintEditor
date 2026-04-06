@@ -4,6 +4,7 @@
 #include "FileDialogs.h"
 #include "BuiltinHandlers.h"
 #include "PathUtils.h"
+#include "../Runtime/MainThreadDispatcher.h"
 #include <filesystem>
 #include <queue>
 #include <unordered_set>
@@ -358,6 +359,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
     // 驱动所有文档的计时器
     for (auto& doc : m_Documents)
         doc->persistentRunner.Tick(deltaTime);
+
+    // 每帧 drain MainThreadDispatcher 队列（驱动 FireEvent 等异步 Post 的任务）
+    ::NodeEditor::Runtime::MainThreadDispatcher::Get().DrainQueue();
 
     // OnTick 事件驱动：对正在执行且有 OnTick 事件源的文档，每帧触发 DispatchEvent
     for (auto& doc : m_Documents)
