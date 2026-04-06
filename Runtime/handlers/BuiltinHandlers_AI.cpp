@@ -249,13 +249,17 @@ void RegisterHandlers_AI(
     // 快速构造 {"role":"user","content":"..."} 消息对象。
     // ========================================================================
     handlers["JSON.MakeMessage"] = [](ExecutionContext& ctx) -> bool {
-        std::string role    = ctx.GetInputValue("Role").asString();
-        std::string content = ctx.GetInputValue("Content").asString();
+        std::string role       = ctx.GetInputValue("Role").asString();
+        std::string content    = ctx.GetInputValue("Content").asString();
+        std::string toolCallId = ctx.GetInputValue("ToolCallId").asString();
         if (role.empty()) role = "user";
 
         crude_json::object obj;
         obj["role"]    = crude_json::value(role);
         obj["content"] = crude_json::value(content);
+        // Add tool_call_id when present (required for role="tool" messages)
+        if (!toolCallId.empty())
+            obj["tool_call_id"] = crude_json::value(toolCallId);
         ctx.SetOutputValue("JSON", Variant(crude_json::value(std::move(obj)).dump()));
         return true;
     };

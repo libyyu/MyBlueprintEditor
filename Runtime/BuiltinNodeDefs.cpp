@@ -1741,8 +1741,9 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
     // JSON.MakeMessage — 构造 {"role":"...","content":"..."} 消息对象
     reg("JSON.MakeMessage", "Make Message", "AI/JSON",
         {
-            MakePin("Role",    PinDataType::String),   // "user" | "assistant" | "system"
-            MakePin("Content", PinDataType::String),
+            MakePin("Role",       PinDataType::String),   // "user" | "assistant" | "system" | "tool"
+            MakePin("Content",    PinDataType::String),
+            MakePin("ToolCallId", PinDataType::String),   // optional; for role="tool" responses
         },
         {
             MakePin("JSON", PinDataType::String),
