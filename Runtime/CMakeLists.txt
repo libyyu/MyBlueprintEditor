@@ -381,14 +381,30 @@ if(BLUEPRINT_LUA)
 endif()
 
 # HTTPS support via OpenSSL (桌面平台；Emscripten 用浏览器 fetch，不需要)
+#
+# 查找顺序：
+#   1. OPENSSL_ROOT_DIR 环境变量 / CMake 变量（手动指定安装路径）
+#   2. vcpkg toolchain 自动注入（cmake -DCMAKE_TOOLCHAIN_FILE=.../vcpkg.cmake）
+#   3. 系统 OpenSSL（Linux/macOS 通常已有）
+#   4. 找不到 → HTTPS 禁用，HTTP 仍可用
+#
+# Windows 快速安装：
+#   vcpkg install openssl:x64-windows
+#   cmake .. -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+# 或者：
+#   下载 https://slproweb.com/products/Win32OpenSSL.html 安装后：
+#   cmake .. -DOPENSSL_ROOT_DIR="C:/Program Files/OpenSSL-Win64"
 if(NOT EMSCRIPTEN)
     find_package(OpenSSL QUIET)
     if(OpenSSL_FOUND OR OPENSSL_FOUND)
         target_compile_definitions(BlueprintRuntime PUBLIC CPPHTTPLIB_OPENSSL_SUPPORT)
         target_link_libraries(BlueprintRuntime PRIVATE OpenSSL::SSL OpenSSL::Crypto)
-        message(STATUS "[BlueprintRuntime] OpenSSL found (${OPENSSL_VERSION}) → HTTPS enabled")
+        message(STATUS "[BlueprintRuntime] OpenSSL ${OPENSSL_VERSION} → HTTPS enabled")
     else()
         message(STATUS "[BlueprintRuntime] OpenSSL not found → HTTPS disabled (HTTP only)")
+        message(STATUS "  Windows: vcpkg install openssl:x64-windows  OR  -DOPENSSL_ROOT_DIR=<path>")
+        message(STATUS "  Linux:   sudo apt install libssl-dev  /  sudo yum install openssl-devel")
+        message(STATUS "  macOS:   brew install openssl  then  -DOPENSSL_ROOT_DIR=$(brew --prefix openssl)")
     endif()
 endif()
 
