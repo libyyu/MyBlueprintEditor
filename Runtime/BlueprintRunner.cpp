@@ -1001,14 +1001,29 @@ ExecutionResult BlueprintRunner::DispatchEvent(const std::string& eventDefinitio
     }
 
     // 找到 definitionId 匹配的事件源节点
+    // 支持两种匹配方式：
+    //   1. definitionId 直接匹配（OnBeginPlay、OnTick 等内置事件）
+    //   2. definitionId == "CustomEventNode" 且 nodeData["EventName"] == eventDefinitionId
+    //      （用户自定义事件，通过 FireEvent 触发）
     const NodeInstance* eventNode = nullptr;
     for (const auto& node : m_blueprint.nodes)
     {
-        if (node.definitionId == eventDefinitionId &&
-            m_blueprint.isEventSourceNode(node.id))
+        if (!m_blueprint.isEventSourceNode(node.id)) continue;
+
+        if (node.definitionId == eventDefinitionId)
         {
             eventNode = &node;
             break;
+        }
+        // CustomEventNode 按 nodeData["EventName"] 匹配
+        if (node.definitionId == "CustomEventNode" || node.definitionId == "CustomEvent")
+        {
+            auto it = node.nodeData.find("EventName");
+            if (it != node.nodeData.end() && it->second.asString() == eventDefinitionId)
+            {
+                eventNode = &node;
+                break;
+            }
         }
     }
 
@@ -2043,8 +2058,10 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     }
 
     // 递归收集所有目标节点的数据上游依赖（排除触发当前流的源节点自身）
-    // 同时排除事件源节点（无 exec 输入、有 exec 输出的节点，如 CustomEvent）
-    // 它们虽然通过数据连接（Function/Delegate引脚）被引用，但不应作为数据依赖执行
+    // 同时排除以下节点：
+    //   1. 事件源节点（无 exec 输入、有 exec 输出，如 CustomEvent）
+    //   2. 有 exec 输入的 exec 驱动节点（如 ForLoop、LLM.Chat、Tool.ForEach 等）
+    //      这些节点由 exec 流驱动，不应作为数据依赖重复执行
     {
         NodeId sourceNodeId = savedNode ? savedNode->id : 0;
         std::queue<NodeId> depQueue;
@@ -2058,6 +2075,8 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
             {
                 if (depId == sourceNodeId) continue;
                 if (m_blueprint.isEventSourceNode(depId)) continue;
+                // 排除有 exec 输入的节点（exec 驱动节点，不当作纯数据依赖）
+                if (m_blueprint.hasExecInputPin(depId)) continue;
                 if (targetSet.insert(depId).second)
                 {
                     depQueue.push(depId);

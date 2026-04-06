@@ -1,5 +1,6 @@
 // Runtime/BuiltinHandlers_Action.cpp -- Action 类型节点处理器
 #include "BuiltinHandlers_Action.h"
+#include "../MainThreadDispatcher.h"
 
 namespace NodeEditor {
 namespace Runtime {
@@ -139,7 +140,27 @@ void RegisterHandlers_Action(
         ctx.ActivateOutputFlow("");
         return true;
     };
-}
+
+    // FireEvent：触发指定名称的 CustomEvent，用于打破 exec 环（异步循环入口）
+    // EventName 可来自 pin 连线或默认值
+    handlers["FireEvent"] = [&runner](ExecutionContext& ctx) -> bool {
+        std::string eventName = ctx.GetInputValue("EventName").asString();
+        ctx.Log("  [FireEvent] triggering event: " + eventName);
+        // 先激活自身的 exec 输出（让当前帧的 exec 链继续），
+        // 再通过 runner 异步分发事件（避免在当前 exec 栈里重入）
+        ctx.ActivateOutputFlow("");
+        if (!eventName.empty()) {
+            // 用 MainThreadDispatcher post 到下一帧，避免在当前 exec 帧里
+            // 重入 executeNodeInternal 导致 context 被覆盖
+            auto* r = &runner;
+            MainThreadDispatcher::Get().Post([r, eventName]() {
+                r->DispatchEvent(eventName);
+            });
+        }
+        return true;
+    };
+
+} // RegisterHandlers_Action
 
 } // namespace Runtime
 } // namespace NodeEditor

@@ -843,6 +843,8 @@ private:
     NodeId                                              m_lastSteppedNodeId = 0;
     // Step 模式标志：为 true 时 executeNodeInternal 跳过断点检测，让节点实际执行
     bool                                                m_bypassBreakpoint = false;
+    // 数据依赖求值标志：防止 executeNodeInternal 递归求值死循环
+    bool                                                m_evaluatingDataDeps = false;
     // 单步模式标志：StepNextNode 执行期间为 true
     // ActivateOutputFlow 在此模式下且处于顶层（m_flowDepth==0）时，
     // 只记录 exec 下游到 m_stepPendingNodes，不递归执行（让 StepNext 逐步进入）

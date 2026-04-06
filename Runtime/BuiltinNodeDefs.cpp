@@ -1395,6 +1395,18 @@ static void RegisterNodeDefs_Event(INodeRegistry& registry)
         {},
         { MakeFlowPin(""), MakePin("EventName", PinDataType::String) },
         "FF8040");
+
+    // FireEvent：在运行时通过名字触发一个 Custom Event（相当于 DispatchEvent）
+    // 用于在异步回调里触发下一轮事件，避免在 exec 图里形成 cycle。
+    reg("FireEvent", "Fire Event", "Event",
+        {
+            MakeFlowPin(""),
+            MakePin("EventName", PinDataType::String),
+        },
+        {
+            MakeFlowPin(""),
+        },
+        "FF8040");
     
 }
 

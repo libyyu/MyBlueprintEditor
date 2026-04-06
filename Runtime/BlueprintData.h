@@ -529,6 +529,19 @@ struct BlueprintData
         }
         return !hasExecInput && hasExecOutput;
     }
+
+    // 检查节点是否有 exec 输入引脚（exec 驱动节点，由 exec 流控制执行）
+    bool hasExecInputPin(NodeId nodeId) const
+    {
+        const NodeInstance* node = findNode(nodeId);
+        if (!node) return false;
+        for (const auto& pin : node->pins)
+        {
+            if (pin.kind == PinKind::Input && pin.isExec)
+                return true;
+        }
+        return false;
+    }
     
     // 辅助方法：收集所有事件源节点及其 exec 下游子图的节点集合
     // 这些节点在主执行循环中应被跳过
