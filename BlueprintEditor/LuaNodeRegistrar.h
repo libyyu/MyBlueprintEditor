@@ -14,6 +14,11 @@
 #include <unordered_set>
 #include <functional>
 
+// Windows winuser.h 将 LoadString 定义为宏（LoadStringA/W），与成员函数名冲突，需取消。
+#ifdef LoadString
+#  undef LoadString
+#endif
+
 // 前向声明（避免 include BlueprintEditor.h 造成循环依赖和 namespace 污染）
 namespace NodeEditor { namespace Runtime {
     class INodeRegistry;

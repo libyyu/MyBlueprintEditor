@@ -2,6 +2,9 @@
 // Phase 3：编辑器侧 Lua 节点注册器实现
 
 #ifdef BLUEPRINT_HAS_LUA
+#ifdef LoadString
+#  undef LoadString
+#endif
 
 #include "LuaNodeRegistrar.h"
 #include "../Runtime/NodeDefinition.h"
