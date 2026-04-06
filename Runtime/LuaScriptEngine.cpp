@@ -278,7 +278,7 @@ void LuaScriptEngine::Tick(double deltaSeconds)
     if (!m_L) return;
 
     // 查找全局 onTick 函数
-    lua_getglobal(m_L, "onTick");
+    lua_getglobal(m_L, "OnGlobalTick");
     if (!lua_isfunction(m_L, -1))
     {
         lua_pop(m_L, 1);   // onTick 不存在，忽略
@@ -291,7 +291,7 @@ void LuaScriptEngine::Tick(double deltaSeconds)
     if (lua_pcall(m_L, 1, 0, 0) != LUA_OK)
     {
         const char* err = lua_tostring(m_L, -1);
-        m_lastError = err ? err : "onTick error";
+        m_lastError = err ? err : "OnGlobalTick error";
         lua_pop(m_L, 1);
     }
 }

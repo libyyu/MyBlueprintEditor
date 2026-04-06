@@ -250,6 +250,59 @@ static int l_registerNode(lua_State* L)
 
     return 0;
 }
+static std::string on_print_handler(lua_State* L)
+{
+	static char sL[20] = { 0 };
+	memset(sL, 0x0, sizeof(sL));
+	snprintf(sL, 20, "%p|", L);
+    static std::string message;
+    message = sL;
+	int n = lua_gettop(L);
+	lua_getglobal(L, "tostring");
+
+	for (int i = 1; i <= n; ++i)
+	{
+		lua_pushvalue(L, -1); // function to be called
+		lua_pushvalue(L, i);  // value to print
+		lua_pcall(L, 1, 1, 0);
+
+		const char* ret = lua_tostring(L, -1);
+		if (ret)
+            message.append(ret);
+
+		if (i < n)
+            message.append("\t");
+
+		lua_pop(L, 1); //pop result
+	}
+
+	return std::move(message);
+}
+static int l_panic(lua_State* L)
+{
+	char sL[20] = { 0 };
+	snprintf(sL, 20, "%p|", L);
+	std::string reason(sL);
+	reason += "unprotected error in call to Lua API (";
+	const char* s = lua_tostring(L, -1);
+	reason += s;
+	reason += ")\n";
+    //TODO: 记录日志文件
+	throw std::runtime_error(reason);
+	return 0;
+}
+static int l_print(lua_State* L)
+{
+	std::string s = "[LUA]" + on_print_handler(L);
+	//TODO: 接管日志系统，输出到编辑器控制台
+	return 0;
+}
+static int l_warn(lua_State* L)
+{
+	std::string s = "[LUA]" + on_print_handler(L);
+    //TODO: 接管日志系统，输出到编辑器控制台
+	return 0;
+}
 
 // ============================================================================
 // LuaNodeRegistrar 实现
@@ -268,9 +321,12 @@ bool LuaNodeRegistrar::ensureLuaState()
 
     m_L = luaL_newstate();
     if (!m_L) { m_lastError = "Failed to create Lua state"; return false; }
-
+    lua_atpanic(m_L, l_panic);
     luaL_openlibs(m_L);
 
+    lua_register(m_L, "print", l_print);
+    lua_register(m_L, "warn", l_warn);
+	
     // 注册运行时 Lua 绑定（Variant + ExecutionContext metatables）
     // 需要一个临时 runner 只为注册 metatables 用
     // 注：Blueprint.RegisterHandler 不在编辑器侧使用，但 metatables 需要
