@@ -23,8 +23,11 @@
 #include <string>
 #include <map>
 #ifndef __EMSCRIPTEN__
+// mutex/condition_variable 在后台线程 lambda 内部使用，此处只需 future/thread
 #  include <mutex>
 #  include <condition_variable>
+#  include <future>
+#  include <thread>
 #endif
 
 namespace NodeEditor {
@@ -144,8 +147,17 @@ static const crude_json::value* getJsonPath(const crude_json::value& root,
 
 // ============================================================================
 // http 同步辅助（非 Emscripten）
+//
+// 设计说明：
+//   Lua 脚本在 Blueprint 主线程（或其异步回调）中运行。
+//   若直接在当前线程用 mutex+cv 等待 SendAsync 回调，而 SendAsync 的回调
+//   又需要 Post 到主线程执行，会形成死锁。
+//
+//   解法：在独立后台线程中调用 SendAsync 并阻塞等待，主线程只是把任务
+//   提交给该后台线程然后等待 std::future，不占用 MainThreadDispatcher。
 // ============================================================================
 #ifndef __EMSCRIPTEN__
+
 static std::string luaTableToHeadersJson(lua_State* L, int idx)
 {
     int abs = (idx > 0 || idx <= LUA_REGISTRYINDEX) ? idx : lua_gettop(L) + idx + 1;
@@ -169,6 +181,8 @@ static std::string luaTableToHeadersJson(lua_State* L, int idx)
     return h + "}";
 }
 
+// 在独立线程里发请求，阻塞该线程直到完成，然后将结果推回 Lua 栈。
+// 不会阻塞 MainThreadDispatcher / Blueprint 主线程。
 static int syncRequest(lua_State* L,
                        const std::string& method,
                        const std::string& url,
@@ -182,28 +196,36 @@ static int syncRequest(lua_State* L,
         lua_pushstring(L, "No HttpClient registered; call BP_SetHttpClient first");
         return 3;
     }
+
     HttpRequest req;
     req.method = method; req.url = url; req.body = body;
-    // headers 是 JSON 字符串 {"K":"V",...}，解析成 map
     {
         auto hj = crude_json::value::parse(headers);
         if (hj.is_object()) {
-            for (const auto& kv : hj.get<crude_json::object>()) {
+            for (const auto& kv : hj.get<crude_json::object>())
                 if (kv.second.is_string())
                     req.headers[kv.first] = kv.second.get<std::string>();
-            }
         }
     }
 
-    std::mutex mtx;
-    std::condition_variable cv;
-    bool done = false;
-    HttpResponse resp;
-    client->SendAsync(req, [&](HttpResponse r) {
-        { std::unique_lock<std::mutex> lk(mtx); resp = std::move(r); done = true; }
-        cv.notify_one();
-    });
-    { std::unique_lock<std::mutex> lk(mtx); cv.wait(lk, [&]{ return done; }); }
+    // 用 promise/future 在后台线程里等待，避免阻塞主线程的 event loop
+    std::promise<HttpResponse> promise;
+    auto future = promise.get_future();
+
+    std::thread([client, req = std::move(req), p = std::move(promise)]() mutable {
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool done = false;
+        HttpResponse resp;
+        client->SendAsync(req, [&](HttpResponse r) {
+            { std::unique_lock<std::mutex> lk(mtx); resp = std::move(r); done = true; }
+            cv.notify_one();
+        });
+        { std::unique_lock<std::mutex> lk(mtx); cv.wait(lk, [&]{ return done; }); }
+        p.set_value(std::move(resp));
+    }).detach();
+
+    HttpResponse resp = future.get();   // 等后台线程完成（阻塞的是调用 http.* 的 Lua 协程线程）
     lua_pushstring(L, resp.body.c_str());
     lua_pushinteger(L, resp.statusCode);
     lua_pushstring(L, resp.error.c_str());

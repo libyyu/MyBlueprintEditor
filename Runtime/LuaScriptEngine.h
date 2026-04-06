@@ -88,6 +88,12 @@ public:
     // 获取已加载的脚本数量（含字符串加载）
     int GetLoadedCount() const { return m_loadedCount; }
 
+    // 心跳 Tick：每帧/每定时器调用。
+    // 若 Lua 全局存在 onTick(deltaSeconds) 函数则调用它。
+    // deltaSeconds 为距上次调用的秒数（由调用方计算传入）。
+    // 线程安全：必须在拥有 lua_State 的线程（主线程）调用。
+    void Tick(double deltaSeconds);
+
 private:
     // 带 traceback 的 pcall 执行已编译 chunk（栈顶）
     bool ExecuteChunk(const std::string& source);

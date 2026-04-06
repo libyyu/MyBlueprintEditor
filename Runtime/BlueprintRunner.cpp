@@ -2379,6 +2379,12 @@ LuaScriptEngine* BlueprintRunner::GetLuaEngine()
     return m_luaEngine.get();
 }
 
+void BlueprintRunner::TickLua(double deltaSeconds)
+{
+    if (m_luaEngine)
+        m_luaEngine->Tick(deltaSeconds);
+}
+
 #endif // BLUEPRINT_HAS_LUA
 
 
