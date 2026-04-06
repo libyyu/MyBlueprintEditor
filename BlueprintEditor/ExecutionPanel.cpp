@@ -356,9 +356,10 @@ void BlueprintEditor::ExecuteBlueprint()
         }
     }
 
-    // isExecuting 在 runner 运行或暂停（断点）时保持 true
+    // isExecuting 在 runner 运行、暂停（断点）或有 pending async（LLM/HTTP 等）时保持 true
     ActiveDoc()->isExecuting = ActiveDoc()->persistentRunner.IsRunning()
-                             || ActiveDoc()->persistentRunner.IsPaused();
+                             || ActiveDoc()->persistentRunner.IsPaused()
+                             || ActiveDoc()->persistentRunner.HasPendingAsync();
     ActiveDoc()->executionLogDirty = true;
 }
 
@@ -376,6 +377,10 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
     bool isPaused  = runner.IsPaused();
     bool isStopped = runner.IsStopped();
     bool isIdle    = runner.IsIdle();
+
+    // 每帧更新 isExecuting：runner 正在运行 / 暂停 / 有待完成的异步任务（LLM/HTTP）时保持 true
+    ActiveDoc()->isExecuting = isRunning || isPaused || runner.HasPendingAsync();
+
     const auto& res = ActiveDoc()->lastExecutionResult;
 
     // ── Tab: Log | Nodes ─────────────────────────────────────────────────
