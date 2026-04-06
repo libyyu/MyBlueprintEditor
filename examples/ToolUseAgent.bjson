@@ -1,833 +1,833 @@
 {
-  "runtime": {
-    "fileType": "blueprint",
-    "metadata": {
-      "name": "ToolUseAgent",
-      "version": "1.0.0",
-      "description": "Two-turn LLM agent with tool use (get_weather). Round 1: LLM decides to call get_weather. Round 2: LLM answers using tool result.",
-      "blueprintClass": "Normal"
+    "runtime": {
+        "fileType": "blueprint",
+        "metadata": {
+            "name": "ToolUseAgent",
+            "version": "1.0.0",
+            "description": "Two-turn LLM agent with tool use (get_weather). Round 1: LLM decides to call get_weather. Round 2: LLM answers using tool result.",
+            "blueprintClass": "Normal"
+        },
+        "nodes": [
+            {
+                "id": 1,
+                "definitionId": "OnBeginPlay",
+                "name": "On Begin Play",
+                "pins": [
+                    {
+                        "id": 1001,
+                        "kind": 1,
+                        "name": "",
+                        "dataType": 0,
+                        "isExec": true
+                    }
+                ]
+            },
+            {
+                "id": 2,
+                "definitionId": "JSON.Build",
+                "name": "Build Tool Def",
+                "pins": [
+                    {
+                        "id": 2001,
+                        "kind": 0,
+                        "name": "JSON",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "{\"type\": \"function\", \"function\": {\"name\": \"get_weather\", \"description\": \"Get current weather for a location\", \"parameters\": {\"type\": \"object\", \"properties\": {\"location\": {\"type\": \"string\", \"description\": \"City name\"}}, \"required\": [\"location\"]}}}"
+                    },
+                    {
+                        "id": 2002,
+                        "kind": 1,
+                        "name": "Value",
+                        "dataType": 9,
+                        "isExec": false
+                    },
+                    {
+                        "id": 2003,
+                        "kind": 1,
+                        "name": "Valid",
+                        "dataType": 1,
+                        "isExec": false
+                    }
+                ]
+            },
+            {
+                "id": 3,
+                "definitionId": "JSON.ArrayPush",
+                "name": "Make Tools Array",
+                "pins": [
+                    {
+                        "id": 3001,
+                        "kind": 0,
+                        "name": "JSON",
+                        "dataType": 9,
+                        "isExec": false
+                    },
+                    {
+                        "id": 3002,
+                        "kind": 0,
+                        "name": "Element",
+                        "dataType": 9,
+                        "isExec": false
+                    },
+                    {
+                        "id": 3003,
+                        "kind": 1,
+                        "name": "JSON",
+                        "dataType": 9,
+                        "isExec": false
+                    }
+                ]
+            },
+            {
+                "id": 4,
+                "definitionId": "String.Template",
+                "name": "User Prompt",
+                "pins": [
+                    {
+                        "id": 4001,
+                        "kind": 0,
+                        "name": "Template",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "What is the weather in {{location}}?"
+                    },
+                    {
+                        "id": 4002,
+                        "kind": 0,
+                        "name": "location",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "Shanghai"
+                    },
+                    {
+                        "id": 4003,
+                        "kind": 1,
+                        "name": "Result",
+                        "dataType": 4,
+                        "isExec": false
+                    }
+                ]
+            },
+            {
+                "id": 5,
+                "definitionId": "JSON.MakeMessage",
+                "name": "User Message",
+                "pins": [
+                    {
+                        "id": 5001,
+                        "kind": 0,
+                        "name": "Role",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "user"
+                    },
+                    {
+                        "id": 5002,
+                        "kind": 0,
+                        "name": "Content",
+                        "dataType": 4,
+                        "isExec": false
+                    },
+                    {
+                        "id": 5003,
+                        "kind": 1,
+                        "name": "Message",
+                        "dataType": 9,
+                        "isExec": false
+                    }
+                ]
+            },
+            {
+                "id": 6,
+                "definitionId": "JSON.ArrayPush",
+                "name": "Make Messages",
+                "pins": [
+                    {
+                        "id": 6001,
+                        "kind": 0,
+                        "name": "JSON",
+                        "dataType": 9,
+                        "isExec": false
+                    },
+                    {
+                        "id": 6002,
+                        "kind": 0,
+                        "name": "Element",
+                        "dataType": 9,
+                        "isExec": false
+                    },
+                    {
+                        "id": 6003,
+                        "kind": 1,
+                        "name": "JSON",
+                        "dataType": 9,
+                        "isExec": false
+                    }
+                ]
+            },
+            {
+                "id": 7,
+                "definitionId": "LLM.Chat",
+                "name": "LLM Call 1",
+                "pins": [
+                    {
+                        "id": 7001,
+                        "kind": 0,
+                        "name": "",
+                        "dataType": 0,
+                        "isExec": true
+                    },
+                    {
+                        "id": 7002,
+                        "kind": 0,
+                        "name": "BaseURL",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "https://api.openai.com/v1"
+                    },
+                    {
+                        "id": 7003,
+                        "kind": 0,
+                        "name": "ApiKey",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "sk-your-api-key-here"
+                    },
+                    {
+                        "id": 7004,
+                        "kind": 0,
+                        "name": "Model",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "gpt-4o"
+                    },
+                    {
+                        "id": 7005,
+                        "kind": 0,
+                        "name": "Messages",
+                        "dataType": 4,
+                        "isExec": false
+                    },
+                    {
+                        "id": 7006,
+                        "kind": 0,
+                        "name": "SystemPrompt",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "You are a helpful assistant."
+                    },
+                    {
+                        "id": 7007,
+                        "kind": 0,
+                        "name": "MaxTokens",
+                        "dataType": 2,
+                        "isExec": false,
+                        "defaultValue": 512
+                    },
+                    {
+                        "id": 7008,
+                        "kind": 0,
+                        "name": "Temperature",
+                        "dataType": 3,
+                        "isExec": false,
+                        "defaultValue": 0.7
+                    },
+                    {
+                        "id": 7009,
+                        "kind": 0,
+                        "name": "Tools",
+                        "dataType": 4,
+                        "isExec": false
+                    },
+                    {
+                        "id": 7010,
+                        "kind": 1,
+                        "name": "onReply",
+                        "dataType": 0,
+                        "isExec": true
+                    },
+                    {
+                        "id": 7011,
+                        "kind": 1,
+                        "name": "onError",
+                        "dataType": 0,
+                        "isExec": true
+                    },
+                    {
+                        "id": 7012,
+                        "kind": 1,
+                        "name": "Reply",
+                        "dataType": 4,
+                        "isExec": false
+                    },
+                    {
+                        "id": 7013,
+                        "kind": 1,
+                        "name": "ErrorMessage",
+                        "dataType": 4,
+                        "isExec": false
+                    }
+                ]
+            },
+            {
+                "id": 8,
+                "definitionId": "JSON.GetPath",
+                "name": "Get Tool Name",
+                "pins": [
+                    {
+                        "id": 8001,
+                        "kind": 0,
+                        "name": "JSON",
+                        "dataType": 4,
+                        "isExec": false
+                    },
+                    {
+                        "id": 8002,
+                        "kind": 0,
+                        "name": "Path",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "choices[0].message.tool_calls[0].function.name"
+                    },
+                    {
+                        "id": 8003,
+                        "kind": 1,
+                        "name": "Value",
+                        "dataType": 4,
+                        "isExec": false
+                    },
+                    {
+                        "id": 8004,
+                        "kind": 1,
+                        "name": "Found",
+                        "dataType": 1,
+                        "isExec": false
+                    }
+                ]
+            },
+            {
+                "id": 9,
+                "definitionId": "JSON.GetPath",
+                "name": "Get Location Arg",
+                "pins": [
+                    {
+                        "id": 9001,
+                        "kind": 0,
+                        "name": "JSON",
+                        "dataType": 4,
+                        "isExec": false
+                    },
+                    {
+                        "id": 9002,
+                        "kind": 0,
+                        "name": "Path",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "choices[0].message.tool_calls[0].function.arguments"
+                    },
+                    {
+                        "id": 9003,
+                        "kind": 1,
+                        "name": "Value",
+                        "dataType": 4,
+                        "isExec": false
+                    },
+                    {
+                        "id": 9004,
+                        "kind": 1,
+                        "name": "Found",
+                        "dataType": 1,
+                        "isExec": false
+                    }
+                ]
+            },
+            {
+                "id": 10,
+                "definitionId": "Branch",
+                "name": "Has Tool Call?",
+                "pins": [
+                    {
+                        "id": 10001,
+                        "kind": 0,
+                        "name": "",
+                        "dataType": 0,
+                        "isExec": true
+                    },
+                    {
+                        "id": 10002,
+                        "kind": 0,
+                        "name": "Condition",
+                        "dataType": 1,
+                        "isExec": false
+                    },
+                    {
+                        "id": 10003,
+                        "kind": 1,
+                        "name": "True",
+                        "dataType": 0,
+                        "isExec": true
+                    },
+                    {
+                        "id": 10004,
+                        "kind": 1,
+                        "name": "False",
+                        "dataType": 0,
+                        "isExec": true
+                    }
+                ]
+            },
+            {
+                "id": 11,
+                "definitionId": "FormatString",
+                "name": "Weather Result",
+                "pins": [
+                    {
+                        "id": 11001,
+                        "kind": 0,
+                        "name": "Format",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "Weather in {location}: Sunny, 25°C"
+                    },
+                    {
+                        "id": 11002,
+                        "kind": 0,
+                        "name": "location",
+                        "dataType": 4,
+                        "isExec": false
+                    },
+                    {
+                        "id": 11003,
+                        "kind": 1,
+                        "name": "Result",
+                        "dataType": 4,
+                        "isExec": false
+                    }
+                ]
+            },
+            {
+                "id": 12,
+                "definitionId": "JSON.MakeMessage",
+                "name": "Tool Message",
+                "pins": [
+                    {
+                        "id": 12001,
+                        "kind": 0,
+                        "name": "Role",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "tool"
+                    },
+                    {
+                        "id": 12002,
+                        "kind": 0,
+                        "name": "Content",
+                        "dataType": 4,
+                        "isExec": false
+                    },
+                    {
+                        "id": 12003,
+                        "kind": 1,
+                        "name": "Message",
+                        "dataType": 9,
+                        "isExec": false
+                    }
+                ]
+            },
+            {
+                "id": 13,
+                "definitionId": "JSON.ArrayPush",
+                "name": "Append Tool Msg",
+                "pins": [
+                    {
+                        "id": 13001,
+                        "kind": 0,
+                        "name": "JSON",
+                        "dataType": 9,
+                        "isExec": false
+                    },
+                    {
+                        "id": 13002,
+                        "kind": 0,
+                        "name": "Element",
+                        "dataType": 9,
+                        "isExec": false
+                    },
+                    {
+                        "id": 13003,
+                        "kind": 1,
+                        "name": "JSON",
+                        "dataType": 9,
+                        "isExec": false
+                    }
+                ]
+            },
+            {
+                "id": 14,
+                "definitionId": "LLM.Chat",
+                "name": "LLM Call 2",
+                "pins": [
+                    {
+                        "id": 14001,
+                        "kind": 0,
+                        "name": "",
+                        "dataType": 0,
+                        "isExec": true
+                    },
+                    {
+                        "id": 14002,
+                        "kind": 0,
+                        "name": "BaseURL",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "https://api.openai.com/v1"
+                    },
+                    {
+                        "id": 14003,
+                        "kind": 0,
+                        "name": "ApiKey",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "sk-your-api-key-here"
+                    },
+                    {
+                        "id": 14004,
+                        "kind": 0,
+                        "name": "Model",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "gpt-4o"
+                    },
+                    {
+                        "id": 14005,
+                        "kind": 0,
+                        "name": "Messages",
+                        "dataType": 4,
+                        "isExec": false
+                    },
+                    {
+                        "id": 14006,
+                        "kind": 0,
+                        "name": "SystemPrompt",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "You are a helpful assistant."
+                    },
+                    {
+                        "id": 14007,
+                        "kind": 0,
+                        "name": "MaxTokens",
+                        "dataType": 2,
+                        "isExec": false,
+                        "defaultValue": 512
+                    },
+                    {
+                        "id": 14008,
+                        "kind": 0,
+                        "name": "Temperature",
+                        "dataType": 3,
+                        "isExec": false,
+                        "defaultValue": 0.7
+                    },
+                    {
+                        "id": 14009,
+                        "kind": 0,
+                        "name": "Tools",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": ""
+                    },
+                    {
+                        "id": 14010,
+                        "kind": 1,
+                        "name": "onReply",
+                        "dataType": 0,
+                        "isExec": true
+                    },
+                    {
+                        "id": 14011,
+                        "kind": 1,
+                        "name": "onError",
+                        "dataType": 0,
+                        "isExec": true
+                    },
+                    {
+                        "id": 14012,
+                        "kind": 1,
+                        "name": "Reply",
+                        "dataType": 4,
+                        "isExec": false
+                    },
+                    {
+                        "id": 14013,
+                        "kind": 1,
+                        "name": "ErrorMessage",
+                        "dataType": 4,
+                        "isExec": false
+                    }
+                ]
+            },
+            {
+                "id": 15,
+                "definitionId": "JSON.GetPath",
+                "name": "Get Final Answer",
+                "pins": [
+                    {
+                        "id": 15001,
+                        "kind": 0,
+                        "name": "JSON",
+                        "dataType": 4,
+                        "isExec": false
+                    },
+                    {
+                        "id": 15002,
+                        "kind": 0,
+                        "name": "Path",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "choices[0].message.content"
+                    },
+                    {
+                        "id": 15003,
+                        "kind": 1,
+                        "name": "Value",
+                        "dataType": 4,
+                        "isExec": false
+                    },
+                    {
+                        "id": 15004,
+                        "kind": 1,
+                        "name": "Found",
+                        "dataType": 1,
+                        "isExec": false
+                    }
+                ]
+            },
+            {
+                "id": 16,
+                "definitionId": "PrintString",
+                "name": "Print Answer",
+                "pins": [
+                    {
+                        "id": 16001,
+                        "kind": 0,
+                        "name": "",
+                        "dataType": 0,
+                        "isExec": true
+                    },
+                    {
+                        "id": 16002,
+                        "kind": 0,
+                        "name": "In String",
+                        "dataType": 4,
+                        "isExec": false
+                    },
+                    {
+                        "id": 16003,
+                        "kind": 1,
+                        "name": "",
+                        "dataType": 0,
+                        "isExec": true
+                    }
+                ]
+            },
+            {
+                "id": 17,
+                "definitionId": "PrintString",
+                "name": "Print Error",
+                "pins": [
+                    {
+                        "id": 17001,
+                        "kind": 0,
+                        "name": "",
+                        "dataType": 0,
+                        "isExec": true
+                    },
+                    {
+                        "id": 17002,
+                        "kind": 0,
+                        "name": "In String",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "LLM call failed"
+                    },
+                    {
+                        "id": 17003,
+                        "kind": 1,
+                        "name": "",
+                        "dataType": 0,
+                        "isExec": true
+                    }
+                ]
+            },
+            {
+                "id": 18,
+                "definitionId": "PrintString",
+                "name": "No Tool Call",
+                "pins": [
+                    {
+                        "id": 18001,
+                        "kind": 0,
+                        "name": "",
+                        "dataType": 0,
+                        "isExec": true
+                    },
+                    {
+                        "id": 18002,
+                        "kind": 0,
+                        "name": "In String",
+                        "dataType": 4,
+                        "isExec": false,
+                        "defaultValue": "No tool call in response"
+                    },
+                    {
+                        "id": 18003,
+                        "kind": 1,
+                        "name": "",
+                        "dataType": 0,
+                        "isExec": true
+                    }
+                ]
+            }
+        ],
+        "links": [
+            {
+                "id": 100,
+                "startPinId": 1001,
+                "endPinId": 7001,
+                "isEnabled": true
+            },
+            {
+                "id": 201,
+                "startPinId": 2002,
+                "endPinId": 3002,
+                "isEnabled": true
+            },
+            {
+                "id": 202,
+                "startPinId": 3003,
+                "endPinId": 7009,
+                "isEnabled": true
+            },
+            {
+                "id": 301,
+                "startPinId": 4003,
+                "endPinId": 5002,
+                "isEnabled": true
+            },
+            {
+                "id": 302,
+                "startPinId": 5003,
+                "endPinId": 6002,
+                "isEnabled": true
+            },
+            {
+                "id": 303,
+                "startPinId": 6003,
+                "endPinId": 7005,
+                "isEnabled": true
+            },
+            {
+                "id": 400,
+                "startPinId": 7010,
+                "endPinId": 10001,
+                "isEnabled": true
+            },
+            {
+                "id": 401,
+                "startPinId": 7011,
+                "endPinId": 17001,
+                "isEnabled": true
+            },
+            {
+                "id": 402,
+                "startPinId": 7012,
+                "endPinId": 8001,
+                "isEnabled": true
+            },
+            {
+                "id": 403,
+                "startPinId": 7012,
+                "endPinId": 9001,
+                "isEnabled": true
+            },
+            {
+                "id": 410,
+                "startPinId": 8004,
+                "endPinId": 10002,
+                "isEnabled": true
+            },
+            {
+                "id": 420,
+                "startPinId": 10003,
+                "endPinId": 14001,
+                "isEnabled": true
+            },
+            {
+                "id": 421,
+                "startPinId": 10004,
+                "endPinId": 18001,
+                "isEnabled": true
+            },
+            {
+                "id": 430,
+                "startPinId": 9003,
+                "endPinId": 11002,
+                "isEnabled": true
+            },
+            {
+                "id": 431,
+                "startPinId": 11003,
+                "endPinId": 12002,
+                "isEnabled": true
+            },
+            {
+                "id": 432,
+                "startPinId": 12003,
+                "endPinId": 13002,
+                "isEnabled": true
+            },
+            {
+                "id": 433,
+                "startPinId": 6003,
+                "endPinId": 13001,
+                "isEnabled": true
+            },
+            {
+                "id": 434,
+                "startPinId": 13003,
+                "endPinId": 14005,
+                "isEnabled": true
+            },
+            {
+                "id": 440,
+                "startPinId": 14010,
+                "endPinId": 16001,
+                "isEnabled": true
+            },
+            {
+                "id": 441,
+                "startPinId": 14011,
+                "endPinId": 17001,
+                "isEnabled": true
+            },
+            {
+                "id": 442,
+                "startPinId": 14012,
+                "endPinId": 15001,
+                "isEnabled": true
+            },
+            {
+                "id": 443,
+                "startPinId": 15003,
+                "endPinId": 16002,
+                "isEnabled": true
+            }
+        ],
+        "variables": []
     },
-    "nodes": [
-      {
-        "id": 1,
-        "definitionId": "OnBeginPlay",
-        "name": "On Begin Play",
-        "pins": [
-          {
-            "id": 1001,
-            "kind": 1,
-            "name": "",
-            "dataType": 0,
-            "isExec": true
-          }
-        ]
-      },
-      {
-        "id": 2,
-        "definitionId": "JSON.Build",
-        "name": "Build Tool Def",
-        "pins": [
-          {
-            "id": 2001,
-            "kind": 0,
-            "name": "JSON",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "{\"type\": \"function\", \"function\": {\"name\": \"get_weather\", \"description\": \"Get current weather for a location\", \"parameters\": {\"type\": \"object\", \"properties\": {\"location\": {\"type\": \"string\", \"description\": \"City name\"}}, \"required\": [\"location\"]}}}"
-          },
-          {
-            "id": 2002,
-            "kind": 1,
-            "name": "Value",
-            "dataType": 9,
-            "isExec": false
-          },
-          {
-            "id": 2003,
-            "kind": 1,
-            "name": "Valid",
-            "dataType": 1,
-            "isExec": false
-          }
-        ]
-      },
-      {
-        "id": 3,
-        "definitionId": "JSON.ArrayPush",
-        "name": "Make Tools Array",
-        "pins": [
-          {
-            "id": 3001,
-            "kind": 0,
-            "name": "Array",
-            "dataType": 9,
-            "isExec": false
-          },
-          {
-            "id": 3002,
-            "kind": 0,
-            "name": "Element",
-            "dataType": 9,
-            "isExec": false
-          },
-          {
-            "id": 3003,
-            "kind": 1,
-            "name": "Array",
-            "dataType": 9,
-            "isExec": false
-          }
-        ]
-      },
-      {
-        "id": 4,
-        "definitionId": "String.Template",
-        "name": "User Prompt",
-        "pins": [
-          {
-            "id": 4001,
-            "kind": 0,
-            "name": "Template",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "What is the weather in {{location}}?"
-          },
-          {
-            "id": 4002,
-            "kind": 0,
-            "name": "location",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "Shanghai"
-          },
-          {
-            "id": 4003,
-            "kind": 1,
-            "name": "Result",
-            "dataType": 4,
-            "isExec": false
-          }
-        ]
-      },
-      {
-        "id": 5,
-        "definitionId": "JSON.MakeMessage",
-        "name": "User Message",
-        "pins": [
-          {
-            "id": 5001,
-            "kind": 0,
-            "name": "Role",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "user"
-          },
-          {
-            "id": 5002,
-            "kind": 0,
-            "name": "Content",
-            "dataType": 4,
-            "isExec": false
-          },
-          {
-            "id": 5003,
-            "kind": 1,
-            "name": "Message",
-            "dataType": 9,
-            "isExec": false
-          }
-        ]
-      },
-      {
-        "id": 6,
-        "definitionId": "JSON.ArrayPush",
-        "name": "Make Messages",
-        "pins": [
-          {
-            "id": 6001,
-            "kind": 0,
-            "name": "Array",
-            "dataType": 9,
-            "isExec": false
-          },
-          {
-            "id": 6002,
-            "kind": 0,
-            "name": "Element",
-            "dataType": 9,
-            "isExec": false
-          },
-          {
-            "id": 6003,
-            "kind": 1,
-            "name": "Array",
-            "dataType": 9,
-            "isExec": false
-          }
-        ]
-      },
-      {
-        "id": 7,
-        "definitionId": "LLM.Chat",
-        "name": "LLM Call 1",
-        "pins": [
-          {
-            "id": 7001,
-            "kind": 0,
-            "name": "",
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 7002,
-            "kind": 0,
-            "name": "BaseURL",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "https://api.openai.com/v1"
-          },
-          {
-            "id": 7003,
-            "kind": 0,
-            "name": "ApiKey",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "sk-your-api-key-here"
-          },
-          {
-            "id": 7004,
-            "kind": 0,
-            "name": "Model",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "gpt-4o"
-          },
-          {
-            "id": 7005,
-            "kind": 0,
-            "name": "Messages",
-            "dataType": 4,
-            "isExec": false
-          },
-          {
-            "id": 7006,
-            "kind": 0,
-            "name": "SystemPrompt",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "You are a helpful assistant."
-          },
-          {
-            "id": 7007,
-            "kind": 0,
-            "name": "MaxTokens",
-            "dataType": 2,
-            "isExec": false,
-            "defaultValue": 512
-          },
-          {
-            "id": 7008,
-            "kind": 0,
-            "name": "Temperature",
-            "dataType": 3,
-            "isExec": false,
-            "defaultValue": 0.7
-          },
-          {
-            "id": 7009,
-            "kind": 0,
-            "name": "Tools",
-            "dataType": 4,
-            "isExec": false
-          },
-          {
-            "id": 7010,
-            "kind": 1,
-            "name": "onSuccess",
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 7011,
-            "kind": 1,
-            "name": "onError",
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 7012,
-            "kind": 1,
-            "name": "Response",
-            "dataType": 4,
-            "isExec": false
-          },
-          {
-            "id": 7013,
-            "kind": 1,
-            "name": "ErrorMessage",
-            "dataType": 4,
-            "isExec": false
-          }
-        ]
-      },
-      {
-        "id": 8,
-        "definitionId": "JSON.GetPath",
-        "name": "Get Tool Name",
-        "pins": [
-          {
-            "id": 8001,
-            "kind": 0,
-            "name": "JSON",
-            "dataType": 4,
-            "isExec": false
-          },
-          {
-            "id": 8002,
-            "kind": 0,
-            "name": "Path",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "choices[0].message.tool_calls[0].function.name"
-          },
-          {
-            "id": 8003,
-            "kind": 1,
-            "name": "Value",
-            "dataType": 4,
-            "isExec": false
-          },
-          {
-            "id": 8004,
-            "kind": 1,
-            "name": "Found",
-            "dataType": 1,
-            "isExec": false
-          }
-        ]
-      },
-      {
-        "id": 9,
-        "definitionId": "JSON.GetPath",
-        "name": "Get Location Arg",
-        "pins": [
-          {
-            "id": 9001,
-            "kind": 0,
-            "name": "JSON",
-            "dataType": 4,
-            "isExec": false
-          },
-          {
-            "id": 9002,
-            "kind": 0,
-            "name": "Path",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "choices[0].message.tool_calls[0].function.arguments"
-          },
-          {
-            "id": 9003,
-            "kind": 1,
-            "name": "Value",
-            "dataType": 4,
-            "isExec": false
-          },
-          {
-            "id": 9004,
-            "kind": 1,
-            "name": "Found",
-            "dataType": 1,
-            "isExec": false
-          }
-        ]
-      },
-      {
-        "id": 10,
-        "definitionId": "Branch",
-        "name": "Has Tool Call?",
-        "pins": [
-          {
-            "id": 10001,
-            "kind": 0,
-            "name": "",
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 10002,
-            "kind": 0,
-            "name": "Condition",
-            "dataType": 1,
-            "isExec": false
-          },
-          {
-            "id": 10003,
-            "kind": 1,
-            "name": "True",
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 10004,
-            "kind": 1,
-            "name": "False",
-            "dataType": 0,
-            "isExec": true
-          }
-        ]
-      },
-      {
-        "id": 11,
-        "definitionId": "FormatString",
-        "name": "Weather Result",
-        "pins": [
-          {
-            "id": 11001,
-            "kind": 0,
-            "name": "Format",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "Weather in {location}: Sunny, 25°C"
-          },
-          {
-            "id": 11002,
-            "kind": 0,
-            "name": "location",
-            "dataType": 4,
-            "isExec": false
-          },
-          {
-            "id": 11003,
-            "kind": 1,
-            "name": "Result",
-            "dataType": 4,
-            "isExec": false
-          }
-        ]
-      },
-      {
-        "id": 12,
-        "definitionId": "JSON.MakeMessage",
-        "name": "Tool Message",
-        "pins": [
-          {
-            "id": 12001,
-            "kind": 0,
-            "name": "Role",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "tool"
-          },
-          {
-            "id": 12002,
-            "kind": 0,
-            "name": "Content",
-            "dataType": 4,
-            "isExec": false
-          },
-          {
-            "id": 12003,
-            "kind": 1,
-            "name": "Message",
-            "dataType": 9,
-            "isExec": false
-          }
-        ]
-      },
-      {
-        "id": 13,
-        "definitionId": "JSON.ArrayPush",
-        "name": "Append Tool Msg",
-        "pins": [
-          {
-            "id": 13001,
-            "kind": 0,
-            "name": "Array",
-            "dataType": 9,
-            "isExec": false
-          },
-          {
-            "id": 13002,
-            "kind": 0,
-            "name": "Element",
-            "dataType": 9,
-            "isExec": false
-          },
-          {
-            "id": 13003,
-            "kind": 1,
-            "name": "Array",
-            "dataType": 9,
-            "isExec": false
-          }
-        ]
-      },
-      {
-        "id": 14,
-        "definitionId": "LLM.Chat",
-        "name": "LLM Call 2",
-        "pins": [
-          {
-            "id": 14001,
-            "kind": 0,
-            "name": "",
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 14002,
-            "kind": 0,
-            "name": "BaseURL",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "https://api.openai.com/v1"
-          },
-          {
-            "id": 14003,
-            "kind": 0,
-            "name": "ApiKey",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "sk-your-api-key-here"
-          },
-          {
-            "id": 14004,
-            "kind": 0,
-            "name": "Model",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "gpt-4o"
-          },
-          {
-            "id": 14005,
-            "kind": 0,
-            "name": "Messages",
-            "dataType": 4,
-            "isExec": false
-          },
-          {
-            "id": 14006,
-            "kind": 0,
-            "name": "SystemPrompt",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "You are a helpful assistant."
-          },
-          {
-            "id": 14007,
-            "kind": 0,
-            "name": "MaxTokens",
-            "dataType": 2,
-            "isExec": false,
-            "defaultValue": 512
-          },
-          {
-            "id": 14008,
-            "kind": 0,
-            "name": "Temperature",
-            "dataType": 3,
-            "isExec": false,
-            "defaultValue": 0.7
-          },
-          {
-            "id": 14009,
-            "kind": 0,
-            "name": "Tools",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": ""
-          },
-          {
-            "id": 14010,
-            "kind": 1,
-            "name": "onSuccess",
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 14011,
-            "kind": 1,
-            "name": "onError",
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 14012,
-            "kind": 1,
-            "name": "Response",
-            "dataType": 4,
-            "isExec": false
-          },
-          {
-            "id": 14013,
-            "kind": 1,
-            "name": "ErrorMessage",
-            "dataType": 4,
-            "isExec": false
-          }
-        ]
-      },
-      {
-        "id": 15,
-        "definitionId": "JSON.GetPath",
-        "name": "Get Final Answer",
-        "pins": [
-          {
-            "id": 15001,
-            "kind": 0,
-            "name": "JSON",
-            "dataType": 4,
-            "isExec": false
-          },
-          {
-            "id": 15002,
-            "kind": 0,
-            "name": "Path",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "choices[0].message.content"
-          },
-          {
-            "id": 15003,
-            "kind": 1,
-            "name": "Value",
-            "dataType": 4,
-            "isExec": false
-          },
-          {
-            "id": 15004,
-            "kind": 1,
-            "name": "Found",
-            "dataType": 1,
-            "isExec": false
-          }
-        ]
-      },
-      {
-        "id": 16,
-        "definitionId": "PrintString",
-        "name": "Print Answer",
-        "pins": [
-          {
-            "id": 16001,
-            "kind": 0,
-            "name": "",
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 16002,
-            "kind": 0,
-            "name": "In String",
-            "dataType": 4,
-            "isExec": false
-          },
-          {
-            "id": 16003,
-            "kind": 1,
-            "name": "",
-            "dataType": 0,
-            "isExec": true
-          }
-        ]
-      },
-      {
-        "id": 17,
-        "definitionId": "PrintString",
-        "name": "Print Error",
-        "pins": [
-          {
-            "id": 17001,
-            "kind": 0,
-            "name": "",
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 17002,
-            "kind": 0,
-            "name": "In String",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "LLM call failed"
-          },
-          {
-            "id": 17003,
-            "kind": 1,
-            "name": "",
-            "dataType": 0,
-            "isExec": true
-          }
-        ]
-      },
-      {
-        "id": 18,
-        "definitionId": "PrintString",
-        "name": "No Tool Call",
-        "pins": [
-          {
-            "id": 18001,
-            "kind": 0,
-            "name": "",
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 18002,
-            "kind": 0,
-            "name": "In String",
-            "dataType": 4,
-            "isExec": false,
-            "defaultValue": "No tool call in response"
-          },
-          {
-            "id": 18003,
-            "kind": 1,
-            "name": "",
-            "dataType": 0,
-            "isExec": true
-          }
-        ]
-      }
-    ],
-    "links": [
-      {
-        "id": 100,
-        "startPinId": 1001,
-        "endPinId": 7001,
-        "isEnabled": true
-      },
-      {
-        "id": 201,
-        "startPinId": 2002,
-        "endPinId": 3002,
-        "isEnabled": true
-      },
-      {
-        "id": 202,
-        "startPinId": 3003,
-        "endPinId": 7009,
-        "isEnabled": true
-      },
-      {
-        "id": 301,
-        "startPinId": 4003,
-        "endPinId": 5002,
-        "isEnabled": true
-      },
-      {
-        "id": 302,
-        "startPinId": 5003,
-        "endPinId": 6002,
-        "isEnabled": true
-      },
-      {
-        "id": 303,
-        "startPinId": 6003,
-        "endPinId": 7005,
-        "isEnabled": true
-      },
-      {
-        "id": 400,
-        "startPinId": 7010,
-        "endPinId": 10001,
-        "isEnabled": true
-      },
-      {
-        "id": 401,
-        "startPinId": 7011,
-        "endPinId": 17001,
-        "isEnabled": true
-      },
-      {
-        "id": 402,
-        "startPinId": 7012,
-        "endPinId": 8001,
-        "isEnabled": true
-      },
-      {
-        "id": 403,
-        "startPinId": 7012,
-        "endPinId": 9001,
-        "isEnabled": true
-      },
-      {
-        "id": 410,
-        "startPinId": 8004,
-        "endPinId": 10002,
-        "isEnabled": true
-      },
-      {
-        "id": 420,
-        "startPinId": 10003,
-        "endPinId": 14001,
-        "isEnabled": true
-      },
-      {
-        "id": 421,
-        "startPinId": 10004,
-        "endPinId": 18001,
-        "isEnabled": true
-      },
-      {
-        "id": 430,
-        "startPinId": 9003,
-        "endPinId": 11002,
-        "isEnabled": true
-      },
-      {
-        "id": 431,
-        "startPinId": 11003,
-        "endPinId": 12002,
-        "isEnabled": true
-      },
-      {
-        "id": 432,
-        "startPinId": 12003,
-        "endPinId": 13002,
-        "isEnabled": true
-      },
-      {
-        "id": 433,
-        "startPinId": 6003,
-        "endPinId": 13001,
-        "isEnabled": true
-      },
-      {
-        "id": 434,
-        "startPinId": 13003,
-        "endPinId": 14005,
-        "isEnabled": true
-      },
-      {
-        "id": 440,
-        "startPinId": 14010,
-        "endPinId": 16001,
-        "isEnabled": true
-      },
-      {
-        "id": 441,
-        "startPinId": 14011,
-        "endPinId": 17001,
-        "isEnabled": true
-      },
-      {
-        "id": 442,
-        "startPinId": 14012,
-        "endPinId": 15001,
-        "isEnabled": true
-      },
-      {
-        "id": 443,
-        "startPinId": 15003,
-        "endPinId": 16002,
-        "isEnabled": true
-      }
-    ],
-    "variables": []
-  },
-  "editor": {
-    "nodePositions": {}
-  }
+    "editor": {
+        "nodePositions": {}
+    }
 }
