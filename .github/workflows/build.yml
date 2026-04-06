@@ -31,9 +31,22 @@ jobs:
 
       - name: Run tests
         run: |
-          # install/bin has all DLLs (BlueprintRuntime, lua54, etc.)
-          # build/bin/Release has the test executable
-          $env:PATH = "${{ github.workspace }}\install\bin;${{ github.workspace }}\build\bin\Release;$env:PATH"
+          # Copy all DLLs next to the test executable so the loader finds them
+          # regardless of PATH inheritance by ctest child processes.
+          $testBin = "${{ github.workspace }}\build\bin\Release"
+          $installBin = "${{ github.workspace }}\install\bin"
+          if (Test-Path $installBin) {
+            Copy-Item "$installBin\*.dll" -Destination $testBin -Force -ErrorAction SilentlyContinue
+          }
+          # Also search common MSVC multi-config output paths
+          foreach ($dir in @("${{ github.workspace }}\build\Release",
+                             "${{ github.workspace }}\build\lib\Release")) {
+            if (Test-Path $dir) {
+              Copy-Item "$dir\*.dll" -Destination $testBin -Force -ErrorAction SilentlyContinue
+            }
+          }
+          Write-Host "DLLs in test bin:"
+          Get-ChildItem $testBin -Filter "*.dll" | Select-Object Name
           ctest --test-dir build -C Release --output-on-failure
         shell: pwsh
 
