@@ -21,14 +21,19 @@ jobs:
           key: gtest-v1.14.0-windows
 
       - name: Configure (shared runtime + editor)
-        run: cmake -B build -A x64 -DBUILD_SHARED_LIBS=ON -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON -DBLUEPRINT_LUA=ON
+        run: cmake -B build -A x64 -DBUILD_SHARED_LIBS=ON -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON -DBLUEPRINT_LUA=ON -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}\install"
 
       - name: Build Release
         run: cmake --build build --config Release --parallel
 
+      - name: Install (collect all DLLs into install/bin)
+        run: cmake --install build --config Release
+
       - name: Run tests
         run: |
-          $env:PATH = "${{ github.workspace }}\build\bin\Release;$env:PATH"
+          # install/bin has all DLLs (BlueprintRuntime, lua54, etc.)
+          # build/bin/Release has the test executable
+          $env:PATH = "${{ github.workspace }}\install\bin;${{ github.workspace }}\build\bin\Release;$env:PATH"
           ctest --test-dir build -C Release --output-on-failure
         shell: pwsh
 
