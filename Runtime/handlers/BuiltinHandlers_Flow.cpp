@@ -1,6 +1,7 @@
 // Runtime/BuiltinHandlers_Flow.cpp -- Flow 控制流节点处理器
 #include "BuiltinHandlers_Flow.h"
 #include "../BlueprintExporter.h"
+#include "../../Utils/Json/crude_json.h"
 #include <cstdlib>
 #include <algorithm>
 
@@ -63,7 +64,8 @@ void RegisterHandlers_Flow(
     // ExecuteBlueprint — 加载并执行另一个蓝图文件（完全异步）
     // 依赖：basePath（路径解析）、runner（获取 handlers + timer）
     handlers["ExecuteBlueprint"] = [&runner, basePath](ExecutionContext& ctx) {
-        auto filePath = ctx.GetInputValue("File").asString();
+        auto filePath  = ctx.GetInputValue("File").asString();
+        auto paramsStr = ctx.GetInputValue("Params").asString();  // optional JSON object
         ctx.Log("  [ExecuteBlueprint] File: \"" + filePath + "\"");
 
         if (filePath.empty())
@@ -148,7 +150,7 @@ void RegisterHandlers_Flow(
 
         ExecutionContext* pCtx = &ctx;
         auto alive = runner.GetAliveFlag();
-        ctx.Delay(0.0f, [pCtx, &runner, sharedData, currentHandlers, completedPinId, resolvedPath, alive]() {
+        ctx.Delay(0.0f, [pCtx, &runner, sharedData, currentHandlers, completedPinId, resolvedPath, alive, paramsStr]() {
             if (!alive->load(std::memory_order_acquire)) return;
             pCtx->Log("  [ExecuteBlueprint] Async: executing \"" + resolvedPath + "\"...");
 
@@ -192,6 +194,31 @@ void RegisterHandlers_Flow(
             subRunner->RegisterExternalFunctions(runner.GetExternalFunctions());
             // 同时透传完整 Library 数据（shared_ptr 共享，零拷贝），供 FuncLib.* 节点正确执行
             subRunner->InheritExternalLibraries(runner.GetExternalLibraries());
+
+            // 注入调用方传入的参数：解析 Params JSON 并逐个 SetVariable
+            if (!paramsStr.empty())
+            {
+                auto root = crude_json::value::parse(paramsStr);
+                if (root.is_object())
+                {
+                    for (const auto& kv : root.get<crude_json::object>())
+                    {
+                        const std::string& key = kv.first;
+                        const crude_json::value& val = kv.second;
+                        Variant v;
+                        if (val.is_string())        v = Variant(val.get<std::string>());
+                        else if (val.is_number())    v = Variant(val.get<double>());
+                        else if (val.is_boolean())   v = Variant(val.get<bool>());
+                        else                         v = Variant(val.dump());
+                        subRunner->SetVariable(key, v);
+                        pCtx->Log("  [ExecuteBlueprint] Param: " + key + " = " + v.asString());
+                    }
+                }
+                else
+                {
+                    pCtx->LogWarning("[ExecuteBlueprint] Params is not a JSON object, ignored: " + paramsStr);
+                }
+            }
 
             subRunner->Execute();
             auto execResult = subRunner->DispatchEvent("OnBeginPlay");

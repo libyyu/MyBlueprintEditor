@@ -74,9 +74,17 @@ static void RegisterNodeDefs_Flow(INodeRegistry& registry)
         d.id = "ExecuteBlueprint";
         d.name = "Execute Blueprint";
         d.category = "Flow";
-        d.inputPins = { MakeFlowPin(""), MakePin("File", PinDataType::String) };
-
-        d.outputPins = { MakeFlowPin("Done"), MakeFlowPin("Completed"), MakePin("Success", PinDataType::Boolean), MakePin("Output", PinDataType::String) };
+        d.inputPins = {
+            MakeFlowPin(""),
+            MakePin("File",   PinDataType::String),
+            MakePin("Params", PinDataType::String),   // optional JSON object: {"key":"value",...}
+        };
+        d.outputPins = {
+            MakeFlowPin("Done"),
+            MakeFlowPin("Completed"),
+            MakePin("Success", PinDataType::Boolean),
+            MakePin("Output",  PinDataType::String),
+        };
         d.color = "FFA040";
         registry.registerNode(d);
     }
