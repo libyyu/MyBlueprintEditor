@@ -493,6 +493,21 @@ static int runBlueprintFromFile(const std::string& filePath, float maxTimeSec, i
 
     auto startTime = std::chrono::high_resolution_clock::now();
     auto result    = runner.Execute();
+
+    // 触发 OnBeginPlay 事件链（与编辑器运行行为一致）
+    // Execute() 负责求值纯数据节点；DispatchEvent 负责执行事件驱动的执行流
+    auto beginPlayResult = runner.DispatchEvent("OnBeginPlay");
+    if (beginPlayResult.success && !beginPlayResult.executedNodeIds.empty())
+    {
+        result.nodesExecuted += beginPlayResult.nodesExecuted;
+        for (auto nid : beginPlayResult.executedNodeIds)
+            result.executedNodeIds.push_back(nid);
+    }
+    else if (!beginPlayResult.success && !beginPlayResult.errorMessage.empty())
+    {
+        std::cerr << "[WARN] OnBeginPlay: " << beginPlayResult.errorMessage << std::endl;
+    }
+
     auto endTime   = std::chrono::high_resolution_clock::now();
     double elapsed = std::chrono::duration<double, std::milli>(endTime - startTime).count();
 
