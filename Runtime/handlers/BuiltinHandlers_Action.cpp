@@ -142,19 +142,24 @@ void RegisterHandlers_Action(
     };
 
     // FireEvent：触发指定名称的 CustomEvent，用于打破 exec 环（异步循环入口）
-    // EventName 可来自 pin 连线或默认值
-    // 注意：直接同步调用 DispatchEvent，而非 post 到 MainThreadDispatcher 队列。
-    // 原因：FireEvent 通常从 LLM.Chat 等异步回调触发，此时当前 exec 帧已结束，
-    //       不存在重入风险。Post 方案依赖 OnFrame DrainQueue，而编辑器在
-    //       BeginPlay 同步链结束后 isExecuting=false，DrainQueue 不再被调用，
-    //       导致事件永远不触发。同步调用可正确驱动 ReAct loop。
+    // 使用 MainThreadDispatcher::Post 异步投递，同时通过 AcquireAsync/ReleaseAsync
+    // 维持 HasPendingAsync()==true，确保编辑器 OnFrame 继续驱动 DrainQueue，
+    // 直到事件真正被消费。这样既避免同步重入（拓扑有环时会递归爆栈），
+    // 又不会因 isExecuting 提前变 false 导致 DrainQueue 停止调用。
     handlers["FireEvent"] = [&runner](ExecutionContext& ctx) -> bool {
         std::string eventName = ctx.GetInputValue("EventName").asString();
         ctx.Log("  [FireEvent] triggering event: " + eventName);
         ctx.ActivateOutputFlow("");
         if (!eventName.empty()) {
-            ctx.Log("  [FireEvent] dispatching synchronously");
-            runner.DispatchEvent(eventName);
+            // 先 Acquire，让 isExecuting 保持 true（OnFrame 继续调 DrainQueue）
+            runner.AcquireAsync();
+            ctx.Log("  [FireEvent] async acquired, posting to dispatcher");
+            auto* r = &runner;
+            MainThreadDispatcher::Get().Post([r, eventName]() {
+                r->DispatchEvent(eventName);
+                // 消费完毕后 Release，计数归零时 isExecuting 才可能变 false
+                r->ReleaseAsync();
+            });
         }
         return true;
     };
