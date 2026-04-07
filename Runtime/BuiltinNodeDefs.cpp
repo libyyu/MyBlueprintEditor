@@ -1922,6 +1922,23 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
         },
         "6A0572");
 
+    // ── Tool.ForEachParallel ─────────────────────────────────────────────────
+    // 并发发起所有 tool_calls 的 HTTP 请求，全部完成后激活 onDone
+    // 适用于多个工具均为 HTTP 服务的场景（比串行快 N 倍）
+    // 若工具是 FuncLib 函数，请使用 Tool.ForEach + Tool.CallByName（串行）
+    reg("Tool.ForEachParallel", "Tool For Each (Parallel)", "AI/Tool",
+        {
+            MakeFlowPin(""),
+            MakePin("ToolCallsJSON", PinDataType::String),
+            MakePin("ToolServerURL", PinDataType::String),  // 工具 HTTP 服务地址（可选）
+        },
+        {
+            MakeFlowPin("onDone"),                          // 全部并发完成
+            MakeFlowPin("onError"),                         // HTTP client 未注册
+            MakePin("ResultsJSON",   PinDataType::String),  // [{id,name,result},...]
+        },
+        "6A0572");
+
     // ── Tool.Match ──────────────────────────────────────────────────────────
     reg("Tool.Match", "Tool Match", "AI/Tool",
         {

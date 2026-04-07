@@ -1084,7 +1084,117 @@ void RegisterHandlers_AI(
     };
 
     // ========================================================================
-    // JSON.ToolCallCount — 返回 tool_calls 数组长度
+    // Tool.ForEachParallel — 并发执行所有 tool_calls，全部完成后激活 onDone
+    //
+    // 与 Tool.ForEach 的区别：
+    //   - Tool.ForEach：串行，每个工具完成后才触发下一个 onTool
+    //   - Tool.ForEachParallel：并发，所有工具同时发起（适合多个独立 HTTP 工具调用）
+    //
+    // 工作原理：
+    //   对每个 tool_call，构造一个 HTTP.POST 请求发送到 ToolServerURL，
+    //   所有请求并发发起，全部完成后主线程统一激活 onDone，输出 ResultsJSON。
+    //
+    // 输入：  ToolCallsJSON (string)   — tool_calls JSON 数组
+    //         ToolServerURL (string)   — 工具 HTTP 服务地址（可选，为空则退化为串行）
+    // 输出：  onDone   exec             — 全部完成
+    //         onError  exec             — HTTP 客户端未注册
+    //         ResultsJSON (string)      — JSON 数组 [{id, name, result}, ...]
+    //
+    // 注意：若工具不是 HTTP 服务而是 FuncLib 函数，请使用 Tool.ForEach +
+    //       Tool.CallByName（后者已支持 FuncLib 动态路由）。
+    // ========================================================================
+    handlers["Tool.ForEachParallel"] = [](ExecutionContext& ctx) {
+        auto* client = BP_GetHttpClient();
+        if (!client) {
+            ctx.SetOutputValue("ResultsJSON", Variant(std::string("[]")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        auto tcJson     = ctx.GetInputValue("ToolCallsJSON").asString();
+        auto serverURL  = ctx.GetInputValue("ToolServerURL").asString();
+
+        // 解析 tool_calls 数组
+        crude_json::value root = crude_json::value::parse(tcJson);
+        if (!root.is_array() || root.get<crude_json::array>().empty()) {
+            ctx.SetOutputValue("ResultsJSON", Variant(std::string("[]")));
+            ctx.ActivateOutputFlow("onDone");
+            return true;
+        }
+        const auto& arr = root.get<crude_json::array>();
+        size_t total = arr.size();
+
+        // 共享状态：收集各工具结果
+        struct ToolResult { std::string id; std::string name; std::string result; };
+        auto results  = std::make_shared<std::vector<ToolResult>>(total);
+        auto counter  = std::make_shared<std::atomic<size_t>>(0);
+
+        ctx.MarkDownstreamAsHandled("onDone");
+        ctx.MarkDownstreamAsHandled("onError");
+        PinId donePinId  = ctx.GetPinId("onDone");
+
+        // dispatcher 模式：在 RunAsync 内并发发起所有请求
+        auto dispatcher = [client, arr, serverURL, results, counter, total](
+            ExecutionContext::AsyncResolve resolve) mutable
+        {
+            for (size_t i = 0; i < total; ++i) {
+                std::string id, name, args;
+                const auto& tc = arr[i];
+                if (tc.is_object()) {
+                    if (tc.contains("id") && tc["id"].is_string())
+                        id = tc["id"].get<std::string>();
+                    if (tc.contains("function") && tc["function"].is_object()) {
+                        const auto& fn = tc["function"];
+                        if (fn.contains("name") && fn["name"].is_string())
+                            name = fn["name"].get<std::string>();
+                        if (fn.contains("arguments") && fn["arguments"].is_string())
+                            args = fn["arguments"].get<std::string>();
+                        else if (fn.contains("arguments"))
+                            args = fn["arguments"].dump();
+                    }
+                }
+
+                // 构造 JSON-RPC 风格请求体
+                crude_json::object reqBody;
+                reqBody["tool_name"] = crude_json::value(name);
+                reqBody["arguments"] = crude_json::value(crude_json::value::parse(args.empty() ? "{}" : args));
+                reqBody["id"]        = crude_json::value(id);
+                std::string bodyStr  = crude_json::value(std::move(reqBody)).dump();
+
+                HttpRequest req;
+                req.url    = serverURL.empty() ? "http://localhost:7788/tool/call" : serverURL;
+                req.method = "POST";
+                req.body   = bodyStr;
+                req.headers["Content-Type"] = "application/json";
+
+                (*results)[i] = { id, name, "" };  // 预填
+
+                client->SendAsync(req,
+                    [results, counter, total, idx = i, resolve](HttpResponse resp) mutable {
+                        (*results)[idx].result = resp.ok() ? resp.body : ("Error: " + resp.error);
+                        if (++(*counter) == total)
+                            resolve();  // 全部完成，触发 onComplete
+                    });
+            }
+        };
+
+        // onComplete：序列化结果并激活 onDone
+        auto onComplete = [results, donePinId](ExecutionContext& c) mutable {
+            crude_json::array out;
+            for (const auto& r : *results) {
+                crude_json::object obj;
+                obj["id"]     = crude_json::value(r.id);
+                obj["name"]   = crude_json::value(r.name);
+                obj["result"] = crude_json::value(r.result);
+                out.push_back(crude_json::value(std::move(obj)));
+            }
+            c.SetOutputValue("ResultsJSON", Variant(crude_json::value(std::move(out)).dump()));
+            c.ActivateOutputFlow(donePinId);
+        };
+
+        ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
+        return true;
+    };
     // 输入：  ToolCallsJSON(String)
     // 输出：  Count(Integer)
     // 纯数据节点（无 exec flow）
