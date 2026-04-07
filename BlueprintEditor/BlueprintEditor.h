@@ -672,6 +672,13 @@ struct BlueprintEditor : public Application
     void            ExecuteBlueprint();
     void            ShowExecutionPanel(float paneWidth);
 
+    // Runner 初始化公共序列：ResetState + SetCallbacks + RegisterLibs + RegisterHandlers + SetBreakpointCb
+    // doc: 目标文档；basePath: 蓝图文件所在目录（空则自动从 doc->filePath 提取）
+    // capturedDoc: 回调里引用的文档指针快照，传 nullptr 则默认使用 doc
+    void            InitRunnerForDoc(BlueprintDocument* doc,
+                                     const std::string& basePath = "",
+                                     BlueprintDocument* capturedDoc = nullptr);
+
     // ------------------------------------------------------------------
     // 类型映射
     // ------------------------------------------------------------------

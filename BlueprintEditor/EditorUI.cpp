@@ -1982,27 +1982,10 @@ void BlueprintEditor::OnFrame(float deltaTime)
                             libDoc2->stepInParentDocIndex = m_ActiveDocIndex;
                             libDoc2->stepInFuncName       = funcName2;
 
-                            libDoc2->persistentRunner.ResetState();
-                            libDoc2->persistentRunner.m_withEditor = true;
-                            BlueprintDocument* cap2 = libDoc2;
-                            libDoc2->persistentRunner.SetLogCallback(
-                                [cap2](::NodeEditor::Runtime::LogLevel, const std::string& msg) {
-                                    cap2->executionLog.push_back(msg);
-                                    cap2->executionLogDirty = true;
-                                });
-                            libDoc2->persistentRunner.SetPrintCallback(
-                                [cap2](::NodeEditor::Runtime::LogLevel, const std::string& msg) {
-                                    cap2->executionLog.push_back(msg);
-                                    cap2->executionLogDirty = true;
-                                });
-                            libDoc2->persistentRunner.SetNodePreExecuteCallback(
-                                [cap2](::NodeEditor::Runtime::NodeId nid2) -> bool {
-                                    return cap2->breakpoints.count(static_cast<uint64_t>(nid2)) > 0;
-                                });
-
                             std::string baseDir2 = BpPath::ParentDir(libAbsPath2);
-                            ::NodeEditor::Runtime::RegisterBuiltinHandlers(
-                                libDoc2->persistentRunner, baseDir2, &m_HandlerRegistry);
+                            BlueprintDocument* cap2 = libDoc2;
+                            InitRunnerForDoc(libDoc2, baseDir2, cap2);
+                            // StepIn 从父 runner 继承外部库（而非扫描文件系统）
                             libDoc2->persistentRunner.RegisterExternalFunctions(runner.GetExternalFunctions());
                             libDoc2->persistentRunner.InheritExternalLibraries(runner.GetExternalLibraries());
 

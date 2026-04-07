@@ -33,6 +33,47 @@ static std::string NowTimestamp()
 }
 
 // ============================================================================
+// InitRunnerForDoc — Runner 初始化公共序列
+// 封装 ResetState + SetCallbacks + RegisterLibs + RegisterHandlers + BreakpointCb
+// 供 ExecuteBlueprint 和 StepIn 共用，消除重复。
+// ============================================================================
+
+void BlueprintEditor::InitRunnerForDoc(BlueprintDocument* doc,
+                                        const std::string& basePath,
+                                        BlueprintDocument* capturedDoc)
+{
+    if (!capturedDoc) capturedDoc = doc;
+
+    doc->persistentRunner.ResetState();
+    doc->persistentRunner.m_withEditor = true;
+
+    doc->persistentRunner.SetLogCallback([capturedDoc](::NodeEditor::Runtime::LogLevel /*level*/, const std::string& msg) {
+        capturedDoc->executionLog.push_back(msg);
+        capturedDoc->executionLogDirty = true;
+    });
+    doc->persistentRunner.SetPrintCallback([capturedDoc](::NodeEditor::Runtime::LogLevel /*level*/, const std::string& msg) {
+        capturedDoc->executionLog.push_back(msg);
+        capturedDoc->executionLogDirty = true;
+    });
+
+    // RegisterBuiltinHandlers（含 basePath）
+    std::string bp = basePath;
+    if (bp.empty()) {
+        bp = BpPath::ParentDir(doc->filePath);
+        if (bp.empty()) bp = ".";
+    }
+    ::NodeEditor::Runtime::RegisterBuiltinHandlers(doc->persistentRunner, bp, &m_HandlerRegistry);
+
+    if (m_DefaultHandler)
+        doc->persistentRunner.SetDefaultHandler(m_DefaultHandler);
+
+    // 断点回调
+    doc->persistentRunner.SetNodePreExecuteCallback([capturedDoc](::NodeEditor::Runtime::NodeId nid) -> bool {
+        return capturedDoc->breakpoints.count(static_cast<uint64_t>(nid)) > 0;
+    });
+}
+
+// ============================================================================
 // 执行蓝图
 // ============================================================================
 
@@ -122,31 +163,13 @@ void BlueprintEditor::ExecuteBlueprint()
     ActiveDoc()->executionLog.push_back("Links: " + std::to_string(bp.links.size()));
     ActiveDoc()->executionLog.push_back("");
 
-    // 2. 使用持久 Runner（这样 Delay 等异步操作注册的 timer 不会随局部变量销毁）
-    ActiveDoc()->persistentRunner.ResetState();
-    ActiveDoc()->persistentRunner.m_withEditor = true;  // friend 权限：标记在编辑器环境下运行
-
-    // 捕获当前文档指针快照（而非每次调用 ActiveDoc()，防止标签页切换后回调写入错误文档）
+    // 2. 使用持久 Runner
+    // 捕获文档指针快照（防止回调期间标签页切换写入错误文档）
     BlueprintDocument* capturedDoc = ActiveDoc();
-    ActiveDoc()->persistentRunner.SetLogCallback([capturedDoc](::NodeEditor::Runtime::LogLevel /*level*/, const std::string& msg) {
-        capturedDoc->executionLog.push_back(msg);
-        capturedDoc->executionLogDirty = true;
-    });
-    ActiveDoc()->persistentRunner.SetPrintCallback([capturedDoc](::NodeEditor::Runtime::LogLevel /*level*/, const std::string& msg) {
-        capturedDoc->executionLog.push_back(msg);
-        capturedDoc->executionLogDirty = true;
-    });
 
-    if (!ActiveDoc()->persistentRunner.Load(bp))
-    {
-        ActiveDoc()->executionLog.push_back("[ERROR] Failed to load: " + ActiveDoc()->persistentRunner.GetLastError());
-        ActiveDoc()->lastExecutionStatus = "Load Failed";
-        ActiveDoc()->isExecuting = false;
-        return;
-    }
+    InitRunnerForDoc(ActiveDoc(), /*basePath=*/"", capturedDoc);
 
-    // 注入工程库函数到 runner（用于 FuncLib.* 节点执行）
-    // 扫描工程 libraries 或蓝图同目录下的库文件
+    // 注入工程库函数（FuncLib.* 节点需要，InitRunnerForDoc 不扫库）
     {
         ::NodeEditor::Runtime::JsonBlueprintExporter exporter;
         auto tryRegisterLibDir = [&](const std::string& dirPath) {
@@ -163,14 +186,12 @@ void BlueprintEditor::ExecuteBlueprint()
                 if (!r.success) continue;
                 if (r.data.metadata.blueprintClass != ::NodeEditor::Runtime::BlueprintClass::FunctionLibrary) continue;
                 ActiveDoc()->persistentRunner.RegisterExternalFunctions(r.data.functions);
-                ActiveDoc()->persistentRunner.RegisterExternalLibrary(r.data);  // 注册完整节点图供 FuncLib.* 执行
+                ActiveDoc()->persistentRunner.RegisterExternalLibrary(r.data);
             }
 #endif
         };
-
         if (m_Project.IsOpen())
         {
-            // 有工程：从工程 libraries 列表注入
             for (const auto& libEntry : m_Project.libraries)
             {
                 std::string absPath = m_Project.AbsPath(libEntry.relativePath);
@@ -179,44 +200,24 @@ void BlueprintEditor::ExecuteBlueprint()
                 if (!r.success) continue;
                 if (r.data.metadata.blueprintClass != ::NodeEditor::Runtime::BlueprintClass::FunctionLibrary) continue;
                 ActiveDoc()->persistentRunner.RegisterExternalFunctions(r.data.functions);
-                ActiveDoc()->persistentRunner.RegisterExternalLibrary(r.data);  // 注册完整节点图供 FuncLib.* 执行
+                ActiveDoc()->persistentRunner.RegisterExternalLibrary(r.data);
             }
         }
         else
         {
-            // 无工程：扫描蓝图同目录下的库文件
             std::string dir = BpPath::ParentDir(ActiveDoc()->filePath);
             if (dir.empty()) dir = ".";
             tryRegisterLibDir(dir);
         }
     }
 
-    // 3. 用当前文件所在目录重新注册 handlers（确保 ExecuteBlueprint 节点能解析子蓝图的相对路径）
-    //    basePath 约定为目录路径，需从完整文件路径中提取目录部分
+    if (!ActiveDoc()->persistentRunner.Load(bp))
     {
-        std::string basePath = BpPath::ParentDir(ActiveDoc()->filePath);
-        if (basePath.empty()) basePath = ".";
-        ::NodeEditor::Runtime::RegisterBuiltinHandlers(
-            ActiveDoc()->persistentRunner, basePath, &m_HandlerRegistry);
-
-        // Phase 3：将 Lua 注册的 handler 也注入到 runner（覆盖同名的 C++ handler）
-#ifdef BLUEPRINT_HAS_LUA
-        for (const auto& kv : m_HandlerRegistry)
-        {
-            // m_HandlerRegistry 中已经包含了 Lua 注册的 handler（通过 m_LuaNodeRegistrar.LoadScript）
-            // RegisterBuiltinHandlers 已遍历了整个 map，Lua handler 如果在 map 里已被注册
-            // 因此此处只需确保 runner 能看到所有 map 里的 handler（RegisterBuiltinHandlers 已覆盖）
-            // 无需额外操作
-        }
-#endif
+        ActiveDoc()->executionLog.push_back("[ERROR] Failed to load: " + ActiveDoc()->persistentRunner.GetLastError());
+        ActiveDoc()->lastExecutionStatus = "Load Failed";
+        ActiveDoc()->isExecuting = false;
+        return;
     }
-    if (m_DefaultHandler)
-        ActiveDoc()->persistentRunner.SetDefaultHandler(m_DefaultHandler);
-
-    // 注册断点回调（使用捕获的文档指针）
-    ActiveDoc()->persistentRunner.SetNodePreExecuteCallback([capturedDoc](::NodeEditor::Runtime::NodeId nid) -> bool {
-        return capturedDoc->breakpoints.count(static_cast<uint64_t>(nid)) > 0;
-    });
 
     // 4. 执行（用 try-catch 防止 bad_function_call / bad_variant_access 等异常崩溃）
     auto startTime = std::chrono::high_resolution_clock::now();
