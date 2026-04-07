@@ -1686,6 +1686,28 @@ static void RegisterNodeDefs_Network(INodeRegistry& registry)
             MakePin("Found", PinDataType::Boolean),
         },
         "2E86AB");
+
+    // HTTP.Download — GET 请求下载内容，跨平台（native + WebGL）
+    // 输入：URL, Headers(可选JSON), TimeoutSeconds
+    // 输出：→ onSuccess, → onError
+    //       Data(String 原始字节), Size(Integer), StatusCode(Integer), ErrorMessage(String)
+    // 注意：WebGL 下 Data 为内存中字节串，如需持久化请配合 File.Write 节点使用
+    reg("HTTP.Download", "HTTP Download", "Network",
+        {
+            MakeFlowPin(""),
+            MakePin("URL",            PinDataType::String),
+            MakePin("Headers",        PinDataType::String),  // JSON 格式 {"Key":"Value"}（可选）
+            MakePin("TimeoutSeconds", PinDataType::Integer),
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("Data",         PinDataType::String),   // 原始响应字节（二进制安全）
+            MakePin("Size",         PinDataType::Integer),  // 字节数
+            MakePin("StatusCode",   PinDataType::Integer),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "2E86AB");  // 蓝色，同 HTTP.Request
 }
 
 // ============================================================================

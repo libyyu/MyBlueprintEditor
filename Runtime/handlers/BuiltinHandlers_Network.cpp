@@ -103,6 +103,90 @@ void RegisterHandlers_Network(
     };
 
     // ========================================================================
+    // HTTP.Download
+    // 输入：  URL(String), Headers(String/JSON), TimeoutSeconds(Integer)
+    // 输出：  → onSuccess, → onError
+    //         Data(String 原始字节), Size(Integer), StatusCode(Integer), ErrorMessage(String)
+    //
+    // 实现：强制 GET 请求，复用 IHttpClient::SendAsync。
+    // 跨平台：native = cpp-httplib 后台线程；WebGL = emscripten_fetch（MEMFS 内存）
+    // 注意：二进制数据存在 std::string（按字节长度，非 null-terminated 语义），
+    //       如需写文件请在蓝图中用 File.Write 节点衔接。
+    // ========================================================================
+    handlers["HTTP.Download"] = [&runner](ExecutionContext& ctx) -> bool {
+
+        IHttpClient* client = BP_GetHttpClient();
+        if (!client) {
+            ctx.LogError("[HTTP.Download] No HttpClient registered. Call BP_InitDefaultHttpClient() first.");
+            ctx.SetOutputValue("Data",         Variant(std::string("")));
+            ctx.SetOutputValue("Size",         Variant(static_cast<int64_t>(0)));
+            ctx.SetOutputValue("StatusCode",   Variant(static_cast<int64_t>(0)));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient registered")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        HttpRequest req;
+        req.url    = ctx.GetInputValue("URL").asString();
+        req.method = "GET";
+
+        std::string headersJson = ctx.GetInputValue("Headers").asString();
+        if (!headersJson.empty()) {
+            crude_json::value hj = crude_json::value::parse(headersJson);
+            if (hj.is_object()) {
+                for (const auto& kv : hj.get<crude_json::object>())
+                    if (kv.second.is_string())
+                        req.headers[kv.first] = kv.second.get<std::string>();
+            }
+        }
+
+        auto timeoutVar = ctx.GetInputValue("TimeoutSeconds");
+        if (timeoutVar.type == PinDataType::Integer || timeoutVar.type == PinDataType::Float)
+            req.timeoutSeconds = static_cast<int>(timeoutVar.asInt());
+
+        PinId successPinId = ctx.GetPinId("onSuccess");
+        PinId errorPinId   = ctx.GetPinId("onError");
+
+        ctx.MarkDownstreamAsHandled("onSuccess");
+        ctx.MarkDownstreamAsHandled("onError");
+
+        auto sharedResp = std::make_shared<HttpResponse>();
+
+        auto dispatcher = [client, req, sharedResp](ExecutionContext::AsyncResolve resolve) mutable
+        {
+            client->SendAsync(req,
+                [sharedResp, resolve = std::move(resolve)](HttpResponse resp) mutable
+                {
+                    *sharedResp = std::move(resp);
+                    resolve();
+                });
+        };
+
+        auto onComplete = [sharedResp, successPinId, errorPinId](ExecutionContext& c) mutable
+        {
+            const HttpResponse& resp = *sharedResp;
+            int64_t size = static_cast<int64_t>(resp.body.size());
+            c.SetOutputValue("Data",         Variant(resp.body));
+            c.SetOutputValue("Size",         Variant(size));
+            c.SetOutputValue("StatusCode",   Variant(static_cast<int64_t>(resp.statusCode)));
+            c.SetOutputValue("ErrorMessage", Variant(resp.error));
+
+            if (resp.ok()) {
+                c.Log("[HTTP.Download] " + std::to_string(resp.statusCode)
+                      + " OK (" + std::to_string(size) + " bytes)");
+                c.ActivateOutputFlow(successPinId);
+            } else {
+                c.LogError("[HTTP.Download] " + std::to_string(resp.statusCode)
+                           + " " + resp.error);
+                c.ActivateOutputFlow(errorPinId);
+            }
+        };
+
+        ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
+        return true;
+    };
+
+    // ========================================================================
     // JSON.GetPath — 支持路径：choices[0].message.content
     // 输入：JSON(String), Path(String)
     // 输出：Value(String), Found(Boolean)
