@@ -1,0 +1,18 @@
+{
+  "_comment": "Copy the 'mcpServers' block into your Claude Desktop config file.",
+  "_config_path_windows": "%APPDATA%\\Claude\\claude_desktop_config.json",
+  "_config_path_mac":     "~/Library/Application Support/Claude/claude_desktop_config.json",
+
+  "mcpServers": {
+    "blueprint": {
+      "command": "py",
+      "args": [
+        "C:\\Users\\maxweili\\MyProjects\\MyBlueprintEditor\\tools\\mcp_server.py"
+      ],
+      "env": {
+        "BLUEPRINT_DLL":  "C:\\Users\\maxweili\\MyProjects\\MyBlueprintEditor\\build\\bin\\Release\\BlueprintRuntime.dll",
+        "BLUEPRINT_ROOT": "C:\\Users\\maxweili\\MyProjects\\MyBlueprintEditor"
+      }
+    }
+  }
+}

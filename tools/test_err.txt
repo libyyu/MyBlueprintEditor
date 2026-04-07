@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "C:\Users\maxweili\MyProjects\MyBlueprintEditor\tools\test_mcp.py", line 39, in <module>
+    result = lib.execute(simple_bp)
+  File "C:\Users\maxweili\MyProjects\MyBlueprintEditor\tools\mcp_server.py", line 190, in execute
+    rc = self._lib.BP_DispatchEvent(runner, b"OnBeginPlay")
+OSError: exception: access violation writing 0x00000000000000A0
