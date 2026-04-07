@@ -72,9 +72,10 @@
         "definitionId": "CustomEventNode",
         "definitionVersion": 1,
         "name": "AgentLoop",
+        "nodeData": { "EventName": "AgentLoop" },
         "pins": [
-          { "id": 26, "kind": 0, "dataType": 4, "name": "EventName", "defaultValue": "AgentLoop" },
-          { "id": 27, "kind": 1, "dataType": 0, "isExec": true }
+          { "id": 27, "kind": 1, "dataType": 0, "isExec": true },
+          { "id": 26, "kind": 1, "dataType": 4, "name": "EventName" }
         ]
       },
       {
