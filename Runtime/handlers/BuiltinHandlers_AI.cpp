@@ -1462,7 +1462,14 @@ void RegisterHandlers_AI(
     // ========================================================================
     // UserInput.Wait
     // Mock 模式：runner 变量 __userinput_mock 非空时直接返回
-    // 正常模式：设置 pending 标志，在后台线程轮询等待编辑器写入结果
+    // 正常模式：设置 pending 标志，通过 SetTimer 每帧轮询等待编辑器写入结果
+    //           完全不使用 std::thread，WebGL/Emscripten 兼容。
+    //
+    // 机制：
+    //   ctx.SetTimer(interval, -1, callback) 内部通过 wrapCallbackWithContextRestore
+    //   自动调用 AcquireAsync()，callback 返回 false 时自动 ReleaseAsync()。
+    //   FrameTimerManager 由 BlueprintRunner::Tick() 驱动，每帧在主线程执行，
+    //   与 ImGui UserInput 弹框的 OK 逻辑完全在同一线程，无竞争问题。
     // ========================================================================
     handlers["UserInput.Wait"] = [](ExecutionContext& ctx) -> bool {
         std::string prompt = ctx.GetInputValue("Prompt").asString();
@@ -1485,65 +1492,23 @@ void RegisterHandlers_AI(
 
         ctx.MarkDownstreamAsHandled("");
 
-        // dispatcher：后台线程轮询 pending 标志
-        auto dispatcher = [](ExecutionContext::AsyncResolve resolve) {
-            std::thread([resolve = std::move(resolve)]() mutable {
-                // 最多等待 5 分钟（300 秒），每 50ms 检查一次
-                // 实际判断由 onComplete 里的变量读取完成
-                for (int i = 0; i < 6000; ++i) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                }
-                resolve();
-            }).detach();
-        };
+        ExecutionContext* pCtx = &ctx;
 
-        // 替代：使用一个更短的后台 poll 方案
-        // 我们利用 RunAsync 的 dispatcher 做轮询
-        struct PendingState {
-            std::atomic<bool> done{false};
-        };
-        auto state = std::make_shared<PendingState>();
-
-        auto dispatcher2 = [state](ExecutionContext::AsyncResolve resolve) mutable {
-            std::thread([state, resolve = std::move(resolve)]() mutable {
-                while (!state->done.load(std::memory_order_relaxed)) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                }
-                resolve();
-            }).detach();
-        };
-
-        auto onComplete = [state](ExecutionContext& c) mutable {
-            // 检查是否已经被编辑器设置了结果
-            std::string pending = c.GetVariable("__userinput_pending").asString();
-            if (pending != "1") {
-                // 编辑器已设置结果
-                std::string result = c.GetVariable("__userinput_result").asString();
-                c.SetOutputValue("Input", Variant(result));
-                c.ActivateOutputFlow("");
-                state->done.store(true, std::memory_order_relaxed);
-            } else {
-                // 还没有，重新 RunAsync 继续等
-                state->done.store(false, std::memory_order_relaxed);
-                auto state2 = state;
-                auto dispatcher3 = [state2](ExecutionContext::AsyncResolve resolve3) mutable {
-                    std::thread([state2, resolve3 = std::move(resolve3)]() mutable {
-                        while (!state2->done.load(std::memory_order_relaxed)) {
-                            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                        }
-                        resolve3();
-                    }).detach();
-                };
-                // 无法从 onComplete 里 RunAsync，改用简单方案：
-                // 重置 pending 为 0（由编辑器写入时触发），此处标记 done 让线程退出
-                // 实际上 onComplete 被调用说明 state->done 已经 true，
-                // 因此此分支表示线程超时退出但 pending 仍为 1，视为取消
-                c.SetOutputValue("Input", Variant(std::string("")));
-                c.ActivateOutputFlow("");
+        // 每 50ms 轮询一次 pending 标志（与原后台线程间隔相同）。
+        // wrapCallbackWithContextRestore 自动管理 AcquireAsync / ReleaseAsync，
+        // callback 返回 true = 继续等待，返回 false = 完成并释放。
+        ctx.SetTimer(0.05f, -1, [pCtx]() -> bool {
+            std::string pending = pCtx->GetVariable("__userinput_pending").asString();
+            if (pending == "1") {
+                return true; // 用户尚未确认，继续轮询
             }
-        };
+            // 编辑器已写入结果（pending == "0"）
+            std::string result = pCtx->GetVariable("__userinput_result").asString();
+            pCtx->SetOutputValue("Input", Variant(result));
+            pCtx->ActivateOutputFlow("");
+            return false; // 取消 timer，触发 ReleaseAsync
+        });
 
-        ctx.RunAsync(std::move(dispatcher2), std::move(onComplete));
         return true;
     };
 
