@@ -1033,7 +1033,85 @@ void RegisterHandlers_AI(
             return true;
         }
 
-        // 构造子 runner（与 FuncLib.* 路径一致）
+        // 解析 Arguments JSON（稍后作为 FuncLib 节点输入引脚默认值注入）
+        std::vector<std::pair<std::string, Variant>> argVars;
+        if (!argsJson.empty()) {
+            auto argsVal = crude_json::value::parse(argsJson);
+            if (argsVal.is_object()) {
+                for (const auto& kv : argsVal.get<crude_json::object>()) {
+                    const auto& v = kv.second;
+                    Variant var;
+                    if (v.is_string())
+                        var = Variant(v.get<std::string>());
+                    else if (v.is_number()) {
+                        double d = v.get<double>();
+                        var = (d == static_cast<double>(static_cast<int64_t>(d)))
+                            ? Variant(static_cast<int64_t>(d)) : Variant(d);
+                    } else if (v.is_boolean())
+                        var = Variant(v.get<bool>());
+                    else
+                        var = Variant(v.dump());
+                    argVars.emplace_back(kv.first, std::move(var));
+                }
+            }
+        }
+
+        // 构造一个微型 Actor 蓝图，用 FuncLib.<funcId> 节点调用目标函数。
+        // FuncLib.* handler 内部创建子 runner 时，会遍历节点的数据输入引脚，
+        // 将引脚值（或默认值）通过 SetVariable 注入函数子 runner。
+        // 因此，Arguments 中的参数需要以数据输入引脚的形式挂在 FuncLib 节点上。
+
+        BlueprintData miniActor;
+        miniActor.metadata.blueprintClass = BlueprintClass::Actor;
+        miniActor.metadata.name = "ToolCallByName_" + toolName;
+
+        // OnBeginPlay 节点（id=1，exec 输出 pin=10）
+        {
+            NodeInstance n;
+            n.id = 1; n.definitionId = "OnBeginPlay"; n.name = "OnBeginPlay";
+            PinInfo ep; ep.id=10; ep.kind=PinKind::Output; ep.isExec=true; ep.name="";
+            n.pins.push_back(ep);
+            miniActor.nodes.push_back(n);
+        }
+
+        // FuncLib.<funcId> 节点（id=2）
+        // 为每个 Argument 添加数据输入引脚（带默认值），FuncLib handler 会将其传入函数
+        std::string funcLibDefId = "FuncLib." + libIt->second->metadata.name + "." + funcDefPtr->id;
+        {
+            NodeInstance n;
+            n.id = 2; n.definitionId = funcLibDefId; n.name = toolName;
+            // exec in/out
+            PinInfo ei; ei.id=20; ei.kind=PinKind::Input; ei.isExec=true; ei.name="";
+            n.pins.push_back(ei);
+            PinInfo eo; eo.id=29; eo.kind=PinKind::Output; eo.isExec=true; eo.name="";
+            n.pins.push_back(eo);
+            // 每个参数作为数据输入引脚（pin id 从 200 开始）
+            PinId argPinId = 200;
+            for (const auto& av : argVars) {
+                PinInfo ap;
+                ap.id = argPinId++;
+                ap.kind = PinKind::Input;
+                ap.isExec = false;
+                ap.dataType = PinDataType::String;  // 统一 String，FuncLib handler 用名称匹配
+                ap.name = av.first;
+                ap.defaultValue = av.second;
+                n.pins.push_back(ap);
+            }
+            // Result 输出引脚
+            PinInfo rp; rp.id=22; rp.kind=PinKind::Output; rp.isExec=false;
+            rp.dataType=PinDataType::String; rp.name="Result";
+            n.pins.push_back(rp);
+            miniActor.nodes.push_back(n);
+        }
+
+        // 连线 OnBeginPlay.exec → FuncLib.exec
+        {
+            LinkInstance lnk; lnk.id=100;
+            lnk.startPinId=10; lnk.endPinId=20;
+            miniActor.links.push_back(lnk);
+        }
+
+        // 构造子 runner，继承父 runner 的全部配置
         ::NodeEditor::Runtime::BlueprintRunner subRunner;
         subRunner.RegisterHandlers(runner.GetHandlers());
         if (ctx.OnLog)   subRunner.SetLogCallback(ctx.OnLog);
@@ -1041,39 +1119,13 @@ void RegisterHandlers_AI(
         subRunner.RegisterExternalFunctions(runner.GetExternalFunctions());
         subRunner.InheritExternalLibraries(runner.GetExternalLibraries());
 
-        // 解析 Arguments JSON，注入为变量
-        if (!argsJson.empty()) {
-            auto argsVal = crude_json::value::parse(argsJson);
-            if (argsVal.is_object()) {
-                for (const auto& kv : argsVal.get<crude_json::object>()) {
-                    const auto& v = kv.second;
-                    if (v.is_string())
-                        subRunner.SetVariable(kv.first, Variant(v.get<std::string>()));
-                    else if (v.is_number()) {
-                        double d = v.get<double>();
-                        if (d == static_cast<double>(static_cast<int64_t>(d)))
-                            subRunner.SetVariable(kv.first, Variant(static_cast<int64_t>(d)));
-                        else
-                            subRunner.SetVariable(kv.first, Variant(d));
-                    } else if (v.is_boolean())
-                        subRunner.SetVariable(kv.first, Variant(v.get<bool>()));
-                    else
-                        subRunner.SetVariable(kv.first, Variant(v.dump()));
-                }
-            }
-        }
-
-        // 构建并执行函数子图
-        // BuildFuncSubGraph 是 BlueprintRunner.cpp 中的 static 函数，无法直接调用
-        // 改用 Function.Call 节点机制：设置 FunctionId 变量后执行
-        // 实际上，这里直接在子 runner 加载完整库数据后执行 DispatchEvent("Function.Entry")
-        // 等价于 Function.Call 的子 runner 逻辑
-        // 为了不重复 BuildFuncSubGraph 逻辑，通过 SetVariable("FunctionId") + FuncLib 前缀调用
-        // 最简方案：手动构建只含该函数的 BlueprintData（等价 BuildFuncSubGraph）
-        // 直接复用 RegisterExternalLibrary 后 Execute()（FuncLib 子图会自动走 Function.Entry 入口）
-        if (subRunner.Load(*libIt->second)) {
+        // 加载并执行
+        if (subRunner.Load(miniActor)) {
             subRunner.Execute();
+            subRunner.DispatchEvent("OnBeginPlay");
             auto result = subRunner.GetVariable("Result");
+            if (result.type == ::NodeEditor::Runtime::PinDataType::Unknown)
+                result = subRunner.GetPinValue(22);  // fallback：从输出引脚读
             ctx.SetOutputValue("Result",
                 result.type != ::NodeEditor::Runtime::PinDataType::Unknown
                     ? result : Variant(std::string("")));
