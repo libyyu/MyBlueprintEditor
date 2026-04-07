@@ -107,6 +107,19 @@ void BlueprintEditor::DrawContextMenus(
                 }
             }
         }
+        // CustomEventNode / FireEvent：支持右键 Rename（类 UE4 风格）
+        if (node && (node->DefinitionId == "CustomEventNode" || node->DefinitionId == "FireEvent"))
+        {
+            ImGui::Separator();
+            if (ImGui::MenuItem(ICON_FA_PEN " Rename"))
+            {
+                ActiveDoc()->editingCommentId = node->ID;
+                snprintf(ActiveDoc()->commentEditBuf,
+                         sizeof(ActiveDoc()->commentEditBuf),
+                         "%s", node->Name.c_str());
+                ImGui::CloseCurrentPopup();
+            }
+        }
         // Comment 节点专属操作
         if (node && node->Type == NodeType::Comment)
         {

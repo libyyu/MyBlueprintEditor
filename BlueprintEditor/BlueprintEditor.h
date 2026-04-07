@@ -225,13 +225,9 @@ public:
     // 节点拖拽位置 Undo 状态（在位置变化检测处使用）
     bool           nodeDragUndoPushed = false;  // 本次拖拽是否已 push 过快照
 
-    // Comment 节点内联编辑状态
-    ed::NodeId     editingCommentId   = 0;         // 当前正在编辑标题的 Comment 节点 ID
+    // Comment 节点内联编辑状态（同样用于 CustomEventNode/FireEvent 节点标题重命名）
+    ed::NodeId     editingCommentId   = 0;         // 当前正在编辑标题的节点 ID
     char           commentEditBuf[256] = {};        // 编辑缓冲区
-
-    // CustomEventNode / FireEvent 新建后弹出命名对话框
-    ed::NodeId     pendingEventNameNodeId = 0;     // 待命名的节点 ID（0 = 无）
-    char           pendingEventNameBuf[128] = {};  // 事件名输入缓冲
 
     // 每帧缓存的双击节点 ID（GetDoubleClickedNode 是一次性消费 API，需提前读取共享）
     ed::NodeId     lastDoubleClickedNode = 0;

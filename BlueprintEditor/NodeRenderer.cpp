@@ -164,20 +164,48 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                             }
                         }
                         // 节点标题：Function.Entry/Return 节点显示前缀避免与函数名歧义
-                        if (node.DefinitionId == "Function.Entry")
+                        // 对支持重命名的节点（CustomEventNode/FireEvent），双击或右键 Rename 后进入内联编辑
+                        bool isTitleEditing = (ActiveDoc()->editingCommentId == node.ID
+                                               && node.Type != NodeType::Comment);
+                        if (isTitleEditing)
                         {
-                            ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 0.8f), ICON_FA_ARROW_RIGHT);
-                            ImGui::Spring(0, 4.0f);
-                            ImGui::TextUnformatted(node.Name.c_str());
-                        }
-                        else if (node.DefinitionId == "Function.Return")
-                        {
-                            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 0.8f), ICON_FA_ARROW_LEFT);
-                            ImGui::Spring(0, 4.0f);
-                            ImGui::TextUnformatted(node.Name.c_str());
+                            ImGui::SetNextItemWidth(std::max(80.0f, ImGui::CalcTextSize(ActiveDoc()->commentEditBuf).x + 24.0f));
+                            ImGui::SetKeyboardFocusHere();
+                            if (ImGui::InputText("##nodetitle",
+                                                 ActiveDoc()->commentEditBuf,
+                                                 sizeof(ActiveDoc()->commentEditBuf),
+                                                 ImGuiInputTextFlags_EnterReturnsTrue |
+                                                 ImGuiInputTextFlags_AutoSelectAll))
+                            {
+                                PushUndoState();
+                                node.Name = ActiveDoc()->commentEditBuf;
+                                ActiveDoc()->isDirty = true;
+                                ActiveDoc()->editingCommentId = 0;
+                            }
+                            if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+                                ActiveDoc()->editingCommentId = 0;
+                            if (!ImGui::IsItemActive() && !ImGui::IsItemFocused() &&
+                                ImGui::IsMouseClicked(0))
+                            {
+                                PushUndoState();
+                                node.Name = ActiveDoc()->commentEditBuf;
+                                ActiveDoc()->isDirty = true;
+                                ActiveDoc()->editingCommentId = 0;
+                            }
+                            ed::EnableShortcuts(false);
                         }
                         else
                         {
+                            if (node.DefinitionId == "Function.Entry")
+                            {
+                                ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 0.8f), ICON_FA_ARROW_RIGHT);
+                                ImGui::Spring(0, 4.0f);
+                            }
+                            else if (node.DefinitionId == "Function.Return")
+                            {
+                                ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 0.8f), ICON_FA_ARROW_LEFT);
+                                ImGui::Spring(0, 4.0f);
+                            }
                             ImGui::TextUnformatted(node.Name.c_str());
                         }
                         ImGui::Spring(1);
