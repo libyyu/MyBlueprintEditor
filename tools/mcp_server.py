@@ -85,6 +85,9 @@ class BlueprintLib:
         lib.BP_LoadFromJson.restype  = ctypes.c_int
         lib.BP_LoadFromJson.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 
+        lib.BP_LoadFromJsonWithBaseDir.restype  = ctypes.c_int
+        lib.BP_LoadFromJsonWithBaseDir.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p]
+
         lib.BP_LoadFromFile.restype  = ctypes.c_int
         lib.BP_LoadFromFile.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 
@@ -168,7 +171,11 @@ class BlueprintLib:
                     return {"output": [], "warnings": self._log_lines[:],
                             "error": f"Load failed: {err}"}
             else:
-                rc = self._lib.BP_LoadFromJson(runner, bjson_content.encode("utf-8"))
+                rc = self._lib.BP_LoadFromJsonWithBaseDir(
+                    runner,
+                    bjson_content.encode("utf-8"),
+                    str(BLUEPRINT_ROOT).encode("utf-8")
+                )
                 if rc != 0:
                     err = self._get_last_error(runner)
                     return {"output": [], "warnings": self._log_lines[:],
@@ -227,7 +234,11 @@ class BlueprintLib:
             if file_path:
                 rc = self._lib.BP_LoadFromFile(runner, file_path.encode("utf-8"))
             else:
-                rc = self._lib.BP_LoadFromJson(runner, bjson_content.encode("utf-8"))
+                rc = self._lib.BP_LoadFromJsonWithBaseDir(
+                    runner,
+                    bjson_content.encode("utf-8"),
+                    str(BLUEPRINT_ROOT).encode("utf-8")
+                )
             if rc != 0:
                 return {"value": None, "output": [],
                         "error": f"Load failed: {self._get_last_error(runner)}"}

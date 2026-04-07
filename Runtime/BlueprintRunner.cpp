@@ -93,6 +93,62 @@ bool BlueprintRunner::LoadFromJson(const std::string& jsonContent)
     return Load(result.data);
 }
 
+bool BlueprintRunner::LoadFromJsonWithDeps(const std::string& jsonContent, const std::string& baseDir)
+{
+#ifdef __EMSCRIPTEN__
+    return LoadFromJson(jsonContent);
+#else
+    m_loadedFileDir = baseDir;
+
+    JsonBlueprintExporter exporter(m_fileSystem);
+    auto result = exporter.importRuntimeFromString(jsonContent);
+    if (!result.success)
+    {
+        m_lastError = "JSON import failed: " + result.errorMessage;
+        return false;
+    }
+
+    // 按 metadata.dependencies 顺序加载 Library（与 LoadFromFileWithDeps 逻辑一致）
+    const auto& deps = result.data.metadata.dependencies;
+    if (!deps.empty())
+    {
+        namespace fs = std::filesystem;
+        fs::path base = baseDir.empty() ? fs::current_path() : fs::path(baseDir);
+
+        for (const auto& dep : deps)
+        {
+            std::string absDepPath = dep;
+            if (!fs::path(dep).is_absolute())
+                absDepPath = (base / dep).lexically_normal().string();
+
+            if (!fs::exists(absDepPath))
+            {
+                m_lastError = "Dependency not found: " + absDepPath;
+                return false;
+            }
+
+            auto libResult = exporter.importRuntimeFromFile(absDepPath);
+            if (!libResult.success)
+            {
+                m_lastError = "Failed to load dependency '" + dep + "': " + libResult.errorMessage;
+                return false;
+            }
+            if (libResult.data.metadata.blueprintClass != BlueprintClass::FunctionLibrary)
+                continue;
+
+            for (const auto& funcDef : libResult.data.functions)
+            {
+                if (funcDef.isPublic)
+                    m_externalFunctions[funcDef.id] = funcDef;
+            }
+            RegisterExternalLibrary(libResult.data);
+        }
+    }
+
+    return Load(result.data);
+#endif
+}
+
 bool BlueprintRunner::LoadFromFile(const std::string& filePath)
 {
     JsonBlueprintExporter exporter(m_fileSystem);

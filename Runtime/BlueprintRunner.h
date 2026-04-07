@@ -397,8 +397,12 @@ public:
     // 从 BlueprintData 直接加载
     bool Load(const BlueprintData& data);
 
-    // 从 JSON 字符串加载
+    // 从 JSON 字符串加载（不加载依赖）
     bool LoadFromJson(const std::string& jsonContent);
+
+    // 从 JSON 字符串加载，并按 metadata.dependencies 自动加载依赖 Library
+    // baseDir: 依赖文件的搜索基准目录（相对路径将相对于此目录解析）
+    bool LoadFromJsonWithDeps(const std::string& jsonContent, const std::string& baseDir);
 
     // 从 JSON 文件加载
     bool LoadFromFile(const std::string& filePath);

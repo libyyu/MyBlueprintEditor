@@ -109,7 +109,17 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_DestroyRunner(BP_Runner runner
 
 /// Load blueprint from a JSON string.
 /// Returns 0 on success, non-zero on failure (call BP_GetLastError for details).
+/// Note: dependencies declared in metadata.dependencies are NOT loaded.
+/// Use BP_LoadFromJsonWithBaseDir to load dependencies automatically.
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromJson(BP_Runner runner, const char* json);
+
+/// Load blueprint from a JSON string and automatically load dependencies.
+/// baseDir: directory used to resolve relative paths in metadata.dependencies.
+///   - If the JSON was read from a file, pass the file's parent directory.
+///   - Pass NULL or "" to use the current working directory.
+/// Returns 0 on success, non-zero on failure.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromJsonWithBaseDir(
+    BP_Runner runner, const char* json, const char* baseDir);
 
 /// Load blueprint from a file path (uses the runner's IFileSystem).
 /// Returns 0 on success, non-zero on failure.

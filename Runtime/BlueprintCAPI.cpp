@@ -81,6 +81,21 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromJson(BP_Runner runner, 
     return 0;
 }
 
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromJsonWithBaseDir(
+    BP_Runner runner, const char* json, const char* baseDir)
+{
+    if (!runner || !json) return 1;
+    auto* w = asWrapper(runner);
+    std::string baseDirStr = (baseDir && *baseDir) ? std::string(baseDir) : std::string("");
+    if (!w->runner.LoadFromJsonWithDeps(std::string(json), baseDirStr))
+    {
+        w->lastError = w->runner.GetLastError();
+        return 1;
+    }
+    w->lastError.clear();
+    return 0;
+}
+
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromFile(BP_Runner runner, const char* filePath)
 {
     if (!runner || !filePath) return 1;
