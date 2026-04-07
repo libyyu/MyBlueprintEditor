@@ -907,6 +907,12 @@ private:
     // 主循环跳过这些节点以避免重复执行
     std::unordered_set<NodeId>                          m_flowExecutedNodes;
 
+    // flowInsertLog：按插入顺序记录加入 m_flowExecutedNodes 的节点。
+    // 提升为成员变量，使嵌套的 executeDownstreamFromPin 调用共享同一序列，
+    // 确保内层递归的插入对外层的 executedHere 更新可见。
+    // 每次 Execute() / DispatchEvent() 开始时与 m_flowExecutedNodes 同步清空。
+    std::vector<NodeId>                                 m_flowInsertLog;
+
     // 递归深度保护
     int m_flowDepth = 0;
     // 控制流递归深度上限（Branch/ForLoop/Sequence 每层 +1）。

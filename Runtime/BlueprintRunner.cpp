@@ -523,8 +523,8 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
             m_logCallback(LogLevel::Warning, "Function.Call: Function.Entry not found for '" + funcId + "'");
         }
 
-        m_context.ActivateOutputFlow(std::string(""));
         propagatePinValues(node);
+        m_context.ActivateOutputFlow(std::string(""));
         return true;
     }
 
@@ -635,8 +635,8 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
                 "Function.CallLibrary: function '" + funcId + "' not found in '" + libPath + "'");
         }
 
-        m_context.ActivateOutputFlow(std::string(""));
         propagatePinValues(node);
+        m_context.ActivateOutputFlow(std::string(""));
         return true;
     }
 
@@ -754,8 +754,10 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
             }
         }
 
-        m_context.ActivateOutputFlow(std::string(""));
+        // 注意顺序：先 propagatePinValues（把输出引脚值传播到下游输入引脚），
+        // 再 ActivateOutputFlow（触发 exec 下游执行），确保下游节点读到正确的输入值。
         propagatePinValues(node);
+        m_context.ActivateOutputFlow(std::string(""));
         return true;
     }
 
@@ -881,6 +883,7 @@ ExecutionResult BlueprintRunner::Execute()
 
     // 按拓扑顺序执行
     m_flowExecutedNodes.clear(); // 清空控制流已执行记录
+    m_flowInsertLog.clear();     // 同步清空插入日志（与 m_flowExecutedNodes 保持一致）
     m_stepTopoIndex = 0;         // 重置单步索引
     m_stepPendingNodes.clear();  // 清空单步待执行队列
     m_stepMode = false;          // 确保单步模式标志复位（防止异常情况下残留）
@@ -1223,6 +1226,7 @@ ExecutionResult BlueprintRunner::ExecuteNodes(const std::vector<NodeId>& nodeIds
 
     // 执行
     m_flowExecutedNodes.clear();  // 确保不受上次 Execute() 结果影响
+    m_flowInsertLog.clear();
     for (NodeId id : filteredOrder)
     {
         const NodeInstance* node = m_blueprint.findNode(id);
@@ -2194,11 +2198,10 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     // 第二次迭代开始所有节点被误跳过。
     std::unordered_set<NodeId> executedHere;
 
-    // flowInsertLog: 按插入顺序记录本次 executeDownstreamFromPin 调用期间
-    // 新加入 m_flowExecutedNodes 的节点 id。
-    // 用途：每次节点执行后，只需遍历 [prevLogSize, logSize) 这段新增区间
-    // 合并到 executedHere，避免全量扫描 m_flowExecutedNodes（O(N²) → O(N)）。
-    std::vector<NodeId> flowInsertLog;
+    // flowInsertLog: 使用成员变量 m_flowInsertLog，使嵌套的 executeDownstreamFromPin
+    // 调用共享同一序列。内层递归对 m_flowExecutedNodes 的插入会被外层的 prevLogSize
+    // 扫描捕获，从而正确更新 executedHere，避免外层 for 循环对同一节点重复执行。
+    auto& flowInsertLog = m_flowInsertLog;
 
     bool ok = true;
     for (NodeId id : fullOrder)
