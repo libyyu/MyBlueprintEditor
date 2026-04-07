@@ -696,12 +696,15 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
     // ── 搜索框 ────────────────────────────────────────────────────────────
     // 搜索框（static 可接受：右键菜单是瞬态 UI，不关联特定文档）
     static char searchBuf[128] = "";
-    // 菜单刚打开时自动清空并聚焦搜索框
+    static char s_lastSearchBuf[128] = "";  // 上次关闭菜单时保留的搜索词
+    // 菜单刚打开时：恢复上次搜索词并聚焦搜索框
     static bool s_justOpened = false;
     if (ImGui::IsWindowAppearing())
     {
-        searchBuf[0] = '\0';
-        m_CachedSearchFilter.clear();
+        // 恢复上次搜索词（不清空，方便连续添加同类节点）
+        std::strncpy(searchBuf, s_lastSearchBuf, sizeof(searchBuf) - 1);
+        searchBuf[sizeof(searchBuf) - 1] = '\0';
+        m_CachedSearchFilter.clear();  // 强制重算搜索结果（过滤条件可能变化）
         s_justOpened = true;
     }
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
@@ -772,6 +775,7 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
                 result = SpawnNodeByDef(d->id);
                 if (result)
                     FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d->id));
+                std::strncpy(s_lastSearchBuf, searchBuf, sizeof(s_lastSearchBuf) - 1);
                 searchBuf[0] = '\0';
                 m_CachedSearchFilter.clear();
                 ImGui::CloseCurrentPopup();
@@ -791,6 +795,7 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
                 result = SpawnNodeByDef(d->id);
                 if (result)
                     FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d->id));
+                std::strncpy(s_lastSearchBuf, searchBuf, sizeof(s_lastSearchBuf) - 1);
                 searchBuf[0] = '\0';
                 m_CachedSearchFilter.clear();
             }

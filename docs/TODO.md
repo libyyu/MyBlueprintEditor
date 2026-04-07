@@ -161,9 +161,9 @@ callback 签名：`function(body: string, statusCode: int, error: string)`
 
 | 项目 | 估时 | 说明 |
 |------|------|------|
-| ~~修复 Lua `http.*` 异步阻塞~~ | ✅ 已完成 | SendAsync + callback，无阻塞 |
-| 流式 tool_calls 支持（缺口3） | 半天 | StreamChat 增量拼合 |
-| 并行工具调用 | 1天 | Tool.ForEach 并发执行多个 tool_call |
+| ~~修复 Lua `http.*` 异步阻塞~~ | ✅ | SendAsync + callback，无阻塞 |
+| ~~流式 tool_calls 支持（缺口3）~~ | ✅ | StreamChat 解析 delta.tool_calls，输出 onToolCall + ToolCallsJSON |
+| ~~并行工具调用~~ | ✅ | `Tool.ForEachParallel`：并发 HTTP，atomic 计数，全部完成后 onDone |
 
 ### P3：编辑器体验
 
