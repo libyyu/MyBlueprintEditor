@@ -1365,21 +1365,16 @@ void RegisterHandlers_AI(
             miniActor.links.push_back(lnk);
         }
 
-        // 构造子 runner，继承父 runner 的全部配置
-        ::NodeEditor::Runtime::BlueprintRunner subRunner;
-        subRunner.RegisterHandlers(runner.GetHandlers());
-        if (ctx.OnLog)   subRunner.SetLogCallback(ctx.OnLog);
-        if (ctx.OnPrint) subRunner.SetPrintCallback(ctx.OnPrint);
-        subRunner.RegisterExternalFunctions(runner.GetExternalFunctions());
-        subRunner.InheritExternalLibraries(runner.GetExternalLibraries());
+        // 构造子 runner，继承父 runner 的全部配置（含 SetParentTimerManager + SetNodePreExecuteCallback）
+        auto subRunner = runner.CreateChildRunner();
 
         // 加载并执行
-        if (subRunner.Load(miniActor)) {
-            subRunner.Execute();
-            subRunner.DispatchEvent("OnBeginPlay");
-            auto result = subRunner.GetVariable("Result");
+        if (subRunner->Load(miniActor)) {
+            subRunner->Execute();
+            subRunner->DispatchEvent("OnBeginPlay");
+            auto result = subRunner->GetVariable("Result");
             if (result.type == ::NodeEditor::Runtime::PinDataType::Unknown)
-                result = subRunner.GetPinValue(22);  // fallback：从输出引脚读
+                result = subRunner->GetPinValue(22);  // fallback：从输出引脚读
             ctx.SetOutputValue("Result",
                 result.type != ::NodeEditor::Runtime::PinDataType::Unknown
                     ? result : Variant(std::string("")));

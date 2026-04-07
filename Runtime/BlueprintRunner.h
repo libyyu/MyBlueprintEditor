@@ -494,6 +494,11 @@ public:
     void RegisterExternalFunctions(const std::vector<FunctionDefinition>& funcs);
     void RegisterExternalFunction(const FunctionDefinition& func);
 
+    // 创建子 runner，继承当前 runner 的全部配置（handlers/callbacks/timer/external libs）
+    // 用于 Function.Call / Function.CallLibrary / FuncLib.* 三条路径，消除重复代码
+    // 返回 unique_ptr 以避免拷贝构造（BlueprintRunner 含 atomic，不可拷贝）
+    std::unique_ptr<BlueprintRunner> CreateChildRunner() const;
+
     // 获取已注册的外部库函数表（供子 runner 继承，确保 FuncLib.* 节点在子蓝图中可用）
     std::vector<FunctionDefinition> GetExternalFunctions() const;
 

@@ -46,6 +46,19 @@ bool BlueprintRunner::IsWithEditor() const
     return m_withEditor;
 }
 
+std::unique_ptr<BlueprintRunner> BlueprintRunner::CreateChildRunner() const
+{
+    auto sub = std::make_unique<BlueprintRunner>();
+    sub->RegisterHandlers(m_handlers);
+    sub->SetParentTimerManager(m_timerManager);
+    if (m_logCallback)      sub->SetLogCallback(m_logCallback);
+    if (m_printCallback)    sub->SetPrintCallback(m_printCallback);
+    if (m_nodePreExecuteCb) sub->SetNodePreExecuteCallback(m_nodePreExecuteCb);
+    sub->RegisterExternalFunctions(GetExternalFunctions());
+    sub->InheritExternalLibraries(m_externalLibraries);
+    return sub;
+}
+
 bool BlueprintRunner::Load(const BlueprintData& data)
 {
     m_blueprint = data;
@@ -482,32 +495,22 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
 
         if (funcDefPtr && subGraphOk)
         {
-            BlueprintRunner subRunner;
-            subRunner.RegisterHandlers(m_handlers);
-            subRunner.SetParentTimerManager(m_timerManager);
-            if (m_logCallback)         subRunner.SetLogCallback(m_logCallback);
-            if (m_printCallback)       subRunner.SetPrintCallback(m_printCallback);
-            if (m_nodePreExecuteCb)    subRunner.SetNodePreExecuteCallback(m_nodePreExecuteCb);
-            subRunner.RegisterExternalFunctions(GetExternalFunctions());
-            subRunner.InheritExternalLibraries(m_externalLibraries);
+            auto subRunner = CreateChildRunner();
             // 传递输入引脚值
             for (const auto& pin : node.pins)
             {
                 if (pin.kind == PinKind::Input && pin.dataType != PinDataType::Unknown && !pin.name.empty())
-                    subRunner.SetVariable(pin.name, m_context.GetInputValue(pin.name));
+                    subRunner->SetVariable(pin.name, m_context.GetInputValue(pin.name));
             }
-            if (subRunner.Load(funcBP))
+            if (subRunner->Load(funcBP))
             {
-                subRunner.Execute();
-                // 若子 runner 因断点暂停，将暂停状态传播到父 runner
-                if (subRunner.IsPaused())
-                    Pause();
-                // 回传输出引脚值
+                subRunner->Execute();
+                if (subRunner->IsPaused()) Pause();
                 for (const auto& pin : node.pins)
                 {
                     if (pin.kind == PinKind::Output && pin.dataType != PinDataType::Unknown && !pin.name.empty())
                     {
-                        auto val = subRunner.GetVariable(pin.name);
+                        auto val = subRunner->GetVariable(pin.name);
                         if (val.type != PinDataType::Unknown)
                             m_context.SetOutputValue(pin.name, val);
                     }
@@ -599,30 +602,22 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
 
         if (funcDefPtr && subGraphOk)
         {
-            BlueprintRunner subRunner;
-            subRunner.RegisterHandlers(m_handlers);
-            subRunner.SetParentTimerManager(m_timerManager);
-            if (m_logCallback)         subRunner.SetLogCallback(m_logCallback);
-            if (m_printCallback)       subRunner.SetPrintCallback(m_printCallback);
-            if (m_nodePreExecuteCb)    subRunner.SetNodePreExecuteCallback(m_nodePreExecuteCb);
-            subRunner.RegisterExternalFunctions(GetExternalFunctions());
-            subRunner.InheritExternalLibraries(m_externalLibraries);
+            auto subRunner = CreateChildRunner();
             for (const auto& pin : node.pins)
             {
                 if (pin.kind == PinKind::Input && pin.dataType != PinDataType::Unknown && !pin.name.empty()
                     && pin.name != "LibraryPath" && pin.name != "FunctionId")
-                    subRunner.SetVariable(pin.name, m_context.GetInputValue(pin.name));
+                    subRunner->SetVariable(pin.name, m_context.GetInputValue(pin.name));
             }
-            if (subRunner.Load(funcBP))
+            if (subRunner->Load(funcBP))
             {
-                subRunner.Execute();
-                if (subRunner.IsPaused())
-                    Pause();
+                subRunner->Execute();
+                if (subRunner->IsPaused()) Pause();
                 for (const auto& pin : node.pins)
                 {
                     if (pin.kind == PinKind::Output && pin.dataType != PinDataType::Unknown && !pin.name.empty())
                     {
-                        auto val = subRunner.GetVariable(pin.name);
+                        auto val = subRunner->GetVariable(pin.name);
                         if (val.type != PinDataType::Unknown)
                             m_context.SetOutputValue(pin.name, val);
                     }
@@ -721,32 +716,23 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
         else
         {
             // ── 构造子 runner ───────────────────────────────────────────────
-            BlueprintRunner subRunner;
-            subRunner.RegisterHandlers(m_handlers);
-            subRunner.SetParentTimerManager(m_timerManager);
-            if (m_logCallback)         subRunner.SetLogCallback(m_logCallback);
-            if (m_printCallback)       subRunner.SetPrintCallback(m_printCallback);
-            if (m_nodePreExecuteCb)    subRunner.SetNodePreExecuteCallback(m_nodePreExecuteCb);
-            subRunner.RegisterExternalFunctions(GetExternalFunctions());
-            subRunner.InheritExternalLibraries(m_externalLibraries);
+            auto subRunner = CreateChildRunner();
             // 传递输入引脚值
             for (const auto& pin : node.pins)
             {
                 if (pin.kind == PinKind::Input && pin.dataType != PinDataType::Unknown && !pin.name.empty())
-                    subRunner.SetVariable(pin.name, m_context.GetInputValue(pin.name));
+                    subRunner->SetVariable(pin.name, m_context.GetInputValue(pin.name));
             }
-            if (subRunner.Load(funcBP))
+            if (subRunner->Load(funcBP))
             {
-                subRunner.Execute();
-                // 若子 runner 因断点暂停，将暂停状态传播到父 runner
-                if (subRunner.IsPaused())
-                    Pause();
+                subRunner->Execute();
+                if (subRunner->IsPaused()) Pause();
                 // 回传输出引脚值
                 for (const auto& pin : node.pins)
                 {
                     if (pin.kind == PinKind::Output && pin.dataType != PinDataType::Unknown && !pin.name.empty())
                     {
-                        auto val = subRunner.GetVariable(pin.name);
+                        auto val = subRunner->GetVariable(pin.name);
                         if (val.type != PinDataType::Unknown)
                             m_context.SetOutputValue(pin.name, val);
                     }
