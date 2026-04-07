@@ -1886,6 +1886,23 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
         },
         "6A0572");
 
+    // ── Tool.CallByName ─────────────────────────────────────────────────────
+    // 按工具名动态路由到同名 FuncLib 函数，无上限（不受 Tool.Match 8 个限制）
+    reg("Tool.CallByName", "Tool Call By Name", "AI/Tool",
+        {
+            MakeFlowPin(""),
+            MakePin("ToolName",   PinDataType::String),    // 工具名（与 FuncLib 函数名一致）
+            MakePin("Arguments",  PinDataType::String),    // 参数 JSON 对象字符串
+            MakePin("ToolCallId", PinDataType::String),    // tool_call id（透传）
+        },
+        {
+            MakeFlowPin("onSuccess"),                      // 找到并调用成功
+            MakeFlowPin("onNotFound"),                     // 找不到同名函数
+            MakePin("Result",     PinDataType::String),    // 函数的 Result 变量返回值
+            MakePin("ToolCallId", PinDataType::String),    // 透传的 tool_call id
+        },
+        "6A0572");
+
     // ── Tool.ForEach ────────────────────────────────────────────────────────
     reg("Tool.ForEach", "Tool For Each", "AI/Tool",
         {
@@ -1985,6 +2002,7 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     addCat("AI/LLM",     "AI / LLM");
     addCat("AI/String",  "AI / String");
     addCat("AI/Memory",  "AI / Memory");
+    addCat("AI/Tool",    "AI / Tool");
     addCat("File",       "File I/O");
 
     // --- 注册各分类的节点定义 ---

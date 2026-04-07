@@ -126,6 +126,12 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_IsLoaded(BP_Runner runner);
 /// Returns 0 on success, non-zero on failure.
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_Execute(BP_Runner runner);
 
+/// Dispatch a named event (e.g. "OnBeginPlay", "OnTick").
+/// Finds the event source node with the matching definitionId and executes its
+/// exec-downstream chain. Returns 0 on success, non-zero on failure.
+/// If the blueprint has no matching event node, returns 0 (silent no-op).
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_DispatchEvent(BP_Runner runner, const char* eventDefinitionId);
+
 /// Execute a single node by ID.
 /// Returns 0 on success, non-zero on failure.
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_ExecuteNode(BP_Runner runner, uint64_t nodeId);

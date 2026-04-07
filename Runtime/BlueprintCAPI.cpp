@@ -118,6 +118,20 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_Execute(BP_Runner runner)
     return 0;
 }
 
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_DispatchEvent(BP_Runner runner, const char* eventDefinitionId)
+{
+    if (!runner || !eventDefinitionId) return 1;
+    auto* w = asWrapper(runner);
+    ExecutionResult result = w->runner.DispatchEvent(std::string(eventDefinitionId));
+    if (!result.success)
+    {
+        w->lastError = result.errorMessage;
+        return 1;
+    }
+    w->lastError.clear();
+    return 0;
+}
+
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_ExecuteNode(BP_Runner runner, uint64_t nodeId)
 {
     if (!runner) return 1;

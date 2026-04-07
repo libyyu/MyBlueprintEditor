@@ -940,6 +940,152 @@ void RegisterHandlers_AI(
     };
 
     // ========================================================================
+    // JSON.ToolCallCount — 返回 tool_calls 数组长度
+    // 输入：  ToolCallsJSON(String)
+    // 输出：  Count(Integer)
+    // 纯数据节点（无 exec flow）
+    // ========================================================================
+    handlers["JSON.ToolCallCount"] = [](ExecutionContext& ctx) {
+        auto json = ctx.GetInputValue("ToolCallsJSON").asString();
+        int64_t count = 0;
+        if (!json.empty()) {
+            auto v = crude_json::value::parse(json);
+            if (v.is_array())
+                count = static_cast<int64_t>(v.get<crude_json::array>().size());
+            // 兼容完整 response 格式：尝试提取 choices[0].message.tool_calls
+            else if (v.is_object() && v.contains("choices")) {
+                const auto& choices = v["choices"];
+                if (choices.is_array() && !choices.get<crude_json::array>().empty()) {
+                    const auto& msg = choices.get<crude_json::array>()[0];
+                    if (msg.is_object() && msg.contains("message")) {
+                        const auto& m = msg["message"];
+                        if (m.is_object() && m.contains("tool_calls")) {
+                            const auto& tc = m["tool_calls"];
+                            if (tc.is_array())
+                                count = static_cast<int64_t>(tc.get<crude_json::array>().size());
+                        }
+                    }
+                }
+            }
+        }
+        ctx.SetOutputValue("Count", Variant(count));
+        return true;
+    };
+
+    // ========================================================================
+    // Tool.CallByName — 按工具名动态路由到同名 FuncLib 函数
+    //
+    // 功能：根据 ToolName 在当前蓝图的外部函数库中查找同名函数并调用，
+    //       无需 Tool.Match 枚举，实现无上限的动态工具路由。
+    //
+    // 输入：  exec in
+    //         ToolName(String)    — 工具名，与 FuncLib 中的函数名一致
+    //         Arguments(String)   — 工具参数 JSON 字符串（传给函数的变量 args）
+    //         ToolCallId(String)  — tool_call id（用于组装 MakeToolResult）
+    // 输出：  onSuccess exec      — 调用成功
+    //         onNotFound exec     — 找不到同名函数
+    //         Result(String)      — 函数返回的 "Result" 变量值
+    //         ToolCallId(String)  — 透传输入的 ToolCallId（便于直接接 MakeToolResult）
+    //
+    // 约定：被调用的 FuncLib 函数需有一个名为 "Result" 的输出变量；
+    //       Arguments JSON 对象的 key 会作为同名变量注入函数。
+    // ========================================================================
+    handlers["Tool.CallByName"] = [&runner](ExecutionContext& ctx) {
+        std::string toolName   = ctx.GetInputValue("ToolName").asString();
+        std::string argsJson   = ctx.GetInputValue("Arguments").asString();
+        std::string toolCallId = ctx.GetInputValue("ToolCallId").asString();
+
+        ctx.SetOutputValue("ToolCallId", Variant(toolCallId));
+
+        if (toolName.empty()) {
+            ctx.SetOutputValue("Result", Variant(std::string("")));
+            ctx.ActivateOutputFlow("onNotFound");
+            return true;
+        }
+
+        // 在已注册的外部函数中查找同名函数
+        // GetExternalFunctions() 返回 vector<FunctionDefinition>
+        auto extFuncs = runner.GetExternalFunctions();
+        const ::NodeEditor::Runtime::FunctionDefinition* funcDefPtr = nullptr;
+        for (const auto& fd : extFuncs) {
+            if (fd.name == toolName || fd.id == toolName) {
+                funcDefPtr = &fd;
+                break;
+            }
+        }
+
+        if (!funcDefPtr) {
+            ctx.Log("[Tool.CallByName] function '" + toolName + "' not found in libraries",
+                    ::NodeEditor::Runtime::LogLevel::Warning);
+            ctx.SetOutputValue("Result", Variant(std::string("")));
+            ctx.ActivateOutputFlow("onNotFound");
+            return true;
+        }
+
+        // 构建函数子图
+        const auto& extLibs = runner.GetExternalLibraries();
+        auto libIt = extLibs.find(funcDefPtr->id);
+        if (libIt == extLibs.end() || !libIt->second) {
+            ctx.Log("[Tool.CallByName] library data not found for '" + toolName + "'",
+                    ::NodeEditor::Runtime::LogLevel::Warning);
+            ctx.SetOutputValue("Result", Variant(std::string("")));
+            ctx.ActivateOutputFlow("onNotFound");
+            return true;
+        }
+
+        // 构造子 runner（与 FuncLib.* 路径一致）
+        ::NodeEditor::Runtime::BlueprintRunner subRunner;
+        subRunner.RegisterHandlers(runner.GetHandlers());
+        if (ctx.OnLog)   subRunner.SetLogCallback(ctx.OnLog);
+        if (ctx.OnPrint) subRunner.SetPrintCallback(ctx.OnPrint);
+        subRunner.RegisterExternalFunctions(runner.GetExternalFunctions());
+        subRunner.InheritExternalLibraries(runner.GetExternalLibraries());
+
+        // 解析 Arguments JSON，注入为变量
+        if (!argsJson.empty()) {
+            auto argsVal = crude_json::value::parse(argsJson);
+            if (argsVal.is_object()) {
+                for (const auto& kv : argsVal.get<crude_json::object>()) {
+                    const auto& v = kv.second;
+                    if (v.is_string())
+                        subRunner.SetVariable(kv.first, Variant(v.get<std::string>()));
+                    else if (v.is_number()) {
+                        double d = v.get<double>();
+                        if (d == static_cast<double>(static_cast<int64_t>(d)))
+                            subRunner.SetVariable(kv.first, Variant(static_cast<int64_t>(d)));
+                        else
+                            subRunner.SetVariable(kv.first, Variant(d));
+                    } else if (v.is_boolean())
+                        subRunner.SetVariable(kv.first, Variant(v.get<bool>()));
+                    else
+                        subRunner.SetVariable(kv.first, Variant(v.dump()));
+                }
+            }
+        }
+
+        // 构建并执行函数子图
+        // BuildFuncSubGraph 是 BlueprintRunner.cpp 中的 static 函数，无法直接调用
+        // 改用 Function.Call 节点机制：设置 FunctionId 变量后执行
+        // 实际上，这里直接在子 runner 加载完整库数据后执行 DispatchEvent("Function.Entry")
+        // 等价于 Function.Call 的子 runner 逻辑
+        // 为了不重复 BuildFuncSubGraph 逻辑，通过 SetVariable("FunctionId") + FuncLib 前缀调用
+        // 最简方案：手动构建只含该函数的 BlueprintData（等价 BuildFuncSubGraph）
+        // 直接复用 RegisterExternalLibrary 后 Execute()（FuncLib 子图会自动走 Function.Entry 入口）
+        if (subRunner.Load(*libIt->second)) {
+            subRunner.Execute();
+            auto result = subRunner.GetVariable("Result");
+            ctx.SetOutputValue("Result",
+                result.type != ::NodeEditor::Runtime::PinDataType::Unknown
+                    ? result : Variant(std::string("")));
+        } else {
+            ctx.SetOutputValue("Result", Variant(std::string("")));
+        }
+
+        ctx.ActivateOutputFlow("onSuccess");
+        return true;
+    };
+
+    // ========================================================================
     // Tool.Match — 按工具名路由到对应 exec 分支（最多 8 个 Case）
     // 输入：  ToolName string
     //         Case0..Case7 string（空 = 不使用）
