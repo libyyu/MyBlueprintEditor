@@ -4,6 +4,7 @@
 #include <map>
 #include <functional>
 #include <algorithm>
+#include <unordered_set>
 #ifndef __EMSCRIPTEN__
 #include <filesystem>
 #endif
@@ -659,6 +660,24 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
         return isEventCategory(d->category);
     };
 
+    // 单例节点过滤：OnBeginPlay / OnTick 每个蓝图只能有一个
+    // 构建当前文档中已存在的单例 definitionId 集合
+    static const std::unordered_set<std::string> kSingletonDefs = {
+        "OnBeginPlay", "OnTick"
+    };
+    std::unordered_set<std::string> existingSingletons;
+    if (ActiveDoc())
+    {
+        for (const auto& n : ActiveDoc()->nodes)
+        {
+            if (kSingletonDefs.count(n.DefinitionId))
+                existingSingletons.insert(n.DefinitionId);
+        }
+    }
+    auto isSingletonFiltered = [&](const RTNodeDef* d) -> bool {
+        return existingSingletons.count(d->id) > 0;
+    };
+
     const auto& allDefsRef = m_NodeRegistry.getAllNodeDefinitions();
     size_t defCount = allDefsRef.size();
 
@@ -748,6 +767,7 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
             for (const auto* d : m_CachedSearchResults)
             {
                 if (isLibraryFilteredDef(d)) continue;
+                if (isSingletonFiltered(d)) continue;
                 PushUndoState();
                 result = SpawnNodeByDef(d->id);
                 if (result)
@@ -763,6 +783,7 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
         for (const auto* d : m_CachedSearchResults)
         {
             if (isLibraryFilteredDef(d)) continue;  // FunctionLibrary 过滤事件节点
+            if (isSingletonFiltered(d)) continue;  // 已存在单例节点不再出现
             ImGui::PushID(d->id.c_str());
             if (ImGui::MenuItem(d->name.c_str()))
             {
@@ -810,6 +831,7 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
 
         for (const auto* d : menuNode.directNodes)
         {
+            if (isSingletonFiltered(d)) continue;  // 已存在单例节点不再出现
             ImGui::PushID(d->id.c_str());
             if (ImGui::MenuItem(d->name.c_str()))
             {
