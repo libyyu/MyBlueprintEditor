@@ -85,7 +85,9 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromFile(BP_Runner runner, 
 {
     if (!runner || !filePath) return 1;
     auto* w = asWrapper(runner);
-    if (!w->runner.LoadFromFile(std::string(filePath)))
+    // 使用 LoadFromFileWithDeps 自动递归加载 metadata.dependencies 中声明的 Library，
+    // 确保 FuncLib.* 节点等依赖函数库的功能可以正常执行
+    if (!w->runner.LoadFromFileWithDeps(std::string(filePath)))
     {
         w->lastError = std::string("LoadFromFile failed: ") + filePath;
         return 1;

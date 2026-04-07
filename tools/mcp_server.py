@@ -140,9 +140,12 @@ class BlueprintLib:
 
     def execute(self, bjson_content: str,
                 variables: Optional[dict] = None,
-                dispatch_beginplay: bool = True) -> dict:
+                dispatch_beginplay: bool = True,
+                file_path: Optional[str] = None) -> dict:
         """
-        Load and run a blueprint from JSON content.
+        Load and run a blueprint.
+        - file_path: if provided, use BP_LoadFromFile (auto-loads dependencies like CommonLib).
+        - bjson_content: fallback JSON string, used when file_path is None.
         Returns {"output": [...], "warnings": [...], "error": str|None}
         """
         self._print_lines.clear()
@@ -157,12 +160,19 @@ class BlueprintLib:
             self._lib.BP_SetPrintCallback(runner, self._print_cb)
             self._lib.BP_SetLogCallback(runner,   self._log_cb)
 
-            # Load
-            rc = self._lib.BP_LoadFromJson(runner, bjson_content.encode("utf-8"))
-            if rc != 0:
-                err = self._get_last_error(runner)
-                return {"output": [], "warnings": self._log_lines[:],
-                        "error": f"Load failed: {err}"}
+            # Load — prefer BP_LoadFromFile when a path is given (auto-resolves dependencies)
+            if file_path:
+                rc = self._lib.BP_LoadFromFile(runner, file_path.encode("utf-8"))
+                if rc != 0:
+                    err = self._get_last_error(runner)
+                    return {"output": [], "warnings": self._log_lines[:],
+                            "error": f"Load failed: {err}"}
+            else:
+                rc = self._lib.BP_LoadFromJson(runner, bjson_content.encode("utf-8"))
+                if rc != 0:
+                    err = self._get_last_error(runner)
+                    return {"output": [], "warnings": self._log_lines[:],
+                            "error": f"Load failed: {err}"}
 
             # Inject variables
             if variables:
@@ -200,7 +210,8 @@ class BlueprintLib:
 
     def get_variable_after_execute(self, bjson_content: str,
                                    var_name: str,
-                                   variables: Optional[dict] = None) -> dict:
+                                   variables: Optional[dict] = None,
+                                   file_path: Optional[str] = None) -> dict:
         """Execute blueprint and return the value of a specific variable."""
         self._print_lines.clear()
         self._log_lines.clear()
@@ -213,7 +224,10 @@ class BlueprintLib:
             self._lib.BP_SetPrintCallback(runner, self._print_cb)
             self._lib.BP_SetLogCallback(runner,   self._log_cb)
 
-            rc = self._lib.BP_LoadFromJson(runner, bjson_content.encode("utf-8"))
+            if file_path:
+                rc = self._lib.BP_LoadFromFile(runner, file_path.encode("utf-8"))
+            else:
+                rc = self._lib.BP_LoadFromJson(runner, bjson_content.encode("utf-8"))
             if rc != 0:
                 return {"value": None, "output": [],
                         "error": f"Load failed: {self._get_last_error(runner)}"}
@@ -488,11 +502,11 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             full = BLUEPRINT_ROOT / path
             if not full.exists():
                 return _text(f"ERROR: File not found: {path}")
-            content = full.read_text(encoding="utf-8")
             variables = arguments.get("variables")
             dispatch  = arguments.get("dispatch_beginplay", True)
             lib = _get_lib()
-            result = lib.execute(content, variables, dispatch)
+            # 传入 file_path 使用 BP_LoadFromFile，自动加载 dependencies 声明的函数库
+            result = lib.execute("", variables, dispatch, file_path=str(full))
             return _json(result)
 
         elif name == "execute_blueprint_json":
@@ -508,10 +522,10 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             full = BLUEPRINT_ROOT / path
             if not full.exists():
                 return _text(f"ERROR: File not found: {path}")
-            content = full.read_text(encoding="utf-8")
             variables = arguments.get("variables")
             lib = _get_lib()
-            result = lib.get_variable_after_execute(content, var_name, variables)
+            result = lib.get_variable_after_execute("", var_name, variables,
+                                                    file_path=str(full))
             return _json(result)
 
         elif name == "create_blueprint":
