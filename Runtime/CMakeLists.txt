@@ -406,6 +406,17 @@ if(NOT EMSCRIPTEN)
         message(STATUS "  Linux:   sudo apt install libssl-dev  /  sudo yum install openssl-devel")
         message(STATUS "  macOS:   brew install openssl  then  -DOPENSSL_ROOT_DIR=$(brew --prefix openssl)")
     endif()
+
+    # macOS: httplib's TLS certificate loading uses Security.framework and
+    # CoreFoundation.framework (httplib::tls::load_system_certs calls CF/Sec APIs).
+    # These must be linked even when OpenSSL is not present.
+    if(APPLE AND NOT IOS)
+        target_link_libraries(BlueprintRuntime PRIVATE
+            "-framework Security"
+            "-framework CoreFoundation"
+        )
+        message(STATUS "[BlueprintRuntime] macOS: linking Security.framework + CoreFoundation.framework")
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------
