@@ -123,7 +123,13 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromJsonWithBaseDir(
 
 /// Load blueprint from a file path (uses the runner's IFileSystem).
 /// Returns 0 on success, non-zero on failure.
+/// Note: also calls BP_SetBasePath internally with the file's parent directory.
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromFile(BP_Runner runner, const char* filePath);
+
+/// Set the base directory used to resolve relative paths in ExecuteBlueprint nodes.
+/// Automatically called by BP_LoadFromFile with the loaded file's parent directory.
+/// Call this manually when using BP_LoadFromJson/BP_LoadFromJsonWithBaseDir.
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetBasePath(BP_Runner runner, const char* basePath);
 
 /// Returns 1 if a blueprint has been loaded successfully, 0 otherwise.
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_IsLoaded(BP_Runner runner);
@@ -148,6 +154,10 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_ExecuteNode(BP_Runner runner, u
 
 /// Advance async timers (call once per frame with your deltaTime in seconds).
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_Tick(BP_Runner runner, float deltaTime);
+
+/// Returns the number of active (pending) async timers.
+/// Use this to decide whether to keep calling BP_Tick.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetActiveTimerCount(BP_Runner runner);
 
 // ---------------------------------------------------------------------------
 // Variables

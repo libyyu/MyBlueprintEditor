@@ -122,6 +122,15 @@ class BlueprintLib:
         lib.BP_IsLoaded.restype  = ctypes.c_int
         lib.BP_IsLoaded.argtypes = [ctypes.c_void_p]
 
+        lib.BP_Tick.restype  = None
+        lib.BP_Tick.argtypes = [ctypes.c_void_p, ctypes.c_float]
+
+        lib.BP_GetActiveTimerCount.restype  = ctypes.c_int
+        lib.BP_GetActiveTimerCount.argtypes = [ctypes.c_void_p]
+
+        lib.BP_SetBasePath.restype  = None
+        lib.BP_SetBasePath.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+
         LogCbType = ctypes.CFUNCTYPE(None, ctypes.c_int, ctypes.c_char_p)
         lib.BP_SetPrintCallback.restype  = None
         lib.BP_SetPrintCallback.argtypes = [ctypes.c_void_p, LogCbType]
@@ -209,6 +218,23 @@ class BlueprintLib:
                     return {"output": self._print_lines[:], "warnings": self._log_lines[:],
                             "error": f"DispatchEvent(OnBeginPlay) failed: {err}"}
 
+            # ── Tick 循环：推进异步 timer（Delay、SetTimer 等节点）──────────
+            # 模拟帧循环，直到所有 timer 完成或超时（max_time_sec）
+            import time as _time
+            max_time_sec  = 30.0
+            tick_rate_sec = 0.016
+            elapsed = 0.0
+            while self._lib.BP_GetActiveTimerCount(runner) > 0:
+                if elapsed >= max_time_sec:
+                    self._log_lines.append(
+                        f"[W] Tick loop timed out after {max_time_sec}s "
+                        f"({self._lib.BP_GetActiveTimerCount(runner)} timers still active)"
+                    )
+                    break
+                _time.sleep(tick_rate_sec)
+                self._lib.BP_Tick(runner, ctypes.c_float(tick_rate_sec))
+                elapsed += tick_rate_sec
+
             return {"output": self._print_lines[:],
                     "warnings": self._log_lines[:],
                     "error": None}
@@ -255,6 +281,14 @@ class BlueprintLib:
 
             self._lib.BP_Execute(runner)
             self._lib.BP_DispatchEvent(runner, b"OnBeginPlay")
+
+            # Tick 循环：推进异步 timer
+            import time as _time
+            max_time_sec = 30.0; tick_rate_sec = 0.016; elapsed = 0.0
+            while self._lib.BP_GetActiveTimerCount(runner) > 0 and elapsed < max_time_sec:
+                _time.sleep(tick_rate_sec)
+                self._lib.BP_Tick(runner, ctypes.c_float(tick_rate_sec))
+                elapsed += tick_rate_sec
 
             buf = ctypes.create_string_buffer(4096)
             n = self._lib.BP_GetVariableString(runner, var_name.encode("utf-8"), buf, 4096)

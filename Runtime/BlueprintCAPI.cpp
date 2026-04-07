@@ -23,6 +23,13 @@ struct RunnerWrapper
 {
     BlueprintRunner runner;
     std::string     lastError;
+    std::string     basePath;   // 蓝图文件所在目录，供 ExecuteBlueprint 相对路径解析
+
+    // 重新注册内置 handler，使用当前 basePath
+    void refreshHandlers()
+    {
+        RegisterBuiltinHandlers(runner, basePath);
+    }
 };
 
 inline RunnerWrapper* asWrapper(BP_Runner h)
@@ -92,6 +99,9 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromJsonWithBaseDir(
         w->lastError = w->runner.GetLastError();
         return 1;
     }
+    // 设置 basePath 供 ExecuteBlueprint 节点解析相对路径
+    w->basePath = baseDirStr;
+    w->refreshHandlers();
     w->lastError.clear();
     return 0;
 }
@@ -107,8 +117,21 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromFile(BP_Runner runner, 
         w->lastError = std::string("LoadFromFile failed: ") + filePath;
         return 1;
     }
+    // 自动提取文件目录作为 basePath，供 ExecuteBlueprint 节点解析相对路径
+    std::string fp(filePath);
+    size_t sl = fp.find_last_of("/\\");
+    w->basePath = (sl != std::string::npos) ? fp.substr(0, sl) : "";
+    w->refreshHandlers();
     w->lastError.clear();
     return 0;
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetBasePath(BP_Runner runner, const char* basePath)
+{
+    if (!runner) return;
+    auto* w = asWrapper(runner);
+    w->basePath = (basePath && *basePath) ? std::string(basePath) : std::string("");
+    w->refreshHandlers();
 }
 
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_IsLoaded(BP_Runner runner)
@@ -167,6 +190,12 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_Tick(BP_Runner runner, float d
 {
     if (!runner) return;
     asWrapper(runner)->runner.Tick(deltaTime);
+}
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetActiveTimerCount(BP_Runner runner)
+{
+    if (!runner) return 0;
+    return static_cast<int>(asWrapper(runner)->runner.GetTimerManager().GetActiveTimerCount());
 }
 
 // ---------------------------------------------------------------------------
