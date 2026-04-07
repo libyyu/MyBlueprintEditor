@@ -1944,38 +1944,12 @@ void BlueprintEditor::OnFrame(float deltaTime)
                         auto* libDoc2 = m_Documents[libDocIdx2].get();
                         const auto& libBP2 = *libs2.at(nextFuncLibId);
 
-                        // 构建函数子图（BFS from Function.Entry）
+                        // 构建函数子图（复用 Runtime 的 BuildFuncSubGraph，带 links 索引优化）
                         ::NodeEditor::Runtime::BlueprintData funcSubBP2;
-                        ::NodeEditor::Runtime::NodeId entryId2 = 0;
-                        for (const auto& nd2 : libBP2.nodes)
-                            if (nd2.definitionId == "Function.Entry" && nd2.name == funcName2)
-                            { entryId2 = nd2.id; break; }
-
-                        if (entryId2 != 0)
-                        {
-                            std::unordered_set<::NodeEditor::Runtime::NodeId> vis2;
-                            std::queue<::NodeEditor::Runtime::NodeId> q2;
-                            q2.push(entryId2); vis2.insert(entryId2);
-                            while (!q2.empty())
-                            {
-                                auto cur2 = q2.front(); q2.pop();
-                                for (auto id2 : libBP2.getExecOutputNodes(cur2))
-                                    if (vis2.insert(id2).second) q2.push(id2);
-                                for (auto id2 : libBP2.getDataInputNodes(cur2))
-                                    if (vis2.insert(id2).second) q2.push(id2);
-                            }
-                            for (const auto& nd2 : libBP2.nodes)
-                                if (vis2.count(nd2.id)) funcSubBP2.nodes.push_back(nd2);
-                            for (const auto& lk2 : libBP2.links)
-                            {
-                                const auto* sn2 = libBP2.findNodeByPin(lk2.startPinId);
-                                const auto* en2 = libBP2.findNodeByPin(lk2.endPinId);
-                                if (sn2 && en2 && vis2.count(sn2->id) && vis2.count(en2->id))
-                                    funcSubBP2.links.push_back(lk2);
-                            }
-                            funcSubBP2.metadata = libBP2.metadata;
-                            funcSubBP2.metadata.name = funcName2;
-                        }
+                        ::NodeEditor::Runtime::BlueprintRunner::BuildFuncSubGraph(
+                            libBP2, funcName2, funcSubBP2);
+                        funcSubBP2.metadata = libBP2.metadata;
+                        funcSubBP2.metadata.name = funcName2;
 
                         if (!funcSubBP2.nodes.empty())
                         {

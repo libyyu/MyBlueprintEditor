@@ -10,12 +10,6 @@
 #include <unordered_set>
 #include <queue>
 
-namespace NodeEditor { namespace Runtime {
-// 前向声明（定义在本文件后段）
-static bool BuildFuncSubGraph(const BlueprintData& libData,
-                              const std::string&   entryName,
-                              BlueprintData&       out);
-} }
 #ifndef __EMSCRIPTEN__
 #  include <filesystem>
 #endif
@@ -1268,7 +1262,7 @@ void BlueprintRunner::RegisterExternalLibrary(const BlueprintData& libData)
 //
 // 返回值：true = 找到入口并构建成功；false = 未找到 Function.Entry
 // ============================================================================
-static bool BuildFuncSubGraph(
+bool BlueprintRunner::BuildFuncSubGraph(
     const BlueprintData& libData,
     const std::string&   entryName,
     BlueprintData&       out)

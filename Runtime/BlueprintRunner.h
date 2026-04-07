@@ -499,6 +499,13 @@ public:
     // 返回 unique_ptr 以避免拷贝构造（BlueprintRunner 含 atomic，不可拷贝）
     std::unique_ptr<BlueprintRunner> CreateChildRunner() const;
 
+    // 从 BlueprintData 中提取以 entryName 为入口的函数子图（BFS，带 links 索引优化）。
+    // 供 Runtime 内部和编辑器 StepIn 共用，消除手写 BFS 重复。
+    // 返回 true = 找到入口并构建成功；false = 未找到 Function.Entry
+    static bool BuildFuncSubGraph(const BlueprintData& libData,
+                                  const std::string&   entryName,
+                                  BlueprintData&       out);
+
     // 获取已注册的外部库函数表（供子 runner 继承，确保 FuncLib.* 节点在子蓝图中可用）
     std::vector<FunctionDefinition> GetExternalFunctions() const;
 
