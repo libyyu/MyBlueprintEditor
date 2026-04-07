@@ -10,6 +10,20 @@
 
 #include <cstring>
 #include <string>
+#include <vector>
+#if !defined(__EMSCRIPTEN__)
+#  include <filesystem>
+#endif
+#if defined(_WIN32) || defined(_WIN64)
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  include <windows.h>
+#  undef IsLoggingEnabled   // 防止 Windows 宏污染 BlueprintRunner 方法名
+#endif
 
 using namespace NodeEditor::Runtime;
 
@@ -29,6 +43,50 @@ struct RunnerWrapper
     void refreshHandlers()
     {
         RegisterBuiltinHandlers(runner, basePath);
+    }
+
+    // 静默加载 BlueprintEntry.lua：
+    //   先找 basePath/BlueprintEntry.lua，再找 DLL 所在目录/BlueprintEntry.lua
+    //   任一存在则加载（不报错，不存在直接跳过）
+    void tryLoadBlueprintEntry()
+    {
+#if defined(BLUEPRINT_HAS_LUA) && !defined(__EMSCRIPTEN__)
+        namespace fs = std::filesystem;
+        std::vector<std::string> candidates;
+
+        // 1. 蓝图文件所在目录
+        if (!basePath.empty())
+            candidates.push_back(basePath + "/BlueprintEntry.lua");
+
+        // 2. DLL 所在目录（Windows: GetModuleFileNameA，其他平台跳过）
+#if defined(_WIN32) || defined(_WIN64)
+        {
+            char dllPath[MAX_PATH] = {};
+            HMODULE hm = nullptr;
+            // 用模块内静态局部地址定位所在 DLL
+            static const int kAnchor = 0;
+            if (::GetModuleHandleExA(
+                    GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                    GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                    reinterpret_cast<LPCSTR>(&kAnchor),
+                    &hm))
+            {
+                ::GetModuleFileNameA(hm, dllPath, MAX_PATH);
+                fs::path dllDir = fs::path(dllPath).parent_path();
+                candidates.push_back((dllDir / "BlueprintEntry.lua").string());
+            }
+        }
+#endif
+
+        for (const auto& path : candidates)
+        {
+            if (fs::exists(path))
+            {
+                runner.LoadLuaScript(path);
+                break;  // 找到第一个存在的就加载，不重复加载
+            }
+        }
+#endif
     }
 };
 
@@ -102,6 +160,8 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromJsonWithBaseDir(
     // 设置 basePath 供 ExecuteBlueprint 节点解析相对路径
     w->basePath = baseDirStr;
     w->refreshHandlers();
+    // 静默加载 BlueprintEntry.lua
+    w->tryLoadBlueprintEntry();
     w->lastError.clear();
     return 0;
 }
@@ -122,6 +182,8 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromFile(BP_Runner runner, 
     size_t sl = fp.find_last_of("/\\");
     w->basePath = (sl != std::string::npos) ? fp.substr(0, sl) : "";
     w->refreshHandlers();
+    // 静默加载 BlueprintEntry.lua（蓝图目录优先，次选 DLL 目录）
+    w->tryLoadBlueprintEntry();
     w->lastError.clear();
     return 0;
 }
@@ -132,6 +194,24 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetBasePath(BP_Runner runner, 
     auto* w = asWrapper(runner);
     w->basePath = (basePath && *basePath) ? std::string(basePath) : std::string("");
     w->refreshHandlers();
+}
+
+/// Manually load a Lua script file into the runner's Lua engine.
+/// The engine is created lazily on first call.
+/// Silently succeeds (returns 0) if BLUEPRINT_HAS_LUA is not defined.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadLuaScript(BP_Runner runner, const char* filePath)
+{
+    if (!runner || !filePath) return 1;
+#ifdef BLUEPRINT_HAS_LUA
+    auto* w = asWrapper(runner);
+    if (!w->runner.LoadLuaScript(std::string(filePath)))
+    {
+        w->lastError = w->runner.GetLastError();
+        return 1;
+    }
+    w->lastError.clear();
+#endif
+    return 0;
 }
 
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_IsLoaded(BP_Runner runner)

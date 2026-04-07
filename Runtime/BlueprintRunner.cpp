@@ -2357,12 +2357,15 @@ void BlueprintRunner::Tick(float deltaTime)
                 m_keepAliveRunners.begin(),
                 m_keepAliveRunners.end(),
                 [](const std::shared_ptr<BlueprintRunner>& sub) {
-                    // 没有正在进行的异步操作时可以释放。
-                    // 涵盖 timer、网络、IO 等所有通过 AcquireAsync/ReleaseAsync 登记的操作。
                     return !sub->HasPendingAsync();
                 }),
             m_keepAliveRunners.end());
     }
+
+#ifdef BLUEPRINT_HAS_LUA
+    // 驱动 Lua 全局 OnGlobalTick(dt)（若脚本已加载且函数存在）
+    TickLua(static_cast<double>(deltaTime));
+#endif
 }
 
 // ============================================================================

@@ -131,6 +131,13 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromFile(BP_Runner runner, 
 /// Call this manually when using BP_LoadFromJson/BP_LoadFromJsonWithBaseDir.
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetBasePath(BP_Runner runner, const char* basePath);
 
+/// Load a Lua script file into the runner's Lua VM.
+/// The VM is created lazily on first call. File not found or syntax error → returns 1.
+/// No-op (returns 0) when the library was compiled without BLUEPRINT_HAS_LUA.
+/// BP_LoadFromFile and BP_LoadFromJsonWithBaseDir automatically attempt to load
+/// BlueprintEntry.lua from the blueprint directory (then the DLL directory).
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadLuaScript(BP_Runner runner, const char* filePath);
+
 /// Returns 1 if a blueprint has been loaded successfully, 0 otherwise.
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_IsLoaded(BP_Runner runner);
 
