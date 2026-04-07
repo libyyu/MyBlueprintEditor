@@ -134,13 +134,16 @@ if (savedNode) {
 
 ### 缺口 1 ✅：`JSON.ToolCallCount` handler — 已完成
 
-### 缺口 2 🟡：Lua `http.*` 同步阻塞主线程
+### 缺口 2 ✅：Lua `http.*` 异步化 — 已完成
 
-**问题**：`LuaLib_JsonHttp.cpp` 的 `syncRequest` 用 `mutex + condition_variable` 阻塞，在主线程调用会卡死帧循环。
+**实现**：`LuaLib_JsonHttp.cpp` 全部改为 `SendAsync` + callback 模式：
+- `http.get(url [, headers], callback)`
+- `http.post(url, body [, headers], callback)`
+- `http.request(method, url, body, headers, callback)`
 
-**影响**：仅影响 Lua 脚本在主线程调 `http.*` 的场景，纯离线脚本不受影响。
+callback 签名：`function(body: string, statusCode: int, error: string)`
 
-**未来方案**：提供 `http.request_async(url, cb)` 回调版本，复用 `IHttpClient::SendAsync + MainThreadDispatcher`。
+底层通过 `luaL_ref` 将 callback 存入 Lua registry 防 GC，`SendAsync` 完成后在主线程直接 `lua_pcall`。无同步阻塞，不卡帧循环。
 
 ### 缺口 3 🟢：流式 `tool_calls` 不支持
 
@@ -158,7 +161,7 @@ if (savedNode) {
 
 | 项目 | 估时 | 说明 |
 |------|------|------|
-| 修复 Lua `http.*` 异步阻塞（缺口2） | 半天 | 提供回调版异步接口 |
+| ~~修复 Lua `http.*` 异步阻塞~~ | ✅ 已完成 | SendAsync + callback，无阻塞 |
 | 流式 tool_calls 支持（缺口3） | 半天 | StreamChat 增量拼合 |
 | 并行工具调用 | 1天 | Tool.ForEach 并发执行多个 tool_call |
 
