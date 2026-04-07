@@ -597,31 +597,147 @@ void RegisterHandlers_AI(
             req.headers["Authorization"] = "Bearer " + apiKey;
         req.timeoutSeconds = 120;
 
-        PinId chunkPinId = ctx.GetPinId("onChunk");
-        PinId donePinId  = ctx.GetPinId("onDone");
-        PinId errorPinId = ctx.GetPinId("onError");
+        PinId chunkPinId    = ctx.GetPinId("onChunk");
+        PinId toolCallPinId = ctx.GetPinId("onToolCall");
+        PinId donePinId     = ctx.GetPinId("onDone");
+        PinId errorPinId    = ctx.GetPinId("onError");
 
         ctx.MarkDownstreamAsHandled("onChunk");
+        ctx.MarkDownstreamAsHandled("onToolCall");
         ctx.MarkDownstreamAsHandled("onDone");
         ctx.MarkDownstreamAsHandled("onError");
 
-        // 共享状态：后台线程收集 chunks
+        // 共享状态：后台线程收集 chunks 和 SSE 原始行（用于解析 tool_calls delta）
         struct StreamResult {
-            std::vector<std::string> chunks;
+            std::vector<std::string> chunks;    // delta.content 文本片段
             std::string              errorMsg;
+            std::string              finishReason;
+            // 流式 tool_calls 拼合：按 index 存储 {name, arguments} 累积字符串
+            struct ToolCallAccum { std::string id; std::string name; std::string arguments; };
+            std::vector<ToolCallAccum> toolCalls;
         };
         auto shared = std::make_shared<StreamResult>();
 
         // dispatcher：StreamAsync 收集所有 chunk，结束后 resolve
         auto dispatcher = [client, req, shared](ExecutionContext::AsyncResolve resolve) mutable {
             client->StreamAsync(req,
-                // onChunk — 可能在后台线程（Default）或主线程（Emscripten），
-                // 此处仅追加到 vector，不直接访问蓝图状态
-                [shared](const std::string& token) {
-                    shared->chunks.push_back(token);
+                // onChunk — 接收原始 SSE data JSON 字符串（Native），
+                //           或完整响应 JSON（Emscripten 降级）
+                [shared](const std::string& sseData) {
+                    if (sseData == "[DONE]") return;
+                    auto v = crude_json::value::parse(sseData);
+                    if (!v.is_object()) return;
+
+                    // 提取 finish_reason
+                    if (v.contains("choices")) {
+                        const auto& choices = v["choices"];
+                        if (choices.is_array() && !choices.get<crude_json::array>().empty()) {
+                            const auto& choice = choices.get<crude_json::array>()[0];
+                            if (choice.is_object()) {
+                                if (choice.contains("finish_reason")) {
+                                    const auto& fr = choice["finish_reason"];
+                                    if (fr.is_string() && fr.get<std::string>() != "null"
+                                        && !fr.get<std::string>().empty())
+                                        shared->finishReason = fr.get<std::string>();
+                                }
+
+                                // Emscripten 降级：choices[0].message（非流式完整响应）
+                                if (choice.contains("message")) {
+                                    const auto& msg = choice["message"];
+                                    if (msg.is_object()) {
+                                        if (msg.contains("content")) {
+                                            const auto& c = msg["content"];
+                                            if (c.is_string()) shared->chunks.push_back(c.get<std::string>());
+                                        }
+                                        if (msg.contains("tool_calls")) {
+                                            const auto& tcArr = msg["tool_calls"];
+                                            if (tcArr.is_array()) {
+                                                size_t idx = 0;
+                                                for (const auto& tc : tcArr.get<crude_json::array>()) {
+                                                    if (!tc.is_object()) { ++idx; continue; }
+                                                    while (shared->toolCalls.size() <= idx)
+                                                        shared->toolCalls.push_back({});
+                                                    auto& accum = shared->toolCalls[idx];
+                                                    if (tc.contains("id")) {
+                                                        const auto& iv = tc["id"];
+                                                        if (iv.is_string()) accum.id = iv.get<std::string>();
+                                                    }
+                                                    if (tc.contains("function")) {
+                                                        const auto& fn = tc["function"];
+                                                        if (fn.is_object()) {
+                                                            if (fn.contains("name")) {
+                                                                const auto& nv = fn["name"];
+                                                                if (nv.is_string()) accum.name = nv.get<std::string>();
+                                                            }
+                                                            if (fn.contains("arguments")) {
+                                                                const auto& av = fn["arguments"];
+                                                                if (av.is_string()) accum.arguments = av.get<std::string>();
+                                                            }
+                                                        }
+                                                    }
+                                                    ++idx;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    return; // Emscripten 降级，整块已处理完
+                                }
+
+                                // Native SSE 流式：choices[0].delta
+                                if (choice.contains("delta")) {
+                                    const auto& delta = choice["delta"];
+                                    if (!delta.is_object()) return;
+
+                                    // delta.content — 普通文本 token
+                                    if (delta.contains("content")) {
+                                        const auto& c = delta["content"];
+                                        if (c.is_string()) {
+                                            const auto& s = c.get<std::string>();
+                                            if (!s.empty()) shared->chunks.push_back(s);
+                                        }
+                                    }
+
+                                    // delta.tool_calls — 工具调用增量拼合
+                                    if (delta.contains("tool_calls")) {
+                                        const auto& tcArr = delta["tool_calls"];
+                                        if (!tcArr.is_array()) return;
+                                        for (const auto& tc : tcArr.get<crude_json::array>()) {
+                                            if (!tc.is_object()) continue;
+                                            size_t idx = 0;
+                                            if (tc.contains("index")) {
+                                                const auto& iv = tc["index"];
+                                                if (iv.is_number())
+                                                    idx = static_cast<size_t>(iv.get<double>());
+                                            }
+                                            while (shared->toolCalls.size() <= idx)
+                                                shared->toolCalls.push_back({});
+                                            auto& accum = shared->toolCalls[idx];
+
+                                            if (tc.contains("id")) {
+                                                const auto& idv = tc["id"];
+                                                if (idv.is_string() && accum.id.empty())
+                                                    accum.id = idv.get<std::string>();
+                                            }
+                                            if (tc.contains("function")) {
+                                                const auto& fn = tc["function"];
+                                                if (fn.is_object()) {
+                                                    if (fn.contains("name")) {
+                                                        const auto& nv = fn["name"];
+                                                        if (nv.is_string()) accum.name += nv.get<std::string>();
+                                                    }
+                                                    if (fn.contains("arguments")) {
+                                                        const auto& av = fn["arguments"];
+                                                        if (av.is_string()) accum.arguments += av.get<std::string>();
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 },
-                // onDone — Default实现在主线程（MainThreadDispatcher），
-                // Emscripten 在 fetch 回调中，均可安全 resolve()
                 [shared, resolve = std::move(resolve)](const std::string& error) mutable {
                     shared->errorMsg = error;
                     resolve();
@@ -629,30 +745,58 @@ void RegisterHandlers_AI(
         };
 
         // onComplete：主线程，批量激活
-        auto onComplete = [shared, chunkPinId, donePinId, errorPinId](ExecutionContext& c) mutable {
+        auto onComplete = [shared, chunkPinId, toolCallPinId, donePinId, errorPinId](ExecutionContext& c) mutable {
             if (!shared->errorMsg.empty()) {
                 c.SetOutputValue("Token",        Variant(std::string("")));
                 c.SetOutputValue("FullText",     Variant(std::string("")));
+                c.SetOutputValue("ToolCallsJSON",Variant(std::string("")));
+                c.SetOutputValue("FinishReason", Variant(std::string("")));
                 c.SetOutputValue("ErrorMessage", Variant(shared->errorMsg));
                 c.LogError("[LLM.StreamChat] " + shared->errorMsg);
                 c.ActivateOutputFlow(errorPinId);
                 return;
             }
 
+            c.SetOutputValue("FinishReason", Variant(shared->finishReason));
+            c.SetOutputValue("ErrorMessage", Variant(std::string("")));
+
+            // ── 工具调用路径 ─────────────────────────────────────────────
+            if (!shared->toolCalls.empty() || shared->finishReason == "tool_calls") {
+                // 将拼合好的 toolCalls 序列化为标准 tool_calls JSON 数组
+                crude_json::array tcArr;
+                for (const auto& tc : shared->toolCalls) {
+                    crude_json::object fn;
+                    fn["name"]      = crude_json::value(tc.name);
+                    fn["arguments"] = crude_json::value(tc.arguments);
+
+                    crude_json::object obj;
+                    obj["id"]       = crude_json::value(tc.id);
+                    obj["type"]     = crude_json::value(std::string("function"));
+                    obj["function"] = crude_json::value(std::move(fn));
+                    tcArr.push_back(crude_json::value(std::move(obj)));
+                }
+                std::string tcJson = crude_json::value(std::move(tcArr)).dump();
+                c.SetOutputValue("ToolCallsJSON", Variant(tcJson));
+                c.SetOutputValue("FullText",      Variant(std::string("")));
+                c.SetOutputValue("Token",         Variant(std::string("")));
+                c.Log("[LLM.StreamChat] tool_calls: " + tcJson);
+                c.ActivateOutputFlow(toolCallPinId);
+                return;
+            }
+
+            // ── 文本流路径 ───────────────────────────────────────────────
             std::string fullText;
             for (const auto& t : shared->chunks) fullText += t;
 
-            c.SetOutputValue("FullText",     Variant(fullText));
-            c.SetOutputValue("ErrorMessage", Variant(std::string("")));
+            c.SetOutputValue("FullText",      Variant(fullText));
+            c.SetOutputValue("ToolCallsJSON", Variant(std::string("")));
             c.Log("[LLM.StreamChat] " + std::to_string(shared->chunks.size())
                   + " chunks, total=" + std::to_string(fullText.size()) + " chars");
 
-            // 逐 token 激活 onChunk
             for (const auto& tok : shared->chunks) {
                 c.SetOutputValue("Token", Variant(tok));
                 c.ActivateOutputFlow(chunkPinId);
             }
-            // onDone
             c.SetOutputValue("Token", Variant(std::string("")));
             c.ActivateOutputFlow(donePinId);
         };

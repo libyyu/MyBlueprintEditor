@@ -255,10 +255,25 @@ public:
                 onDone(cfg.error);
                 return;
             }
-            for (const auto& tok : cfg.chunks) {
+            // 将每个文本 chunk 包装为 SSE JSON（与 HttpClient_Default 的 parseSseLine 输出一致）
+            for (size_t i = 0; i < cfg.chunks.size(); ++i) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(cfg.delayMs));
-                onChunk(tok);
+                // 最后一个 chunk 附带 finish_reason=stop
+                std::string fr = (i + 1 == cfg.chunks.size()) ? "\"stop\"" : "null";
+                // 转义 content 中的引号
+                std::string content = cfg.chunks[i];
+                std::string escaped;
+                for (char c : content) {
+                    if (c == '"') escaped += "\\\"";
+                    else if (c == '\\') escaped += "\\\\";
+                    else escaped += c;
+                }
+                std::string sseJson =
+                    "{\"choices\":[{\"delta\":{\"content\":\"" + escaped + "\"},"
+                    "\"finish_reason\":" + fr + "}]}";
+                onChunk(sseJson);
             }
+            onChunk("[DONE]");
             onDone("");
         }).detach();
     }

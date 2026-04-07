@@ -65,8 +65,9 @@ static ParsedUrl parseUrl(const std::string& url)
 
 // ============================================================================
 // SSE 行解析辅助
-//   从 "data: {...}" 行提取 choices[0].delta.content
-//   返回 token；[DONE] 行返回 "" 并设置 isDone=true
+//   从 "data: {...}" 行提取原始 JSON 字符串（不做内容解析）
+//   "[DONE]" 行返回 "" 并设置 isDone=true
+//   由上层调用方（handler）负责解析 delta.content / delta.tool_calls 等字段
 // ============================================================================
 
 static std::string parseSseLine(const std::string& line, bool& isDone)
@@ -80,29 +81,26 @@ static std::string parseSseLine(const std::string& line, bool& isDone)
     size_t s = data.find_first_not_of(' ');
     if (s != std::string::npos) data = data.substr(s);
 
-    if (data == "[DONE]") { isDone = true; return ""; }
+    if (data == "[DONE]") { isDone = true; return "[DONE]"; }
 
+    // 快速检查是否合法 JSON（以 { 开头）
+    if (data.empty() || data[0] != '{') return "";
+
+    // 提取 finish_reason 判断流是否结束（不修改 data，仅检查）
     crude_json::value j = crude_json::value::parse(data);
-    if (!j.is_object()) return "";
-    if (!j.contains("choices")) return "";
-    const auto& choices = j["choices"];
-    if (!choices.is_array() || choices.get<crude_json::array>().empty()) return "";
-    const auto& first = choices.get<crude_json::array>()[0];
-    if (!first.is_object()) return "";
-
-    // finish_reason — 如果存在且非 null，标记 done
-    if (first.contains("finish_reason")) {
-        const auto& fr = first["finish_reason"];
-        if (!fr.is_null()) isDone = (fr.is_string() && fr.get<std::string>() != "");
+    if (j.is_object() && j.contains("choices")) {
+        const auto& choices = j["choices"];
+        if (choices.is_array() && !choices.get<crude_json::array>().empty()) {
+            const auto& first = choices.get<crude_json::array>()[0];
+            if (first.is_object() && first.contains("finish_reason")) {
+                const auto& fr = first["finish_reason"];
+                if (!fr.is_null() && fr.is_string() && !fr.get<std::string>().empty())
+                    isDone = true;
+            }
+        }
     }
 
-    if (!first.contains("delta")) return "";
-    const auto& delta = first["delta"];
-    if (!delta.is_object()) return "";
-    if (!delta.contains("content")) return "";
-    const auto& content = delta["content"];
-    if (content.is_string()) return content.get<std::string>();
-    return "";
+    return data;  // 返回原始 JSON 字符串，由 handler 解析
 }
 
 // ============================================================================
@@ -170,11 +168,11 @@ public:
                     pos = nl + 1;
 
                     bool isDone = false;
-                    std::string token = parseSseLine(line, isDone);
-                    if (!token.empty()) {
-                        // 每个 token dispatch 到主线程
+                    std::string sseData = parseSseLine(line, isDone);
+                    if (!sseData.empty()) {
+                        // 将原始 SSE data JSON（或"[DONE]"）dispatch 到主线程
                         MainThreadDispatcher::Get().Post(
-                            [onChunk, tok = std::move(token)]() {
+                            [onChunk, tok = std::move(sseData)]() {
                                 onChunk(tok);
                             });
                     }

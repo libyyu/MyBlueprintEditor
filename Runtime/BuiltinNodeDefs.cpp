@@ -1802,11 +1802,14 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
             MakePin("Tools",        PinDataType::String),
         },
         {
-            MakeFlowPin("onChunk"),                          // 每个 token 激活一次
-            MakeFlowPin("onDone"),                           // 全部 chunk 完毕
+            MakeFlowPin("onChunk"),                          // 每个 token 激活一次（文本流）
+            MakeFlowPin("onToolCall"),                       // finish_reason=tool_calls 时触发
+            MakeFlowPin("onDone"),                           // 全部 chunk 完毕（文本流结束）
             MakeFlowPin("onError"),
             MakePin("Token",         PinDataType::String),   // 当前 token（onChunk 时）
             MakePin("FullText",      PinDataType::String),   // 完整文本（onDone 时）
+            MakePin("ToolCallsJSON", PinDataType::String),   // tool_calls JSON（onToolCall 时）
+            MakePin("FinishReason",  PinDataType::String),   // "stop"|"tool_calls"|"length"|...
             MakePin("ErrorMessage",  PinDataType::String),
         },
         "6A0572");
