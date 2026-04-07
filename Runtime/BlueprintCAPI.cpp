@@ -279,10 +279,10 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetActiveTimerCount(BP_Runner r
     return static_cast<int>(asWrapper(runner)->runner.GetTimerManager().GetActiveTimerCount());
 }
 
-BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_HasPendingAsync(BP_Runner runner)
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_HasPendingWork(BP_Runner runner)
 {
     if (!runner) return 0;
-    return asWrapper(runner)->runner.HasPendingAsync() ? 1 : 0;
+    return asWrapper(runner)->runner.HasPendingWork() ? 1 : 0;
 }
 
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_DrainQueue(void)

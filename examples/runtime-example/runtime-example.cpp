@@ -25,6 +25,7 @@
 #include "BlueprintExporter.h"
 #include "BuiltinHandlers.h"
 #include "MainThreadDispatcher.h"
+#include "Http/IHttpClient.h"
 #include "crude_json.h"
 
 using namespace NodeEditor::Runtime;
@@ -467,6 +468,9 @@ static int runBlueprintFromFile(const std::string& filePath, float maxTimeSec, i
     runner.SetLogCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
     runner.SetPrintCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
 
+    // 注册默认 HTTP client（LLM.Chat / http.* Lua 节点需要）
+    ::NodeEditor::Runtime::BP_SetHttpClient(::NodeEditor::Runtime::CreateDefaultHttpClient());
+
     // 单文件格式：importRuntimeFromFile 自动检测 runtime+editor 内容
     if (!runner.LoadFromFileWithDeps(filePath))
     {
@@ -519,7 +523,7 @@ static int runBlueprintFromFile(const std::string& filePath, float maxTimeSec, i
     std::cout << "  Elapsed: " << elapsed << " ms" << std::endl;
     std::cout << "========================================" << std::endl;
 
-    if (runner.GetTimerManager().GetActiveTimerCount() > 0 || runner.HasPendingAsync())
+    if (runner.HasPendingWork())
     {
         std::cout << "\n[Tick Loop] Active timers: " << runner.GetTimerManager().GetActiveTimerCount()
                   << ", pending async: " << runner.PendingAsyncCount()
@@ -528,7 +532,7 @@ static int runBlueprintFromFile(const std::string& filePath, float maxTimeSec, i
         auto loopStart = std::chrono::high_resolution_clock::now();
         auto lastTick  = loopStart;
 
-        while (runner.GetTimerManager().GetActiveTimerCount() > 0 || runner.HasPendingAsync())
+        while (runner.HasPendingWork())
         {
             auto now = std::chrono::high_resolution_clock::now();
             double totalElapsed = std::chrono::duration<double>(now - loopStart).count();

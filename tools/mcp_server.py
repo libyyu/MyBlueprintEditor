@@ -128,8 +128,8 @@ class BlueprintLib:
         lib.BP_GetActiveTimerCount.restype  = ctypes.c_int
         lib.BP_GetActiveTimerCount.argtypes = [ctypes.c_void_p]
 
-        lib.BP_HasPendingAsync.restype  = ctypes.c_int
-        lib.BP_HasPendingAsync.argtypes = [ctypes.c_void_p]
+        lib.BP_HasPendingWork.restype  = ctypes.c_int
+        lib.BP_HasPendingWork.argtypes = [ctypes.c_void_p]
 
         lib.BP_DrainQueue.restype  = None
         lib.BP_DrainQueue.argtypes = []
@@ -225,19 +225,15 @@ class BlueprintLib:
                             "error": f"DispatchEvent(OnBeginPlay) failed: {err}"}
 
             # ── Tick 循环：推进异步 timer 和 FireEvent/HTTP 回调 ──────────────
-            # DrainQueue 处理 FireEvent 等投递到主线程的任务（ReAct 循环依赖此步）
-            # Tick 推进 timer（Delay / SetTimer 等节点）
+            # BP_HasPendingWork = timers > 0 OR pending async > 0（统一判断）
             import time as _time
             max_time_sec  = 30.0
             tick_rate_sec = 0.016
             elapsed = 0.0
-            while (self._lib.BP_GetActiveTimerCount(runner) > 0
-                   or self._lib.BP_HasPendingAsync(runner) > 0):
+            while self._lib.BP_HasPendingWork(runner) > 0:
                 if elapsed >= max_time_sec:
                     self._log_lines.append(
-                        f"[W] Tick loop timed out after {max_time_sec}s "
-                        f"(timers={self._lib.BP_GetActiveTimerCount(runner)}, "
-                        f"pending={self._lib.BP_HasPendingAsync(runner)})"
+                        f"[W] Tick loop timed out after {max_time_sec}s"
                     )
                     break
                 # 先 Drain（消费 FireEvent callback），再 Tick（推进 timer）
@@ -296,10 +292,7 @@ class BlueprintLib:
             # Tick 循环：推进异步 timer 和 FireEvent/HTTP 回调
             import time as _time
             max_time_sec = 30.0; tick_rate_sec = 0.016; elapsed = 0.0
-            while elapsed < max_time_sec and (
-                self._lib.BP_GetActiveTimerCount(runner) > 0
-                or self._lib.BP_HasPendingAsync(runner) > 0
-            ):
+            while elapsed < max_time_sec and self._lib.BP_HasPendingWork(runner) > 0:
                 self._lib.BP_DrainQueue()
                 self._lib.BP_Tick(runner, ctypes.c_float(tick_rate_sec))
                 _time.sleep(tick_rate_sec)

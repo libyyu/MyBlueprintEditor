@@ -750,6 +750,14 @@ public:
     bool HasPendingAsync() const { return m_pendingAsyncCount.load(std::memory_order_acquire) > 0; }
     int  PendingAsyncCount() const { return m_pendingAsyncCount.load(std::memory_order_acquire); }
 
+    // 统一判断"是否还有未完成的异步工作"（timer + async 两者都检查）
+    // 用于 Tick 循环退出条件，替代分别检查 GetActiveTimerCount()/HasPendingAsync()
+    bool HasPendingWork() const
+    {
+        return m_pendingAsyncCount.load(std::memory_order_acquire) > 0
+            || GetTimerManager().GetActiveTimerCount() > 0;
+    }
+
     // RAII 封装：构造时 Acquire，析构时 Release（支持移动，不可拷贝）
     struct AsyncGuard
     {
