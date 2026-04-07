@@ -646,6 +646,20 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
 {
     Node* result = nullptr;
 
+    // 新建 CustomEventNode 或 FireEvent 后触发命名弹窗
+    auto TriggerEventNamePopupIfNeeded = [this](Node* node) {
+        if (!node) return;
+        if (node->DefinitionId == "CustomEventNode" || node->DefinitionId == "FireEvent") {
+            ActiveDoc()->pendingEventNameNodeId = node->ID;
+            // 默认用节点原始 displayName，用户可以覆盖
+            snprintf(ActiveDoc()->pendingEventNameBuf,
+                     sizeof(ActiveDoc()->pendingEventNameBuf),
+                     "%s", node->Name.c_str());
+            ImGui::OpenPopup("Set Event Name");
+        }
+    };
+
+
     // FunctionLibrary 蓝图过滤：禁止添加事件驱动节点
     // （Event.* / OnBeginPlay / OnTick / CustomEvent 等）
     bool isLibBP = ActiveDoc() && ActiveDoc()->blueprintClass == RTBlueprintClass::FunctionLibrary;
@@ -752,9 +766,11 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
                 result = SpawnNodeByDef(d->id);
                 if (result)
                     FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d->id));
+                TriggerEventNamePopupIfNeeded(result);
                 searchBuf[0] = '\0';
                 m_CachedSearchFilter.clear();
-                ImGui::CloseCurrentPopup();
+                if (ActiveDoc()->pendingEventNameNodeId == 0)
+                    ImGui::CloseCurrentPopup();
                 break;
             }
         }
@@ -763,17 +779,20 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
         for (const auto* d : m_CachedSearchResults)
         {
             if (isLibraryFilteredDef(d)) continue;  // FunctionLibrary 过滤事件节点
+            ImGui::PushID(d->id.c_str());
             if (ImGui::MenuItem(d->name.c_str()))
             {
                 PushUndoState();
                 result = SpawnNodeByDef(d->id);
                 if (result)
                     FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d->id));
+                TriggerEventNamePopupIfNeeded(result);
                 searchBuf[0] = '\0';
                 m_CachedSearchFilter.clear();
             }
             if (!d->category.empty() && ImGui::IsItemHovered())
                 ImGui::SetTooltip("Category: %s", d->category.c_str());
+            ImGui::PopID();
         }
 
         if (m_CachedSearchResults.empty())
@@ -808,13 +827,16 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
 
         for (const auto* d : menuNode.directNodes)
         {
+            ImGui::PushID(d->id.c_str());
             if (ImGui::MenuItem(d->name.c_str()))
             {
                 PushUndoState();
                 result = SpawnNodeByDef(d->id);
                 if (result)
                     FixupSpecialPinTypes(result, m_NodeRegistry.getNodeDefinition(d->id));
+                TriggerEventNamePopupIfNeeded(result);
             }
+            ImGui::PopID();
         }
     };
 
@@ -836,6 +858,51 @@ Node* BlueprintEditor::ShowCreateNodeMenu()
             renderMenu(it->second);
             ImGui::EndMenu();
         }
+    }
+
+    // ── "Set Event Name" 模态弹窗 ─────────────────────────────────────────
+    // 用于 CustomEventNode / FireEvent 新建后命名
+    ImGui::SetNextWindowSize(ImVec2(320, 0), ImGuiCond_Always);
+    if (ImGui::BeginPopupModal("Set Event Name", nullptr,
+            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove))
+    {
+        ImGui::Text("Event Name:");
+        ImGui::SetNextItemWidth(-1.0f);
+        bool confirmed = false;
+
+        // 自动聚焦
+        if (ImGui::IsWindowAppearing())
+            ImGui::SetKeyboardFocusHere();
+
+        if (ImGui::InputText("##eventname",
+                ActiveDoc()->pendingEventNameBuf,
+                sizeof(ActiveDoc()->pendingEventNameBuf),
+                ImGuiInputTextFlags_EnterReturnsTrue))
+            confirmed = true;
+
+        ImGui::Spacing();
+        if (ImGui::Button("OK", ImVec2(120, 0)) || confirmed)
+        {
+            // 应用名称到节点
+            Node* node = nullptr;
+            for (auto& n : ActiveDoc()->nodes) {
+                if (n.ID == ActiveDoc()->pendingEventNameNodeId) { node = &n; break; }
+            }
+            if (node && ActiveDoc()->pendingEventNameBuf[0] != '\0')
+            {
+                node->Name = ActiveDoc()->pendingEventNameBuf;
+                ActiveDoc()->isDirty = true;
+            }
+            ActiveDoc()->pendingEventNameNodeId = 0;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0)))
+        {
+            ActiveDoc()->pendingEventNameNodeId = 0;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
     }
 
     return result;
@@ -873,6 +940,14 @@ RTBlueprintData BlueprintEditor::BuildRuntimeData()
             char colorBuf[8];
             snprintf(colorBuf, sizeof(colorBuf), "%02X%02X%02X", r, g, b);
             ni.customProperties["__color"] = colorBuf;
+        }
+
+        // CustomEventNode：事件名存在 nodeData["EventName"]，供运行时 DispatchEvent 匹配
+        // 编辑器里节点 Name 即事件名（右键 Rename 即可改）
+        if (ni.definitionId == "CustomEventNode")
+        {
+            if (!ni.name.empty())
+                ni.nodeData["EventName"] = RTVariant(ni.name);
         }
 
         // 输入引脚
