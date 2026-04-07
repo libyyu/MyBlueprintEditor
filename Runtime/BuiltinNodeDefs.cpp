@@ -2015,6 +2015,50 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
         },
         "6A0572");
 
+    // UserInput.Wait — 等待用户在编辑器输入框输入文本
+    reg("UserInput.Wait", "Wait For Input", "AI",
+        {
+            MakeFlowPin(""),
+            MakePin("Prompt",       PinDataType::String),
+            MakePin("DefaultValue", PinDataType::String),
+        },
+        {
+            MakeFlowPin(""),
+            MakePin("Input", PinDataType::String),
+        },
+        "6A5F9A");
+
+    // Tool.Define — 可视化定义一个 LLM 工具
+    reg("Tool.Define", "Define Tool", "AI/Tools",
+        {
+            MakePin("Name",        PinDataType::String),
+            MakePin("Description", PinDataType::String),
+            MakePin("ParamNames",  PinDataType::Array),
+            MakePin("ParamDescs",  PinDataType::Array),
+            MakePin("Required",    PinDataType::Array),
+        },
+        {
+            MakePin("ToolJSON", PinDataType::String),
+        },
+        "5A7A6A");
+
+    // MCP.Call — 调用 MCP Server 工具
+    reg("MCP.Call", "MCP Call", "AI/MCP",
+        {
+            MakeFlowPin(""),
+            MakePin("ServerURL",  PinDataType::String),
+            MakePin("ToolName",   PinDataType::String),
+            MakePin("Arguments",  PinDataType::String),
+            MakePin("TimeoutSec", PinDataType::Integer),
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("Result",       PinDataType::String),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "5A6A7A");
+
 }
 
 void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)

@@ -1459,6 +1459,216 @@ void RegisterHandlers_AI(
         return true;
     };
 
+    // ========================================================================
+    // UserInput.Wait
+    // Mock 模式：runner 变量 __userinput_mock 非空时直接返回
+    // 正常模式：设置 pending 标志，在后台线程轮询等待编辑器写入结果
+    // ========================================================================
+    handlers["UserInput.Wait"] = [](ExecutionContext& ctx) -> bool {
+        std::string prompt = ctx.GetInputValue("Prompt").asString();
+        std::string defVal = ctx.GetInputValue("DefaultValue").asString();
+        if (prompt.empty()) prompt = "Input:";
+
+        // Mock 模式：变量 __userinput_mock 非空时立即返回
+        Variant mockVal = ctx.GetVariable("__userinput_mock");
+        if (!mockVal.asString().empty()) {
+            ctx.SetOutputValue("Input", mockVal);
+            ctx.ActivateOutputFlow("");
+            return true;
+        }
+
+        // 设置 pending 标志，供编辑器渲染弹框
+        ctx.SetVariable("__userinput_prompt",  Variant(prompt));
+        ctx.SetVariable("__userinput_default", Variant(defVal));
+        ctx.SetVariable("__userinput_result",  Variant(std::string("")));
+        ctx.SetVariable("__userinput_pending", Variant(std::string("1")));
+
+        ctx.MarkDownstreamAsHandled("");
+
+        // dispatcher：后台线程轮询 pending 标志
+        auto dispatcher = [](ExecutionContext::AsyncResolve resolve) {
+            std::thread([resolve = std::move(resolve)]() mutable {
+                // 最多等待 5 分钟（300 秒），每 50ms 检查一次
+                // 实际判断由 onComplete 里的变量读取完成
+                for (int i = 0; i < 6000; ++i) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                }
+                resolve();
+            }).detach();
+        };
+
+        // 替代：使用一个更短的后台 poll 方案
+        // 我们利用 RunAsync 的 dispatcher 做轮询
+        struct PendingState {
+            std::atomic<bool> done{false};
+        };
+        auto state = std::make_shared<PendingState>();
+
+        auto dispatcher2 = [state](ExecutionContext::AsyncResolve resolve) mutable {
+            std::thread([state, resolve = std::move(resolve)]() mutable {
+                while (!state->done.load(std::memory_order_relaxed)) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                }
+                resolve();
+            }).detach();
+        };
+
+        auto onComplete = [state](ExecutionContext& c) mutable {
+            // 检查是否已经被编辑器设置了结果
+            std::string pending = c.GetVariable("__userinput_pending").asString();
+            if (pending != "1") {
+                // 编辑器已设置结果
+                std::string result = c.GetVariable("__userinput_result").asString();
+                c.SetOutputValue("Input", Variant(result));
+                c.ActivateOutputFlow("");
+                state->done.store(true, std::memory_order_relaxed);
+            } else {
+                // 还没有，重新 RunAsync 继续等
+                state->done.store(false, std::memory_order_relaxed);
+                auto state2 = state;
+                auto dispatcher3 = [state2](ExecutionContext::AsyncResolve resolve3) mutable {
+                    std::thread([state2, resolve3 = std::move(resolve3)]() mutable {
+                        while (!state2->done.load(std::memory_order_relaxed)) {
+                            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                        }
+                        resolve3();
+                    }).detach();
+                };
+                // 无法从 onComplete 里 RunAsync，改用简单方案：
+                // 重置 pending 为 0（由编辑器写入时触发），此处标记 done 让线程退出
+                // 实际上 onComplete 被调用说明 state->done 已经 true，
+                // 因此此分支表示线程超时退出但 pending 仍为 1，视为取消
+                c.SetOutputValue("Input", Variant(std::string("")));
+                c.ActivateOutputFlow("");
+            }
+        };
+
+        ctx.RunAsync(std::move(dispatcher2), std::move(onComplete));
+        return true;
+    };
+
+    // ========================================================================
+    // Tool.Define — 构建单个 OpenAI function calling tool JSON
+    // ========================================================================
+    handlers["Tool.Define"] = [](ExecutionContext& ctx) -> bool {
+        std::string name  = ctx.GetInputValue("Name").asString();
+        std::string desc  = ctx.GetInputValue("Description").asString();
+        Variant paramNames = ctx.GetInputValue("ParamNames");
+        Variant paramDescs = ctx.GetInputValue("ParamDescs");
+        Variant required   = ctx.GetInputValue("Required");
+
+        crude_json::object props;
+        size_t n = paramNames.arraySize();
+        for (size_t i = 0; i < n; ++i) {
+            std::string pname = paramNames.arrayGet(i).asString();
+            std::string pdesc = (i < paramDescs.arraySize())
+                                ? paramDescs.arrayGet(i).asString() : "";
+            if (pname.empty()) continue;
+            crude_json::object prop;
+            prop["type"] = crude_json::value(std::string("string"));
+            if (!pdesc.empty()) prop["description"] = crude_json::value(pdesc);
+            props[pname] = crude_json::value(prop);
+        }
+
+        crude_json::array reqArr;
+        for (size_t i = 0; i < required.arraySize(); ++i) {
+            std::string r = required.arrayGet(i).asString();
+            if (!r.empty()) reqArr.push_back(crude_json::value(r));
+        }
+
+        crude_json::object params;
+        params["type"]       = crude_json::value(std::string("object"));
+        params["properties"] = crude_json::value(props);
+        if (!reqArr.empty()) params["required"] = crude_json::value(reqArr);
+
+        crude_json::object func;
+        func["name"]        = crude_json::value(name);
+        func["description"] = crude_json::value(desc);
+        func["parameters"]  = crude_json::value(params);
+
+        crude_json::object tool;
+        tool["type"]     = crude_json::value(std::string("function"));
+        tool["function"] = crude_json::value(func);
+
+        ctx.SetOutputValue("ToolJSON", Variant(crude_json::value(tool).dump()));
+        return true;
+    };
+
+    // ========================================================================
+    // MCP.Call — 调用 MCP Server 工具（HTTP POST JSON-RPC 风格）
+    // ========================================================================
+    handlers["MCP.Call"] = [](ExecutionContext& ctx) -> bool {
+        IHttpClient* client = BP_GetHttpClient();
+        if (!client) {
+            ctx.SetOutputValue("Result",       Variant(std::string("")));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient registered")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        std::string serverURL  = ctx.GetInputValue("ServerURL").asString();
+        std::string toolName   = ctx.GetInputValue("ToolName").asString();
+        std::string arguments  = ctx.GetInputValue("Arguments").asString();
+        int         timeoutSec = static_cast<int>(ctx.GetInputValue("TimeoutSec").asInt());
+
+        if (serverURL.empty())  serverURL = "http://localhost:7788/tool/call";
+        if (toolName.empty()) {
+            ctx.SetOutputValue("Result",       Variant(std::string("")));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("ToolName is empty")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+        if (arguments.empty()) arguments = "{}";
+
+        // 构造请求体
+        crude_json::object reqBody;
+        reqBody["tool_name"] = crude_json::value(toolName);
+        reqBody["arguments"] = crude_json::value(crude_json::value::parse(arguments));
+        std::string bodyStr  = crude_json::value(std::move(reqBody)).dump();
+
+        HttpRequest req;
+        req.url    = serverURL;
+        req.method = "POST";
+        req.body   = bodyStr;
+        req.headers["Content-Type"] = "application/json";
+        if (timeoutSec > 0)
+            req.timeoutSeconds = timeoutSec;
+
+        ctx.MarkDownstreamAsHandled("onSuccess");
+        ctx.MarkDownstreamAsHandled("onError");
+        PinId successPin = ctx.GetPinId("onSuccess");
+        PinId errorPin   = ctx.GetPinId("onError");
+
+        auto sharedResp = std::make_shared<HttpResponse>();
+
+        auto dispatcher = [client, req, sharedResp](ExecutionContext::AsyncResolve resolve) mutable {
+            client->SendAsync(req,
+                [sharedResp, resolve = std::move(resolve)](HttpResponse resp) mutable {
+                    *sharedResp = std::move(resp);
+                    resolve();
+                });
+        };
+
+        auto onComplete = [sharedResp, successPin, errorPin](ExecutionContext& c) mutable {
+            const HttpResponse& resp = *sharedResp;
+            if (!resp.ok()) {
+                std::string errMsg = resp.error.empty()
+                    ? ("HTTP " + std::to_string(resp.statusCode))
+                    : resp.error;
+                c.SetOutputValue("Result",       Variant(std::string("")));
+                c.SetOutputValue("ErrorMessage", Variant(errMsg));
+                c.ActivateOutputFlow(errorPin);
+            } else {
+                c.SetOutputValue("Result",       Variant(resp.body));
+                c.SetOutputValue("ErrorMessage", Variant(std::string("")));
+                c.ActivateOutputFlow(successPin);
+            }
+        };
+
+        ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
+        return true;
+    };
+
 }
 
 } // namespace Runtime

@@ -363,6 +363,56 @@ void BlueprintEditor::OnFrame(float deltaTime)
     // 每帧 drain MainThreadDispatcher 队列（驱动 FireEvent 等异步 Post 的任务）
     ::NodeEditor::Runtime::MainThreadDispatcher::Get().DrainQueue();
 
+    // UserInput.Wait：检测 pending 标志，渲染居中输入弹框
+    for (auto& doc : m_Documents)
+    {
+        if (!doc->isExecuting) continue;
+        std::string pending = doc->persistentRunner.GetVariable("__userinput_pending").asString();
+        if (pending == "1")
+        {
+            std::string prompt = doc->persistentRunner.GetVariable("__userinput_prompt").asString();
+            std::string defVal = doc->persistentRunner.GetVariable("__userinput_default").asString();
+
+            ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(),
+                                    ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+            ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Always);
+            bool open = true;
+            if (ImGui::Begin("##UserInputDialog", &open,
+                             ImGuiWindowFlags_NoTitleBar  |
+                             ImGuiWindowFlags_NoResize    |
+                             ImGuiWindowFlags_NoMove      |
+                             ImGuiWindowFlags_NoScrollbar |
+                             ImGuiWindowFlags_AlwaysAutoResize))
+            {
+                ImGui::TextWrapped("%s", prompt.c_str());
+                ImGui::Spacing();
+
+                static char s_UIDlgBuf[1024] = {};
+                static std::string s_UIDlgLastPrompt;
+                if (s_UIDlgLastPrompt != prompt) {
+                    s_UIDlgLastPrompt = prompt;
+                    strncpy(s_UIDlgBuf, defVal.c_str(), sizeof(s_UIDlgBuf) - 1);
+                    s_UIDlgBuf[sizeof(s_UIDlgBuf)-1] = '\0';
+                    ImGui::SetKeyboardFocusHere();
+                }
+
+                bool confirmed = ImGui::InputText("##uidlg", s_UIDlgBuf,
+                                                  sizeof(s_UIDlgBuf),
+                                                  ImGuiInputTextFlags_EnterReturnsTrue);
+                ImGui::SameLine();
+                if (ImGui::Button("OK") || confirmed) {
+                    doc->persistentRunner.SetVariable("__userinput_result",
+                                                      ::NodeEditor::Runtime::Variant(std::string(s_UIDlgBuf)));
+                    doc->persistentRunner.SetVariable("__userinput_pending",
+                                                      ::NodeEditor::Runtime::Variant(std::string("0")));
+                    s_UIDlgLastPrompt.clear();
+                }
+            }
+            ImGui::End();
+            break; // 每帧只处理第一个 pending doc
+        }
+    }
+
     // OnTick 事件驱动：对正在执行且有 OnTick 事件源的文档，每帧触发 DispatchEvent
     for (auto& doc : m_Documents)
     {
