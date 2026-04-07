@@ -317,6 +317,76 @@ void RegisterHandlers_AI(
     // ========================================================================
     handlers["LLM.Chat"] = [&runner](ExecutionContext& ctx) -> bool {
 
+        // ── MOCK 模式（ApiKey == "mock"）──────────────────────────────────
+        // 不走网络，用于在没有真实 API Key 时验证 Agent Loop 逻辑。
+        // 策略：前两次调用返回 tool_call（get_weather），第三次返回文本 reply。
+        // 使用 runner 变量 "__mock_round" 跟踪轮次。
+        {
+            std::string mockKey = ctx.GetInputValue("ApiKey").asString();
+            if (mockKey == "mock") {
+                // 读取 mock 轮次
+                Variant roundVar = runner.GetVariable("__mock_round");
+                int mockRound = (roundVar.type == PinDataType::Integer) ? (int)roundVar.asInt() : 0;
+                runner.SetVariable("__mock_round", Variant((int64_t)(mockRound + 1)));
+
+                ctx.Log("[LLM.Chat][MOCK] round=" + std::to_string(mockRound));
+
+                PinId replyPinId  = ctx.GetPinId("onReply");
+                PinId toolPinId   = ctx.GetPinId("onToolCall");
+                PinId errorPinId  = ctx.GetPinId("onError");
+
+                ctx.MarkDownstreamAsHandled("onReply");
+                ctx.MarkDownstreamAsHandled("onToolCall");
+                ctx.MarkDownstreamAsHandled("onError");
+
+                // 构造 mock 响应数据（在 lambda 里用 shared_ptr 传递）
+                auto mockData = std::make_shared<std::pair<int,std::string>>(
+                    mockRound, (mockRound == 0) ? "Beijing" : (mockRound == 1) ? "Shanghai" : ""
+                );
+
+                // dispatcher：立即 resolve（无网络 I/O）
+                auto dispatcher = [](ExecutionContext::AsyncResolve resolve) mutable {
+                    resolve();
+                };
+
+                // onComplete：设置输出并激活对应 output flow
+                auto onComplete = [mockData, replyPinId, toolPinId, errorPinId]
+                                  (ExecutionContext& c) mutable {
+                    int round = mockData->first;
+                    const std::string& city = mockData->second;
+
+                    if (round < 2) {
+                        // 返回 tool_call
+                        std::string toolCallId = "mock_tc_" + std::to_string(round);
+                        std::string toolCallsJson =
+                            "[{\"id\":\"" + toolCallId + "\","
+                            "\"type\":\"function\","
+                            "\"function\":{\"name\":\"get_weather\","
+                            "\"arguments\":{\"location\":\"" + city + "\"}}}]";
+                        c.SetOutputValue("Reply",         Variant(std::string("")));
+                        c.SetOutputValue("ToolCallsJSON", Variant(toolCallsJson));
+                        c.SetOutputValue("FinishReason",  Variant(std::string("tool_calls")));
+                        c.SetOutputValue("FullResponse",  Variant(std::string("{\"mock\":true}")));
+                        c.SetOutputValue("ErrorMessage",  Variant(std::string("")));
+                        c.ActivateOutputFlow(toolPinId);
+                    } else {
+                        // 返回最终文本
+                        std::string reply = "[MOCK] The weather: Beijing Sunny 25°C, Shanghai Cloudy 22°C.";
+                        c.SetOutputValue("Reply",         Variant(reply));
+                        c.SetOutputValue("ToolCallsJSON", Variant(std::string("[]")));
+                        c.SetOutputValue("FinishReason",  Variant(std::string("stop")));
+                        c.SetOutputValue("FullResponse",  Variant(std::string("{\"mock\":true}")));
+                        c.SetOutputValue("ErrorMessage",  Variant(std::string("")));
+                        c.ActivateOutputFlow(replyPinId);
+                    }
+                };
+
+                ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
+                return true;
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────
+
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.LogError("[LLM.Chat] No HttpClient registered. Call BP_SetHttpClient() first.");
