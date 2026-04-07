@@ -154,6 +154,78 @@ static void setAtPath(crude_json::value& node,
 }
 
 // ============================================================================
+// BuildLLMRequest — LLM.Chat 和 LLM.StreamChat 共用的请求构建逻辑
+// 从 ExecutionContext 读取所有 LLM 参数，构建并返回 HttpRequest。
+// ============================================================================
+static HttpRequest BuildLLMRequest(ExecutionContext& ctx)
+{
+    std::string baseURL      = ctx.GetInputValue("BaseURL").asString();
+    std::string apiKey       = ctx.GetInputValue("ApiKey").asString();
+    std::string model        = ctx.GetInputValue("Model").asString();
+    std::string messagesStr  = ctx.GetInputValue("Messages").asString();
+    std::string systemPrompt = ctx.GetInputValue("SystemPrompt").asString();
+    std::string toolsStr     = ctx.GetInputValue("Tools").asString();
+
+    if (baseURL.empty()) baseURL = "https://api.openai.com/v1";
+    if (model.empty())   model   = "gpt-4o";
+
+    int64_t maxTokens   = 1024;
+    double  temperature = 0.7;
+    {
+        auto mt = ctx.GetInputValue("MaxTokens");
+        if (mt.type == PinDataType::Integer || mt.type == PinDataType::Float)
+            maxTokens = mt.asInt();
+        auto tp = ctx.GetInputValue("Temperature");
+        if (tp.type == PinDataType::Float || tp.type == PinDataType::Integer)
+            temperature = tp.asFloat();
+    }
+
+    // 构建 messages 数组
+    crude_json::array messages;
+    if (!systemPrompt.empty()) {
+        crude_json::object sys;
+        sys["role"]    = crude_json::value(std::string("system"));
+        sys["content"] = crude_json::value(systemPrompt);
+        messages.push_back(crude_json::value(std::move(sys)));
+    }
+    if (!messagesStr.empty()) {
+        crude_json::value parsed = crude_json::value::parse(messagesStr);
+        if (parsed.is_array()) {
+            for (const auto& m : parsed.get<crude_json::array>())
+                messages.push_back(m);
+        } else if (parsed.is_object()) {
+            messages.push_back(parsed);
+        } else if (parsed.is_string()) {
+            crude_json::object um;
+            um["role"]    = crude_json::value(std::string("user"));
+            um["content"] = crude_json::value(messagesStr);
+            messages.push_back(crude_json::value(std::move(um)));
+        }
+    }
+
+    // 构建 body
+    crude_json::object body;
+    body["model"]       = crude_json::value(model);
+    body["messages"]    = crude_json::value(std::move(messages));
+    body["max_tokens"]  = crude_json::value(static_cast<double>(maxTokens));
+    body["temperature"] = crude_json::value(temperature);
+    if (!toolsStr.empty()) {
+        crude_json::value tv = crude_json::value::parse(toolsStr);
+        if (tv.is_array()) body["tools"] = tv;
+    }
+
+    HttpRequest req;
+    req.url    = baseURL + "/chat/completions";
+    req.method = "POST";
+    req.body   = crude_json::value(std::move(body)).dump();
+    req.headers["Content-Type"] = "application/json";
+    if (!apiKey.empty())
+        req.headers["Authorization"] = "Bearer " + apiKey;
+    req.timeoutSeconds = 120;
+    return req;
+}
+
+// ============================================================================
 // RegisterHandlers_AI
 // ============================================================================
 void RegisterHandlers_AI(
@@ -327,79 +399,7 @@ void RegisterHandlers_AI(
             return true;
         }
 
-        // ── 读取输入 ─────────────────────────────────────────────────────
-        std::string baseURL     = ctx.GetInputValue("BaseURL").asString();
-        std::string apiKey      = ctx.GetInputValue("ApiKey").asString();
-        std::string model       = ctx.GetInputValue("Model").asString();
-        std::string messagesStr = ctx.GetInputValue("Messages").asString();
-        std::string systemPrompt= ctx.GetInputValue("SystemPrompt").asString();
-
-        if (baseURL.empty()) baseURL = "https://api.openai.com/v1";
-        if (model.empty())   model   = "gpt-4o";
-
-        int64_t maxTokens   = 1024;
-        double  temperature = 0.7;
-        {
-            auto mt = ctx.GetInputValue("MaxTokens");
-            if (mt.type == PinDataType::Integer || mt.type == PinDataType::Float)
-                maxTokens = mt.asInt();
-            auto tp = ctx.GetInputValue("Temperature");
-            if (tp.type == PinDataType::Float || tp.type == PinDataType::Integer)
-                temperature = tp.asFloat();
-        }
-
-        // ── 构建 messages 数组 ──────────────────────────────────────────
-        crude_json::array messages;
-
-        // 插入 system prompt（若有）
-        if (!systemPrompt.empty()) {
-            crude_json::object sys;
-            sys["role"]    = crude_json::value(std::string("system"));
-            sys["content"] = crude_json::value(systemPrompt);
-            messages.push_back(crude_json::value(std::move(sys)));
-        }
-
-        // 追加用户传入的 messages
-        if (!messagesStr.empty()) {
-            crude_json::value parsed = crude_json::value::parse(messagesStr);
-            if (parsed.is_array()) {
-                for (const auto& m : parsed.get<crude_json::array>())
-                    messages.push_back(m);
-            } else if (parsed.is_object()) {
-                // 单条消息对象也支持
-                messages.push_back(parsed);
-            } else if (parsed.is_string()) {
-                // 纯字符串：包成 user 消息
-                crude_json::object um;
-                um["role"]    = crude_json::value(std::string("user"));
-                um["content"] = crude_json::value(messagesStr);
-                messages.push_back(crude_json::value(std::move(um)));
-            }
-        }
-
-        // ── 构建请求 body ───────────────────────────────────────────────
-        crude_json::object body;
-        body["model"]       = crude_json::value(model);
-        body["messages"]    = crude_json::value(std::move(messages));
-        body["max_tokens"]  = crude_json::value(static_cast<double>(maxTokens));
-        body["temperature"] = crude_json::value(temperature);
-
-        // ── Tools（function calling schema）──────────────────────────
-        std::string toolsStr = ctx.GetInputValue("Tools").asString();
-        if (!toolsStr.empty()) {
-            crude_json::value toolsJson = crude_json::value::parse(toolsStr);
-            if (toolsJson.is_array())
-                body["tools"] = toolsJson;
-        }
-
-        HttpRequest req;
-        req.url    = baseURL + "/chat/completions";
-        req.method = "POST";
-        req.body   = crude_json::value(std::move(body)).dump();
-        req.headers["Content-Type"]  = "application/json";
-        if (!apiKey.empty())
-            req.headers["Authorization"] = "Bearer " + apiKey;
-        req.timeoutSeconds = 120;  // LLM 可能慢
+        HttpRequest req = BuildLLMRequest(ctx);
 
         PinId replyPinId    = ctx.GetPinId("onReply");
         PinId toolPinId     = ctx.GetPinId("onToolCall");
@@ -541,61 +541,7 @@ void RegisterHandlers_AI(
             return true;
         }
 
-        // ── 读取参数 ────────────────────────────────────────────────
-        std::string baseURL      = ctx.GetInputValue("BaseURL").asString();
-        std::string apiKey       = ctx.GetInputValue("ApiKey").asString();
-        std::string model        = ctx.GetInputValue("Model").asString();
-        std::string messagesStr  = ctx.GetInputValue("Messages").asString();
-        std::string systemPrompt = ctx.GetInputValue("SystemPrompt").asString();
-        std::string toolsStr     = ctx.GetInputValue("Tools").asString();
-
-        if (baseURL.empty()) baseURL = "https://api.openai.com/v1";
-        if (model.empty())   model   = "gpt-4o";
-
-        int64_t maxTokens   = 1024;
-        double  temperature = 0.7;
-        {
-            auto mt = ctx.GetInputValue("MaxTokens");
-            if (mt.type == PinDataType::Integer || mt.type == PinDataType::Float)
-                maxTokens = mt.asInt();
-            auto tp = ctx.GetInputValue("Temperature");
-            if (tp.type == PinDataType::Float || tp.type == PinDataType::Integer)
-                temperature = tp.asFloat();
-        }
-
-        crude_json::array messages;
-        if (!systemPrompt.empty()) {
-            crude_json::object sys;
-            sys["role"]    = crude_json::value(std::string("system"));
-            sys["content"] = crude_json::value(systemPrompt);
-            messages.push_back(crude_json::value(std::move(sys)));
-        }
-        if (!messagesStr.empty()) {
-            crude_json::value parsed = crude_json::value::parse(messagesStr);
-            if (parsed.is_array())
-                for (const auto& m : parsed.get<crude_json::array>()) messages.push_back(m);
-            else if (parsed.is_object())
-                messages.push_back(parsed);
-        }
-
-        crude_json::object body;
-        body["model"]       = crude_json::value(model);
-        body["messages"]    = crude_json::value(std::move(messages));
-        body["max_tokens"]  = crude_json::value(static_cast<double>(maxTokens));
-        body["temperature"] = crude_json::value(temperature);
-        if (!toolsStr.empty()) {
-            crude_json::value tv = crude_json::value::parse(toolsStr);
-            if (tv.is_array()) body["tools"] = tv;
-        }
-
-        HttpRequest req;
-        req.url    = baseURL + "/chat/completions";
-        req.method = "POST";
-        req.body   = crude_json::value(std::move(body)).dump();
-        req.headers["Content-Type"] = "application/json";
-        if (!apiKey.empty())
-            req.headers["Authorization"] = "Bearer " + apiKey;
-        req.timeoutSeconds = 120;
+        HttpRequest req = BuildLLMRequest(ctx);
 
         PinId chunkPinId    = ctx.GetPinId("onChunk");
         PinId toolCallPinId = ctx.GetPinId("onToolCall");
