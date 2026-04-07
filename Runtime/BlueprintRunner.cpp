@@ -46,6 +46,50 @@ bool BlueprintRunner::IsWithEditor() const
     return m_withEditor;
 }
 
+bool BlueprintRunner::loadDependencies(const std::vector<std::string>& deps,
+                                       const std::string& baseDir)
+{
+#ifdef __EMSCRIPTEN__
+    (void)deps; (void)baseDir; return true;
+#else
+    if (deps.empty()) return true;
+
+    namespace fs = std::filesystem;
+    fs::path base = baseDir.empty() ? fs::current_path() : fs::path(baseDir);
+
+    JsonBlueprintExporter exporter(m_fileSystem);
+    for (const auto& dep : deps)
+    {
+        std::string absDepPath = dep;
+        if (!fs::path(dep).is_absolute())
+            absDepPath = (base / dep).lexically_normal().string();
+
+        if (!fs::exists(absDepPath))
+        {
+            m_lastError = "Dependency not found: " + absDepPath;
+            return false;
+        }
+
+        auto libResult = exporter.importRuntimeFromFile(absDepPath);
+        if (!libResult.success)
+        {
+            m_lastError = "Failed to load dependency '" + dep + "': " + libResult.errorMessage;
+            return false;
+        }
+        if (libResult.data.metadata.blueprintClass != BlueprintClass::FunctionLibrary)
+            continue;
+
+        for (const auto& funcDef : libResult.data.functions)
+        {
+            if (funcDef.isPublic)
+                m_externalFunctions[funcDef.id] = funcDef;
+        }
+        RegisterExternalLibrary(libResult.data);
+    }
+    return true;
+#endif
+}
+
 std::unique_ptr<BlueprintRunner> BlueprintRunner::CreateChildRunner() const
 {
     auto sub = std::make_unique<BlueprintRunner>();
@@ -121,42 +165,8 @@ bool BlueprintRunner::LoadFromJsonWithDeps(const std::string& jsonContent, const
         return false;
     }
 
-    // 按 metadata.dependencies 顺序加载 Library（与 LoadFromFileWithDeps 逻辑一致）
-    const auto& deps = result.data.metadata.dependencies;
-    if (!deps.empty())
-    {
-        namespace fs = std::filesystem;
-        fs::path base = baseDir.empty() ? fs::current_path() : fs::path(baseDir);
-
-        for (const auto& dep : deps)
-        {
-            std::string absDepPath = dep;
-            if (!fs::path(dep).is_absolute())
-                absDepPath = (base / dep).lexically_normal().string();
-
-            if (!fs::exists(absDepPath))
-            {
-                m_lastError = "Dependency not found: " + absDepPath;
-                return false;
-            }
-
-            auto libResult = exporter.importRuntimeFromFile(absDepPath);
-            if (!libResult.success)
-            {
-                m_lastError = "Failed to load dependency '" + dep + "': " + libResult.errorMessage;
-                return false;
-            }
-            if (libResult.data.metadata.blueprintClass != BlueprintClass::FunctionLibrary)
-                continue;
-
-            for (const auto& funcDef : libResult.data.functions)
-            {
-                if (funcDef.isPublic)
-                    m_externalFunctions[funcDef.id] = funcDef;
-            }
-            RegisterExternalLibrary(libResult.data);
-        }
-    }
+    if (!loadDependencies(result.data.metadata.dependencies, baseDir))
+        return false;
 
     return Load(result.data);
 #endif
@@ -180,7 +190,6 @@ bool BlueprintRunner::LoadFromFile(const std::string& filePath)
 bool BlueprintRunner::LoadFromFileWithDeps(const std::string& filePath)
 {
 #ifdef __EMSCRIPTEN__
-    // WebGL 环境无文件系统访问，退化到普通 LoadFromFile
     return LoadFromFile(filePath);
 #else
     // 记录蓝图文件所在目录
@@ -189,7 +198,6 @@ bool BlueprintRunner::LoadFromFileWithDeps(const std::string& filePath)
         m_loadedFileDir = (sl != std::string::npos) ? filePath.substr(0, sl) : "";
     }
 
-    // 1. 先加载蓝图本体
     JsonBlueprintExporter exporter(m_fileSystem);
     auto result = exporter.importRuntimeFromFile(filePath);
     if (!result.success)
@@ -198,43 +206,8 @@ bool BlueprintRunner::LoadFromFileWithDeps(const std::string& filePath)
         return false;
     }
 
-    // 2. 按 metadata.dependencies 顺序加载 Library，注册外部函数
-    const auto& deps = result.data.metadata.dependencies;
-    if (!deps.empty())
-    {
-        namespace fs = std::filesystem;
-        fs::path baseDir = fs::path(filePath).parent_path();
-
-        for (const auto& dep : deps)
-        {
-            std::string absDepPath = dep;
-            if (!fs::path(dep).is_absolute())
-                absDepPath = (baseDir / dep).lexically_normal().string();
-
-            if (!fs::exists(absDepPath))
-            {
-                m_lastError = "Dependency not found: " + absDepPath;
-                return false;
-            }
-
-            auto libResult = exporter.importRuntimeFromFile(absDepPath);
-            if (!libResult.success)
-            {
-                m_lastError = "Failed to load dependency '" + dep + "': " + libResult.errorMessage;
-                return false;
-            }
-            if (libResult.data.metadata.blueprintClass != BlueprintClass::FunctionLibrary)
-                continue;
-
-            for (const auto& funcDef : libResult.data.functions)
-            {
-                if (funcDef.isPublic)
-                    m_externalFunctions[funcDef.id] = funcDef;
-            }
-            // 同时缓存完整 BlueprintData，供 FuncLib.* 节点执行时构建完整函数子图
-            RegisterExternalLibrary(libResult.data);
-        }
-    }
+    if (!loadDependencies(result.data.metadata.dependencies, m_loadedFileDir))
+        return false;
 
     return Load(result.data);
 #endif

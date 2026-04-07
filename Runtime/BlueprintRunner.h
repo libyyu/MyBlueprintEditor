@@ -928,6 +928,14 @@ private:
     // Lua 脚本引擎（延迟创建：首次 LoadLuaScript 时初始化）
     std::unique_ptr<LuaScriptEngine>                    m_luaEngine;
 #endif
+
+    // ── 私有辅助方法 ─────────────────────────────────────────────────────────
+
+    // 遍历 deps 列表，按 baseDir 解析路径，加载 FunctionLibrary 并注册外部函数/库。
+    // 返回 false 表示某个依赖加载失败，m_lastError 已写入错误信息。
+    // 注意：仅在非 Emscripten 平台编译时有意义（内部使用 std::filesystem）。
+    bool loadDependencies(const std::vector<std::string>& deps,
+                          const std::string& baseDir);
 };
 
 } // namespace Runtime
