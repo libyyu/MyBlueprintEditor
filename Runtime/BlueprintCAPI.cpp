@@ -117,11 +117,11 @@ int copyString(const std::string& src, char* dst, int bufLen)
 
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_InitDefaultHttpClient(void)
 {
-#ifndef __EMSCRIPTEN__
     // 幂等：已有注册时不重复覆盖
+    // Emscripten 下注册 HttpClient_Emscripten（基于 emscripten_fetch）
+    // 其他平台注册 HttpClient_Default（基于 cpp-httplib）
     if (!::NodeEditor::Runtime::BP_GetHttpClient())
         ::NodeEditor::Runtime::BP_SetHttpClient(::NodeEditor::Runtime::CreateDefaultHttpClient());
-#endif
 }
 
 // ---------------------------------------------------------------------------

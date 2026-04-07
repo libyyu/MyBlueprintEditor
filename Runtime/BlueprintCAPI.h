@@ -97,10 +97,9 @@ typedef void (*BP_LogCallback)(BP_LogLevel level, const char* message);
 // Global HTTP client (shared across all runners)
 // ---------------------------------------------------------------------------
 
-/// Register the built-in HTTP client (cpp-httplib).
+/// Register the built-in HTTP client (cpp-httplib on native, emscripten_fetch on WebGL).
 /// Must be called once before any LLM.Chat / http.* Lua nodes execute.
 /// Safe to call multiple times (idempotent – only registers if not already set).
-/// Not available on Emscripten (fetch API is used automatically instead).
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_InitDefaultHttpClient(void);
 
 // ---------------------------------------------------------------------------
