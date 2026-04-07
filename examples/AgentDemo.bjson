@@ -9,7 +9,6 @@
       "version": "1.0"
     },
     "nodes": [
-
       {
         "id": 1,
         "definitionId": "OnBeginPlay",
@@ -18,7 +17,6 @@
           { "id": 2, "kind": 1, "dataType": 0, "isExec": true }
         ]
       },
-
       {
         "id": 10,
         "definitionId": "String.Template",
@@ -34,7 +32,6 @@
           { "id": 14, "kind": 1, "dataType": 4, "name": "Result" }
         ]
       },
-
       {
         "id": 20,
         "definitionId": "JSON.MakeMessage",
@@ -43,10 +40,10 @@
         "pins": [
           { "id": 21, "kind": 0, "dataType": 4, "name": "Role",    "defaultValue": "user" },
           { "id": 22, "kind": 0, "dataType": 4, "name": "Content", "defaultValue": "" },
-          { "id": 23, "kind": 1, "dataType": 4, "name": "JSON" }
+          { "id": 23, "kind": 0, "dataType": 4, "name": "ToolCallId", "defaultValue": "" },
+          { "id": 24, "kind": 1, "dataType": 4, "name": "Message" }
         ]
       },
-
       {
         "id": 30,
         "definitionId": "JSON.ArrayPush",
@@ -55,13 +52,12 @@
         "pins": [
           { "id": 300, "kind": 0, "dataType": 0, "isExec": true },
           { "id": 31, "kind": 0, "dataType": 4, "name": "JSON",    "defaultValue": "[]" },
-          { "id": 32, "kind": 0, "dataType": 9, "name": "Element", "defaultValue": "" },
+          { "id": 32, "kind": 0, "dataType": 9, "name": "Element" },
           { "id": 33, "kind": 1, "dataType": 0, "isExec": true },
           { "id": 34, "kind": 1, "dataType": 4, "name": "JSON" },
           { "id": 35, "kind": 1, "dataType": 2, "name": "Length" }
         ]
       },
-
       {
         "id": 40,
         "definitionId": "LLM.Chat",
@@ -80,14 +76,17 @@
             "defaultValue": "你是一个专业的AI助手，回答简洁准确。" },
           { "id": 46, "kind": 0, "dataType": 2, "name": "MaxTokens",  "defaultValue": 256 },
           { "id": 47, "kind": 0, "dataType": 3, "name": "Temperature","defaultValue": 0.7 },
-          { "id": 48, "kind": 1, "dataType": 0, "name": "onReply",  "isExec": true },
-          { "id": 49, "kind": 1, "dataType": 0, "name": "onError",  "isExec": true },
+          { "id": 4700, "kind": 0, "dataType": 4, "name": "Tools", "defaultValue": "" },
+          { "id": 48, "kind": 1, "dataType": 0, "name": "onReply",    "isExec": true },
+          { "id": 4801, "kind": 1, "dataType": 0, "name": "onToolCall","isExec": true },
+          { "id": 49, "kind": 1, "dataType": 0, "name": "onError",    "isExec": true },
           { "id": 50, "kind": 1, "dataType": 4, "name": "Reply" },
+          { "id": 4901, "kind": 1, "dataType": 4, "name": "ToolCallsJSON" },
+          { "id": 4902, "kind": 1, "dataType": 4, "name": "FinishReason" },
           { "id": 51, "kind": 1, "dataType": 4, "name": "FullResponse" },
           { "id": 52, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
         ]
       },
-
       {
         "id": 60,
         "definitionId": "PrintString",
@@ -99,7 +98,6 @@
           { "id": 62, "kind": 1, "dataType": 0, "isExec": true }
         ]
       },
-
       {
         "id": 70,
         "definitionId": "FormatString",
@@ -107,12 +105,11 @@
         "comment": "Prefix reply with [AI] label",
         "pins": [
           { "id": 71, "kind": 0, "dataType": 4, "name": "Format",
-            "defaultValue": "[AI] {0}" },
-          { "id": 72, "kind": 0, "dataType": 4, "name": "Arg0",     "defaultValue": "" },
+            "defaultValue": "[AI] {reply}" },
+          { "id": 72, "kind": 0, "dataType": 4, "name": "reply", "defaultValue": "" },
           { "id": 73, "kind": 1, "dataType": 4, "name": "Result" }
         ]
       },
-
       {
         "id": 80,
         "definitionId": "FormatString",
@@ -120,12 +117,11 @@
         "comment": "Prefix error with [ERR] label",
         "pins": [
           { "id": 81, "kind": 0, "dataType": 4, "name": "Format",
-            "defaultValue": "[ERR] {0}" },
-          { "id": 82, "kind": 0, "dataType": 4, "name": "Arg0",     "defaultValue": "" },
+            "defaultValue": "[ERR] {err}" },
+          { "id": 82, "kind": 0, "dataType": 4, "name": "err", "defaultValue": "" },
           { "id": 83, "kind": 1, "dataType": 4, "name": "Result" }
         ]
       },
-
       {
         "id": 90,
         "definitionId": "PrintString",
@@ -137,22 +133,16 @@
           { "id": 92, "kind": 1, "dataType": 0, "isExec": true }
         ]
       }
-
     ],
     "links": [
       { "id": 1001, "startPinId": 2,   "endPinId": 300,  "isEnabled": true },
-
       { "id": 1002, "startPinId": 14,  "endPinId": 22,   "isEnabled": true },
-
-      { "id": 1003, "startPinId": 23,  "endPinId": 32,   "isEnabled": true },
-
+      { "id": 1003, "startPinId": 24,  "endPinId": 32,   "isEnabled": true },
       { "id": 1004, "startPinId": 33,  "endPinId": 400,  "isEnabled": true },
       { "id": 1005, "startPinId": 34,  "endPinId": 44,   "isEnabled": true },
-
       { "id": 1006, "startPinId": 50,  "endPinId": 72,   "isEnabled": true },
       { "id": 1007, "startPinId": 73,  "endPinId": 61,   "isEnabled": true },
       { "id": 1008, "startPinId": 48,  "endPinId": 600,  "isEnabled": true },
-
       { "id": 1009, "startPinId": 52,  "endPinId": 82,   "isEnabled": true },
       { "id": 1010, "startPinId": 83,  "endPinId": 91,   "isEnabled": true },
       { "id": 1011, "startPinId": 49,  "endPinId": 900,  "isEnabled": true }
@@ -163,15 +153,15 @@
     "fileType": "editor",
     "metadata": { "author": "", "createdAt": "", "updatedAt": "" },
     "nodes": [
-      { "id": 1,  "position": { "x": 0,    "y": 200 } },
-      { "id": 10, "position": { "x": 200,  "y": 0   } },
-      { "id": 20, "position": { "x": 480,  "y": 0   } },
-      { "id": 30, "position": { "x": 200,  "y": 200 } },
-      { "id": 40, "position": { "x": 520,  "y": 200 } },
-      { "id": 70, "position": { "x": 820,  "y": 120 } },
-      { "id": 60, "position": { "x": 1060, "y": 120 } },
-      { "id": 80, "position": { "x": 820,  "y": 360 } },
-      { "id": 90, "position": { "x": 1060, "y": 360 } }
+      { "id": 1,  "position": { "x": -400, "y": 0   }, "size": { "width": 161,  "height": 72  } },
+      { "id": 10, "position": { "x": -400, "y": 200  }, "size": { "width": 320,  "height": 105 } },
+      { "id": 20, "position": { "x": 0,    "y": 200  }, "size": { "width": 340,  "height": 105 } },
+      { "id": 30, "position": { "x": 0,    "y": 0    }, "size": { "width": 260,  "height": 128 } },
+      { "id": 40, "position": { "x": 360,  "y": 0    }, "size": { "width": 400,  "height": 317 } },
+      { "id": 70, "position": { "x": 820,  "y": -80  }, "size": { "width": 320,  "height": 71  } },
+      { "id": 60, "position": { "x": 1200, "y": -80  }, "size": { "width": 193,  "height": 100 } },
+      { "id": 80, "position": { "x": 820,  "y": 220  }, "size": { "width": 320,  "height": 71  } },
+      { "id": 90, "position": { "x": 1200, "y": 220  }, "size": { "width": 193,  "height": 100 } }
     ],
     "viewInfo": {
       "viewPosition": { "x": -60, "y": -60 },

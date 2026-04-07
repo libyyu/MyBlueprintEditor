@@ -143,20 +143,18 @@ void RegisterHandlers_Action(
 
     // FireEvent：触发指定名称的 CustomEvent，用于打破 exec 环（异步循环入口）
     // EventName 可来自 pin 连线或默认值
+    // 注意：直接同步调用 DispatchEvent，而非 post 到 MainThreadDispatcher 队列。
+    // 原因：FireEvent 通常从 LLM.Chat 等异步回调触发，此时当前 exec 帧已结束，
+    //       不存在重入风险。Post 方案依赖 OnFrame DrainQueue，而编辑器在
+    //       BeginPlay 同步链结束后 isExecuting=false，DrainQueue 不再被调用，
+    //       导致事件永远不触发。同步调用可正确驱动 ReAct loop。
     handlers["FireEvent"] = [&runner](ExecutionContext& ctx) -> bool {
         std::string eventName = ctx.GetInputValue("EventName").asString();
         ctx.Log("  [FireEvent] triggering event: " + eventName);
-        // 先激活自身的 exec 输出（让当前帧的 exec 链继续），
-        // 再通过 runner 异步分发事件（避免在当前 exec 栈里重入）
         ctx.ActivateOutputFlow("");
         if (!eventName.empty()) {
-            // 用 MainThreadDispatcher post 到下一帧，避免在当前 exec 帧里
-            // 重入 executeNodeInternal 导致 context 被覆盖
-            auto* r = &runner;
-            MainThreadDispatcher::Get().Post([r, eventName]() {
-                r->DispatchEvent(eventName);
-            });
-            ctx.Log("  [FireEvent] posted to queue, pending dispatch");
+            ctx.Log("  [FireEvent] dispatching synchronously");
+            runner.DispatchEvent(eventName);
         }
         return true;
     };

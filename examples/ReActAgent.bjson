@@ -103,57 +103,6 @@
         ]
       },
       {
-        "id": 21,
-        "definitionId": "FireEvent",
-        "definitionVersion": 1,
-        "name": "Start Agent Loop",
-        "pins": [
-          {
-            "id": 22,
-            "kind": 0,
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 23,
-            "kind": 0,
-            "dataType": 4,
-            "name": "EventName",
-            "defaultValue": "AgentLoop"
-          },
-          {
-            "id": 24,
-            "kind": 1,
-            "dataType": 0,
-            "isExec": true
-          }
-        ]
-      },
-      {
-        "id": 25,
-        "definitionId": "CustomEventNode",
-        "definitionVersion": 1,
-        "name": "AgentLoop",
-        "pins": [
-          {
-            "id": 26,
-            "kind": 1,
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 27,
-            "kind": 1,
-            "dataType": 4,
-            "name": "EventName",
-            "defaultValue": "AgentLoop"
-          }
-        ],
-        "nodeData": {
-          "EventName": "AgentLoop"
-        }
-      },
-      {
         "id": 28,
         "definitionId": "GetVariable",
         "definitionVersion": 1,
@@ -606,7 +555,7 @@
             "kind": 0,
             "dataType": 4,
             "name": "Format",
-            "defaultValue": "Weather in {city}: Sunny 25�C"
+            "defaultValue": "Weather in {city}: Sunny 25°C"
           },
           {
             "id": 95,
@@ -717,33 +666,6 @@
           },
           {
             "id": 117,
-            "kind": 1,
-            "dataType": 0,
-            "isExec": true
-          }
-        ]
-      },
-      {
-        "id": 118,
-        "definitionId": "FireEvent",
-        "definitionVersion": 1,
-        "name": "Next Agent Round",
-        "pins": [
-          {
-            "id": 119,
-            "kind": 0,
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 120,
-            "kind": 0,
-            "dataType": 4,
-            "name": "EventName",
-            "defaultValue": "AgentLoop"
-          },
-          {
-            "id": 121,
             "kind": 1,
             "dataType": 0,
             "isExec": true
@@ -862,14 +784,8 @@
         "isEnabled": true
       },
       {
-        "id": 129,
+        "id": 200,
         "startPinId": 20,
-        "endPinId": 22,
-        "isEnabled": true
-      },
-      {
-        "id": 130,
-        "startPinId": 26,
         "endPinId": 32,
         "isEnabled": true
       },
@@ -964,9 +880,9 @@
         "isEnabled": true
       },
       {
-        "id": 149,
-        "startPinId": 62,
-        "endPinId": 119,
+        "id": 201,
+        "startPinId": 117,
+        "endPinId": 32,
         "isEnabled": true
       },
       {
@@ -1023,250 +939,109 @@
     "nodes": [
       {
         "id": 1,
-        "position": {
-          "x": -729,
-          "y": -228
-        },
-        "size": {
-          "width": 161,
-          "height": 72
-        },
+        "position": { "x": -729, "y": -228 },
+        "size": { "width": 161, "height": 72 },
         "isCollapsed": false
       },
       {
         "id": 9,
-        "position": {
-          "x": -403,
-          "y": -236
-        },
-        "size": {
-          "width": 299,
-          "height": 131
-        },
+        "position": { "x": -403, "y": -236 },
+        "size": { "width": 299, "height": 131 },
         "isCollapsed": false
       },
       {
         "id": 16,
-        "position": {
-          "x": 24,
-          "y": -239
-        },
-        "size": {
-          "width": 246,
-          "height": 131
-        },
-        "isCollapsed": false
-      },
-      {
-        "id": 21,
-        "position": {
-          "x": 472,
-          "y": -244
-        },
-        "size": {
-          "width": 286,
-          "height": 103
-        },
-        "isCollapsed": false
-      },
-      {
-        "id": 25,
-        "position": {
-          "x": -872,
-          "y": 720
-        },
-        "size": {
-          "width": 144,
-          "height": 100
-        },
+        "position": { "x": 24, "y": -239 },
+        "size": { "width": 246, "height": 131 },
         "isCollapsed": false
       },
       {
         "id": 28,
-        "position": {
-          "x": -1032,
-          "y": 891
-        },
-        "size": {
-          "width": 401,
-          "height": 43
-        },
+        "position": { "x": -1032, "y": 891 },
+        "size": { "width": 401, "height": 43 },
         "isCollapsed": false
       },
       {
         "id": 31,
-        "position": {
-          "x": -520,
-          "y": 723
-        },
-        "size": {
-          "width": 417,
-          "height": 317
-        },
+        "position": { "x": 472, "y": -244 },
+        "size": { "width": 417, "height": 317 },
         "isCollapsed": false
       },
       {
         "id": 49,
-        "position": {
-          "x": 168,
-          "y": 721
-        },
-        "size": {
-          "width": 246,
-          "height": 131
-        },
+        "position": { "x": 168, "y": 721 },
+        "size": { "width": 246, "height": 131 },
         "isCollapsed": false
       },
       {
         "id": 54,
-        "position": {
-          "x": 616,
-          "y": 716
-        },
-        "size": {
-          "width": 193,
-          "height": 100
-        },
+        "position": { "x": 616, "y": 716 },
+        "size": { "width": 193, "height": 100 },
         "isCollapsed": false
       },
       {
         "id": 58,
-        "position": {
-          "x": 157,
-          "y": 936
-        },
-        "size": {
-          "width": 283,
-          "height": 212
-        },
+        "position": { "x": 157, "y": 936 },
+        "size": { "width": 283, "height": 212 },
         "isCollapsed": false
       },
       {
         "id": 67,
-        "position": {
-          "x": 1013,
-          "y": 928
-        },
-        "size": {
-          "width": 355,
-          "height": 348
-        },
+        "position": { "x": 1013, "y": 928 },
+        "size": { "width": 355, "height": 348 },
         "isCollapsed": false
       },
       {
         "id": 88,
-        "position": {
-          "x": 552,
-          "y": 1616
-        },
-        "size": {
-          "width": 290,
-          "height": 103
-        },
+        "position": { "x": 552, "y": 1616 },
+        "size": { "width": 290, "height": 103 },
         "isCollapsed": false
       },
       {
         "id": 93,
-        "position": {
-          "x": 920,
-          "y": 1610
-        },
-        "size": {
-          "width": 467,
-          "height": 71
-        },
+        "position": { "x": 920, "y": 1610 },
+        "size": { "width": 467, "height": 71 },
         "isCollapsed": false
       },
       {
         "id": 103,
-        "position": {
-          "x": 1528,
-          "y": 1066
-        },
-        "size": {
-          "width": 463,
-          "height": 43
-        },
+        "position": { "x": 1528, "y": 1066 },
+        "size": { "width": 463, "height": 43 },
         "isCollapsed": false
       },
       {
         "id": 106,
-        "position": {
-          "x": 2121,
-          "y": 928
-        },
-        "size": {
-          "width": 213,
-          "height": 128
-        },
+        "position": { "x": 2121, "y": 928 },
+        "size": { "width": 213, "height": 128 },
         "isCollapsed": false
       },
       {
         "id": 113,
-        "position": {
-          "x": 2552,
-          "y": 913
-        },
-        "size": {
-          "width": 246,
-          "height": 131
-        },
-        "isCollapsed": false
-      },
-      {
-        "id": 118,
-        "position": {
-          "x": 1240,
-          "y": 1326
-        },
-        "size": {
-          "width": 286,
-          "height": 103
-        },
+        "position": { "x": 2552, "y": 913 },
+        "size": { "width": 246, "height": 131 },
         "isCollapsed": false
       },
       {
         "id": 122,
-        "position": {
-          "x": 157,
-          "y": 1184
-        },
-        "size": {
-          "width": 155,
-          "height": 100
-        },
+        "position": { "x": 157, "y": 1184 },
+        "size": { "width": 155, "height": 100 },
         "isCollapsed": false
       },
       {
         "id": 153,
-        "position": {
-          "x": -936,
-          "y": -84
-        },
-        "size": {
-          "width": 456,
-          "height": 105
-        },
+        "position": { "x": -936, "y": -84 },
+        "size": { "width": 456, "height": 105 },
         "isCollapsed": false
       },
       {
         "id": 162,
-        "position": {
-          "x": 1542,
-          "y": 1521
-        },
-        "size": {
-          "width": 418,
-          "height": 99
-        },
+        "position": { "x": 1542, "y": 1521 },
+        "size": { "width": 418, "height": 99 },
         "isCollapsed": false
       }
     ],
     "viewInfo": {
-      "viewPosition": {
-        "x": 0,
-        "y": 0
-      },
+      "viewPosition": { "x": 0, "y": 0 },
       "viewScale": 1
     }
   }
