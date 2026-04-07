@@ -872,12 +872,19 @@ private:
     mutable std::unordered_set<NodeId>                  m_reachableCache;
     mutable bool                                        m_reachableDirty = true;
 
+    // 缓存：FuncLib 函数子图（funcId → BlueprintData）
+    // key = FunctionDefinition::id，value = BuildFuncSubGraph 构建的子图
+    // ForLoop 内多次调用同一 FuncLib 函数时只构建一次，避免重复 BFS
+    // invalidateTopoCache() 时同步清空（蓝图结构变更时失效）
+    mutable std::unordered_map<std::string, BlueprintData> m_funcSubGraphCache;
+
     // 标记拓扑缓存失效（图结构变更时调用）
     void invalidateTopoCache()
     {
         m_topoCacheDirty     = true;
         m_eventSubgraphDirty = true;
         m_reachableDirty     = true;
+        m_funcSubGraphCache.clear();  // 子图缓存随图结构失效
     }
 
     // 确保拓扑缓存有效，返回是否无环

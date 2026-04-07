@@ -614,7 +614,7 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
         BlueprintData funcBP;
         bool subGraphOk = false;
 
-        // 1. 先从当前蓝图自身函数列表找（内部函数）
+        // 1. 先从当前蓝图自身函数列表找（内部函数，不缓存：蓝图本身变化时 invalidate）
         for (const auto& fd : m_blueprint.functions)
         {
             if (fd.id == funcId)
@@ -624,7 +624,7 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
                 break;
             }
         }
-        // 2. 再从外部依赖库找
+        // 2. 再从外部依赖库找（外部库在 runner 生命周期内不变，可安全缓存）
         if (!funcDefPtr)
         {
             auto extIt = m_externalFunctions.find(funcId);
@@ -633,7 +633,21 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
                 funcDefPtr = &extIt->second;
                 auto libIt = m_externalLibraries.find(funcId);
                 if (libIt != m_externalLibraries.end())
-                    subGraphOk = BuildFuncSubGraph(*libIt->second, extIt->second.name, funcBP);
+                {
+                    // 先查缓存
+                    auto cacheIt = m_funcSubGraphCache.find(funcId);
+                    if (cacheIt != m_funcSubGraphCache.end())
+                    {
+                        funcBP = cacheIt->second;
+                        subGraphOk = true;
+                    }
+                    else
+                    {
+                        subGraphOk = BuildFuncSubGraph(*libIt->second, extIt->second.name, funcBP);
+                        if (subGraphOk)
+                            m_funcSubGraphCache[funcId] = funcBP;  // 存入缓存
+                    }
+                }
             }
         }
 
@@ -1251,6 +1265,21 @@ static bool BuildFuncSubGraph(
         for (const auto& p : n.pins)
             pinToNode[p.id] = n.id;
 
+    // 局部 links 索引（只在 BuildFuncSubGraph 内有效）：
+    //   startPinLinks[outputPinId] = {link indices...}  — 从 output pin 出发的链接
+    //   endPinLinks[inputPinId]    = {link indices...}  — 到 input pin 的链接
+    // 避免 BFS 每步遍历全表 libData.links（O(L)），降为 O(1) 查找
+    std::unordered_map<PinId, std::vector<size_t>> startPinLinks;
+    std::unordered_map<PinId, std::vector<size_t>> endPinLinks;
+    startPinLinks.reserve(libData.links.size() * 2);
+    endPinLinks.reserve(libData.links.size() * 2);
+    for (size_t i = 0; i < libData.links.size(); ++i)
+    {
+        if (!libData.links[i].isEnabled) continue;
+        startPinLinks[libData.links[i].startPinId].push_back(i);
+        endPinLinks[libData.links[i].endPinId].push_back(i);
+    }
+
     // ── 找 Function.Entry 入口 ───────────────────────────────────────────────
     NodeId entryId = 0;
     for (const auto& n : libData.nodes)
@@ -1280,31 +1309,34 @@ static bool BuildFuncSubGraph(
 
         for (const auto& pin : nIt->second->pins)
         {
-            for (const auto& lk : libData.links)
+            if (pin.kind == PinKind::Output)
             {
-                if (!lk.isEnabled) continue;
-                PinId checkPin  = 0;
-                PinId otherPin  = 0;
-
-                if (pin.kind == PinKind::Output)
+                // 从 Output 向下游遍历（exec + 数据下游）
+                auto it = startPinLinks.find(pin.id);
+                if (it == startPinLinks.end()) continue;
+                for (size_t lkIdx : it->second)
                 {
-                    // 从 Output 向下游遍历（exec + 数据下游）
-                    if (lk.startPinId == pin.id)
-                    { checkPin = lk.startPinId; otherPin = lk.endPinId; }
+                    PinId otherPin = libData.links[lkIdx].endPinId;
+                    auto pIt = pinToNode.find(otherPin);
+                    if (pIt == pinToNode.end()) continue;
+                    if (visited.insert(pIt->second).second)
+                        bfsQueue.push(pIt->second);
                 }
-                else // Input
+            }
+            else // Input
+            {
+                // 从 Input 向上游追溯数据源节点（收集数据依赖）
+                if (pin.isExec) continue;
+                auto it = endPinLinks.find(pin.id);
+                if (it == endPinLinks.end()) continue;
+                for (size_t lkIdx : it->second)
                 {
-                    // 从 Input 向上游追溯数据源节点（收集数据依赖）
-                    if (lk.endPinId == pin.id && !pin.isExec)
-                    { checkPin = lk.endPinId; otherPin = lk.startPinId; }
+                    PinId otherPin = libData.links[lkIdx].startPinId;
+                    auto pIt = pinToNode.find(otherPin);
+                    if (pIt == pinToNode.end()) continue;
+                    if (visited.insert(pIt->second).second)
+                        bfsQueue.push(pIt->second);
                 }
-
-                if (checkPin == 0 || otherPin == 0) continue;
-
-                auto pIt = pinToNode.find(otherPin);
-                if (pIt == pinToNode.end()) continue;
-                if (visited.insert(pIt->second).second)
-                    bfsQueue.push(pIt->second);
             }
         }
     }
@@ -2106,6 +2138,12 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     // 第二次迭代开始所有节点被误跳过。
     std::unordered_set<NodeId> executedHere;
 
+    // flowInsertLog: 按插入顺序记录本次 executeDownstreamFromPin 调用期间
+    // 新加入 m_flowExecutedNodes 的节点 id。
+    // 用途：每次节点执行后，只需遍历 [prevLogSize, logSize) 这段新增区间
+    // 合并到 executedHere，避免全量扫描 m_flowExecutedNodes（O(N²) → O(N)）。
+    std::vector<NodeId> flowInsertLog;
+
     bool ok = true;
     for (NodeId id : fullOrder)
     {
@@ -2126,9 +2164,8 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
                 ", def=" + node->definitionId + ")");
         }
 
-        // 记录执行前 m_flowExecutedNodes 的大小，用于检测内层递归新增的节点
-        // （比之前的全量拷贝 snapshot 高效得多，避免 ForLoop 等高频循环中的 O(N²) 开销）
-        auto snapshotSize = m_flowExecutedNodes.size();
+        // 记录执行前 flowInsertLog 的大小，用于检测内层递归新增的节点
+        size_t prevLogSize = flowInsertLog.size();
 
         // 设置触发该节点的输入引脚 ID（仅直接目标节点有此信息）
         auto activatedIt = nodeToActivatedInputPin.find(id);
@@ -2155,18 +2192,17 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
         // 清除已用完的激活引脚信息
         m_state.activatedInputPinId = InvalidPinId;
 
-        // 标记为全局已执行（供主循环 execute() 使用）
-        m_flowExecutedNodes.insert(id);
+        // 标记为全局已执行（供主循环 execute() 使用），同时记录到 insertLog
+        if (m_flowExecutedNodes.insert(id).second)
+            flowInsertLog.push_back(id);
 
         // 如果该节点的 handler 通过 ActivateOutputFlow 递归执行了更多节点，
-        // 把这些新增节点加入 executedHere，在当前循环中跳过（防止重复执行）
-        if (m_flowExecutedNodes.size() > snapshotSize + 1)
+        // 只遍历 [prevLogSize, flowInsertLog.size()) 这段新增区间合并到 executedHere，
+        // 而非全量扫描 m_flowExecutedNodes（O(N²) → O(N)）
+        for (size_t k = prevLogSize; k < flowInsertLog.size(); ++k)
         {
-            for (auto flowId : m_flowExecutedNodes)
-            {
-                if (flowId != id && executedHere.find(flowId) == executedHere.end())
-                    executedHere.insert(flowId);
-            }
+            if (flowInsertLog[k] != id)
+                executedHere.insert(flowInsertLog[k]);
         }
     }
 
