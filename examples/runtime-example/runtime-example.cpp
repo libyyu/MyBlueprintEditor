@@ -24,6 +24,7 @@
 #include "BlueprintRunner.h"
 #include "BlueprintExporter.h"
 #include "BuiltinHandlers.h"
+#include "MainThreadDispatcher.h"
 #include "crude_json.h"
 
 using namespace NodeEditor::Runtime;
@@ -518,33 +519,38 @@ static int runBlueprintFromFile(const std::string& filePath, float maxTimeSec, i
     std::cout << "  Elapsed: " << elapsed << " ms" << std::endl;
     std::cout << "========================================" << std::endl;
 
-    if (runner.GetTimerManager().GetActiveTimerCount() > 0)
+    if (runner.GetTimerManager().GetActiveTimerCount() > 0 || runner.HasPendingAsync())
     {
-        std::cout << "\n[Timer Loop] Active timers: " << runner.GetTimerManager().GetActiveTimerCount()
+        std::cout << "\n[Tick Loop] Active timers: " << runner.GetTimerManager().GetActiveTimerCount()
+                  << ", pending async: " << runner.PendingAsyncCount()
                   << ", entering frame loop..." << std::endl;
 
         auto loopStart = std::chrono::high_resolution_clock::now();
         auto lastTick  = loopStart;
 
-        while (runner.GetTimerManager().GetActiveTimerCount() > 0)
+        while (runner.GetTimerManager().GetActiveTimerCount() > 0 || runner.HasPendingAsync())
         {
             auto now = std::chrono::high_resolution_clock::now();
             double totalElapsed = std::chrono::duration<double>(now - loopStart).count();
             if (totalElapsed > maxTimeSec)
             {
-                std::cout << "[Timer Loop] Max time (" << maxTimeSec << "s) exceeded, stopping." << std::endl;
+                std::cout << "[Tick Loop] Max time (" << maxTimeSec << "s) exceeded, stopping." << std::endl;
                 break;
             }
             float deltaTime = std::chrono::duration<float>(now - lastTick).count();
             lastTick = now;
+            // 先 DrainQueue：消费 FireEvent / async callback 投递的主线程任务
+            ::NodeEditor::Runtime::MainThreadDispatcher::Get().DrainQueue();
+            // 再 Tick：推进 timer（Delay / SetTimer 等）
             runner.Tick(deltaTime);
             std::this_thread::sleep_for(std::chrono::milliseconds(tickRateMs));
         }
 
         auto loopEnd = std::chrono::high_resolution_clock::now();
         double loopElapsed = std::chrono::duration<double, std::milli>(loopEnd - loopStart).count();
-        std::cout << "[Timer Loop] Finished. Loop time: " << loopElapsed << " ms" << std::endl;
+        std::cout << "[Tick Loop] Finished. Loop time: " << loopElapsed << " ms" << std::endl;
         std::cout << "  Remaining active timers: " << runner.GetTimerManager().GetActiveTimerCount() << std::endl;
+        std::cout << "  Remaining pending async: " << runner.PendingAsyncCount() << std::endl;
     }
 
     std::cout << "\n=== Done ===" << std::endl;

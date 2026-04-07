@@ -166,6 +166,15 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_Tick(BP_Runner runner, float d
 /// Use this to decide whether to keep calling BP_Tick.
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetActiveTimerCount(BP_Runner runner);
 
+/// Returns 1 if the runner has pending async operations (HTTP/LLM/FireEvent callbacks).
+/// Combined with BP_GetActiveTimerCount, determines whether the Tick loop should continue.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_HasPendingAsync(BP_Runner runner);
+
+/// Drain the global MainThreadDispatcher queue.
+/// Must be called each frame BEFORE BP_Tick to process FireEvent callbacks and
+/// async HTTP/LLM results posted by background threads.
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_DrainQueue(void);
+
 // ---------------------------------------------------------------------------
 // Variables
 // ---------------------------------------------------------------------------

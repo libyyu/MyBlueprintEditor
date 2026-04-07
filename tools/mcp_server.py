@@ -128,6 +128,12 @@ class BlueprintLib:
         lib.BP_GetActiveTimerCount.restype  = ctypes.c_int
         lib.BP_GetActiveTimerCount.argtypes = [ctypes.c_void_p]
 
+        lib.BP_HasPendingAsync.restype  = ctypes.c_int
+        lib.BP_HasPendingAsync.argtypes = [ctypes.c_void_p]
+
+        lib.BP_DrainQueue.restype  = None
+        lib.BP_DrainQueue.argtypes = []
+
         lib.BP_SetBasePath.restype  = None
         lib.BP_SetBasePath.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 
@@ -218,21 +224,26 @@ class BlueprintLib:
                     return {"output": self._print_lines[:], "warnings": self._log_lines[:],
                             "error": f"DispatchEvent(OnBeginPlay) failed: {err}"}
 
-            # ── Tick 循环：推进异步 timer（Delay、SetTimer 等节点）──────────
-            # 模拟帧循环，直到所有 timer 完成或超时（max_time_sec）
+            # ── Tick 循环：推进异步 timer 和 FireEvent/HTTP 回调 ──────────────
+            # DrainQueue 处理 FireEvent 等投递到主线程的任务（ReAct 循环依赖此步）
+            # Tick 推进 timer（Delay / SetTimer 等节点）
             import time as _time
             max_time_sec  = 30.0
             tick_rate_sec = 0.016
             elapsed = 0.0
-            while self._lib.BP_GetActiveTimerCount(runner) > 0:
+            while (self._lib.BP_GetActiveTimerCount(runner) > 0
+                   or self._lib.BP_HasPendingAsync(runner) > 0):
                 if elapsed >= max_time_sec:
                     self._log_lines.append(
                         f"[W] Tick loop timed out after {max_time_sec}s "
-                        f"({self._lib.BP_GetActiveTimerCount(runner)} timers still active)"
+                        f"(timers={self._lib.BP_GetActiveTimerCount(runner)}, "
+                        f"pending={self._lib.BP_HasPendingAsync(runner)})"
                     )
                     break
-                _time.sleep(tick_rate_sec)
+                # 先 Drain（消费 FireEvent callback），再 Tick（推进 timer）
+                self._lib.BP_DrainQueue()
                 self._lib.BP_Tick(runner, ctypes.c_float(tick_rate_sec))
+                _time.sleep(tick_rate_sec)
                 elapsed += tick_rate_sec
 
             return {"output": self._print_lines[:],
@@ -282,12 +293,16 @@ class BlueprintLib:
             self._lib.BP_Execute(runner)
             self._lib.BP_DispatchEvent(runner, b"OnBeginPlay")
 
-            # Tick 循环：推进异步 timer
+            # Tick 循环：推进异步 timer 和 FireEvent/HTTP 回调
             import time as _time
             max_time_sec = 30.0; tick_rate_sec = 0.016; elapsed = 0.0
-            while self._lib.BP_GetActiveTimerCount(runner) > 0 and elapsed < max_time_sec:
-                _time.sleep(tick_rate_sec)
+            while elapsed < max_time_sec and (
+                self._lib.BP_GetActiveTimerCount(runner) > 0
+                or self._lib.BP_HasPendingAsync(runner) > 0
+            ):
+                self._lib.BP_DrainQueue()
                 self._lib.BP_Tick(runner, ctypes.c_float(tick_rate_sec))
+                _time.sleep(tick_rate_sec)
                 elapsed += tick_rate_sec
 
             buf = ctypes.create_string_buffer(4096)

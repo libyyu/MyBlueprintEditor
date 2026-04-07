@@ -7,6 +7,7 @@
 #include "BlueprintRunner.h"
 #include "BuiltinHandlers.h"
 #include "BuiltinNodeDefs.h"
+#include "MainThreadDispatcher.h"
 
 #include <cstring>
 #include <string>
@@ -276,6 +277,17 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetActiveTimerCount(BP_Runner r
 {
     if (!runner) return 0;
     return static_cast<int>(asWrapper(runner)->runner.GetTimerManager().GetActiveTimerCount());
+}
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_HasPendingAsync(BP_Runner runner)
+{
+    if (!runner) return 0;
+    return asWrapper(runner)->runner.HasPendingAsync() ? 1 : 0;
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_DrainQueue(void)
+{
+    ::NodeEditor::Runtime::MainThreadDispatcher::Get().DrainQueue();
 }
 
 // ---------------------------------------------------------------------------
