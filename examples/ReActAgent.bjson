@@ -200,7 +200,7 @@
         "name": "Mock Weather Result",
         "pins": [
           { "id": 94, "kind": 0, "dataType": 4, "name": "Format",
-            "defaultValue": "Weather in {city}: Sunny 25°C" },
+            "defaultValue": "Weather in {0}: Sunny 25°C" },
           { "id": 95, "kind": 0, "dataType": 4, "name": "city" },
           { "id": 96, "kind": 1, "dataType": 4, "name": "Result" }
         ]

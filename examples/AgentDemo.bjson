@@ -105,7 +105,7 @@
         "comment": "Prefix reply with [AI] label",
         "pins": [
           { "id": 71, "kind": 0, "dataType": 4, "name": "Format",
-            "defaultValue": "[AI] {reply}" },
+            "defaultValue": "[AI] {0}" },
           { "id": 72, "kind": 0, "dataType": 4, "name": "reply", "defaultValue": "" },
           { "id": 73, "kind": 1, "dataType": 4, "name": "Result" }
         ]
@@ -117,7 +117,7 @@
         "comment": "Prefix error with [ERR] label",
         "pins": [
           { "id": 81, "kind": 0, "dataType": 4, "name": "Format",
-            "defaultValue": "[ERR] {err}" },
+            "defaultValue": "[ERR] {0}" },
           { "id": 82, "kind": 0, "dataType": 4, "name": "err", "defaultValue": "" },
           { "id": 83, "kind": 1, "dataType": 4, "name": "Result" }
         ]

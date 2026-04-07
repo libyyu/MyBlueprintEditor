@@ -135,7 +135,7 @@
         "name": "Weather Result",
         "pins": [
           { "id": 11001, "kind": 0, "dataType": 4, "name": "Format",
-            "defaultValue": "Weather in {city}: Sunny, 25°C" },
+            "defaultValue": "Weather in {0}: Sunny, 25°C" },
           { "id": 11002, "kind": 0, "dataType": 4, "name": "city" },
           { "id": 11003, "kind": 1, "dataType": 4, "name": "Result" }
         ]
