@@ -68,6 +68,9 @@ class BlueprintLib:
         self._print_lines: list[str] = []
         self._log_lines:   list[str] = []
 
+        # 注册默认 HTTP client（幂等，已注册则跳过）
+        self._lib.BP_InitDefaultHttpClient()
+
         # keep callback alive (ctypes GC protection)
         LogCb = ctypes.CFUNCTYPE(None, ctypes.c_int, ctypes.c_char_p)
         self._print_cb = LogCb(self._on_print)
@@ -75,6 +78,9 @@ class BlueprintLib:
 
     def _setup_signatures(self):
         lib = self._lib
+
+        lib.BP_InitDefaultHttpClient.restype  = None
+        lib.BP_InitDefaultHttpClient.argtypes = []
 
         lib.BP_CreateRunner.restype  = ctypes.c_void_p
         lib.BP_CreateRunner.argtypes = []

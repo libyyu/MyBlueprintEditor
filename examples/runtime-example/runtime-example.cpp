@@ -25,7 +25,7 @@
 #include "BlueprintExporter.h"
 #include "BuiltinHandlers.h"
 #include "MainThreadDispatcher.h"
-#include "Http/IHttpClient.h"
+#include "BlueprintCAPI.h"
 #include "crude_json.h"
 
 using namespace NodeEditor::Runtime;
@@ -468,8 +468,8 @@ static int runBlueprintFromFile(const std::string& filePath, float maxTimeSec, i
     runner.SetLogCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
     runner.SetPrintCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
 
-    // 注册默认 HTTP client（LLM.Chat / http.* Lua 节点需要）
-    ::NodeEditor::Runtime::BP_SetHttpClient(::NodeEditor::Runtime::CreateDefaultHttpClient());
+    // 注册默认 HTTP client（LLM.Chat / http.* Lua 节点需要；幂等）
+    BP_InitDefaultHttpClient();
 
     // 单文件格式：importRuntimeFromFile 自动检测 runtime+editor 内容
     if (!runner.LoadFromFileWithDeps(filePath))

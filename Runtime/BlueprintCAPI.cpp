@@ -8,6 +8,7 @@
 #include "BuiltinHandlers.h"
 #include "BuiltinNodeDefs.h"
 #include "MainThreadDispatcher.h"
+#include "Http/IHttpClient.h"
 
 #include <cstring>
 #include <string>
@@ -109,6 +110,19 @@ int copyString(const std::string& src, char* dst, int bufLen)
 }
 
 } // anonymous namespace
+
+// ---------------------------------------------------------------------------
+// Global HTTP client
+// ---------------------------------------------------------------------------
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_InitDefaultHttpClient(void)
+{
+#ifndef __EMSCRIPTEN__
+    // 幂等：已有注册时不重复覆盖
+    if (!::NodeEditor::Runtime::BP_GetHttpClient())
+        ::NodeEditor::Runtime::BP_SetHttpClient(::NodeEditor::Runtime::CreateDefaultHttpClient());
+#endif
+}
 
 // ---------------------------------------------------------------------------
 // Lifecycle
