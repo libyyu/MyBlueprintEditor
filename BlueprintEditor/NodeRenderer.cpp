@@ -169,13 +169,39 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                                && node.Type != NodeType::Comment);
                         if (isTitleEditing)
                         {
+                            // CustomEventNode 重名校验：同一蓝图内不允许两个 CustomEventNode 同名
+                            auto IsEventNameDuplicate = [&](const std::string& newName) -> bool {
+                                if (node.DefinitionId != "CustomEventNode") return false;
+                                for (const auto& n : ActiveDoc()->nodes) {
+                                    if (n.ID == node.ID) continue;
+                                    if (n.DefinitionId == "CustomEventNode" && n.Name == newName)
+                                        return true;
+                                }
+                                return false;
+                            };
+
+                            bool isDuplicate = IsEventNameDuplicate(ActiveDoc()->commentEditBuf);
+                            if (isDuplicate)
+                                ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
+
                             ImGui::SetNextItemWidth(std::max(80.0f, ImGui::CalcTextSize(ActiveDoc()->commentEditBuf).x + 24.0f));
                             ImGui::SetKeyboardFocusHere();
-                            if (ImGui::InputText("##nodetitle",
+                            bool confirmed = ImGui::InputText("##nodetitle",
                                                  ActiveDoc()->commentEditBuf,
                                                  sizeof(ActiveDoc()->commentEditBuf),
                                                  ImGuiInputTextFlags_EnterReturnsTrue |
-                                                 ImGuiInputTextFlags_AutoSelectAll))
+                                                 ImGuiInputTextFlags_AutoSelectAll);
+
+                            if (isDuplicate)
+                            {
+                                ImGui::PopStyleColor();
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+                                    ImGui::SetTooltip("Event name already exists in this blueprint");
+                            }
+
+                            // 只有非重名时才确认
+                            bool isDupNow = IsEventNameDuplicate(ActiveDoc()->commentEditBuf);
+                            if (confirmed && !isDupNow)
                             {
                                 PushUndoState();
                                 node.Name = ActiveDoc()->commentEditBuf;
@@ -187,9 +213,12 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                             if (!ImGui::IsItemActive() && !ImGui::IsItemFocused() &&
                                 ImGui::IsMouseClicked(0))
                             {
-                                PushUndoState();
-                                node.Name = ActiveDoc()->commentEditBuf;
-                                ActiveDoc()->isDirty = true;
+                                if (!IsEventNameDuplicate(ActiveDoc()->commentEditBuf))
+                                {
+                                    PushUndoState();
+                                    node.Name = ActiveDoc()->commentEditBuf;
+                                    ActiveDoc()->isDirty = true;
+                                }
                                 ActiveDoc()->editingCommentId = 0;
                             }
                             ed::EnableShortcuts(false);
