@@ -154,6 +154,41 @@ static void setAtPath(crude_json::value& node,
 }
 
 // ============================================================================
+// GetFirstChoice — 安全提取 choices[0]（返回指针，不存在返回 nullptr）
+// ============================================================================
+static const crude_json::value* GetFirstChoice(const crude_json::value& resp)
+{
+    if (!resp.is_object() || !resp.contains("choices")) return nullptr;
+    const auto& choices = resp["choices"];
+    if (!choices.is_array() || choices.get<crude_json::array>().empty()) return nullptr;
+    const auto& first = choices.get<crude_json::array>()[0];
+    return first.is_object() ? &first : nullptr;
+}
+
+// ============================================================================
+// ExtractToolCall — 从单个 tool_call 对象中提取 id/name/arguments
+// ============================================================================
+struct ToolCallInfo { std::string id, name, arguments; };
+
+static ToolCallInfo ExtractToolCall(const crude_json::value& tc)
+{
+    ToolCallInfo info;
+    if (!tc.is_object()) return info;
+    if (tc.contains("id") && tc["id"].is_string())
+        info.id = tc["id"].get<std::string>();
+    if (tc.contains("function") && tc["function"].is_object()) {
+        const auto& fn = tc["function"];
+        if (fn.contains("name") && fn["name"].is_string())
+            info.name = fn["name"].get<std::string>();
+        if (fn.contains("arguments") && fn["arguments"].is_string())
+            info.arguments = fn["arguments"].get<std::string>();
+        else if (fn.contains("arguments"))
+            info.arguments = fn["arguments"].dump();
+    }
+    return info;
+}
+
+// ============================================================================
 // BuildLLMRequest — LLM.Chat 和 LLM.StreamChat 共用的请求构建逻辑
 // 从 ExecutionContext 读取所有 LLM 参数，构建并返回 HttpRequest。
 // ============================================================================
@@ -451,32 +486,20 @@ void RegisterHandlers_AI(
 
             // finish_reason
             std::string finishReason;
-            if (j.is_object() && j.contains("choices")) {
-                const auto& choices = j["choices"];
-                if (choices.is_array() && !choices.get<crude_json::array>().empty()) {
-                    const auto& first = choices.get<crude_json::array>()[0];
-                    if (first.is_object() && first.contains("finish_reason")) {
-                        const auto& fr = first["finish_reason"];
-                        if (fr.is_string()) finishReason = fr.get<std::string>();
-                    }
-                }
+            const crude_json::value* first = GetFirstChoice(j);
+            if (first && first->contains("finish_reason")) {
+                const auto& fr = (*first)["finish_reason"];
+                if (fr.is_string()) finishReason = fr.get<std::string>();
             }
             c.SetOutputValue("FinishReason", Variant(finishReason));
 
             // ── tool_calls 分支 ──────────────────────────────────────
             if (finishReason == "tool_calls") {
                 std::string toolCallsJson = "[]";
-                if (j.is_object() && j.contains("choices")) {
-                    const auto& choices = j["choices"];
-                    if (choices.is_array() && !choices.get<crude_json::array>().empty()) {
-                        const auto& first = choices.get<crude_json::array>()[0];
-                        if (first.is_object() && first.contains("message")) {
-                            const auto& msg = first["message"];
-                            if (msg.is_object() && msg.contains("tool_calls")) {
-                                toolCallsJson = msg["tool_calls"].dump();
-                            }
-                        }
-                    }
+                if (first && first->contains("message")) {
+                    const auto& msg = (*first)["message"];
+                    if (msg.is_object() && msg.contains("tool_calls"))
+                        toolCallsJson = msg["tool_calls"].dump();
                 }
                 c.SetOutputValue("Reply",         Variant(std::string("")));
                 c.SetOutputValue("ToolCallsJSON", Variant(toolCallsJson));
@@ -488,18 +511,11 @@ void RegisterHandlers_AI(
 
             // ── 普通文本回复 ─────────────────────────────────────────
             std::string reply;
-            if (j.is_object() && j.contains("choices")) {
-                const auto& choices = j["choices"];
-                if (choices.is_array() && !choices.get<crude_json::array>().empty()) {
-                    const auto& first = choices.get<crude_json::array>()[0];
-                    if (first.is_object() && first.contains("message")) {
-                        const auto& msg = first["message"];
-                        if (msg.is_object() && msg.contains("content")) {
-                            const auto& content = msg["content"];
-                            if (content.is_string())
-                                reply = content.get<std::string>();
-                        }
-                    }
+            if (first && first->contains("message")) {
+                const auto& msg = (*first)["message"];
+                if (msg.is_object() && msg.contains("content")) {
+                    const auto& content = msg["content"];
+                    if (content.is_string()) reply = content.get<std::string>();
                 }
             }
             c.SetOutputValue("Reply",         Variant(reply));
@@ -777,23 +793,10 @@ void RegisterHandlers_AI(
             return true;
         }
         const auto& tc = arr[index];
-        std::string name, argsJson, id;
-        if (tc.is_object()) {
-            if (tc.contains("id") && tc["id"].is_string())
-                id = tc["id"].get<std::string>();
-            if (tc.contains("function") && tc["function"].is_object()) {
-                const auto& fn = tc["function"];
-                if (fn.contains("name") && fn["name"].is_string())
-                    name = fn["name"].get<std::string>();
-                if (fn.contains("arguments") && fn["arguments"].is_string())
-                    argsJson = fn["arguments"].get<std::string>();
-                else if (fn.contains("arguments") && fn["arguments"].is_object())
-                    argsJson = fn["arguments"].dump();
-            }
-        }
-        ctx.SetOutputValue("Name",          Variant(name));
-        ctx.SetOutputValue("ArgumentsJSON", Variant(argsJson.empty() ? std::string("{}") : argsJson));
-        ctx.SetOutputValue("ID",            Variant(id));
+        auto info = ExtractToolCall(tc);
+        ctx.SetOutputValue("Name",          Variant(info.name));
+        ctx.SetOutputValue("ArgumentsJSON", Variant(info.arguments.empty() ? std::string("{}") : info.arguments));
+        ctx.SetOutputValue("ID",            Variant(info.id));
         return true;
     };
 
@@ -1004,24 +1007,10 @@ void RegisterHandlers_AI(
 
         const auto& arr = root.get<crude_json::array>();
         for (int i = 0; i < (int)arr.size(); ++i) {
-            const auto& tc = arr[i];
-            std::string name, args, id;
-            if (tc.is_object()) {
-                if (tc.contains("id") && tc["id"].is_string())
-                    id = tc["id"].get<std::string>();
-                if (tc.contains("function") && tc["function"].is_object()) {
-                    const auto& fn = tc["function"];
-                    if (fn.contains("name") && fn["name"].is_string())
-                        name = fn["name"].get<std::string>();
-                    if (fn.contains("arguments") && fn["arguments"].is_string())
-                        args = fn["arguments"].get<std::string>();
-                    else if (fn.contains("arguments"))
-                        args = fn["arguments"].dump();
-                }
-            }
-            ctx.SetOutputValue("ToolName",   Variant(name));
-            ctx.SetOutputValue("Arguments",  Variant(args));
-            ctx.SetOutputValue("ToolCallId", Variant(id));
+            auto info = ExtractToolCall(arr[i]);
+            ctx.SetOutputValue("ToolName",   Variant(info.name));
+            ctx.SetOutputValue("Arguments",  Variant(info.arguments));
+            ctx.SetOutputValue("ToolCallId", Variant(info.id));
             ctx.SetOutputValue("Index",      Variant((int64_t)i));
             ctx.ActivateOutputFlow("onTool");
         }
@@ -1084,21 +1073,10 @@ void RegisterHandlers_AI(
             ExecutionContext::AsyncResolve resolve) mutable
         {
             for (size_t i = 0; i < total; ++i) {
-                std::string id, name, args;
-                const auto& tc = arr[i];
-                if (tc.is_object()) {
-                    if (tc.contains("id") && tc["id"].is_string())
-                        id = tc["id"].get<std::string>();
-                    if (tc.contains("function") && tc["function"].is_object()) {
-                        const auto& fn = tc["function"];
-                        if (fn.contains("name") && fn["name"].is_string())
-                            name = fn["name"].get<std::string>();
-                        if (fn.contains("arguments") && fn["arguments"].is_string())
-                            args = fn["arguments"].get<std::string>();
-                        else if (fn.contains("arguments"))
-                            args = fn["arguments"].dump();
-                    }
-                }
+                auto info = ExtractToolCall(arr[i]);
+                const std::string& id   = info.id;
+                const std::string& name = info.name;
+                const std::string& args = info.arguments;
 
                 // 构造 JSON-RPC 风格请求体
                 crude_json::object reqBody;
@@ -1439,13 +1417,6 @@ void RegisterHandlers_AI(
 
         auto v = crude_json::value::parse(jsonStr);
         bool isNull = v.is_null();
-        // crude_json returns null for parse errors, but "null" is valid JSON
-        bool looksJson = jsonStr.find_first_not_of(" \t\r\n") != std::string::npos &&
-                         (jsonStr[jsonStr.find_first_not_of(" \t\r\n")] == '{' ||
-                          jsonStr[jsonStr.find_first_not_of(" \t\r\n")] == '[' ||
-                          jsonStr.find("null") != std::string::npos ||
-                          jsonStr.find("true") != std::string::npos ||
-                          jsonStr.find("false") != std::string::npos);
 
         if (isNull && jsonStr.find("null") == std::string::npos) {
             ctx.SetOutputValue("IsValid",      Variant(false));
