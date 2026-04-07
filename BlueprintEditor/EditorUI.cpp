@@ -368,9 +368,22 @@ void BlueprintEditor::OnFrame(float deltaTime)
     {
         if (!doc->isExecuting) continue;
         if (doc->blueprintClass == RTBlueprintClass::FunctionLibrary) continue;
+        // 已暂停于断点时跳过 DispatchEvent（避免覆盖暂停状态）
+        if (doc->persistentRunner.IsPaused()) continue;
         // 注入 deltaTime，OnTick handler 通过 GetVariable("__DeltaTime") 读取
         doc->persistentRunner.SetVariable("__DeltaTime", ::NodeEditor::Runtime::Variant(static_cast<double>(deltaTime)));
-        doc->persistentRunner.DispatchEvent("OnTick");
+        auto tickResult = doc->persistentRunner.DispatchEvent("OnTick");
+        // 检查 OnTick 链上是否命中断点
+        if (doc->persistentRunner.IsPaused())
+        {
+            // 将命中的节点加入高亮（与 OnBeginPlay 路径一致）
+            for (auto nid : tickResult.executedNodeIds)
+            {
+                auto& hl = doc->executedNodeHighlight[nid];
+                hl.timeLeft = 2.0f;
+                hl.color    = ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
+            }
+        }
     }
 
     // 衰减执行高亮
