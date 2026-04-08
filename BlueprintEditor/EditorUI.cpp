@@ -254,7 +254,7 @@ void BlueprintEditor::ShowStyleEditor(bool* show)
         }
         ImGui::Spring();
         if (ImGui::Button(ICON_FA_FLOPPY_DISK " Save"))
-            tm.SaveToFile("data/theme.json");
+            tm.SaveToFile("resource/theme.json");
         ImGui::EndHorizontal();
     }
     ImGui::Spacing();

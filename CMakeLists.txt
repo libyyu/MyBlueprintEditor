@@ -421,13 +421,13 @@ if(NOT BUILD_RUNTIME_ONLY)
     # 按配置分别复制到 bin/Debug/ 和 bin/Release/
     foreach(_CFG Debug Release)
         set(_COPY_RESOURCE_COMMANDS_${_CFG}
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_DIR}/${_CFG}/data
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_DIR}/${_CFG}/resource
         )
-        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/data")
-            file(GLOB _DATA_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/data/*")
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/BlueprintEditor/resource")
+            file(GLOB _DATA_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/BlueprintEditor/resource/*")
             foreach(RES ${_DATA_RESOURCES})
                 list(APPEND _COPY_RESOURCE_COMMANDS_${_CFG}
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RES} ${OUTPUT_DIR}/${_CFG}/data/
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RES} ${OUTPUT_DIR}/${_CFG}/resource/
                 )
             endforeach()
         endif()

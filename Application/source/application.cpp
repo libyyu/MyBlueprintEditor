@@ -269,7 +269,7 @@ void Application::RecreateFontAtlas()
     config.PixelSnapH = false;
 
     // 1. 加载默认字体（Play-Regular）
-    m_DefaultFont = io.Fonts->AddFontFromFileTTF("data/Play-Regular.ttf", fontSize, &config);
+    m_DefaultFont = io.Fonts->AddFontFromFileTTF("resource/Play-Regular.ttf", fontSize, &config);
 
     // 2. 合并 FontAwesome 6 图标字体到默认字体
     {
@@ -279,11 +279,11 @@ void Application::RecreateFontAtlas()
         iconConfig.PixelSnapH = true;
         iconConfig.GlyphMinAdvanceX = fontSize;
         iconConfig.GlyphOffset.y = 2.0f;
-        io.Fonts->AddFontFromFileTTF("data/fa-solid-900.ttf", fontSize - 2.0f, &iconConfig, icon_ranges);
+        io.Fonts->AddFontFromFileTTF("resource/fa-solid-900.ttf", fontSize - 2.0f, &iconConfig, icon_ranges);
     }
 
     // 3. 加载标题字体（Cuprum-Bold）
-    m_HeaderFont = io.Fonts->AddFontFromFileTTF("data/Cuprum-Bold.ttf", hFontSize, &config);
+    m_HeaderFont = io.Fonts->AddFontFromFileTTF("resource/Cuprum-Bold.ttf", hFontSize, &config);
 
     // 4. 合并 FontAwesome 到标题字体
     {
@@ -293,7 +293,7 @@ void Application::RecreateFontAtlas()
         iconConfig.PixelSnapH = true;
         iconConfig.GlyphMinAdvanceX = hFontSize;
         iconConfig.GlyphOffset.y = 2.0f;
-        io.Fonts->AddFontFromFileTTF("data/fa-solid-900.ttf", hFontSize - 2.0f, &iconConfig, icon_ranges);
+        io.Fonts->AddFontFromFileTTF("resource/fa-solid-900.ttf", hFontSize - 2.0f, &iconConfig, icon_ranges);
     }
 
     // 5. 独立图标字体（大号，用于面板标题图标等）
@@ -303,7 +303,7 @@ void Application::RecreateFontAtlas()
         iconOnlyConfig.OversampleH = 2;
         iconOnlyConfig.OversampleV = 2;
         iconOnlyConfig.GlyphMinAdvanceX = iFontSize;
-        m_IconFont = io.Fonts->AddFontFromFileTTF("data/fa-solid-900.ttf", iFontSize, &iconOnlyConfig, icon_ranges);
+        m_IconFont = io.Fonts->AddFontFromFileTTF("resource/fa-solid-900.ttf", iFontSize, &iconOnlyConfig, icon_ranges);
     }
 
     // 6. 等宽字体：使用 ImGui 内置的 ProggyClean（13px 像素等宽字体），用于日志/代码窗口

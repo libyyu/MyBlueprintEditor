@@ -1115,9 +1115,9 @@ void BlueprintEditor::OnStart()
     // 不自动创建空白文档——无工程时右侧画布留空，由 Project 面板引导用户
 
     // 加载纹理资源
-    m_HeaderBackground = LoadTexture("data/BlueprintBackground.png");
-    m_SaveIcon         = LoadTexture("data/ic_save_white_24dp.png");
-    m_RestoreIcon      = LoadTexture("data/ic_restore_white_24dp.png");
+    m_HeaderBackground = LoadTexture("resource/BlueprintBackground.png");
+    m_SaveIcon         = LoadTexture("resource/ic_save_white_24dp.png");
+    m_RestoreIcon      = LoadTexture("resource/ic_restore_white_24dp.png");
 
     // 加载最近文件列表
     LoadRecentFiles();
@@ -1131,7 +1131,7 @@ void BlueprintEditor::OnStart()
     ::NodeEditor::Runtime::LoadFunctionLibrary(m_NodeRegistry, "data/function_library");
 
     // 加载主题（不存在时默认 Dark）
-    if (!ThemeManager::Get().LoadFromFile("data/theme.json"))
+    if (!ThemeManager::Get().LoadFromFile("resource/theme.json"))
         ThemeManager::Get().Apply("Dark");
 
     // 设置初始标题
@@ -1191,7 +1191,7 @@ void BlueprintEditor::OnStop()
     releaseTexture(m_HeaderBackground);
 
     // 保存主题设置
-    ThemeManager::Get().SaveToFile("data/theme.json");
+    ThemeManager::Get().SaveToFile("resource/theme.json");
 
     // 先停止所有 runner（让 RunAsync detached 线程的 alive flag 失效，避免进程残留）
     for (auto& doc : m_Documents)
