@@ -22,11 +22,14 @@ end
 
 -- ── 注册 OnBeginPlay handler ──────────────────────────────────────────────
 Blueprint.RegisterHandler("OnBeginPlay", function(ctx)
-    local api_key    = ctx:GetVariable("ApiKey")    or ""
-    local base_url   = ctx:GetVariable("BaseURL")   or "https://api.openai.com/v1"
-    local model      = ctx:GetVariable("Model")     or "gpt-4o"
-    local user_query = ctx:GetVariable("UserQuery") or
-        "What's the weather in Beijing and Shanghai today, and any recent AI news?"
+    local api_key    = ctx:GetVariable("ApiKey")   :asString()
+    local base_url   = ctx:GetVariable("BaseURL")  :asString()
+    local model      = ctx:GetVariable("Model")    :asString()
+    local user_query = ctx:GetVariable("UserQuery"):asString()
+
+    if base_url   == "" then base_url   = "https://api.openai.com/v1" end
+    if model      == "" then model      = "gpt-4o" end
+    if user_query == "" then user_query = "What's the weather in Beijing and Shanghai today, and any recent AI news?" end
 
     if api_key == "" or api_key == "sk-your-api-key-here" then
         print("[LuaAgent] ERROR: ApiKey variable is not set.")
