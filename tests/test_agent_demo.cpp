@@ -94,7 +94,7 @@ protected:
     }
 
     static std::string demoPath() {
-        return std::string(TEST_PROJECT_DIR) + "/examples/AgentDemo.bjson";
+        return std::string(TEST_DATA_DIR) + "/examples/AgentDemo.bjson";
     }
 };
 
@@ -855,7 +855,7 @@ protected:
     }
 
     static std::string reactPath() {
-        return std::string(TEST_PROJECT_DIR) + "/examples/ReActAgent.bjson";
+        return std::string(TEST_DATA_DIR) + "/examples/ReActAgent.bjson";
     }
 };
 

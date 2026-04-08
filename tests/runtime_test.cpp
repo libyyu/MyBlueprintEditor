@@ -152,7 +152,7 @@ static void test_flow_blueprint()
     });
 
     // 加载蓝图
-    bool loaded = runner.LoadFromFile("flow_test.bjson");
+    bool loaded = runner.LoadFromFile(std::string(TEST_DATA_DIR) + "/examples/flow_test.bjson");
     CHECK(loaded, "flow_test.bjson 加载成功");
     if (!loaded)
     {

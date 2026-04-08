@@ -139,10 +139,10 @@ TEST_F(HandlersTest, ForLoopAccumulation)
 {
     // TestBP.01.bjson: OnBeginPlay → ForLoop 0..4 累加 counter = 0+1+2+3+4 = 10
     BlueprintRunner fr;
-    RegisterBuiltinHandlers(fr, "assets");
+    RegisterBuiltinHandlers(fr, TEST_ASSETS_DIR);
 
-    bool loaded = fr.LoadFromFile("assets/TestBP.01.bjson");
-    ASSERT_TRUE(loaded) << "Failed to load assets/TestBP.01.bjson: " << fr.GetLastError();
+    bool loaded = fr.LoadFromFile(std::string(TEST_ASSETS_DIR) + "/TestBP.01.bjson");
+    ASSERT_TRUE(loaded) << "Failed to load TestBP.01.bjson: " << fr.GetLastError();
 
     auto result = RunWithBeginPlay(fr);
     EXPECT_TRUE(result.success) << fr.GetLastError();

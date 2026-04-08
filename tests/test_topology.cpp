@@ -345,13 +345,13 @@ TEST(TopologyTest, DispatchEventNonExistentSilent)
 TEST(TopologyTest, ForLoopExecution)
 {
     BlueprintRunner runner;
-    RegisterBuiltinHandlers(runner, "assets");
+    RegisterBuiltinHandlers(runner, TEST_ASSETS_DIR);
 
     std::vector<std::string> logs;
     runner.SetPrintCallback([&](LogLevel, const std::string& m){ logs.push_back(m); });
 
-    bool loaded = runner.LoadFromFileWithDeps("assets/Main.bjson");
-    ASSERT_TRUE(loaded) << "Failed to load assets/Main.bjson: " << runner.GetLastError();
+    bool loaded = runner.LoadFromFileWithDeps(std::string(TEST_ASSETS_DIR) + "/Main.bjson");
+    ASSERT_TRUE(loaded) << "Failed to load Main.bjson: " << runner.GetLastError();
 
     // Main.bjson 若无 OnBeginPlay，用 RunWithBeginPlay 也兼容（DispatchEvent 静默忽略）
     // 若 Main.bjson 有控制流节点但无事件源，这里会产生 0 执行——需更新 Main.bjson
@@ -371,13 +371,13 @@ TEST(TopologyTest, ForLoopExecution)
 TEST(TopologyTest, AsyncDelayInSubBlueprint)
 {
     BlueprintRunner runner;
-    RegisterBuiltinHandlers(runner, "assets");
+    RegisterBuiltinHandlers(runner, TEST_ASSETS_DIR);
 
     std::vector<std::string> logs;
     runner.SetPrintCallback([&](LogLevel, const std::string& m){ logs.push_back(m); });
 
-    bool loaded = runner.LoadFromFile("assets/Sub/Sub.bjson");
-    ASSERT_TRUE(loaded) << "Failed to load assets/Sub/Sub.bjson: " << runner.GetLastError();
+    bool loaded = runner.LoadFromFile(std::string(TEST_ASSETS_DIR) + "/Sub/Sub.bjson");
+    ASSERT_TRUE(loaded) << "Failed to load Sub/Sub.bjson: " << runner.GetLastError();
 
     // 同 Main.bjson — Sub.bjson 若无 OnBeginPlay，全严格模式下不执行
     RunWithBeginPlay(runner);

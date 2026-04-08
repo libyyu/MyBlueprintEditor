@@ -49,10 +49,12 @@ target_link_libraries(blueprint_tests
         GTest::gtest_main
 )
 
-# TEST_ASSETS_DIR：指向 tests/assets，供 test_handlers 等定位 bjson 文件
-# TEST_PROJECT_DIR：指向项目根目录，供 test_agent_demo 定位 examples/
+# TEST_ASSETS_DIR：指向 data/tests/assets，供 test_handlers/test_topology 定位 bjson 文件
+# TEST_DATA_DIR：指向 data/，供测试定位示例蓝图（data/examples/）
+# TEST_PROJECT_DIR：指向项目根目录（保留兼容）
 target_compile_definitions(blueprint_tests PRIVATE
-    TEST_ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets"
+    TEST_ASSETS_DIR="${CMAKE_SOURCE_DIR}/data/tests/assets"
+    TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/data"
     TEST_PROJECT_DIR="${CMAKE_SOURCE_DIR}"
 )
 

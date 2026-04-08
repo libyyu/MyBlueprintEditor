@@ -1,0 +1,1 @@
+{"blueprints":[{"name":"Main","path":"assets\/Main.bjson"},{"name":"Sub","path":"assets\/Sub\/Sub.bjson"},{"name":"Third","path":"assets\/Sub\/Third\/Third.bjson"},{"name":"ReActAgent","path":"..\/examples\/ReActAgent.bjson"}],"description":"","libraries":[{"name":"CommonLib","path":"assets\/CommonLib.bjson"}],"name":"Demo","projVersion":1,"version":"1.0"}

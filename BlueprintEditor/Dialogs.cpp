@@ -10,12 +10,13 @@
 
 void BlueprintEditor::ShowUnsavedChangesDialog()
 {
-    if (!m_ShowUnsavedDialog) return;
+    // OpenPopup 只在触发帧调用一次；BeginPopupModal 每帧都必须调用（ImGui 内部状态机要求）
+    if (m_ShowUnsavedDialog)
+    {
+        ImGui::OpenPopup("Unsaved Changes###UnsavedDlg");
+        m_ShowUnsavedDialog = false;
+    }
 
-    ImGui::OpenPopup("Unsaved Changes###UnsavedDlg");
-    m_ShowUnsavedDialog = false;  // 只触发一次 OpenPopup
-
-    // 保持 popup 持续显示
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
