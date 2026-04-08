@@ -545,10 +545,10 @@ void LuaNodeRegistrar::AddLuaPath(const std::string& dir)
     lua_settop(L, top);
 }
 
-void LuaNodeRegistrar::LoadEntrySilent(const std::string& filePath, const std::string& chunkName)
+bool LuaNodeRegistrar::LoadEntrySilent(const std::string& filePath, const std::string& chunkName)
 {
-    if (!ensureLuaState() || filePath.empty()) return;
-    if (!fs::exists(filePath)) return;  // 文件不存在静默跳过
+    if (!ensureLuaState() || filePath.empty()) return false;
+    if (!fs::exists(filePath)) return false;  // 文件不存在静默跳过
 
     lua_State* L = m_L;
     int top = lua_gettop(L);
@@ -562,7 +562,7 @@ void LuaNodeRegistrar::LoadEntrySilent(const std::string& filePath, const std::s
         // 语法错误静默忽略（不影响编辑器启动）
         lua_pop(L, 1);
         lua_settop(L, top);
-        return;
+        return false;
     }
 
     // 设置 chunk 名（@前缀表示文件名，此处用自定义 name 覆盖）
@@ -583,6 +583,7 @@ void LuaNodeRegistrar::LoadEntrySilent(const std::string& filePath, const std::s
     }
     lua_pop(L, 1);  // pop errFunc
     lua_settop(L, top);
+    return true;
 }
 
 void LuaNodeRegistrar::WatchEntryScript(const std::string& filePath, const std::string& chunkName)

@@ -1103,12 +1103,29 @@ void BlueprintEditor::OnStart()
             exeDir = fs::path(fs::absolute(m_Argv[0])).parent_path().string();
         else
             exeDir = fs::current_path().string();
+		
+        bool bLoaded = false;
+#if defined(_DEBUG) && defined(ROOT_DIR)
+        {
+            std::string dataDir = ROOT_DIR;
+            dataDir += "/data";
+            m_LuaNodeRegistrar.AddLuaPath(dataDir);
 
+			// 工程跟目录/data
+			std::string globalEntry = dataDir + "/BlueprintEntry.lua";
+            bLoaded = m_LuaNodeRegistrar.LoadEntrySilent(globalEntry, "global:BlueprintEntry");
+			BPLOG("Lua global path: " + dataDir);
+        }
+#endif
         m_LuaNodeRegistrar.AddLuaPath(exeDir);
+
         // exe 目录下的全局入口脚本（不存在则静默跳过，不 watch——全局不会动态出现）
-        std::string globalEntry = exeDir + "/BlueprintEntry.lua";
-        m_LuaNodeRegistrar.LoadEntrySilent(globalEntry, "global:BlueprintEntry");
-        BPLOG("Lua global path: " + exeDir);
+        if(!bLoaded)
+        {
+            std::string globalEntry = exeDir + "/BlueprintEntry.lua";
+            bLoaded = m_LuaNodeRegistrar.LoadEntrySilent(globalEntry, "global:BlueprintEntry");
+            BPLOG("Lua global path: " + exeDir);
+        }
 #endif
     }
 

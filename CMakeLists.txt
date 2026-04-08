@@ -66,6 +66,7 @@ endif()
 # ---------------------------------------------------------------------------
 if(MSVC)
     add_compile_options(/utf-8)
+    add_compile_options(/W0)  # MSVC: 禁用所有警告
 endif()
 
 # ImGui math operators — defined via target_compile_definitions(imgui PUBLIC ...) below.
@@ -75,6 +76,14 @@ endif()
 # Project root dir (referenced by Runtime/CMakeLists.txt for Utils sources)
 # ---------------------------------------------------------------------------
 set(BLUEPRINT_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+# Disable some warnings on Windows for all targets
+if(MSVC)
+  add_definitions(-D_CRT_SECURE_NO_WARNINGS -DWIN32_LEAN_AND_MEAN)
+  add_definitions(-DROOT_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+elseif (NOT EMSCRIPTEN)
+  add_definitions(-DROOT_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
+
 
 # ---------------------------------------------------------------------------
 # crude_json  (lightweight JSON parser – used by Runtime and Editor)

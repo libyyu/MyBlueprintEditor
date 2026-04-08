@@ -52,7 +52,7 @@ public:
     // ── Entry Script 加载（直接 loadfile，不走 require，支持独立 chunkName）
     // 立即尝试加载 filePath；文件不存在或执行出错均静默忽略。
     // chunkName 用于区分同名脚本（建议用工程名，如 "MyGame:BlueprintEntry"）。
-    void LoadEntrySilent(const std::string& filePath, const std::string& chunkName = "");
+    bool LoadEntrySilent(const std::string& filePath, const std::string& chunkName = "");
 
     // ── Entry Script Watcher ─────────────────────────────────────────
     // 注册一个待监视的入口脚本。
