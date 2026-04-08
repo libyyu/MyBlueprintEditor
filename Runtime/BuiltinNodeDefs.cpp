@@ -2117,19 +2117,24 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
         },
         "5A7A6A");
 
-    // MCP.Call — 调用 MCP Server 工具
+    // MCP.Call — 调用 MCP Server 工具（支持标准 JSON-RPC 2.0 协议）
+    // Protocol: "jsonrpc2"（默认，标准 MCP）或 "simple"（{tool_name, arguments}）
+    // JSON-RPC 2.0 请求：{"jsonrpc":"2.0","id":N,"method":"tools/call","params":{"name":ToolName,"arguments":{...}}}
+    // JSON-RPC 2.0 响应解析：result.content[0].text → Result
     reg("MCP.Call", "MCP Call", "AI/MCP",
         {
             MakeFlowPin(""),
-            MakePin("ServerURL",  PinDataType::String),
+            MakePin("ServerURL",  PinDataType::String),   // e.g. http://localhost:7788
             MakePin("ToolName",   PinDataType::String),
-            MakePin("Arguments",  PinDataType::String),
+            MakePin("Arguments",  PinDataType::String),   // JSON object string
+            MakePin("Protocol",   PinDataType::String),   // "jsonrpc2"(default) | "simple"
             MakePin("TimeoutSec", PinDataType::Integer),
         },
         {
             MakeFlowPin("onSuccess"),
             MakeFlowPin("onError"),
-            MakePin("Result",       PinDataType::String),
+            MakePin("Result",       PinDataType::String), // 解析后的文本结果
+            MakePin("RawResult",    PinDataType::String), // 完整响应 JSON
             MakePin("ErrorMessage", PinDataType::String),
         },
         "5A6A7A");

@@ -24,9 +24,12 @@
 - [x] **5. File Agent 示例**
   - 新建 examples/FileAgent.bjson ✓
 
-- [ ] **6. MCP.Call 节点接真实 MCP Server**
-  - 实现 MCP.Call handler（当前为 stub）
-  - 接入 filesystem-mcp / fetch-mcp
+- [x] **6. MCP.Call 节点接真实 MCP Server**
+  - 实现标准 JSON-RPC 2.0 协议（默认）和 simple 模式切换 ✓
+  - 正确解析 result.content[0].text，支持多条 content 拼接 ✓
+  - 新增 Protocol / RawResult 引脚 ✓
+  - examples/MCPCallDemo.bjson 示例蓝图 ✓
+  - tools/mcp_test_server.py 本地测试服务器（内置 read_file/write_file/list_dir/web_fetch/echo）✓
 
 ## 🟢 低优先级：生态完整性
 

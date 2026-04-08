@@ -14,6 +14,7 @@
 #include "../../Utils/Json/crude_json.h"
 #include <sstream>
 #include <regex>
+#include <atomic>
 #ifndef __EMSCRIPTEN__
 #  include <fstream>
 #  include <filesystem>
@@ -1560,12 +1561,22 @@ void RegisterHandlers_AI(
     };
 
     // ========================================================================
-    // MCP.Call — 调用 MCP Server 工具（HTTP POST JSON-RPC 风格）
+    // MCP.Call — 调用 MCP Server 工具（标准 JSON-RPC 2.0 + 简单模式）
+    // ========================================================================
+    // Protocol = "jsonrpc2"（默认）：标准 MCP JSON-RPC 2.0
+    //   请求：POST {ServerURL}/  body={"jsonrpc":"2.0","id":N,"method":"tools/call","params":{"name":ToolName,"arguments":{...}}}
+    //   响应解析：result.content[0].text → Result
+    //            error.message → ErrorMessage
+    //
+    // Protocol = "simple"：简单 POST 模式（兼容旧格式）
+    //   请求：POST {ServerURL}  body={"tool_name":ToolName,"arguments":{...}}
+    //   响应：直接把 body 作为 Result
     // ========================================================================
     handlers["MCP.Call"] = [](ExecutionContext& ctx) -> bool {
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("Result",       Variant(std::string("")));
+            ctx.SetOutputValue("RawResult",    Variant(std::string("")));
             ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient registered")));
             ctx.ActivateOutputFlow("onError");
             return true;
@@ -1574,30 +1585,65 @@ void RegisterHandlers_AI(
         std::string serverURL  = ctx.GetInputValue("ServerURL").asString();
         std::string toolName   = ctx.GetInputValue("ToolName").asString();
         std::string arguments  = ctx.GetInputValue("Arguments").asString();
+        std::string protocol   = ctx.GetInputValue("Protocol").asString();
         int         timeoutSec = static_cast<int>(ctx.GetInputValue("TimeoutSec").asInt());
 
-        if (serverURL.empty())  serverURL = "http://localhost:7788/tool/call";
+        if (serverURL.empty())  serverURL = "http://localhost:7788";
+        if (protocol.empty())   protocol  = "jsonrpc2";
         if (toolName.empty()) {
             ctx.SetOutputValue("Result",       Variant(std::string("")));
+            ctx.SetOutputValue("RawResult",    Variant(std::string("")));
             ctx.SetOutputValue("ErrorMessage", Variant(std::string("ToolName is empty")));
             ctx.ActivateOutputFlow("onError");
             return true;
         }
         if (arguments.empty()) arguments = "{}";
 
+        // 解析 arguments JSON
+        crude_json::value argsVal = crude_json::value::parse(arguments);
+        if (argsVal.is_discarded() || argsVal.is_null()) {
+            argsVal = crude_json::value(crude_json::object{});
+        }
+
         // 构造请求体
-        crude_json::object reqBody;
-        reqBody["tool_name"] = crude_json::value(toolName);
-        reqBody["arguments"] = crude_json::value(crude_json::value::parse(arguments));
-        std::string bodyStr  = crude_json::value(std::move(reqBody)).dump();
+        std::string bodyStr;
+        std::string requestURL = serverURL;
+
+        // 全局自增 ID（线程不敏感，仅用于请求区分）
+        static std::atomic<int> s_reqId{1};
+
+        if (protocol == "simple") {
+            // 简单模式：{tool_name, arguments}
+            crude_json::object req;
+            req["tool_name"]  = crude_json::value(toolName);
+            req["arguments"]  = argsVal;
+            bodyStr = crude_json::value(std::move(req)).dump();
+            // URL 使用默认 /tool/call 后缀
+            if (requestURL.back() != '/')
+                requestURL += "/tool/call";
+            else
+                requestURL += "tool/call";
+        } else {
+            // JSON-RPC 2.0 模式（标准 MCP）
+            crude_json::object params;
+            params["name"]      = crude_json::value(toolName);
+            params["arguments"] = argsVal;
+
+            crude_json::object req;
+            req["jsonrpc"] = crude_json::value(std::string("2.0"));
+            req["id"]      = crude_json::value(static_cast<double>(s_reqId.fetch_add(1)));
+            req["method"]  = crude_json::value(std::string("tools/call"));
+            req["params"]  = crude_json::value(std::move(params));
+            bodyStr = crude_json::value(std::move(req)).dump();
+            // JSON-RPC 直接 POST 到 ServerURL
+        }
 
         HttpRequest req;
-        req.url    = serverURL;
+        req.url    = requestURL;
         req.method = "POST";
         req.body   = bodyStr;
         req.headers["Content-Type"] = "application/json";
-        if (timeoutSec > 0)
-            req.timeoutSeconds = timeoutSec;
+        if (timeoutSec > 0) req.timeoutSeconds = timeoutSec;
 
         ctx.MarkDownstreamAsHandled("onSuccess");
         ctx.MarkDownstreamAsHandled("onError");
@@ -1605,6 +1651,7 @@ void RegisterHandlers_AI(
         PinId errorPin   = ctx.GetPinId("onError");
 
         auto sharedResp = std::make_shared<HttpResponse>();
+        bool isJsonRpc   = (protocol != "simple");
 
         auto dispatcher = [client, req, sharedResp](ExecutionContext::AsyncResolve resolve) mutable {
             client->SendAsync(req,
@@ -1614,20 +1661,92 @@ void RegisterHandlers_AI(
                 });
         };
 
-        auto onComplete = [sharedResp, successPin, errorPin](ExecutionContext& c) mutable {
+        auto onComplete = [sharedResp, successPin, errorPin, isJsonRpc](ExecutionContext& c) mutable {
             const HttpResponse& resp = *sharedResp;
             if (!resp.ok()) {
                 std::string errMsg = resp.error.empty()
                     ? ("HTTP " + std::to_string(resp.statusCode))
                     : resp.error;
                 c.SetOutputValue("Result",       Variant(std::string("")));
+                c.SetOutputValue("RawResult",    Variant(resp.body));
                 c.SetOutputValue("ErrorMessage", Variant(errMsg));
                 c.ActivateOutputFlow(errorPin);
-            } else {
+                return;
+            }
+
+            c.SetOutputValue("RawResult", Variant(resp.body));
+
+            if (!isJsonRpc) {
+                // 简单模式：直接返回 body
                 c.SetOutputValue("Result",       Variant(resp.body));
                 c.SetOutputValue("ErrorMessage", Variant(std::string("")));
                 c.ActivateOutputFlow(successPin);
+                return;
             }
+
+            // JSON-RPC 2.0 响应解析
+            crude_json::value jresp = crude_json::value::parse(resp.body);
+
+            // 检查 error 字段
+            if (jresp.is_object() && jresp.contains("error")) {
+                const auto& errObj = jresp["error"];
+                std::string errMsg;
+                if (errObj.is_object() && errObj.contains("message")
+                    && errObj["message"].is_string())
+                    errMsg = errObj["message"].get<std::string>();
+                else
+                    errMsg = resp.body.substr(0, 200);
+                c.SetOutputValue("Result",       Variant(std::string("")));
+                c.SetOutputValue("ErrorMessage", Variant(errMsg));
+                c.ActivateOutputFlow(errorPin);
+                return;
+            }
+
+            // 解析 result.content[0].text
+            // 标准 MCP 响应：{"result":{"content":[{"type":"text","text":"..."}],...}}
+            std::string resultText;
+            bool parsed = false;
+
+            if (jresp.is_object() && jresp.contains("result")) {
+                const auto& result = jresp["result"];
+                if (result.is_object() && result.contains("content")) {
+                    const auto& content = result["content"];
+                    if (content.is_array()) {
+                        const auto& arr = content.get<crude_json::array>();
+                        for (const auto& item : arr) {
+                            if (item.is_object()) {
+                                // 拼接所有 type=text 的文本
+                                bool isText = !item.contains("type") ||
+                                    (item["type"].is_string() &&
+                                     item["type"].get<std::string>() == "text");
+                                if (isText && item.contains("text") && item["text"].is_string()) {
+                                    if (!resultText.empty()) resultText += "\n";
+                                    resultText += item["text"].get<std::string>();
+                                    parsed = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                // 若 content 解析失败，尝试 result.text 或直接 dump
+                if (!parsed) {
+                    if (result.is_string()) {
+                        resultText = result.get<std::string>();
+                        parsed = true;
+                    } else if (result.is_object() || result.is_array()) {
+                        resultText = result.dump();
+                        parsed = true;
+                    }
+                }
+            }
+
+            // 最终降级：返回整个 body
+            if (!parsed) resultText = resp.body;
+
+            c.SetOutputValue("Result",       Variant(resultText));
+            c.SetOutputValue("ErrorMessage", Variant(std::string("")));
+            c.Log("[MCP.Call] result length=" + std::to_string(resultText.size()));
+            c.ActivateOutputFlow(successPin);
         };
 
         ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
