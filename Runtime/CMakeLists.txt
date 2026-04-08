@@ -339,6 +339,9 @@ if(BLUEPRINT_LUA)
         ${CMAKE_CURRENT_SOURCE_DIR}/LuaScriptEngine.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/LuaBindings.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/LuaLib_JsonHttp.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/LuaLib_Json.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/LuaLib_Http.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/LuaLib_File.cpp
     )
     list(APPEND RUNTIME_PUBLIC_HEADERS
         ${CMAKE_CURRENT_SOURCE_DIR}/LuaScriptEngine.h
