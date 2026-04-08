@@ -1,0 +1,30 @@
+[MainThreadDispatcher] Post: queue size=1
+[MainThreadDispatcher] DrainQueue: executing 1 tasks
+[MainThreadDispatcher] Post: queue size=1
+[MainThreadDispatcher] DrainQueue: executing 1 tasks
+[MainThreadDispatcher] Post: queue size=1
+[MainThreadDispatcher] DrainQueue: executing 1 tasks
+[MainThreadDispatcher] Post: queue size=1
+[MainThreadDispatcher] DrainQueue: executing 1 tasks
+[MainThreadDispatcher] Post: queue size=1
+[MainThreadDispatcher] DrainQueue: executing 1 tasks
+[MainThreadDispatcher] Post: queue size=1
+[MainThreadDispatcher] DrainQueue: executing 1 tasks
+[MainThreadDispatcher] Post: queue size=1
+[MainThreadDispatcher] DrainQueue: executing 1 tasks
+[MainThreadDispatcher] Post: queue size=1
+[MainThreadDispatcher] DrainQueue: executing 1 tasks
+[MainThreadDispatcher] Post: queue size=1
+[MainThreadDispatcher] DrainQueue: executing 1 tasks
+[MainThreadDispatcher] Post: queue size=1
+[MainThreadDispatcher] DrainQueue: executing 1 tasks
+[MainThreadDispatcher] Post: queue size=1
+[MainThreadDispatcher] DrainQueue: executing 1 tasks
+[MainThreadDispatcher] Post: queue size=1
+[MainThreadDispatcher] DrainQueue: executing 1 tasks
+[MainThreadDispatcher] Post: queue size=1
+[MainThreadDispatcher] DrainQueue: executing 1 tasks
+[MainThreadDispatcher] Post: queue size=1
+[MainThreadDispatcher] DrainQueue: executing 1 tasks
+[MainThreadDispatcher] Post: queue size=1
+[MainThreadDispatcher] DrainQueue: executing 1 tasks

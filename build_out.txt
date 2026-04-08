@@ -1,0 +1,29 @@
+-- [BlueprintRuntime] Building as SHARED
+-- [BlueprintRuntime] Lua library type: STATIC (LUA_LINK_STATIC=ON)
+-- [BlueprintRuntime] Lua STATIC mode: skipping system Lua, using FetchContent
+-- [BlueprintRuntime] Lua not found via find_package/pkg-config, using FetchContent
+CMake Warning (dev) at C:/Program Files/CMake/share/cmake-4.1/Modules/FetchContent.cmake:1953 (message):
+  Calling FetchContent_Populate(lua54) is deprecated, call
+  FetchContent_MakeAvailable(lua54) instead.  Policy CMP0169 can be set to
+  OLD to allow FetchContent_Populate(lua54) to be called directly for now,
+  but the ability to call it with declared details will be removed completely
+  in a future version.
+Call Stack (most recent call first):
+  Runtime/CMakeLists.txt:210 (FetchContent_Populate)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- [BlueprintRuntime] Output name: BlueprintRuntime
+-- [BlueprintRuntime] Lua scripting enabled (STATIC, include: C:/Users/maxweili/MyProjects/MyBlueprintEditor/build-windows/_deps/lua54-src/src)
+-- [BlueprintRuntime] OpenSSL not found → HTTPS disabled (HTTP only)
+--   Windows: vcpkg install openssl:x64-windows  OR  -DOPENSSL_ROOT_DIR=<path>
+--   Linux:   sudo apt install libssl-dev  /  sudo yum install openssl-devel
+--   macOS:   brew install openssl  then  -DOPENSSL_ROOT_DIR=$(brew --prefix openssl)
+-- [BlueprintBundle] Skipped (SHARED build, no merging needed)
+-- [runtime-example] target added (BUILD_RUNTIME_ONLY=OFF)
+-- Found ImGui headers at: C:/Users/maxweili/MyProjects/MyBlueprintEditor/external/imgui
+-- Building examples...
+-- Examples will be built in: C:/Users/maxweili/MyProjects/MyBlueprintEditor/build-windows/bin
+-- [Tests] Unit tests enabled (run: ctest --test-dir C:/Users/maxweili/MyProjects/MyBlueprintEditor/build-windows)
+-- Configuring done (3.5s)
+-- Generating done (0.3s)
+-- Build files have been written to: C:/Users/maxweili/MyProjects/MyBlueprintEditor/build-windows
