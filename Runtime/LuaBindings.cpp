@@ -185,6 +185,12 @@ static int variant_tostring(lua_State* L)
     return 1;
 }
 
+static int variant_isValid(lua_State* L)
+{
+    lua_pushboolean(L, checkVariant(L, 1)->type != PinDataType::Unknown ? 1 : 0);
+    return 1;
+}
+
 static int variant_gc(lua_State* L)
 {
     checkVariant(L, 1)->~Variant();
@@ -204,6 +210,7 @@ static void registerVariantMetatable(lua_State* L)
         {"asInt",      variant_asInt},
         {"asFloat",    variant_asFloat},
         {"asString",   variant_asString},
+        {"isValid",    variant_isValid},
         {"__tostring", variant_tostring},
         {"__gc",       variant_gc},
         {nullptr, nullptr}

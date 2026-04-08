@@ -33,8 +33,14 @@ end
 -- 注意：Blueprint 会先执行 Execute()（数据流），再 DispatchEvent("OnBeginPlay")。
 -- DispatchEvent 触发此 handler。
 Blueprint.RegisterHandler("OnBeginPlay", function(ctx)
+    -- guard：变量不存在说明这不是 LuaReActAgent 蓝图，直接跳过
+    local api_key_var = ctx:GetVariable("ApiKey")
+    if not api_key_var:isValid() then
+        return false  -- 不消费事件，让蓝图继续正常执行
+    end
+
     -- 从蓝图变量读取配置
-    local api_key    = ctx:GetVariable("ApiKey")   :asString()
+    local api_key    = api_key_var:asString()
     local base_url   = ctx:GetVariable("BaseURL")  :asString()
     local model      = ctx:GetVariable("Model")    :asString()
     local user_query = ctx:GetVariable("UserQuery"):asString()

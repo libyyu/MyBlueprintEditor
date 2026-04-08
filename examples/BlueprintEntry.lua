@@ -21,8 +21,15 @@ if not ok then
 end
 
 -- ── 注册 OnBeginPlay handler ──────────────────────────────────────────────
+-- 仅对含有 ApiKey 变量的蓝图（LuaReActAgent）生效，其他蓝图直接跳过。
 Blueprint.RegisterHandler("OnBeginPlay", function(ctx)
-    local api_key    = ctx:GetVariable("ApiKey")   :asString()
+    -- guard：变量不存在（isValid() == false）说明这不是 LuaReActAgent 蓝图
+    local api_key_var = ctx:GetVariable("ApiKey")
+    if not api_key_var:isValid() then
+        return false  -- 不消费事件，让蓝图继续正常执行
+    end
+
+    local api_key    = api_key_var:asString()
     local base_url   = ctx:GetVariable("BaseURL")  :asString()
     local model      = ctx:GetVariable("Model")    :asString()
     local user_query = ctx:GetVariable("UserQuery"):asString()
