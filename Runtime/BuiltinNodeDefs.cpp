@@ -1708,6 +1708,81 @@ static void RegisterNodeDefs_Network(INodeRegistry& registry)
             MakePin("ErrorMessage", PinDataType::String),
         },
         "2E86AB");  // 蓝色，同 HTTP.Request
+
+    // HTTP.Get — 快捷 GET 节点（HTTP.Request 的精简版）
+    reg("HTTP.Get", "HTTP Get", "Network",
+        {
+            MakeFlowPin(""),
+            MakePin("URL",            PinDataType::String),
+            MakePin("Headers",        PinDataType::String),  // JSON 格式（可选）
+            MakePin("TimeoutSeconds", PinDataType::Integer),
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("StatusCode",   PinDataType::Integer),
+            MakePin("ResponseBody", PinDataType::String),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "2E86AB");
+
+    // HTTP.Post — 快捷 POST 节点
+    reg("HTTP.Post", "HTTP Post", "Network",
+        {
+            MakeFlowPin(""),
+            MakePin("URL",            PinDataType::String),
+            MakePin("Body",           PinDataType::String),
+            MakePin("Headers",        PinDataType::String),  // JSON 格式（可选）
+            MakePin("TimeoutSeconds", PinDataType::Integer),
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("StatusCode",   PinDataType::Integer),
+            MakePin("ResponseBody", PinDataType::String),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "2E86AB");
+
+    // Web.Search — DuckDuckGo Lite 网页搜索（无需 API Key，跨平台）
+    // 输入：Query(String), MaxResults(Integer，默认5)
+    // 输出：→ onSuccess, → onError
+    //       Results(String，JSON数组 [{title,url,snippet},...])
+    //       ResultText(String，纯文本拼接，适合直接喂给 LLM)
+    reg("Web.Search", "Web Search", "Network",
+        {
+            MakeFlowPin(""),
+            MakePin("Query",      PinDataType::String),
+            MakePin("MaxResults", PinDataType::Integer),  // 默认 5
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("Results",    PinDataType::String),   // JSON 数组
+            MakePin("ResultText", PinDataType::String),   // 纯文本，适合喂 LLM
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "2E86AB");
+
+    // Code.Run — 执行子进程命令（native only，WebGL 走 onError）
+    // 输入：Command(String), WorkDir(String), TimeoutSeconds(Integer)
+    // 输出：→ onSuccess, → onError
+    //       Stdout(String), Stderr(String), ExitCode(Integer)
+    reg("Code.Run", "Code Run", "Network",
+        {
+            MakeFlowPin(""),
+            MakePin("Command",        PinDataType::String),
+            MakePin("WorkDir",        PinDataType::String),   // 工作目录（可选）
+            MakePin("TimeoutSeconds", PinDataType::Integer),  // 默认 30
+        },
+        {
+            MakeFlowPin("onSuccess"),  // ExitCode == 0
+            MakeFlowPin("onError"),    // 启动失败或超时
+            MakePin("Stdout",    PinDataType::String),
+            MakePin("Stderr",    PinDataType::String),
+            MakePin("ExitCode",  PinDataType::Integer),
+        },
+        "2E86AB");
 }
 
 // ============================================================================

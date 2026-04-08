@@ -1,9 +1,14 @@
 // Runtime/handlers/BuiltinHandlers_Network.cpp
-// 网络相关节点处理器：HTTP.Request, JSON.GetPath
+// 网络相关节点处理器：HTTP.Request, HTTP.Get, HTTP.Post, HTTP.Download,
+//                    JSON.GetPath, Web.Search, Code.Run
 #include "BuiltinHandlers_Network.h"
 #include "../BlueprintRunner.h"
 #include "../Http/IHttpClient.h"
 #include "../../Utils/Json/crude_json.h"
+
+#include <thread>
+#include <cstdio>
+#include <cctype>
 
 namespace NodeEditor {
 namespace Runtime {
@@ -249,6 +254,360 @@ void RegisterHandlers_Network(
         ctx.SetOutputValue("Value", Variant(resultStr));
         ctx.SetOutputValue("Found", Variant(found));
         return true;
+    };
+
+    // ========================================================================
+    // HTTP.Get — 快捷 GET 节点
+    // ========================================================================
+    handlers["HTTP.Get"] = [&runner](ExecutionContext& ctx) -> bool {
+        IHttpClient* client = BP_GetHttpClient();
+        if (!client) {
+            ctx.SetOutputValue("StatusCode",   Variant(static_cast<int64_t>(0)));
+            ctx.SetOutputValue("ResponseBody", Variant(std::string("")));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient registered")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+        HttpRequest req;
+        req.url    = ctx.GetInputValue("URL").asString();
+        req.method = "GET";
+        std::string headersJson = ctx.GetInputValue("Headers").asString();
+        if (!headersJson.empty()) {
+            crude_json::value hj = crude_json::value::parse(headersJson);
+            if (hj.is_object())
+                for (const auto& kv : hj.get<crude_json::object>())
+                    if (kv.second.is_string()) req.headers[kv.first] = kv.second.get<std::string>();
+        }
+        auto tv = ctx.GetInputValue("TimeoutSeconds");
+        if (tv.type == PinDataType::Integer || tv.type == PinDataType::Float)
+            req.timeoutSeconds = static_cast<int>(tv.asInt());
+
+        PinId successPinId = ctx.GetPinId("onSuccess");
+        PinId errorPinId   = ctx.GetPinId("onError");
+        ctx.MarkDownstreamAsHandled("onSuccess");
+        ctx.MarkDownstreamAsHandled("onError");
+        auto sharedResp = std::make_shared<HttpResponse>();
+        ctx.RunAsync(
+            [client, req, sharedResp](ExecutionContext::AsyncResolve resolve) mutable {
+                client->SendAsync(req, [sharedResp, resolve=std::move(resolve)](HttpResponse r) mutable {
+                    *sharedResp = std::move(r); resolve();
+                });
+            },
+            [sharedResp, successPinId, errorPinId](ExecutionContext& c) mutable {
+                const HttpResponse& r = *sharedResp;
+                c.SetOutputValue("StatusCode",   Variant(static_cast<int64_t>(r.statusCode)));
+                c.SetOutputValue("ResponseBody", Variant(r.body));
+                c.SetOutputValue("ErrorMessage", Variant(r.error));
+                c.ActivateOutputFlow(r.ok() ? successPinId : errorPinId);
+            });
+        return true;
+    };
+
+    // ========================================================================
+    // HTTP.Post — 快捷 POST 节点
+    // ========================================================================
+    handlers["HTTP.Post"] = [&runner](ExecutionContext& ctx) -> bool {
+        IHttpClient* client = BP_GetHttpClient();
+        if (!client) {
+            ctx.SetOutputValue("StatusCode",   Variant(static_cast<int64_t>(0)));
+            ctx.SetOutputValue("ResponseBody", Variant(std::string("")));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient registered")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+        HttpRequest req;
+        req.url    = ctx.GetInputValue("URL").asString();
+        req.method = "POST";
+        req.body   = ctx.GetInputValue("Body").asString();
+        std::string headersJson = ctx.GetInputValue("Headers").asString();
+        if (!headersJson.empty()) {
+            crude_json::value hj = crude_json::value::parse(headersJson);
+            if (hj.is_object())
+                for (const auto& kv : hj.get<crude_json::object>())
+                    if (kv.second.is_string()) req.headers[kv.first] = kv.second.get<std::string>();
+        }
+        auto tv = ctx.GetInputValue("TimeoutSeconds");
+        if (tv.type == PinDataType::Integer || tv.type == PinDataType::Float)
+            req.timeoutSeconds = static_cast<int>(tv.asInt());
+
+        PinId successPinId = ctx.GetPinId("onSuccess");
+        PinId errorPinId   = ctx.GetPinId("onError");
+        ctx.MarkDownstreamAsHandled("onSuccess");
+        ctx.MarkDownstreamAsHandled("onError");
+        auto sharedResp = std::make_shared<HttpResponse>();
+        ctx.RunAsync(
+            [client, req, sharedResp](ExecutionContext::AsyncResolve resolve) mutable {
+                client->SendAsync(req, [sharedResp, resolve=std::move(resolve)](HttpResponse r) mutable {
+                    *sharedResp = std::move(r); resolve();
+                });
+            },
+            [sharedResp, successPinId, errorPinId](ExecutionContext& c) mutable {
+                const HttpResponse& r = *sharedResp;
+                c.SetOutputValue("StatusCode",   Variant(static_cast<int64_t>(r.statusCode)));
+                c.SetOutputValue("ResponseBody", Variant(r.body));
+                c.SetOutputValue("ErrorMessage", Variant(r.error));
+                c.ActivateOutputFlow(r.ok() ? successPinId : errorPinId);
+            });
+        return true;
+    };
+
+    // ========================================================================
+    // Web.Search — DuckDuckGo Lite 无 Key 搜索（HTML scraping）
+    //
+    // 实现：GET https://lite.duckduckgo.com/lite/?q=<query>
+    //   解析 HTML 中 <a class="result-link"> 提取标题+URL，
+    //   <td class="result-snippet"> 提取摘要。
+    // 跨平台：native + WebGL（同 HTTP.Get，底层走 IHttpClient）
+    // ========================================================================
+    handlers["Web.Search"] = [&runner](ExecutionContext& ctx) -> bool {
+        IHttpClient* client = BP_GetHttpClient();
+        if (!client) {
+            ctx.SetOutputValue("Results",     Variant(std::string("[]")));
+            ctx.SetOutputValue("ResultText",  Variant(std::string("")));
+            ctx.SetOutputValue("ErrorMessage",Variant(std::string("No HttpClient registered")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        std::string query = ctx.GetInputValue("Query").asString();
+        auto maxVar = ctx.GetInputValue("MaxResults");
+        int maxResults = (maxVar.type == PinDataType::Integer) ? static_cast<int>(maxVar.asInt()) : 5;
+        if (maxResults <= 0) maxResults = 5;
+
+        // URL 编码 query
+        std::string encoded;
+        for (unsigned char c : query) {
+            if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+                encoded += c;
+            } else {
+                char buf[4];
+                snprintf(buf, sizeof(buf), "%%%02X", c);
+                encoded += buf;
+            }
+        }
+
+        HttpRequest req;
+        req.url    = "https://lite.duckduckgo.com/lite/?q=" + encoded;
+        req.method = "GET";
+        req.headers["User-Agent"] = "Mozilla/5.0 (compatible; BlueprintRuntime/1.0)";
+        req.timeoutSeconds = 15;
+
+        PinId successPinId = ctx.GetPinId("onSuccess");
+        PinId errorPinId   = ctx.GetPinId("onError");
+        ctx.MarkDownstreamAsHandled("onSuccess");
+        ctx.MarkDownstreamAsHandled("onError");
+
+        auto sharedResp    = std::make_shared<HttpResponse>();
+        int  capturedMax   = maxResults;
+
+        ctx.RunAsync(
+            [client, req, sharedResp](ExecutionContext::AsyncResolve resolve) mutable {
+                client->SendAsync(req, [sharedResp, resolve=std::move(resolve)](HttpResponse r) mutable {
+                    *sharedResp = std::move(r); resolve();
+                });
+            },
+            [sharedResp, successPinId, errorPinId, capturedMax](ExecutionContext& c) mutable {
+                const HttpResponse& r = *sharedResp;
+                if (!r.ok()) {
+                    c.SetOutputValue("Results",      Variant(std::string("[]")));
+                    c.SetOutputValue("ResultText",   Variant(std::string("")));
+                    c.SetOutputValue("ErrorMessage", Variant(r.error.empty()
+                        ? "HTTP " + std::to_string(r.statusCode) : r.error));
+                    c.ActivateOutputFlow(errorPinId);
+                    return;
+                }
+
+                // 简单 HTML 解析：提取 <a class="result-link" href="...">title</a>
+                // 和 <td class="result-snippet">snippet</td>
+                const std::string& html = r.body;
+                struct SRItem { std::string title, url, snippet; };
+                std::vector<SRItem> items;
+
+                auto extractBetween = [](const std::string& s, const std::string& open,
+                                          const std::string& close, size_t from) -> std::pair<std::string, size_t> {
+                    size_t p = s.find(open, from);
+                    if (p == std::string::npos) return {"", std::string::npos};
+                    p += open.size();
+                    size_t e = s.find(close, p);
+                    if (e == std::string::npos) return {"", std::string::npos};
+                    return {s.substr(p, e - p), e + close.size()};
+                };
+
+                auto stripTags = [](const std::string& s) -> std::string {
+                    std::string out; bool inTag = false;
+                    for (char ch : s) {
+                        if (ch == '<') { inTag = true; continue; }
+                        if (ch == '>') { inTag = false; continue; }
+                        if (!inTag) out += ch;
+                    }
+                    return out;
+                };
+
+                size_t pos = 0;
+                while ((int)items.size() < capturedMax) {
+                    // 找 href
+                    size_t hrefP = html.find("class=\"result-link\"", pos);
+                    if (hrefP == std::string::npos) break;
+                    // 往前找 href="..."
+                    size_t tagStart = html.rfind('<', hrefP);
+                    auto [href, p1] = extractBetween(html, "href=\"", "\"", tagStart);
+                    // 标题为 >...</a>
+                    size_t titleStart = html.find('>', hrefP);
+                    auto [titleRaw, p2] = extractBetween(html, ">", "</a>", hrefP);
+                    std::string title = stripTags(titleRaw);
+                    // 找 snippet
+                    auto [snipRaw, p3] = extractBetween(html, "class=\"result-snippet\">", "</td>", hrefP);
+                    std::string snippet = stripTags(snipRaw);
+                    // 去首尾空白
+                    auto trim = [](std::string& str) {
+                        size_t s = str.find_first_not_of(" \t\r\n");
+                        size_t e = str.find_last_not_of(" \t\r\n");
+                        str = (s == std::string::npos) ? "" : str.substr(s, e - s + 1);
+                    };
+                    trim(title); trim(href); trim(snippet);
+
+                    if (!href.empty() && !title.empty()) {
+                        SRItem item;
+                        item.title   = title;
+                        item.url     = href;
+                        item.snippet = snippet;
+                        items.push_back(std::move(item));
+                    }
+
+                    pos = (p2 != std::string::npos) ? p2 : hrefP + 1;
+                    if (pos == std::string::npos) break;
+                }
+
+                // 构建 JSON 数组
+                std::string json = "[";
+                std::string text;
+                for (size_t i = 0; i < items.size(); ++i) {
+                    if (i) json += ",";
+                    auto escape = [](const std::string& s) {
+                        std::string out;
+                        for (char ch : s) {
+                            if      (ch == '"')  out += "\\\"";
+                            else if (ch == '\\') out += "\\\\";
+                            else if (ch == '\n') out += "\\n";
+                            else if (ch == '\r') out += "\\r";
+                            else                 out += ch;
+                        }
+                        return out;
+                    };
+                    json += "{\"title\":\"" + escape(items[i].title) + "\","
+                             "\"url\":\""   + escape(items[i].url) + "\","
+                             "\"snippet\":\"" + escape(items[i].snippet) + "\"}";
+                    text += std::to_string(i+1) + ". " + items[i].title + "\n"
+                          + "   " + items[i].url + "\n"
+                          + "   " + items[i].snippet + "\n\n";
+                }
+                json += "]";
+
+                c.SetOutputValue("Results",      Variant(json));
+                c.SetOutputValue("ResultText",   Variant(text));
+                c.SetOutputValue("ErrorMessage", Variant(std::string("")));
+                c.Log("[Web.Search] " + std::to_string(items.size()) + " results");
+                c.ActivateOutputFlow(successPinId);
+            });
+        return true;
+    };
+
+    // ========================================================================
+    // Code.Run — 执行子进程命令（native only，WebGL 走 onError）
+    // ========================================================================
+    handlers["Code.Run"] = [&runner](ExecutionContext& ctx) -> bool {
+#ifdef __EMSCRIPTEN__
+        ctx.SetOutputValue("Stdout",   Variant(std::string("")));
+        ctx.SetOutputValue("Stderr",   Variant(std::string("")));
+        ctx.SetOutputValue("ExitCode", Variant(static_cast<int64_t>(-1)));
+        ctx.SetOutputValue("ErrorMessage", Variant(std::string("Code.Run not supported on WebGL")));
+        ctx.ActivateOutputFlow("onError");
+        return true;
+#else
+        std::string command = ctx.GetInputValue("Command").asString();
+        std::string workDir = ctx.GetInputValue("WorkDir").asString();
+        auto tv = ctx.GetInputValue("TimeoutSeconds");
+        int timeoutSec = (tv.type == PinDataType::Integer) ? static_cast<int>(tv.asInt()) : 30;
+        if (timeoutSec <= 0) timeoutSec = 30;
+
+        if (command.empty()) {
+            ctx.SetOutputValue("Stdout",   Variant(std::string("")));
+            ctx.SetOutputValue("Stderr",   Variant(std::string("")));
+            ctx.SetOutputValue("ExitCode", Variant(static_cast<int64_t>(-1)));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("Command is empty")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        PinId successPinId = ctx.GetPinId("onSuccess");
+        PinId errorPinId   = ctx.GetPinId("onError");
+        ctx.MarkDownstreamAsHandled("onSuccess");
+        ctx.MarkDownstreamAsHandled("onError");
+
+        struct RunResult {
+            std::string stdoutStr, stderrStr, errorMsg;
+            int exitCode = -1;
+        };
+        auto sharedResult = std::make_shared<RunResult>();
+
+        ctx.RunAsync(
+            [command, workDir, timeoutSec, sharedResult](ExecutionContext::AsyncResolve resolve) mutable {
+                // 在后台线程执行子进程
+                std::thread([command, workDir, timeoutSec, sharedResult, resolve=std::move(resolve)]() mutable {
+                    // 切换工作目录（临时）
+                    // 使用 popen 捕获 stdout（stderr 重定向到 stdout）
+                    std::string fullCmd = command;
+#ifdef _WIN32
+                    // Windows：通过 cmd /c 执行，stderr 合并到 stdout
+                    fullCmd = "cmd /c \"" + command + "\" 2>&1";
+#else
+                    fullCmd = command + " 2>&1";
+#endif
+                    FILE* pipe = nullptr;
+#ifdef _WIN32
+                    if (!workDir.empty()) {
+                        // Windows 下在命令前 cd 到工作目录
+                        fullCmd = "cmd /c \"cd /d \"" + workDir + "\" && " + command + "\" 2>&1";
+                    }
+                    pipe = _popen(fullCmd.c_str(), "r");
+#else
+                    if (!workDir.empty()) {
+                        fullCmd = "cd \"" + workDir + "\" && " + command + " 2>&1";
+                    }
+                    pipe = popen(fullCmd.c_str(), "r");
+#endif
+                    if (!pipe) {
+                        sharedResult->errorMsg = "Failed to start process: " + command;
+                        sharedResult->exitCode = -1;
+                    } else {
+                        char buf[256];
+                        while (fgets(buf, sizeof(buf), pipe))
+                            sharedResult->stdoutStr += buf;
+#ifdef _WIN32
+                        sharedResult->exitCode = _pclose(pipe);
+#else
+                        sharedResult->exitCode = pclose(pipe) >> 8;
+#endif
+                    }
+                    resolve();
+                }).detach();
+            },
+            [sharedResult, successPinId, errorPinId](ExecutionContext& c) mutable {
+                c.SetOutputValue("Stdout",   Variant(sharedResult->stdoutStr));
+                c.SetOutputValue("Stderr",   Variant(sharedResult->stderrStr));
+                c.SetOutputValue("ExitCode", Variant(static_cast<int64_t>(sharedResult->exitCode)));
+                c.SetOutputValue("ErrorMessage", Variant(sharedResult->errorMsg));
+                if (sharedResult->errorMsg.empty() && sharedResult->exitCode == 0) {
+                    c.Log("[Code.Run] exit=0");
+                    c.ActivateOutputFlow(successPinId);
+                } else {
+                    c.LogError("[Code.Run] exit=" + std::to_string(sharedResult->exitCode)
+                               + " " + sharedResult->errorMsg);
+                    c.ActivateOutputFlow(errorPinId);
+                }
+            });
+        return true;
+#endif // __EMSCRIPTEN__
     };
 }
 
