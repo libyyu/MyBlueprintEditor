@@ -1,0 +1,13 @@
+{
+  "_comment": "复制此文件内容到 %APPDATA%\\Claude\\claude_desktop_config.json (Windows) 或 ~/Library/Application Support/Claude/claude_desktop_config.json (macOS)",
+  "mcpServers": {
+    "blueprint": {
+      "command": "python",
+      "args": ["C:/Users/maxweili/MyProjects/MyBlueprintEditor/tools/mcp_server.py"],
+      "env": {
+        "BLUEPRINT_DLL": "C:/Users/maxweili/MyProjects/MyBlueprintEditor/build-windows/bin/Release/BlueprintRuntime.dll",
+        "BLUEPRINT_ROOT": "C:/Users/maxweili/MyProjects/MyBlueprintEditor"
+      }
+    }
+  }
+}

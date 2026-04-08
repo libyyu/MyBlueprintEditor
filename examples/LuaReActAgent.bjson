@@ -1,0 +1,52 @@
+{
+  "runtime": {
+    "fileType": "runtime",
+    "metadata": {
+      "schemaVersion": 2,
+      "blueprintClass": 0,
+      "name": "LuaReActAgent",
+      "description": "ReAct Agent implemented entirely in Lua. Tools: get_weather (wttr.in) + web_search (DuckDuckGo). Logic in examples/BlueprintEntry.lua + lua/agent_tools.lua. Variables: ApiKey, BaseURL, Model, UserQuery.",
+      "version": "1.0"
+    },
+    "nodes": [
+      {
+        "id": 1,
+        "definitionId": "OnBeginPlay",
+        "name": "On Begin Play",
+        "comment": "Lua handler registered in BlueprintEntry.lua intercepts this event and runs the agent",
+        "pins": [
+          { "id": 2, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 3,
+        "definitionId": "PrintString",
+        "name": "Done",
+        "comment": "This node is never reached — Lua handler takes over OnBeginPlay",
+        "pins": [
+          { "id": 4, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 5, "kind": 0, "dataType": 4, "name": "In String", "defaultValue": "[LuaReActAgent] Blueprint shell — logic runs in Lua." },
+          { "id": 6, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      }
+    ],
+    "links": [
+      { "id": 1, "startPinId": 2, "endPinId": 4, "isEnabled": true }
+    ],
+    "variables": [
+      { "name": "ApiKey",    "dataType": 4, "defaultValue": "sk-your-api-key-here" },
+      { "name": "BaseURL",   "dataType": 4, "defaultValue": "https://api.openai.com/v1" },
+      { "name": "Model",     "dataType": 4, "defaultValue": "gpt-4o" },
+      { "name": "UserQuery", "dataType": 4, "defaultValue": "What's the weather in Beijing and Shanghai today, and any recent AI news?" }
+    ]
+  },
+  "editor": {
+    "fileType": "editor",
+    "metadata": { "author": "", "createdAt": "", "updatedAt": "" },
+    "nodes": [
+      { "id": 1, "position": { "x": -200, "y": 0 }, "size": { "width": 161, "height": 72 } },
+      { "id": 3, "position": { "x":  100, "y": 0 }, "size": { "width": 400, "height": 100 } }
+    ],
+    "viewInfo": { "viewPosition": { "x": -100, "y": -50 }, "viewScale": 1 }
+  }
+}

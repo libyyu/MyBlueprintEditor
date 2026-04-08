@@ -13,12 +13,15 @@ Claude Desktop config (~/.claude/claude_desktop_config.json):
         "command": "py",
         "args": ["C:/Users/maxweili/MyProjects/MyBlueprintEditor/tools/mcp_server.py"],
         "env": {
-          "BLUEPRINT_DLL": "C:/Users/maxweili/MyProjects/MyBlueprintEditor/build/bin/Release/BlueprintRuntime.dll",
+          "BLUEPRINT_DLL": "C:/Users/maxweili/MyProjects/MyBlueprintEditor/build-windows/bin/Release/BlueprintRuntime.dll",
           "BLUEPRINT_ROOT": "C:/Users/maxweili/MyProjects/MyBlueprintEditor"
         }
       }
     }
   }
+
+Variable injection (pass via execute_blueprint "variables"):
+  {"ApiKey": "sk-xxx", "BaseURL": "https://api.openai.com/v1", "Model": "gpt-4o"}
 
 Available tools:
   list_blueprints       - List all .bjson files in the project
@@ -27,7 +30,7 @@ Available tools:
   get_variable          - Read a variable value after execution
   set_variable          - Set a variable before execution
   create_blueprint      - Write a new blueprint from JSON text
-  list_node_defs        - (future) Query registered node type definitions
+  get_blueprint_schema  - Return .bjson format reference
 """
 
 import os
@@ -53,7 +56,7 @@ BLUEPRINT_ROOT = pathlib.Path(
 
 BLUEPRINT_DLL = os.environ.get(
     "BLUEPRINT_DLL",
-    str(BLUEPRINT_ROOT / "build" / "bin" / "Release" / "BlueprintRuntime.dll")
+    str(BLUEPRINT_ROOT / "build-windows" / "bin" / "Release" / "BlueprintRuntime.dll")
 )
 
 # ---------------------------------------------------------------------------

@@ -897,12 +897,19 @@ TEST_F(ReActAgentTest, FullReActLoop_ToolCall_ThenFinalAnswer)
         }]
     })";
 
-    // 两轮顺序 mock
+    // 两轮顺序 mock（新版 ReActAgent 共 3 次 HTTP 调用）
+    // call 0: LLM round1 → tool_call(get_weather, Beijing)
+    // call 1: wttr.in    → 天气数据
+    // call 2: LLM round2 → final answer
     class SeqMock : public IHttpClient {
     public:
         std::vector<std::string> bodies;
         std::atomic<int> callCount{0};
-        SeqMock(std::string r1, std::string r2) { bodies.push_back(std::move(r1)); bodies.push_back(std::move(r2)); }
+        SeqMock(std::string r1, std::string weather, std::string r2) {
+            bodies.push_back(std::move(r1));
+            bodies.push_back(std::move(weather));
+            bodies.push_back(std::move(r2));
+        }
         void SendAsync(const HttpRequest&, HttpCallback cb) override {
             int n = callCount.fetch_add(1);
             std::string body = (n < (int)bodies.size()) ? bodies[n] : bodies.back();
@@ -913,7 +920,7 @@ TEST_F(ReActAgentTest, FullReActLoop_ToolCall_ThenFinalAnswer)
             }).detach();
         }
     };
-    auto multiMock = std::make_shared<SeqMock>(round1, round2);
+    auto multiMock = std::make_shared<SeqMock>(round1, "Beijing: Sunny, 25°C", round2);
     BP_SetHttpClient(multiMock);
 
     JsonBlueprintExporter exp;
@@ -924,14 +931,14 @@ TEST_F(ReActAgentTest, FullReActLoop_ToolCall_ThenFinalAnswer)
     runner.Execute();
     runner.DispatchEvent("OnBeginPlay");
 
-    // 等待两轮 LLM 异步完成
+    // 等待三轮 HTTP 异步完成（LLM×2 + weather×1）
     auto start = std::chrono::steady_clock::now();
-    for (int i = 0; i < 2000; ++i) {
+    for (int i = 0; i < 3000; ++i) {
         MainThreadDispatcher::Get().DrainQueue();
-        if (multiMock->callCount.load() >= 2 &&
+        if (multiMock->callCount.load() >= 3 &&
             !runner.HasPendingAsync())
             break;
-        if (std::chrono::steady_clock::now() - start > std::chrono::milliseconds(5000)) break;
+        if (std::chrono::steady_clock::now() - start > std::chrono::milliseconds(8000)) break;
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
     MainThreadDispatcher::Get().DrainQueue();
@@ -945,8 +952,8 @@ TEST_F(ReActAgentTest, FullReActLoop_ToolCall_ThenFinalAnswer)
     std::cout << "--- LLM call count: " << multiMock->callCount.load() << " ---\n";
     std::cout << "======================================\n";
 
-    EXPECT_EQ(multiMock->callCount.load(), 2)
-        << "Should call LLM twice: tool_call round + final answer round";
+    EXPECT_EQ(multiMock->callCount.load(), 3)
+        << "Should call HTTP 3 times: LLM round1 + wttr.in weather + LLM round2";
 
     // PrintString 节点（Print Final Answer）应打印含 Beijing 的文字
     bool foundFinalAnswer = false;

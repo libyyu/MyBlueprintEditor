@@ -10,6 +10,18 @@
 #include <cstdio>
 #include <cctype>
 
+#ifdef _WIN32
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h>
+#elif !defined(__EMSCRIPTEN__)
+#  include <unistd.h>
+#  include <sys/wait.h>
+#  include <signal.h>
+#  include <fcntl.h>
+#endif
+
 namespace NodeEditor {
 namespace Runtime {
 
@@ -452,7 +464,6 @@ void RegisterHandlers_Network(
                     size_t tagStart = html.rfind('<', hrefP);
                     auto [href, p1] = extractBetween(html, "href=\"", "\"", tagStart);
                     // 标题为 >...</a>
-                    size_t titleStart = html.find('>', hrefP);
                     auto [titleRaw, p2] = extractBetween(html, ">", "</a>", hrefP);
                     std::string title = stripTags(titleRaw);
                     // 找 snippet
@@ -517,9 +528,9 @@ void RegisterHandlers_Network(
     // ========================================================================
     handlers["Code.Run"] = [&runner](ExecutionContext& ctx) -> bool {
 #ifdef __EMSCRIPTEN__
-        ctx.SetOutputValue("Stdout",   Variant(std::string("")));
-        ctx.SetOutputValue("Stderr",   Variant(std::string("")));
-        ctx.SetOutputValue("ExitCode", Variant(static_cast<int64_t>(-1)));
+        ctx.SetOutputValue("Stdout",       Variant(std::string("")));
+        ctx.SetOutputValue("Stderr",       Variant(std::string("")));
+        ctx.SetOutputValue("ExitCode",     Variant(static_cast<int64_t>(-1)));
         ctx.SetOutputValue("ErrorMessage", Variant(std::string("Code.Run not supported on WebGL")));
         ctx.ActivateOutputFlow("onError");
         return true;
@@ -531,9 +542,9 @@ void RegisterHandlers_Network(
         if (timeoutSec <= 0) timeoutSec = 30;
 
         if (command.empty()) {
-            ctx.SetOutputValue("Stdout",   Variant(std::string("")));
-            ctx.SetOutputValue("Stderr",   Variant(std::string("")));
-            ctx.SetOutputValue("ExitCode", Variant(static_cast<int64_t>(-1)));
+            ctx.SetOutputValue("Stdout",       Variant(std::string("")));
+            ctx.SetOutputValue("Stderr",       Variant(std::string("")));
+            ctx.SetOutputValue("ExitCode",     Variant(static_cast<int64_t>(-1)));
             ctx.SetOutputValue("ErrorMessage", Variant(std::string("Command is empty")));
             ctx.ActivateOutputFlow("onError");
             return true;
@@ -552,50 +563,162 @@ void RegisterHandlers_Network(
 
         ctx.RunAsync(
             [command, workDir, timeoutSec, sharedResult](ExecutionContext::AsyncResolve resolve) mutable {
-                // 在后台线程执行子进程
                 std::thread([command, workDir, timeoutSec, sharedResult, resolve=std::move(resolve)]() mutable {
-                    // 切换工作目录（临时）
-                    // 使用 popen 捕获 stdout（stderr 重定向到 stdout）
-                    std::string fullCmd = command;
+
 #ifdef _WIN32
-                    // Windows：通过 cmd /c 执行，stderr 合并到 stdout
-                    fullCmd = "cmd /c \"" + command + "\" 2>&1";
-#else
-                    fullCmd = command + " 2>&1";
-#endif
-                    FILE* pipe = nullptr;
-#ifdef _WIN32
-                    if (!workDir.empty()) {
-                        // Windows 下在命令前 cd 到工作目录
+                    // ── Windows：CreateProcess + WaitForSingleObject + TerminateProcess ──
+                    std::string fullCmd;
+                    if (!workDir.empty())
                         fullCmd = "cmd /c \"cd /d \"" + workDir + "\" && " + command + "\" 2>&1";
+                    else
+                        fullCmd = "cmd /c \"" + command + "\" 2>&1";
+
+                    // 创建匿名管道捕获 stdout
+                    HANDLE hReadPipe = nullptr, hWritePipe = nullptr;
+                    SECURITY_ATTRIBUTES sa{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
+                    if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0)) {
+                        sharedResult->errorMsg = "CreatePipe failed";
+                        resolve(); return;
                     }
-                    pipe = _popen(fullCmd.c_str(), "r");
-#else
-                    if (!workDir.empty()) {
-                        fullCmd = "cd \"" + workDir + "\" && " + command + " 2>&1";
+                    SetHandleInformation(hReadPipe, HANDLE_FLAG_INHERIT, 0);
+
+                    STARTUPINFOA si{};
+                    si.cb          = sizeof(si);
+                    si.hStdOutput  = hWritePipe;
+                    si.hStdError   = hWritePipe;
+                    si.dwFlags     = STARTF_USESTDHANDLES;
+
+                    PROCESS_INFORMATION pi{};
+                    std::vector<char> cmdBuf(fullCmd.begin(), fullCmd.end());
+                    cmdBuf.push_back('\0');
+
+                    if (!CreateProcessA(nullptr, cmdBuf.data(), nullptr, nullptr,
+                                        TRUE, CREATE_NO_WINDOW, nullptr,
+                                        workDir.empty() ? nullptr : workDir.c_str(),
+                                        &si, &pi)) {
+                        CloseHandle(hWritePipe); CloseHandle(hReadPipe);
+                        sharedResult->errorMsg = "CreateProcess failed: " + command;
+                        resolve(); return;
                     }
-                    pipe = popen(fullCmd.c_str(), "r");
-#endif
-                    if (!pipe) {
-                        sharedResult->errorMsg = "Failed to start process: " + command;
+                    CloseHandle(hWritePipe);  // 子进程拥有写端
+
+                    // 读 stdout（在独立线程，避免 pipe 缓冲区满死锁）
+                    std::string captured;
+                    std::thread reader([&]() {
+                        char buf[4096];
+                        DWORD read = 0;
+                        while (ReadFile(hReadPipe, buf, sizeof(buf)-1, &read, nullptr) && read > 0) {
+                            buf[read] = '\0';
+                            captured += buf;
+                        }
+                    });
+
+                    DWORD waitMs = static_cast<DWORD>(timeoutSec) * 1000;
+                    DWORD wr = WaitForSingleObject(pi.hProcess, waitMs);
+                    bool timedOut = (wr == WAIT_TIMEOUT);
+
+                    if (timedOut) {
+                        TerminateProcess(pi.hProcess, 1);
+                        WaitForSingleObject(pi.hProcess, 3000);
+                        sharedResult->errorMsg = "Process killed: timeout (" + std::to_string(timeoutSec) + "s)";
                         sharedResult->exitCode = -1;
                     } else {
-                        char buf[256];
-                        while (fgets(buf, sizeof(buf), pipe))
-                            sharedResult->stdoutStr += buf;
-#ifdef _WIN32
-                        sharedResult->exitCode = _pclose(pipe);
-#else
-                        sharedResult->exitCode = pclose(pipe) >> 8;
-#endif
+                        DWORD code = 0;
+                        GetExitCodeProcess(pi.hProcess, &code);
+                        sharedResult->exitCode = static_cast<int>(code);
                     }
+
+                    CloseHandle(pi.hProcess);
+                    CloseHandle(pi.hThread);
+                    CloseHandle(hReadPipe);
+                    reader.join();
+                    sharedResult->stdoutStr = captured;
+
+#else
+                    // ── POSIX：fork + execvp + waitpid(WNOHANG) 轮询超时 + kill ──
+                    // 用 popen 方式同样可实现，但无法可靠 kill；改用 pipe+fork
+                    std::string fullCmd;
+                    if (!workDir.empty())
+                        fullCmd = "cd \"" + workDir + "\" && " + command + " 2>&1";
+                    else
+                        fullCmd = command + " 2>&1";
+
+                    int pipeFd[2];
+                    if (pipe(pipeFd) != 0) {
+                        sharedResult->errorMsg = "pipe() failed";
+                        resolve(); return;
+                    }
+
+                    pid_t pid = fork();
+                    if (pid < 0) {
+                        close(pipeFd[0]); close(pipeFd[1]);
+                        sharedResult->errorMsg = "fork() failed";
+                        resolve(); return;
+                    }
+
+                    if (pid == 0) {
+                        // 子进程
+                        close(pipeFd[0]);
+                        dup2(pipeFd[1], STDOUT_FILENO);
+                        dup2(pipeFd[1], STDERR_FILENO);
+                        close(pipeFd[1]);
+                        execl("/bin/sh", "sh", "-c", fullCmd.c_str(), nullptr);
+                        _exit(127);
+                    }
+
+                    // 父进程：读 pipe + 超时监控
+                    close(pipeFd[1]);
+
+                    auto deadline = std::chrono::steady_clock::now()
+                                  + std::chrono::seconds(timeoutSec);
+                    std::string captured;
+                    bool timedOut = false;
+
+                    // 设 pipe 为非阻塞
+                    int flags = fcntl(pipeFd[0], F_GETFL, 0);
+                    fcntl(pipeFd[0], F_SETFL, flags | O_NONBLOCK);
+
+                    while (true) {
+                        // 读取可用数据
+                        char buf[4096];
+                        ssize_t n = read(pipeFd[0], buf, sizeof(buf)-1);
+                        if (n > 0) { buf[n] = '\0'; captured += buf; }
+
+                        // 检查子进程是否结束
+                        int status = 0;
+                        pid_t ret = waitpid(pid, &status, WNOHANG);
+                        if (ret == pid) {
+                            // 进程已结束，把剩余数据读完
+                            while ((n = read(pipeFd[0], buf, sizeof(buf)-1)) > 0) {
+                                buf[n] = '\0'; captured += buf;
+                            }
+                            sharedResult->exitCode = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+                            break;
+                        }
+
+                        if (std::chrono::steady_clock::now() >= deadline) {
+                            timedOut = true;
+                            kill(pid, SIGKILL);
+                            waitpid(pid, nullptr, 0);
+                            sharedResult->errorMsg = "Process killed: timeout ("
+                                                   + std::to_string(timeoutSec) + "s)";
+                            sharedResult->exitCode = -1;
+                            break;
+                        }
+
+                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                    }
+                    close(pipeFd[0]);
+                    sharedResult->stdoutStr = captured;
+                    (void)timedOut;
+#endif
                     resolve();
                 }).detach();
             },
             [sharedResult, successPinId, errorPinId](ExecutionContext& c) mutable {
-                c.SetOutputValue("Stdout",   Variant(sharedResult->stdoutStr));
-                c.SetOutputValue("Stderr",   Variant(sharedResult->stderrStr));
-                c.SetOutputValue("ExitCode", Variant(static_cast<int64_t>(sharedResult->exitCode)));
+                c.SetOutputValue("Stdout",       Variant(sharedResult->stdoutStr));
+                c.SetOutputValue("Stderr",       Variant(sharedResult->stderrStr));
+                c.SetOutputValue("ExitCode",     Variant(static_cast<int64_t>(sharedResult->exitCode)));
                 c.SetOutputValue("ErrorMessage", Variant(sharedResult->errorMsg));
                 if (sharedResult->errorMsg.empty() && sharedResult->exitCode == 0) {
                     c.Log("[Code.Run] exit=0");
