@@ -15,7 +15,7 @@ class BlueprintRunner;
 // 注册 Variant/ExecutionContext metatable + Blueprint 全局表
 BLUEPRINT_API void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner);
 
-// 注册 json.* 和 http.* Lua 全局库（需在 RegisterLuaBindings 之后调用）
+// 注册 json.* 、http.* 和 file.* Lua 全局库（需在 RegisterLuaBindings 之后调用）
 BLUEPRINT_API void RegisterLuaJsonHttpLibs(lua_State* L);
 
 } // namespace Runtime

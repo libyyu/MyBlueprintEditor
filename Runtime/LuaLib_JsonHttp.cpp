@@ -1,27 +1,42 @@
 // Runtime/LuaLib_JsonHttp.cpp
-// json.* 和 http.* Lua 全局库实现
+// json.* 、http.* 和 file.* Lua 全局库实现
 //
 // json.parse(str)              → table | nil, errMsg
 // json.stringify(val)          → string
 // json.get(str, path)          → value | nil   ("choices[0].message.content")
 // json.set(str, key, val)      → string         (顶层 key 写入)
 //
-// http.get(url [, hdrs])                → body, statusCode, error
-// http.post(url, body [, hdrs])         → body, statusCode, error
-// http.request(method, url, body, hdrs) → body, statusCode, error
+// http.get(url [, hdrs], cb)                → (async, cb(body, status, err))
+// http.post(url, body [, hdrs], cb)         → (async)
+// http.request(method, url, body, hdrs, cb) → (async)
+//
+// file.read(path)              → content:string | nil, err:string
+// file.write(path, content)    → ok:bool, err:string
+// file.append(path, content)   → ok:bool, err:string
+// file.exists(path)            → bool
+// file.delete(path)            → ok:bool, err:string
+// file.size(path)              → int64 (-1 on error)
+// file.listdir(path [, pat])   → table | nil, err:string
+// file.mkdir(path)             → ok:bool, err:string
+// file.basename(path)          → string
+// file.dirname(path)           → string
+// file.join(base, part)        → string
 //
 // Emscripten 下 http.* 返回 nil, 0, "not supported on WebGL"
+// Emscripten 下 file.write/append/delete/listdir/mkdir 返回 false + errMsg
 // NoLua（未定义 BLUEPRINT_HAS_LUA）时整个文件不编译
 
 #ifdef BLUEPRINT_HAS_LUA
 
 #include "LuaBindings.h"
 #include "Http/IHttpClient.h"
+#include "FileSystem.h"
 #include "../../Utils/Json/crude_json.h"
 
 #include <lua.hpp>
 #include <string>
 #include <map>
+#include <vector>
 
 namespace NodeEditor {
 namespace Runtime {
@@ -333,6 +348,185 @@ void RegisterLuaJsonHttpLibs(lua_State* L)
     lua_setfield(L, -2, "request");
 
     lua_setglobal(L, "http");
+
+    // ── file ──────────────────────────────────────────────────────────────────
+    // 所有操作通过 GetDefaultFileSystem() 路由，平台差异在 DefaultFileSystem 内处理。
+    //
+    //   file.read(path)               → content, nil   | nil, errMsg
+    //   file.write(path, content)     → true, nil      | false, errMsg
+    //   file.append(path, content)    → true, nil      | false, errMsg
+    //   file.exists(path)             → bool
+    //   file.delete(path)             → true, nil      | false, errMsg
+    //   file.size(path)               → int64 (-1 on error)
+    //   file.listdir(path [, pat])    → {name,...}, nil | nil, errMsg
+    //   file.mkdir(path)              → true, nil      | false, errMsg
+    //   file.basename(path)           → string
+    //   file.dirname(path)            → string
+    //   file.join(base, part)         → string
+    //
+    lua_newtable(L);  // file 表
+
+    // file.read(path) → content | nil, err
+    {
+        lua_CFunction fn = [](lua_State* Lx) -> int {
+            const char* path = luaL_checkstring(Lx, 1);
+            auto* fs = GetDefaultFileSystem().get();
+            if (!fs) { lua_pushnil(Lx); lua_pushstring(Lx, "FileSystem not available"); return 2; }
+            std::string content, err;
+            if (fs->ReadFile(path, content, err)) {
+                lua_pushlstring(Lx, content.c_str(), content.size()); return 1;
+            }
+            lua_pushnil(Lx); lua_pushstring(Lx, err.c_str()); return 2;
+        };
+        lua_pushcfunction(L, fn);
+    }
+    lua_setfield(L, -2, "read");
+
+    // file.write(path, content) → true | false, err
+    {
+        lua_CFunction fn = [](lua_State* Lx) -> int {
+            const char* path = luaL_checkstring(Lx, 1);
+            size_t len = 0;
+            const char* content = luaL_checklstring(Lx, 2, &len);
+            auto* fs = GetDefaultFileSystem().get();
+            if (!fs) { lua_pushboolean(Lx, 0); lua_pushstring(Lx, "FileSystem not available"); return 2; }
+            std::string err;
+            if (fs->WriteFile(path, std::string(content, len), err)) { lua_pushboolean(Lx, 1); return 1; }
+            lua_pushboolean(Lx, 0); lua_pushstring(Lx, err.c_str()); return 2;
+        };
+        lua_pushcfunction(L, fn);
+    }
+    lua_setfield(L, -2, "write");
+
+    // file.append(path, content) → true | false, err
+    {
+        lua_CFunction fn = [](lua_State* Lx) -> int {
+            const char* path = luaL_checkstring(Lx, 1);
+            size_t len = 0;
+            const char* content = luaL_checklstring(Lx, 2, &len);
+            auto* fs = GetDefaultFileSystem().get();
+            if (!fs) { lua_pushboolean(Lx, 0); lua_pushstring(Lx, "FileSystem not available"); return 2; }
+            std::string err;
+            if (fs->AppendFile(path, std::string(content, len), err)) { lua_pushboolean(Lx, 1); return 1; }
+            lua_pushboolean(Lx, 0); lua_pushstring(Lx, err.c_str()); return 2;
+        };
+        lua_pushcfunction(L, fn);
+    }
+    lua_setfield(L, -2, "append");
+
+    // file.exists(path) → bool
+    {
+        lua_CFunction fn = [](lua_State* Lx) -> int {
+            const char* path = luaL_checkstring(Lx, 1);
+            auto* fs = GetDefaultFileSystem().get();
+            lua_pushboolean(Lx, (fs && fs->FileExists(path)) ? 1 : 0);
+            return 1;
+        };
+        lua_pushcfunction(L, fn);
+    }
+    lua_setfield(L, -2, "exists");
+
+    // file.delete(path) → true | false, err
+    {
+        lua_CFunction fn = [](lua_State* Lx) -> int {
+            const char* path = luaL_checkstring(Lx, 1);
+            auto* fs = GetDefaultFileSystem().get();
+            if (!fs) { lua_pushboolean(Lx, 0); lua_pushstring(Lx, "FileSystem not available"); return 2; }
+            std::string err;
+            if (fs->DeleteFile(path, false, err)) { lua_pushboolean(Lx, 1); return 1; }
+            lua_pushboolean(Lx, 0); lua_pushstring(Lx, err.c_str()); return 2;
+        };
+        lua_pushcfunction(L, fn);
+    }
+    lua_setfield(L, -2, "delete");
+
+    // file.size(path) → int64
+    {
+        lua_CFunction fn = [](lua_State* Lx) -> int {
+            const char* path = luaL_checkstring(Lx, 1);
+            auto* fs = GetDefaultFileSystem().get();
+            lua_pushinteger(Lx, fs ? static_cast<lua_Integer>(fs->GetFileSize(path)) : -1);
+            return 1;
+        };
+        lua_pushcfunction(L, fn);
+    }
+    lua_setfield(L, -2, "size");
+
+    // file.listdir(path [, pattern]) → {name,...} | nil, err
+    {
+        lua_CFunction fn = [](lua_State* Lx) -> int {
+            const char* path    = luaL_checkstring(Lx, 1);
+            const char* pattern = luaL_optstring(Lx, 2, "");
+            auto* fs = GetDefaultFileSystem().get();
+            if (!fs) { lua_pushnil(Lx); lua_pushstring(Lx, "FileSystem not available"); return 2; }
+            std::vector<std::string> names;
+            std::string err;
+            if (!fs->ListDir(path, pattern, names, err)) {
+                lua_pushnil(Lx); lua_pushstring(Lx, err.c_str()); return 2;
+            }
+            lua_createtable(Lx, static_cast<int>(names.size()), 0);
+            for (int i = 0; i < static_cast<int>(names.size()); ++i) {
+                lua_pushstring(Lx, names[i].c_str());
+                lua_rawseti(Lx, -2, i + 1);
+            }
+            return 1;
+        };
+        lua_pushcfunction(L, fn);
+    }
+    lua_setfield(L, -2, "listdir");
+
+    // file.mkdir(path) → true | false, err
+    {
+        lua_CFunction fn = [](lua_State* Lx) -> int {
+            const char* path = luaL_checkstring(Lx, 1);
+            auto* fs = GetDefaultFileSystem().get();
+            if (!fs) { lua_pushboolean(Lx, 0); lua_pushstring(Lx, "FileSystem not available"); return 2; }
+            std::string err;
+            if (fs->MakeDir(path, err)) { lua_pushboolean(Lx, 1); return 1; }
+            lua_pushboolean(Lx, 0); lua_pushstring(Lx, err.c_str()); return 2;
+        };
+        lua_pushcfunction(L, fn);
+    }
+    lua_setfield(L, -2, "mkdir");
+
+    // file.basename(path) → string
+    {
+        lua_CFunction fn = [](lua_State* Lx) -> int {
+            const char* path = luaL_checkstring(Lx, 1);
+            auto* fs = GetDefaultFileSystem().get();
+            lua_pushstring(Lx, fs ? fs->GetBaseName(path).c_str() : "");
+            return 1;
+        };
+        lua_pushcfunction(L, fn);
+    }
+    lua_setfield(L, -2, "basename");
+
+    // file.dirname(path) → string
+    {
+        lua_CFunction fn = [](lua_State* Lx) -> int {
+            const char* path = luaL_checkstring(Lx, 1);
+            auto* fs = GetDefaultFileSystem().get();
+            lua_pushstring(Lx, fs ? fs->GetDirName(path).c_str() : "");
+            return 1;
+        };
+        lua_pushcfunction(L, fn);
+    }
+    lua_setfield(L, -2, "dirname");
+
+    // file.join(base, part) → string
+    {
+        lua_CFunction fn = [](lua_State* Lx) -> int {
+            const char* base = luaL_checkstring(Lx, 1);
+            const char* part = luaL_checkstring(Lx, 2);
+            auto* fs = GetDefaultFileSystem().get();
+            lua_pushstring(Lx, fs ? fs->JoinPath(base, part).c_str() : "");
+            return 1;
+        };
+        lua_pushcfunction(L, fn);
+    }
+    lua_setfield(L, -2, "join");
+
+    lua_setglobal(L, "file");
 }
 
 } // namespace Runtime
