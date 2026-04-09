@@ -19,6 +19,10 @@ void BlueprintEditor::ShowUnsavedChangesDialog()
 
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    // 最小宽度随 DPI/字体大小自适应（字体越大，按钮越宽）
+    float dpiScale  = ImGui::GetFontSize() / 13.0f;  // 13px 为基准字体大小
+    float minWidth  = 360.0f * dpiScale;
+    ImGui::SetNextWindowSizeConstraints(ImVec2(minWidth, 0), ImVec2(FLT_MAX, FLT_MAX));
 
     if (ImGui::BeginPopupModal("Unsaved Changes###UnsavedDlg", nullptr,
         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
@@ -33,7 +37,7 @@ void BlueprintEditor::ShowUnsavedChangesDialog()
         ImGui::Separator();
         ImGui::Spacing();
 
-        float buttonWidth = 100.0f;
+        float buttonWidth = 100.0f * dpiScale;
         float totalWidth = buttonWidth * 3 + ImGui::GetStyle().ItemSpacing.x * 2;
         float startX = (ImGui::GetContentRegionAvail().x - totalWidth) * 0.5f;
         if (startX > 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + startX);

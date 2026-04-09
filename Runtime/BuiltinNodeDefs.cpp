@@ -294,13 +294,13 @@ static void RegisterNodeDefs_Math(INodeRegistry& registry)
 
     // --- Comparison (Math/Comparison) ---
     reg("Less", "<", "Math/Comparison",
-        { MakePin("", PinDataType::Float), MakePin("", PinDataType::Float) },
-        { MakePin("", PinDataType::Float) },
+        { MakePin("A", PinDataType::Float), MakePin("B", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Boolean) },
         "80C3F8", "Simple");
 
     reg("Greater", ">", "Math/Comparison",
-        { MakePin("", PinDataType::Float), MakePin("", PinDataType::Float) },
-        { MakePin("", PinDataType::Float) },
+        { MakePin("A", PinDataType::Float), MakePin("B", PinDataType::Float) },
+        { MakePin("Result", PinDataType::Boolean) },
         "80C3F8", "Simple");
 
     reg("Equal", "==", "Math/Comparison",
