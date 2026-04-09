@@ -2139,6 +2139,73 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
         },
         "5A6A7A");
 
+    // ── HTTP.Retry ───────────────────────────────────────────────────────────
+    // 带自动重试的 HTTP GET/POST，网络抖动时自动重试 MaxRetries 次
+    // RetryOnStatus: 逗号分隔的 HTTP 状态码（如 "429,503"），匹配时重试
+    reg("HTTP.Retry", "HTTP Retry", "Network",
+        {
+            MakeFlowPin(""),
+            MakePin("URL",           PinDataType::String),
+            MakePin("Method",        PinDataType::String),   // "GET" | "POST"
+            MakePin("Body",          PinDataType::String),
+            MakePin("Headers",       PinDataType::String),
+            MakePin("MaxRetries",    PinDataType::Integer),  // default 3
+            MakePin("RetryDelaySec", PinDataType::Float),    // default 1.0
+            MakePin("RetryOnStatus", PinDataType::String),   // "429,503" 等
+            MakePin("TimeoutSeconds",PinDataType::Integer),
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("StatusCode",   PinDataType::Integer),
+            MakePin("ResponseBody", PinDataType::String),
+            MakePin("RetryCount",   PinDataType::Integer),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "2E86AB"); // 蓝色，同 HTTP.Get
+
+    // ── Agent.Reflect ────────────────────────────────────────────────────────
+    // 让 LLM 评估上一步输出是否满足 Criteria，不满足时触发 onFail + Feedback
+    reg("Agent.Reflect", "Agent Reflect", "AI/Agent",
+        {
+            MakeFlowPin(""),
+            MakePin("BaseURL",     PinDataType::String),
+            MakePin("ApiKey",      PinDataType::String),
+            MakePin("Model",       PinDataType::String),
+            MakePin("Output",      PinDataType::String),  // 上一步的输出内容
+            MakePin("Criteria",    PinDataType::String),  // 评判标准（自然语言）
+            MakePin("MaxTokens",   PinDataType::Integer),
+        },
+        {
+            MakeFlowPin("onPass"),
+            MakeFlowPin("onFail"),
+            MakeFlowPin("onError"),
+            MakePin("Feedback",      PinDataType::String), // 不满足时的改进建议
+            MakePin("Score",         PinDataType::String), // "pass" | "fail"
+            MakePin("ErrorMessage",  PinDataType::String),
+        },
+        "A05050"); // 红色
+
+    // ── Context.Compress ─────────────────────────────────────────────────────
+    // 压缩对话历史：保留最近 KeepRecent 轮，用 LLM 摘要更早的内容
+    reg("Context.Compress", "Context Compress", "AI/Agent",
+        {
+            MakeFlowPin(""),
+            MakePin("BaseURL",    PinDataType::String),
+            MakePin("ApiKey",     PinDataType::String),
+            MakePin("Model",      PinDataType::String),
+            MakePin("Messages",   PinDataType::String),   // JSON 数组字符串
+            MakePin("KeepRecent", PinDataType::Integer),  // 保留最近 N 条，default 6
+            MakePin("MaxTokens",  PinDataType::Integer),
+        },
+        {
+            MakeFlowPin("onDone"),
+            MakeFlowPin("onError"),
+            MakePin("Compressed",    PinDataType::String), // 压缩后的 JSON 数组
+            MakePin("ErrorMessage",  PinDataType::String),
+        },
+        "50A080"); // 绿色
+
 }
 
 void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)

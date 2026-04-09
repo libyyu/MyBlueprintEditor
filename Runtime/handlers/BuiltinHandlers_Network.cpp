@@ -1,12 +1,15 @@
 // Runtime/handlers/BuiltinHandlers_Network.cpp
 // 网络相关节点处理器：HTTP.Request, HTTP.Get, HTTP.Post, HTTP.Download,
-//                    JSON.GetPath, Web.Search, Code.Run
+//                    JSON.GetPath, Web.Search, Code.Run, HTTP.Retry
 #include "BuiltinHandlers_Network.h"
 #include "../BlueprintRunner.h"
 #include "../Http/IHttpClient.h"
 #include "../../Utils/Json/crude_json.h"
 
 #include <thread>
+#include <future>
+#include <set>
+#include <sstream>
 #include <cstdio>
 #include <cctype>
 
@@ -732,6 +735,128 @@ void RegisterHandlers_Network(
         return true;
 #endif // __EMSCRIPTEN__
     };
+
+    // ========================================================================
+    // HTTP.Retry
+    // 带自动重试的 HTTP 请求，适用于网络抖动、限流（429）等场景
+    // MaxRetries: 最大重试次数（不含首次），默认 3
+    // RetryDelaySec: 每次重试等待秒数，默认 1.0
+    // RetryOnStatus: 逗号分隔的需要重试的 HTTP 状态码，如 "429,503"；空=只重试网络错误
+    // ========================================================================
+    handlers["HTTP.Retry"] = [&runner](ExecutionContext& ctx) -> bool {
+
+        IHttpClient* client = BP_GetHttpClient();
+        if (!client) {
+            ctx.SetOutputValue("StatusCode",   Variant(static_cast<int64_t>(0)));
+            ctx.SetOutputValue("ResponseBody", Variant(std::string("")));
+            ctx.SetOutputValue("RetryCount",   Variant(static_cast<int64_t>(0)));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient registered")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        HttpRequest req;
+        req.url    = ctx.GetInputValue("URL").asString();
+        req.method = ctx.GetInputValue("Method").asString();
+        req.body   = ctx.GetInputValue("Body").asString();
+        if (req.method.empty()) req.method = "GET";
+
+        std::string headersJson = ctx.GetInputValue("Headers").asString();
+        if (!headersJson.empty()) {
+            crude_json::value hj = crude_json::value::parse(headersJson);
+            if (hj.is_object()) {
+                for (const auto& kv : hj.get<crude_json::object>())
+                    if (kv.second.is_string())
+                        req.headers[kv.first] = kv.second.get<std::string>();
+            }
+        }
+        auto timeoutVar = ctx.GetInputValue("TimeoutSeconds");
+        if (timeoutVar.type == PinDataType::Integer || timeoutVar.type == PinDataType::Float)
+            req.timeoutSeconds = static_cast<int>(timeoutVar.asInt());
+
+        int maxRetries   = static_cast<int>(ctx.GetInputValue("MaxRetries").asInt());
+        if (maxRetries <= 0) maxRetries = 3;
+
+        double retryDelay = ctx.GetInputValue("RetryDelaySec").asFloat();
+        if (retryDelay <= 0.0) retryDelay = 1.0;
+
+        // 解析 RetryOnStatus（逗号分隔）
+        std::string retryOnStatusStr = ctx.GetInputValue("RetryOnStatus").asString();
+        std::set<int> retryOnStatus;
+        {
+            std::stringstream ss(retryOnStatusStr);
+            std::string tok;
+            while (std::getline(ss, tok, ',')) {
+                try { retryOnStatus.insert(std::stoi(tok)); } catch (...) {}
+            }
+        }
+
+        PinId successPinId = ctx.GetPinId("onSuccess");
+        PinId errorPinId   = ctx.GetPinId("onError");
+        ctx.MarkDownstreamAsHandled("onSuccess");
+        ctx.MarkDownstreamAsHandled("onError");
+
+        // 使用 shared_ptr 在递归 lambda 间共享状态
+        struct RetryState {
+            HttpResponse response;
+            int retryCount = 0;
+        };
+        auto state = std::make_shared<RetryState>();
+
+        // 递归重试逻辑：通过 RunAsync 链式调用
+        // 为避免真正的递归，使用迭代式方法：把所有尝试打包到单个 dispatcher 中
+        auto dispatcher = [client, req, maxRetries, retryDelay, retryOnStatus, state]
+                          (ExecutionContext::AsyncResolve resolve) mutable
+        {
+            // 在后台线程同步循环（每次重试之间 sleep）
+            std::thread([client, req, maxRetries, retryDelay, retryOnStatus, state,
+                         resolve = std::move(resolve)]() mutable
+            {
+                for (int attempt = 0; attempt <= maxRetries; ++attempt) {
+                    if (attempt > 0) {
+                        std::this_thread::sleep_for(
+                            std::chrono::milliseconds(static_cast<int>(retryDelay * 1000)));
+                        ++state->retryCount;
+                    }
+                    // 同步发送（用 promise/future 阻塞当前线程等待回调）
+                    std::promise<HttpResponse> prom;
+                    auto fut = prom.get_future();
+                    client->SendAsync(req, [&prom](HttpResponse resp) mutable {
+                        prom.set_value(std::move(resp));
+                    });
+                    HttpResponse resp = fut.get();
+
+                    bool shouldRetry = !resp.ok() &&
+                        (attempt < maxRetries) &&
+                        (!resp.error.empty() || retryOnStatus.count(resp.statusCode) > 0);
+
+                    if (!shouldRetry) {
+                        state->response = std::move(resp);
+                        break;
+                    }
+                    state->response = std::move(resp); // 保留最后一次响应
+                }
+                resolve();
+            }).detach();
+        };
+
+        auto onComplete = [state, successPinId, errorPinId](ExecutionContext& c) mutable
+        {
+            const HttpResponse& resp = state->response;
+            c.SetOutputValue("StatusCode",   Variant(static_cast<int64_t>(resp.statusCode)));
+            c.SetOutputValue("ResponseBody", Variant(resp.body));
+            c.SetOutputValue("RetryCount",   Variant(static_cast<int64_t>(state->retryCount)));
+            c.SetOutputValue("ErrorMessage", Variant(resp.error));
+            if (resp.ok())
+                c.ActivateOutputFlow(successPinId);
+            else
+                c.ActivateOutputFlow(errorPinId);
+        };
+
+        ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
+        return true;
+    };
+
 }
 
 } // namespace Runtime

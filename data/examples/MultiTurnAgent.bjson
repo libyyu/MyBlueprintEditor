@@ -382,6 +382,33 @@
         ]
       },
       {
+        "id": 35,
+        "definitionId": "GetVariable",
+        "name": "Get ApiKey",
+        "pins": [
+          { "id": 35001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "ApiKey" },
+          { "id": 35010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 36,
+        "definitionId": "GetVariable",
+        "name": "Get BaseURL",
+        "pins": [
+          { "id": 36001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "BaseURL" },
+          { "id": 36010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 37,
+        "definitionId": "GetVariable",
+        "name": "Get Model",
+        "pins": [
+          { "id": 37001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Model" },
+          { "id": 37010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
         "id": 34,
         "definitionId": "PrintString",
         "name": "Loop Completed",
@@ -435,9 +462,19 @@
       { "id": 9039, "startPinId": 17012, "endPinId": 32001, "isEnabled": true },
       { "id": 9040, "startPinId": 17024, "endPinId": 32002, "isEnabled": true },
       { "id": 9041, "startPinId": 32010, "endPinId": 33001, "isEnabled": true },
-      { "id": 9042, "startPinId": 13011, "endPinId": 34001, "isEnabled": true }
+      { "id": 9042, "startPinId": 13011, "endPinId": 34001, "isEnabled": true },
+      { "id": 9043, "startPinId": 35010, "endPinId": 17003, "isEnabled": true },
+      { "id": 9044, "startPinId": 36010, "endPinId": 17002, "isEnabled": true },
+      { "id": 9045, "startPinId": 37010, "endPinId": 17004, "isEnabled": true }
     ],
-    "variables": []
+    "variables": [
+      { "name": "messages", "dataType": 4, "defaultValue": "[]" },
+      { "name": "round",    "dataType": 2, "defaultValue": 0 },
+      { "name": "done",     "dataType": 1, "defaultValue": false },
+      { "name": "ApiKey",   "dataType": 4, "defaultValue": "sk-your-api-key-here" },
+      { "name": "BaseURL",  "dataType": 4, "defaultValue": "https://api.openai.com/v1" },
+      { "name": "Model",    "dataType": 4, "defaultValue": "gpt-4o" }
+    ]
   },
   "editor": {
     "fileType": "editor",

@@ -292,15 +292,29 @@ class BlueprintLib:
                 self._lib.BP_Tick(runner, ctypes.c_float(tick))
                 time.sleep(tick)
                 elapsed += tick
+            # 先尝试读 String（最通用；int/float 也能转成字符串）
             buf = ctypes.create_string_buffer(4096)
             n = self._lib.BP_GetVariableString(
                 runner, var_name.encode("utf-8"), buf, 4096)
             if n >= 0:
-                value = buf.value.decode("utf-8", errors="replace")
+                raw = buf.value.decode("utf-8", errors="replace")
+                # 尝试还原为原生 int / float 类型（避免返回 "42" 而非 42）
+                try:
+                    as_int = int(raw)
+                    # 只有整数字符串才转 int（避免 "3.14" → 3）
+                    if str(as_int) == raw:
+                        value = as_int
+                    else:
+                        value = float(raw)
+                except (ValueError, TypeError):
+                    value = raw
             else:
-                vi = self._lib.BP_GetVariableInt(runner, var_name.encode("utf-8"))
-                vf = self._lib.BP_GetVariableFloat(runner, var_name.encode("utf-8"))
-                value = vi if vi != 0 else vf
+                # 变量不存在或读取失败
+                err_buf = ctypes.create_string_buffer(256)
+                self._lib.BP_GetLastError(runner, err_buf, 256)
+                return {"value": None, "output": self._print_lines[:],
+                        "error": f"Variable '{var_name}' not found: "
+                                 f"{err_buf.value.decode('utf-8', errors='replace')}"}
             return {"value": value, "output": self._print_lines[:], "error": None}
         finally:
             self._lib.BP_DestroyRunner(runner)

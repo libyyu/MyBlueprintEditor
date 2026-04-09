@@ -87,19 +87,32 @@ def _get_lib() -> BlueprintLib:
 # Helpers
 # ---------------------------------------------------------------------------
 def _find_bjson_files(root: pathlib.Path) -> list[dict]:
-    """Recursively find all .bjson files, return relative paths + metadata."""
+    """Recursively find all .bjson files, return relative paths + metadata + variables."""
     results = []
     skip = {"build", "build-windows", "build-static", ".git", "external", "logs"}
     for p in root.rglob("*.bjson"):
-        # Skip build directories
         if any(part in skip for part in p.parts):
             continue
         rel = p.relative_to(root)
-        results.append({
+        entry: dict = {
             "path": str(rel).replace("\\", "/"),
             "name": p.stem,
             "size_bytes": p.stat().st_size,
-        })
+        }
+        # 尝试解析变量列表，帮助 AI 知道执行前需要注入哪些变量
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            vars_list = data.get("runtime", {}).get("variables", [])
+            # 只返回非内部变量（不以 __ 开头）
+            entry["variables"] = [
+                {"name": v["name"], "dataType": v.get("dataType", 0),
+                 "defaultValue": v.get("defaultValue", "")}
+                for v in vars_list
+                if not v.get("name", "").startswith("__")
+            ]
+        except Exception:
+            entry["variables"] = []
+        results.append(entry)
     results.sort(key=lambda x: x["path"])
     return results
 
@@ -360,7 +373,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                 },
                 "node_structure": {
                     "id": "Unique integer ID",
-                    "definitionId": "Node type identifier (see common_node_types)",
+                    "definitionId": "Node type identifier (see node_types)",
                     "name": "Display name",
                     "pins": "Array of PinInfo objects"
                 },
@@ -372,6 +385,11 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                     "name": "Pin name (empty string for unnamed exec pins)",
                     "defaultValue": "Default value (string/number/bool/array)"
                 },
+                "variable_structure": {
+                    "name": "Variable name",
+                    "dataType": "See data_types (4=String most common)",
+                    "defaultValue": "Default value"
+                },
                 "link_structure": {
                     "id": "Unique integer ID",
                     "startPinId": "Output pin ID",
@@ -379,35 +397,77 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                     "isEnabled": "true"
                 },
                 "data_types": {
-                    "0": "Unknown/Any",
+                    "0": "Unknown/Flow (exec pins)",
                     "1": "Boolean",
                     "2": "Integer",
                     "3": "Float",
                     "4": "String",
-                    "6": "Array",
+                    "6": "Array (JSON array string)",
                     "9": "Any"
                 },
-                "common_node_types": {
-                    "OnBeginPlay": "Event source - entry point, exec output pin only",
-                    "PrintString": "Print to console. Pins: 'In String'(in,4), exec in/out",
-                    "FormatString": "Format string. Pins: 'Format'(in,4), named args(in,4), 'Result'(out,4)",
-                    "ForLoop": "Loop. Pins: exec-in, 'First Index'(in,2), 'Last Index'(in,2); exec-out 'LoopBody'+'Completed', 'Index'(out,2)",
-                    "Branch": "If/else. Pins: exec-in, 'Condition'(in,1); exec-out 'True'+'False'",
-                    "SetVariable": "Set variable. Pins: exec-in, 'Name'(in,4), 'Value'(in,any); exec-out",
-                    "GetVariable": "Get variable. Pins: 'Name'(in,4), 'Value'(out,any)",
-                    "AppendString": "Concatenate. Pins: 'A'(in,4), 'B'(in,4), 'Result'(out,4)",
-                    "LLM.Chat": "Call LLM API. Pins: BaseURL,ApiKey,Model,Messages,SystemPrompt,MaxTokens,Temperature,Tools(in); onReply,onToolCall,onError(exec-out); Reply,ToolCallsJSON,FullResponse,ErrorMessage(out,4)",
-                    "JSON.MakeMessage": "Build chat message. Pins: Role,Content,ToolCallId(in,4); Message(out,4)",
-                    "JSON.ArrayPush": "Push to JSON array. Pins: exec-in, JSON(in,4), Element(in,any); exec-out, JSON(out,4), Length(out,2)",
-                    "JSON.Extract": "Extract field. Pins: JSON,Path(in,4); Value(out,4)",
-                    "String.Template": "Template substitution. Pins: Template(in,4),Keys(in,6),Values(in,6); Result(out,4)"
+                "node_types": {
+                    "control_flow": {
+                        "OnBeginPlay": "Entry point. Out: exec",
+                        "Branch": "If/else. In: exec,'Condition'(bool). Out: exec 'True','False'",
+                        "ForLoop": "In: exec,'First Index'(int),'Last Index'(int). Out: exec 'LoopBody','Completed'; 'Index'(int)",
+                        "WhileLoop": "In: exec,'Condition'(bool). Out: exec 'Loop Body','Completed'",
+                        "FireEvent": "Fire a named event. In: exec,'EventName'(str). Out: exec",
+                        "CustomEventNode": "Receives a named event. nodeData:{EventName}. Out: exec,'EventName'(str)"
+                    },
+                    "variables": {
+                        "SetVariable": "In: exec,'Name'(str),'Value'(any). Out: exec",
+                        "GetVariable": "In: 'Name'(str). Out: 'Value'(any)"
+                    },
+                    "string_ops": {
+                        "PrintString": "In: exec,'In String'(str). Out: exec",
+                        "FormatString": "In: 'Format'(str), named args(str). Out: 'Result'(str). Use {0},{1}... in Format",
+                        "AppendString": "In: 'A','B'(str). Out: 'Result'(str)",
+                        "String.Template": "In: 'Template'(str),'Keys'(array),'Values'(array). Out: 'Result'(str). Use {{key}} in Template"
+                    },
+                    "json_ops": {
+                        "JSON.MakeMessage": "Build chat message. In: 'Role','Content','ToolCallId'(str). Out: 'Message'(str)",
+                        "JSON.ArrayPush": "In: exec,'JSON'(str),'Element'(any). Out: exec,'JSON'(str),'Length'(int)",
+                        "JSON.GetPath": "In: 'JSON','Path'(str). Out: 'Value'(str),'Found'(bool). Path: 'key', '[0]', '[0].key'",
+                        "JSON.Extract": "In: 'JSON','Path'(str). Out: 'Value'(str)"
+                    },
+                    "network": {
+                        "HTTP.Get": "In: exec,'URL','Headers'(str),'TimeoutSeconds'(int). Out: exec 'onSuccess','onError'; 'StatusCode'(int),'ResponseBody','ErrorMessage'(str)",
+                        "HTTP.Post": "In: exec,'URL','Body','ContentType','Headers'(str),'TimeoutSeconds'(int). Out: exec 'onSuccess','onError'; 'StatusCode'(int),'ResponseBody','ErrorMessage'(str)",
+                        "HTTP.Download": "In: exec,'URL'(str). Out: exec 'onSuccess','onError'; 'Content','ErrorMessage'(str)",
+                        "Web.Search": "DuckDuckGo (no API key). In: exec,'Query'(str),'MaxResults'(int). Out: exec 'onSuccess','onError'; 'Results'(JSON),'ResultText','ErrorMessage'(str)",
+                        "Code.Run": "Run subprocess. In: exec,'Command','WorkDir'(str),'TimeoutSeconds'(int). Out: exec 'onSuccess','onError'; 'Stdout','Stderr','ExitCode'(str)"
+                    },
+                    "ai_llm": {
+                        "LLM.Chat": "OpenAI-compat chat. In: exec,'BaseURL','ApiKey','Model','Messages','SystemPrompt'(str),'MaxTokens'(int),'Temperature'(float),'Tools'(str). Out: exec 'onReply','onToolCall','onError'; 'Reply','ToolCallsJSON','FinishReason','FullResponse','ErrorMessage'(str)",
+                        "LLM.StreamChat": "Streaming chat. Same inputs as LLM.Chat plus 'Stream'(bool). Out: exec 'onChunk','onDone','onToolCall','onError'; 'Chunk','Reply','ToolCallsJSON','ErrorMessage'(str)"
+                    },
+                    "ai_tools": {
+                        "Tool.ForEach": "Iterate tool calls. In: exec,'ToolCallsJSON'(str). Out: exec 'onTool','onDone'; 'ToolName','Arguments','ToolCallId'(str),'Index'(int)",
+                        "Tool.ForEachParallel": "Parallel tool calls. Same as Tool.ForEach but fires all onTool in parallel",
+                        "Tool.Match": "Route by tool name. In: exec,'ToolName'(str),'Case0'..'Case7'(str). Out: exec 'Match0'..'Match7','Default'; 'MatchedIndex'(int)",
+                        "Tool.CallByName": "Dynamic tool dispatch via FuncLib. In: exec,'ToolName','Arguments'(str). Out: exec 'onSuccess','onError'; 'Result','ErrorMessage'(str)",
+                        "Tool.Define": "Define a tool for LLM. In: 'Name','Description'(str), param pins. Out: 'ToolJSON'(str)",
+                        "MCP.Call": "Call MCP server. In: exec,'ServerURL','ToolName','Arguments'(str),'Protocol'(str). Out: exec 'onSuccess','onError'; 'Result','RawResult','ErrorMessage'(str)"
+                    },
+                    "ai_memory": {
+                        "Memory.LoadHistory": "Load chat history. In: exec,'HistoryId'(str). Out: exec 'onFound','onEmpty'; 'Messages'(str)",
+                        "Memory.SaveHistory": "Save chat history. In: exec,'HistoryId','Messages'(str). Out: exec"
+                    },
+                    "ai_misc": {
+                        "UserInput.Wait": "Wait for text input. In: exec,'Prompt'(str). Out: exec,'Input'(str)"
+                    }
                 },
-                "tips": [
+                "best_practices": [
+                    "Always add blueprint variables for ApiKey/BaseURL/Model so they can be injected via MCP variables parameter.",
+                    "Use GetVariable nodes to read variables and connect to LLM.Chat pins instead of hardcoding in defaultValue.",
                     "Always use unique IDs for nodes and pins across the whole file.",
-                    "Exec pins connect the execution flow; data pins connect values.",
-                    "OnBeginPlay is the standard entry point for Actor blueprints.",
-                    "Use PrintString to output results - they appear in 'output' after execution.",
-                    "Link startPinId must be an Output pin, endPinId must be an Input pin."
+                    "Exec pins connect execution flow; data pins connect values.",
+                    "OnBeginPlay is the standard entry point for Actor blueprints (blueprintClass=0).",
+                    "Use PrintString to output results - they appear in 'output' after execute_blueprint.",
+                    "Link startPinId must be an Output pin (kind=1), endPinId must be an Input pin (kind=0).",
+                    "For multi-turn agents, use FireEvent+CustomEventNode to avoid recursive call stack overflow.",
+                    "Tool.CallByName requires the tool handler to be registered as a FuncLib function.",
+                    "HTTP.Get/Post/Web.Search are async - connect onSuccess/onError exec pins."
                 ]
             }
             return _json(schema)

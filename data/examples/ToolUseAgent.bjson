@@ -71,6 +71,33 @@
         ]
       },
       {
+        "id": 101,
+        "definitionId": "GetVariable",
+        "name": "Get ApiKey",
+        "pins": [
+          { "id": 1011, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "ApiKey" },
+          { "id": 1012, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 102,
+        "definitionId": "GetVariable",
+        "name": "Get BaseURL",
+        "pins": [
+          { "id": 1021, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "BaseURL" },
+          { "id": 1022, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 103,
+        "definitionId": "GetVariable",
+        "name": "Get Model",
+        "pins": [
+          { "id": 1031, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Model" },
+          { "id": 1032, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
         "id": 7,
         "definitionId": "LLM.Chat",
         "name": "LLM Call 1",
@@ -165,6 +192,33 @@
         ]
       },
       {
+        "id": 104,
+        "definitionId": "GetVariable",
+        "name": "Get ApiKey 2",
+        "pins": [
+          { "id": 1041, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "ApiKey" },
+          { "id": 1042, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 105,
+        "definitionId": "GetVariable",
+        "name": "Get BaseURL 2",
+        "pins": [
+          { "id": 1051, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "BaseURL" },
+          { "id": 1052, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 106,
+        "definitionId": "GetVariable",
+        "name": "Get Model 2",
+        "pins": [
+          { "id": 1061, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Model" },
+          { "id": 1062, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
         "id": 14,
         "definitionId": "LLM.Chat",
         "name": "LLM Call 2",
@@ -229,6 +283,9 @@
       { "id": 202, "startPinId": 6010,  "endPinId": 7001,  "isEnabled": true },
       { "id": 203, "startPinId": 6011,  "endPinId": 7005,  "isEnabled": true },
       { "id": 204, "startPinId": 2011,  "endPinId": 7009,  "isEnabled": true },
+      { "id": 205, "startPinId": 1012,  "endPinId": 7003,  "isEnabled": true },
+      { "id": 206, "startPinId": 1022,  "endPinId": 7002,  "isEnabled": true },
+      { "id": 207, "startPinId": 1032,  "endPinId": 7004,  "isEnabled": true },
       { "id": 400, "startPinId": 7010,  "endPinId": 10001, "isEnabled": true },
       { "id": 401, "startPinId": 7012,  "endPinId": 17001, "isEnabled": true },
       { "id": 402, "startPinId": 7014,  "endPinId": 8001,  "isEnabled": true },
@@ -243,11 +300,18 @@
       { "id": 434, "startPinId": 6011,  "endPinId": 13002, "isEnabled": true },
       { "id": 435, "startPinId": 13010, "endPinId": 14001, "isEnabled": true },
       { "id": 436, "startPinId": 13011, "endPinId": 14005, "isEnabled": true },
+      { "id": 437, "startPinId": 1042,  "endPinId": 14003, "isEnabled": true },
+      { "id": 438, "startPinId": 1052,  "endPinId": 14002, "isEnabled": true },
+      { "id": 439, "startPinId": 1062,  "endPinId": 14004, "isEnabled": true },
       { "id": 440, "startPinId": 14010, "endPinId": 16001, "isEnabled": true },
       { "id": 441, "startPinId": 14012, "endPinId": 17001, "isEnabled": true },
       { "id": 442, "startPinId": 14013, "endPinId": 16002, "isEnabled": true }
     ],
-    "variables": []
+    "variables": [
+      { "name": "ApiKey",  "dataType": 4, "defaultValue": "sk-your-api-key-here" },
+      { "name": "BaseURL", "dataType": 4, "defaultValue": "https://api.openai.com/v1" },
+      { "name": "Model",   "dataType": 4, "defaultValue": "gpt-4o" }
+    ]
   },
   "editor": {
     "fileType": "editor",

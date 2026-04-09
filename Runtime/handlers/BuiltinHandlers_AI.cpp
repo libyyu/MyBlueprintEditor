@@ -1753,7 +1753,264 @@ void RegisterHandlers_AI(
         return true;
     };
 
+    // ========================================================================
+    // Agent.Reflect
+    // 让 LLM 评估输出是否满足评判标准（Criteria），输出 pass/fail + Feedback
+    // ========================================================================
+    handlers["Agent.Reflect"] = [&runner](ExecutionContext& ctx) -> bool {
+
+        IHttpClient* client = BP_GetHttpClient();
+        if (!client) {
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient registered")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        std::string baseUrl  = ctx.GetInputValue("BaseURL").asString();
+        std::string apiKey   = ctx.GetInputValue("ApiKey").asString();
+        std::string model    = ctx.GetInputValue("Model").asString();
+        std::string output   = ctx.GetInputValue("Output").asString();
+        std::string criteria = ctx.GetInputValue("Criteria").asString();
+        int maxTokens        = static_cast<int>(ctx.GetInputValue("MaxTokens").asInt());
+
+        if (baseUrl.empty()) baseUrl = "https://api.openai.com/v1";
+        if (model.empty())   model   = "gpt-4o";
+        if (maxTokens <= 0)  maxTokens = 256;
+
+        // 构造评估 prompt
+        std::string sysPrompt =
+            "You are a strict evaluator. Given an OUTPUT and CRITERIA, decide if the output PASSES or FAILS.\n"
+            "Respond with a JSON object: {\"result\": \"pass\" or \"fail\", \"feedback\": \"brief reason\"}.\n"
+            "No extra text, only valid JSON.";
+        std::string userMsg =
+            "OUTPUT:\n" + output + "\n\nCRITERIA:\n" + criteria;
+
+        crude_json::array messages;
+        crude_json::object sysMsg, userMsgObj;
+        sysMsg["role"]    = crude_json::value(std::string("system"));
+        sysMsg["content"] = crude_json::value(sysPrompt);
+        userMsgObj["role"]    = crude_json::value(std::string("user"));
+        userMsgObj["content"] = crude_json::value(userMsg);
+        messages.push_back(crude_json::value(std::move(sysMsg)));
+        messages.push_back(crude_json::value(std::move(userMsgObj)));
+
+        crude_json::object body;
+        body["model"]      = crude_json::value(model);
+        body["messages"]   = crude_json::value(std::move(messages));
+        body["max_tokens"] = crude_json::value(static_cast<double>(maxTokens));
+
+        HttpRequest req;
+        req.url    = baseUrl + "/chat/completions";
+        req.method = "POST";
+        req.body   = crude_json::value(std::move(body)).dump();
+        req.headers["Content-Type"]  = "application/json";
+        req.headers["Authorization"] = "Bearer " + apiKey;
+        req.timeoutSeconds = 30;
+
+        PinId passPinId  = ctx.GetPinId("onPass");
+        PinId failPinId  = ctx.GetPinId("onFail");
+        PinId errorPinId = ctx.GetPinId("onError");
+        ctx.MarkDownstreamAsHandled("onPass");
+        ctx.MarkDownstreamAsHandled("onFail");
+        ctx.MarkDownstreamAsHandled("onError");
+
+        auto sharedResp = std::make_shared<HttpResponse>();
+        auto dispatcher = [client, req, sharedResp](ExecutionContext::AsyncResolve resolve) mutable
+        {
+            client->SendAsync(req, [sharedResp, resolve = std::move(resolve)](HttpResponse resp) mutable {
+                *sharedResp = std::move(resp);
+                resolve();
+            });
+        };
+
+        auto onComplete = [sharedResp, passPinId, failPinId, errorPinId](ExecutionContext& c) mutable
+        {
+            const HttpResponse& resp = *sharedResp;
+            if (!resp.ok()) {
+                c.SetOutputValue("ErrorMessage", Variant(resp.error.empty() ?
+                    "HTTP " + std::to_string(resp.statusCode) : resp.error));
+                c.SetOutputValue("Score",    Variant(std::string("fail")));
+                c.SetOutputValue("Feedback", Variant(std::string("")));
+                c.ActivateOutputFlow(errorPinId);
+                return;
+            }
+            // 解析 LLM 返回
+            crude_json::value root = crude_json::value::parse(resp.body);
+            std::string content;
+            if (root.is_object() && root.contains("choices")) {
+                const auto& choices = root["choices"];
+                if (choices.is_array() && !choices.get<crude_json::array>().empty()) {
+                    const auto& first = choices.get<crude_json::array>()[0];
+                    if (first.is_object() && first.contains("message")) {
+                        const auto& msg = first["message"];
+                        if (msg.is_object() && msg.contains("content")) {
+                            const auto& cv = msg["content"];
+                            if (cv.is_string()) content = cv.get<std::string>();
+                        }
+                    }
+                }
+            }
+            // 解析 JSON 评估结果
+            crude_json::value evalJson = crude_json::value::parse(content);
+            std::string result   = "fail";
+            std::string feedback = content;
+            if (evalJson.is_object()) {
+                if (evalJson.contains("result") && evalJson["result"].is_string())
+                    result = evalJson["result"].get<std::string>();
+                if (evalJson.contains("feedback") && evalJson["feedback"].is_string())
+                    feedback = evalJson["feedback"].get<std::string>();
+            }
+            c.SetOutputValue("Score",        Variant(result));
+            c.SetOutputValue("Feedback",     Variant(feedback));
+            c.SetOutputValue("ErrorMessage", Variant(std::string("")));
+            if (result == "pass")
+                c.ActivateOutputFlow(passPinId);
+            else
+                c.ActivateOutputFlow(failPinId);
+        };
+
+        ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
+        return true;
+    };
+
+    // ========================================================================
+    // Context.Compress
+    // 保留最近 KeepRecent 条消息，用 LLM 摘要更早的内容，防止 context 溢出
+    // ========================================================================
+    handlers["Context.Compress"] = [&runner](ExecutionContext& ctx) -> bool {
+
+        IHttpClient* client = BP_GetHttpClient();
+        if (!client) {
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient registered")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        std::string baseUrl  = ctx.GetInputValue("BaseURL").asString();
+        std::string apiKey   = ctx.GetInputValue("ApiKey").asString();
+        std::string model    = ctx.GetInputValue("Model").asString();
+        std::string messages = ctx.GetInputValue("Messages").asString();
+        int keepRecent       = static_cast<int>(ctx.GetInputValue("KeepRecent").asInt());
+        int maxTokens        = static_cast<int>(ctx.GetInputValue("MaxTokens").asInt());
+
+        if (baseUrl.empty()) baseUrl  = "https://api.openai.com/v1";
+        if (model.empty())   model    = "gpt-4o";
+        if (keepRecent <= 0) keepRecent = 6;
+        if (maxTokens  <= 0) maxTokens  = 512;
+
+        // 解析 messages 数组
+        crude_json::value msgsJson = crude_json::value::parse(messages);
+        if (!msgsJson.is_array()) {
+            ctx.SetOutputValue("Compressed",   Variant(messages));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("Messages is not a JSON array")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        const auto& arr = msgsJson.get<crude_json::array>();
+        int total = static_cast<int>(arr.size());
+
+        // 消息数量 <= KeepRecent，无需压缩
+        if (total <= keepRecent) {
+            ctx.SetOutputValue("Compressed",   Variant(messages));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("")));
+            ctx.ActivateOutputFlow("onDone");
+            return true;
+        }
+
+        // 需要压缩：[0, total-keepRecent) 的消息用 LLM 摘要
+        int splitAt = total - keepRecent;
+        crude_json::array earlyMsgs(arr.begin(), arr.begin() + splitAt);
+        crude_json::array recentMsgs(arr.begin() + splitAt, arr.end());
+
+        // 构造摘要请求
+        std::string earlyText = crude_json::value(earlyMsgs).dump();
+        crude_json::array summaryMessages;
+        crude_json::object sysMsg;
+        sysMsg["role"]    = crude_json::value(std::string("system"));
+        sysMsg["content"] = crude_json::value(std::string(
+            "Summarize the following conversation history concisely. "
+            "Preserve key facts, decisions, and context. Output plain text summary only."));
+        crude_json::object userMsgObj;
+        userMsgObj["role"]    = crude_json::value(std::string("user"));
+        userMsgObj["content"] = crude_json::value(earlyText);
+        summaryMessages.push_back(crude_json::value(std::move(sysMsg)));
+        summaryMessages.push_back(crude_json::value(std::move(userMsgObj)));
+
+        crude_json::object reqBody;
+        reqBody["model"]      = crude_json::value(model);
+        reqBody["messages"]   = crude_json::value(std::move(summaryMessages));
+        reqBody["max_tokens"] = crude_json::value(static_cast<double>(maxTokens));
+
+        HttpRequest req;
+        req.url    = baseUrl + "/chat/completions";
+        req.method = "POST";
+        req.body   = crude_json::value(std::move(reqBody)).dump();
+        req.headers["Content-Type"]  = "application/json";
+        req.headers["Authorization"] = "Bearer " + apiKey;
+        req.timeoutSeconds = 30;
+
+        PinId donePinId  = ctx.GetPinId("onDone");
+        PinId errorPinId = ctx.GetPinId("onError");
+        ctx.MarkDownstreamAsHandled("onDone");
+        ctx.MarkDownstreamAsHandled("onError");
+
+        auto sharedResp = std::make_shared<HttpResponse>();
+        auto sharedRecent = std::make_shared<crude_json::array>(std::move(recentMsgs));
+
+        auto dispatcher = [client, req, sharedResp](ExecutionContext::AsyncResolve resolve) mutable
+        {
+            client->SendAsync(req, [sharedResp, resolve = std::move(resolve)](HttpResponse resp) mutable {
+                *sharedResp = std::move(resp);
+                resolve();
+            });
+        };
+
+        auto onComplete = [sharedResp, sharedRecent, donePinId, errorPinId](ExecutionContext& c) mutable
+        {
+            const HttpResponse& resp = *sharedResp;
+            if (!resp.ok()) {
+                c.SetOutputValue("ErrorMessage", Variant(resp.error.empty() ?
+                    "HTTP " + std::to_string(resp.statusCode) : resp.error));
+                c.ActivateOutputFlow(errorPinId);
+                return;
+            }
+            // 提取摘要文本
+            std::string summary;
+            crude_json::value root = crude_json::value::parse(resp.body);
+            if (root.is_object() && root.contains("choices")) {
+                const auto& choices = root["choices"];
+                if (choices.is_array() && !choices.get<crude_json::array>().empty()) {
+                    const auto& first = choices.get<crude_json::array>()[0];
+                    if (first.is_object() && first.contains("message")) {
+                        const auto& msg = first["message"];
+                        if (msg.is_object() && msg.contains("content")) {
+                            const auto& cv = msg["content"];
+                            if (cv.is_string()) summary = cv.get<std::string>();
+                        }
+                    }
+                }
+            }
+            // 组装压缩后消息：[system summary] + recent messages
+            crude_json::array compressed;
+            crude_json::object summaryMsg;
+            summaryMsg["role"]    = crude_json::value(std::string("system"));
+            summaryMsg["content"] = crude_json::value(std::string("[Conversation summary] ") + summary);
+            compressed.push_back(crude_json::value(std::move(summaryMsg)));
+            for (const auto& m : *sharedRecent)
+                compressed.push_back(m);
+
+            c.SetOutputValue("Compressed",   Variant(crude_json::value(std::move(compressed)).dump()));
+            c.SetOutputValue("ErrorMessage", Variant(std::string("")));
+            c.ActivateOutputFlow(donePinId);
+        };
+
+        ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
+        return true;
+    };
+
 }
 
 } // namespace Runtime
 } // namespace NodeEditor
+
