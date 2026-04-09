@@ -2164,6 +2164,28 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
         },
         "2E86AB"); // 蓝色，同 HTTP.Get
 
+    // ── Agent.Plan ───────────────────────────────────────────────────────────
+    // 让 LLM 把复杂 Goal 分解为可执行步骤列表（JSON 数组），配合 Tool.CallByName
+    reg("Agent.Plan", "Agent Plan", "AI/Agent",
+        {
+            MakeFlowPin(""),
+            MakePin("BaseURL",         PinDataType::String),
+            MakePin("ApiKey",          PinDataType::String),
+            MakePin("Model",           PinDataType::String),
+            MakePin("Goal",            PinDataType::String),  // 目标描述
+            MakePin("AvailableTools",  PinDataType::String),  // JSON 数组，每项含 name+description
+            MakePin("MaxSteps",        PinDataType::Integer), // 最大步骤数，default 5
+            MakePin("MaxTokens",       PinDataType::Integer),
+        },
+        {
+            MakeFlowPin("onDone"),
+            MakeFlowPin("onError"),
+            MakePin("PlanJSON",      PinDataType::String),  // JSON 数组：[{"tool","arguments","reason"}]
+            MakePin("StepCount",     PinDataType::Integer),
+            MakePin("ErrorMessage",  PinDataType::String),
+        },
+        "5080C0"); // 蓝紫色
+
     // ── Agent.Reflect ────────────────────────────────────────────────────────
     // 让 LLM 评估上一步输出是否满足 Criteria，不满足时触发 onFail + Feedback
     reg("Agent.Reflect", "Agent Reflect", "AI/Agent",
@@ -2236,6 +2258,8 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     addCat("AI/String",  "AI / String");
     addCat("AI/Memory",  "AI / Memory");
     addCat("AI/Tool",    "AI / Tool");
+    addCat("AI/Agent",   "AI / Agent");
+    addCat("AI/MCP",     "AI / MCP");
     addCat("File",       "File I/O");
 
     // --- 注册各分类的节点定义 ---

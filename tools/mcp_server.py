@@ -209,6 +209,11 @@ async def list_tools() -> list[types.Tool]:
                         "type": "object",
                         "description": "Optional variables to inject before execution",
                         "additionalProperties": True
+                    },
+                    "dispatch_beginplay": {
+                        "type": "boolean",
+                        "description": "Whether to dispatch OnBeginPlay event after Execute. Default: true.",
+                        "default": True
                     }
                 },
                 "required": ["content"]
@@ -326,8 +331,9 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         elif name == "execute_blueprint_json":
             content   = arguments["content"]
             variables = arguments.get("variables")
+            dispatch  = arguments.get("dispatch_beginplay", True)
             lib = _get_lib()
-            result = lib.execute(content, variables, dispatch_beginplay=True)
+            result = lib.execute(content, variables, dispatch_beginplay=dispatch)
             return _json(result)
 
         elif name == "get_variable":
@@ -434,6 +440,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                         "HTTP.Get": "In: exec,'URL','Headers'(str),'TimeoutSeconds'(int). Out: exec 'onSuccess','onError'; 'StatusCode'(int),'ResponseBody','ErrorMessage'(str)",
                         "HTTP.Post": "In: exec,'URL','Body','ContentType','Headers'(str),'TimeoutSeconds'(int). Out: exec 'onSuccess','onError'; 'StatusCode'(int),'ResponseBody','ErrorMessage'(str)",
                         "HTTP.Download": "In: exec,'URL'(str). Out: exec 'onSuccess','onError'; 'Content','ErrorMessage'(str)",
+                        "HTTP.Retry": "Auto-retry HTTP request. In: exec,'URL','Method','Body','Headers'(str),'MaxRetries'(int),'RetryDelaySec'(float),'RetryOnStatus'(str e.g.'429,503'),'TimeoutSeconds'(int). Out: exec 'onSuccess','onError'; 'StatusCode'(int),'ResponseBody','RetryCount'(int),'ErrorMessage'(str)",
                         "Web.Search": "DuckDuckGo (no API key). In: exec,'Query'(str),'MaxResults'(int). Out: exec 'onSuccess','onError'; 'Results'(JSON),'ResultText','ErrorMessage'(str)",
                         "Code.Run": "Run subprocess. In: exec,'Command','WorkDir'(str),'TimeoutSeconds'(int). Out: exec 'onSuccess','onError'; 'Stdout','Stderr','ExitCode'(str)"
                     },
@@ -452,6 +459,11 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                     "ai_memory": {
                         "Memory.LoadHistory": "Load chat history. In: exec,'HistoryId'(str). Out: exec 'onFound','onEmpty'; 'Messages'(str)",
                         "Memory.SaveHistory": "Save chat history. In: exec,'HistoryId','Messages'(str). Out: exec"
+                    },
+                    "ai_agent": {
+                        "Agent.Plan": "Decompose a goal into steps. In: exec,'BaseURL','ApiKey','Model','Goal','AvailableTools'(str),'MaxSteps'(int),'MaxTokens'(int). Out: exec 'onDone','onError'; 'PlanJSON'(str JSON array of {tool,arguments,reason}),'StepCount'(int),'ErrorMessage'(str)",
+                        "Agent.Reflect": "Evaluate output against criteria. In: exec,'BaseURL','ApiKey','Model','Output','Criteria'(str),'MaxTokens'(int). Out: exec 'onPass','onFail','onError'; 'Feedback','Score'(str pass|fail),'ErrorMessage'(str)",
+                        "Context.Compress": "Compress old messages with LLM summary. In: exec,'BaseURL','ApiKey','Model','Messages'(str),'KeepRecent'(int),'MaxTokens'(int). Out: exec 'onDone','onError'; 'Compressed'(str JSON array),'ErrorMessage'(str)"
                     },
                     "ai_misc": {
                         "UserInput.Wait": "Wait for text input. In: exec,'Prompt'(str). Out: exec,'Input'(str)"
@@ -493,6 +505,79 @@ async def main():
         )
 
 
-if __name__ == "__main__":
+def run_http(host: str = "0.0.0.0", port: int = 7799):
+    """HTTP REST 模式：任意程序可通过 POST /tool 调用工具，无需 MCP 客户端。
+
+    请求格式：
+      POST /tool
+      Content-Type: application/json
+      {"tool": "execute_blueprint", "arguments": {"path": "...", "variables": {...}}}
+
+    响应格式：
+      {"result": [...TextContent...], "error": null}
+    """
     import asyncio
-    asyncio.run(main())
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, fmt, *args):
+            pass  # 静默访问日志
+
+        def do_POST(self):
+            if self.path != "/tool":
+                self.send_response(404)
+                self.end_headers()
+                return
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length)
+            try:
+                req = json.loads(body)
+                tool_name = req.get("tool", "")
+                arguments = req.get("arguments", {})
+                result = asyncio.run(call_tool(tool_name, arguments))
+                resp = json.dumps({
+                    "result": [{"type": r.type, "text": r.text} for r in result],
+                    "error": None
+                }, ensure_ascii=False)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(resp.encode("utf-8"))
+            except Exception as e:
+                err = json.dumps({"result": [], "error": str(e)})
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(err.encode("utf-8"))
+
+        def do_GET(self):
+            if self.path == "/health":
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"status":"ok","server":"blueprint-mcp"}')
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+    httpd = HTTPServer((host, port), Handler)
+    print(f"[Blueprint MCP] HTTP mode listening on http://{host}:{port}/tool", flush=True)
+    print(f"[Blueprint MCP] Health check: http://{host}:{port}/health", flush=True)
+    httpd.serve_forever()
+
+
+if __name__ == "__main__":
+    import sys
+    import asyncio
+
+    if "--http" in sys.argv:
+        host = "0.0.0.0"
+        port = 7799
+        for arg in sys.argv:
+            if arg.startswith("--port="):
+                port = int(arg.split("=", 1)[1])
+            if arg.startswith("--host="):
+                host = arg.split("=", 1)[1]
+        run_http(host, port)
+    else:
+        asyncio.run(main())

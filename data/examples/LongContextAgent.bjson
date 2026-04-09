@@ -1,0 +1,425 @@
+{
+  "runtime": {
+    "fileType": "runtime",
+    "metadata": {
+      "schemaVersion": 2,
+      "blueprintClass": 0,
+      "name": "LongContextAgent",
+      "description": "Demonstrates Context.Compress: multi-turn chat that auto-compresses history when message count exceeds threshold. Variables: ApiKey, BaseURL, Model, UserQuery, KeepRecent, CompressThreshold.",
+      "version": "1.0"
+    },
+    "nodes": [
+      {
+        "id": 1,
+        "definitionId": "OnBeginPlay",
+        "name": "On Begin Play",
+        "pins": [
+          { "id": 2, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 10,
+        "definitionId": "SetVariable",
+        "name": "Init messages",
+        "pins": [
+          { "id": 100, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 101, "kind": 0, "dataType": 4, "name": "Name",  "defaultValue": "messages" },
+          { "id": 102, "kind": 0, "dataType": 4, "name": "Value", "defaultValue": "[]" },
+          { "id": 103, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 11,
+        "definitionId": "SetVariable",
+        "name": "Init round",
+        "pins": [
+          { "id": 110, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 111, "kind": 0, "dataType": 4, "name": "Name",  "defaultValue": "round" },
+          { "id": 112, "kind": 0, "dataType": 2, "name": "Value", "defaultValue": 0 },
+          { "id": 113, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 20,
+        "definitionId": "GetVariable",
+        "name": "Get ApiKey",
+        "pins": [
+          { "id": 200, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "ApiKey" },
+          { "id": 201, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 21,
+        "definitionId": "GetVariable",
+        "name": "Get BaseURL",
+        "pins": [
+          { "id": 210, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "BaseURL" },
+          { "id": 211, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 22,
+        "definitionId": "GetVariable",
+        "name": "Get Model",
+        "pins": [
+          { "id": 220, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Model" },
+          { "id": 221, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 23,
+        "definitionId": "GetVariable",
+        "name": "Get UserQuery",
+        "pins": [
+          { "id": 230, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "UserQuery" },
+          { "id": 231, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 30,
+        "definitionId": "JSON.MakeMessage",
+        "name": "Make User Msg",
+        "pins": [
+          { "id": 300, "kind": 0, "dataType": 4, "name": "Role",       "defaultValue": "user" },
+          { "id": 301, "kind": 0, "dataType": 4, "name": "Content" },
+          { "id": 302, "kind": 0, "dataType": 4, "name": "ToolCallId", "defaultValue": "" },
+          { "id": 303, "kind": 1, "dataType": 4, "name": "Message" }
+        ]
+      },
+      {
+        "id": 31,
+        "definitionId": "GetVariable",
+        "name": "Get messages for push",
+        "pins": [
+          { "id": 310, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "messages" },
+          { "id": 311, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 32,
+        "definitionId": "JSON.ArrayPush",
+        "name": "Append User Msg",
+        "pins": [
+          { "id": 320, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 321, "kind": 0, "dataType": 4, "name": "JSON" },
+          { "id": 322, "kind": 0, "dataType": 9, "name": "Element" },
+          { "id": 323, "kind": 1, "dataType": 0, "isExec": true },
+          { "id": 324, "kind": 1, "dataType": 4, "name": "JSON" },
+          { "id": 325, "kind": 1, "dataType": 2, "name": "Length" }
+        ]
+      },
+      {
+        "id": 33,
+        "definitionId": "SetVariable",
+        "name": "Save messages after push",
+        "pins": [
+          { "id": 330, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 331, "kind": 0, "dataType": 4, "name": "Name",  "defaultValue": "messages" },
+          { "id": 332, "kind": 0, "dataType": 4, "name": "Value" },
+          { "id": 333, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 40,
+        "definitionId": "GetVariable",
+        "name": "Get messages length check",
+        "pins": [
+          { "id": 400, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "messages" },
+          { "id": 401, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 41,
+        "definitionId": "JSON.ArrayPush",
+        "name": "Count messages",
+        "comment": "Push dummy to get length, then discard",
+        "pins": [
+          { "id": 410, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 411, "kind": 0, "dataType": 4, "name": "JSON" },
+          { "id": 412, "kind": 0, "dataType": 9, "name": "Element", "defaultValue": "" },
+          { "id": 413, "kind": 1, "dataType": 0, "isExec": true },
+          { "id": 414, "kind": 1, "dataType": 4, "name": "JSON" },
+          { "id": 415, "kind": 1, "dataType": 2, "name": "Length" }
+        ]
+      },
+      {
+        "id": 42,
+        "definitionId": "GetVariable",
+        "name": "Get CompressThreshold",
+        "pins": [
+          { "id": 420, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "CompressThreshold" },
+          { "id": 421, "kind": 1, "dataType": 2, "name": "Value" }
+        ]
+      },
+      {
+        "id": 43,
+        "definitionId": "GreaterEqual",
+        "name": "Length >= Threshold",
+        "pins": [
+          { "id": 430, "kind": 0, "dataType": 2, "name": "A" },
+          { "id": 431, "kind": 0, "dataType": 2, "name": "B" },
+          { "id": 432, "kind": 1, "dataType": 1, "name": "Result" }
+        ]
+      },
+      {
+        "id": 44,
+        "definitionId": "Branch",
+        "name": "Need Compress?",
+        "pins": [
+          { "id": 440, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 441, "kind": 0, "dataType": 1, "name": "Condition" },
+          { "id": 442, "kind": 1, "dataType": 0, "name": "True",  "isExec": true },
+          { "id": 443, "kind": 1, "dataType": 0, "name": "False", "isExec": true }
+        ]
+      },
+      {
+        "id": 50,
+        "definitionId": "GetVariable",
+        "name": "Get messages for compress",
+        "pins": [
+          { "id": 500, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "messages" },
+          { "id": 501, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 51,
+        "definitionId": "GetVariable",
+        "name": "Get KeepRecent",
+        "pins": [
+          { "id": 510, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "KeepRecent" },
+          { "id": 511, "kind": 1, "dataType": 2, "name": "Value" }
+        ]
+      },
+      {
+        "id": 52,
+        "definitionId": "Context.Compress",
+        "name": "Compress History",
+        "pins": [
+          { "id": 520, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 521, "kind": 0, "dataType": 4, "name": "BaseURL" },
+          { "id": 522, "kind": 0, "dataType": 4, "name": "ApiKey" },
+          { "id": 523, "kind": 0, "dataType": 4, "name": "Model" },
+          { "id": 524, "kind": 0, "dataType": 4, "name": "Messages" },
+          { "id": 525, "kind": 0, "dataType": 2, "name": "KeepRecent" },
+          { "id": 526, "kind": 0, "dataType": 2, "name": "MaxTokens",  "defaultValue": 512 },
+          { "id": 527, "kind": 1, "dataType": 0, "name": "onDone",  "isExec": true },
+          { "id": 528, "kind": 1, "dataType": 0, "name": "onError", "isExec": true },
+          { "id": 529, "kind": 1, "dataType": 4, "name": "Compressed" },
+          { "id": 530, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
+        ]
+      },
+      {
+        "id": 53,
+        "definitionId": "SetVariable",
+        "name": "Save compressed messages",
+        "pins": [
+          { "id": 531, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 532, "kind": 0, "dataType": 4, "name": "Name",  "defaultValue": "messages" },
+          { "id": 533, "kind": 0, "dataType": 4, "name": "Value" },
+          { "id": 534, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 54,
+        "definitionId": "PrintString",
+        "name": "Print Compressed",
+        "pins": [
+          { "id": 540, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 541, "kind": 0, "dataType": 4, "name": "In String",
+            "defaultValue": "[LongContextAgent] History compressed." },
+          { "id": 542, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 60,
+        "definitionId": "GetVariable",
+        "name": "Get messages for LLM",
+        "pins": [
+          { "id": 600, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "messages" },
+          { "id": 601, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 61,
+        "definitionId": "LLM.Chat",
+        "name": "LLM Call",
+        "pins": [
+          { "id": 610, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 611, "kind": 0, "dataType": 4, "name": "BaseURL",      "defaultValue": "https://api.openai.com/v1" },
+          { "id": 612, "kind": 0, "dataType": 4, "name": "ApiKey",       "defaultValue": "" },
+          { "id": 613, "kind": 0, "dataType": 4, "name": "Model",        "defaultValue": "gpt-4o" },
+          { "id": 614, "kind": 0, "dataType": 4, "name": "Messages" },
+          { "id": 615, "kind": 0, "dataType": 4, "name": "SystemPrompt",
+            "defaultValue": "You are a helpful assistant with long conversation memory." },
+          { "id": 616, "kind": 0, "dataType": 2, "name": "MaxTokens",    "defaultValue": 512 },
+          { "id": 617, "kind": 0, "dataType": 3, "name": "Temperature",  "defaultValue": 0.7 },
+          { "id": 618, "kind": 0, "dataType": 4, "name": "Tools",        "defaultValue": "" },
+          { "id": 619, "kind": 1, "dataType": 0, "name": "onReply",    "isExec": true },
+          { "id": 620, "kind": 1, "dataType": 0, "name": "onToolCall", "isExec": true },
+          { "id": 621, "kind": 1, "dataType": 0, "name": "onError",    "isExec": true },
+          { "id": 622, "kind": 1, "dataType": 4, "name": "Reply" },
+          { "id": 623, "kind": 1, "dataType": 4, "name": "ToolCallsJSON" },
+          { "id": 624, "kind": 1, "dataType": 4, "name": "FinishReason" },
+          { "id": 625, "kind": 1, "dataType": 4, "name": "FullResponse" },
+          { "id": 626, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
+        ]
+      },
+      {
+        "id": 62,
+        "definitionId": "JSON.MakeMessage",
+        "name": "Make Assistant Msg",
+        "pins": [
+          { "id": 627, "kind": 0, "dataType": 4, "name": "Role",       "defaultValue": "assistant" },
+          { "id": 628, "kind": 0, "dataType": 4, "name": "Content" },
+          { "id": 629, "kind": 0, "dataType": 4, "name": "ToolCallId", "defaultValue": "" },
+          { "id": 630, "kind": 1, "dataType": 4, "name": "Message" }
+        ]
+      },
+      {
+        "id": 63,
+        "definitionId": "GetVariable",
+        "name": "Get messages for append reply",
+        "pins": [
+          { "id": 631, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "messages" },
+          { "id": 632, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 64,
+        "definitionId": "JSON.ArrayPush",
+        "name": "Append Reply",
+        "pins": [
+          { "id": 640, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 641, "kind": 0, "dataType": 4, "name": "JSON" },
+          { "id": 642, "kind": 0, "dataType": 9, "name": "Element" },
+          { "id": 643, "kind": 1, "dataType": 0, "isExec": true },
+          { "id": 644, "kind": 1, "dataType": 4, "name": "JSON" },
+          { "id": 645, "kind": 1, "dataType": 2, "name": "Length" }
+        ]
+      },
+      {
+        "id": 65,
+        "definitionId": "SetVariable",
+        "name": "Save messages with reply",
+        "pins": [
+          { "id": 650, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 651, "kind": 0, "dataType": 4, "name": "Name",  "defaultValue": "messages" },
+          { "id": 652, "kind": 0, "dataType": 4, "name": "Value" },
+          { "id": 653, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 70,
+        "definitionId": "PrintString",
+        "name": "Print Reply",
+        "pins": [
+          { "id": 700, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 701, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 702, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 71,
+        "definitionId": "PrintString",
+        "name": "Print Error",
+        "pins": [
+          { "id": 710, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 711, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 712, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      }
+    ],
+    "links": [
+      { "id": 1,  "startPinId": 2,   "endPinId": 100, "isEnabled": true },
+      { "id": 2,  "startPinId": 103, "endPinId": 110, "isEnabled": true },
+      { "id": 3,  "startPinId": 113, "endPinId": 320, "isEnabled": true },
+      { "id": 4,  "startPinId": 231, "endPinId": 301, "isEnabled": true },
+      { "id": 5,  "startPinId": 303, "endPinId": 322, "isEnabled": true },
+      { "id": 6,  "startPinId": 311, "endPinId": 321, "isEnabled": true },
+      { "id": 7,  "startPinId": 323, "endPinId": 330, "isEnabled": true },
+      { "id": 8,  "startPinId": 324, "endPinId": 332, "isEnabled": true },
+      { "id": 9,  "startPinId": 333, "endPinId": 410, "isEnabled": true },
+      { "id": 10, "startPinId": 401, "endPinId": 411, "isEnabled": true },
+      { "id": 11, "startPinId": 415, "endPinId": 430, "isEnabled": true },
+      { "id": 12, "startPinId": 421, "endPinId": 431, "isEnabled": true },
+      { "id": 13, "startPinId": 432, "endPinId": 441, "isEnabled": true },
+      { "id": 14, "startPinId": 413, "endPinId": 440, "isEnabled": true },
+      { "id": 15, "startPinId": 442, "endPinId": 520, "isEnabled": true },
+      { "id": 16, "startPinId": 443, "endPinId": 610, "isEnabled": true },
+      { "id": 17, "startPinId": 211, "endPinId": 521, "isEnabled": true },
+      { "id": 18, "startPinId": 201, "endPinId": 522, "isEnabled": true },
+      { "id": 19, "startPinId": 221, "endPinId": 523, "isEnabled": true },
+      { "id": 20, "startPinId": 501, "endPinId": 524, "isEnabled": true },
+      { "id": 21, "startPinId": 511, "endPinId": 525, "isEnabled": true },
+      { "id": 22, "startPinId": 527, "endPinId": 531, "isEnabled": true },
+      { "id": 23, "startPinId": 529, "endPinId": 533, "isEnabled": true },
+      { "id": 24, "startPinId": 534, "endPinId": 540, "isEnabled": true },
+      { "id": 25, "startPinId": 542, "endPinId": 610, "isEnabled": true },
+      { "id": 26, "startPinId": 528, "endPinId": 710, "isEnabled": true },
+      { "id": 27, "startPinId": 530, "endPinId": 711, "isEnabled": true },
+      { "id": 28, "startPinId": 211, "endPinId": 611, "isEnabled": true },
+      { "id": 29, "startPinId": 201, "endPinId": 612, "isEnabled": true },
+      { "id": 30, "startPinId": 221, "endPinId": 613, "isEnabled": true },
+      { "id": 31, "startPinId": 601, "endPinId": 614, "isEnabled": true },
+      { "id": 32, "startPinId": 619, "endPinId": 640, "isEnabled": true },
+      { "id": 33, "startPinId": 622, "endPinId": 628, "isEnabled": true },
+      { "id": 34, "startPinId": 630, "endPinId": 642, "isEnabled": true },
+      { "id": 35, "startPinId": 632, "endPinId": 641, "isEnabled": true },
+      { "id": 36, "startPinId": 643, "endPinId": 650, "isEnabled": true },
+      { "id": 37, "startPinId": 644, "endPinId": 652, "isEnabled": true },
+      { "id": 38, "startPinId": 653, "endPinId": 700, "isEnabled": true },
+      { "id": 39, "startPinId": 622, "endPinId": 701, "isEnabled": true },
+      { "id": 40, "startPinId": 621, "endPinId": 710, "isEnabled": true },
+      { "id": 41, "startPinId": 626, "endPinId": 711, "isEnabled": true }
+    ],
+    "variables": [
+      { "name": "ApiKey",             "dataType": 4, "defaultValue": "sk-your-api-key-here" },
+      { "name": "BaseURL",            "dataType": 4, "defaultValue": "https://api.openai.com/v1" },
+      { "name": "Model",              "dataType": 4, "defaultValue": "gpt-4o" },
+      { "name": "UserQuery",          "dataType": 4, "defaultValue": "Tell me about the history of artificial intelligence." },
+      { "name": "KeepRecent",         "dataType": 2, "defaultValue": 4 },
+      { "name": "CompressThreshold",  "dataType": 2, "defaultValue": 10 },
+      { "name": "messages",           "dataType": 4, "defaultValue": "[]" },
+      { "name": "round",              "dataType": 2, "defaultValue": 0 }
+    ]
+  },
+  "editor": {
+    "fileType": "editor",
+    "metadata": { "author": "", "createdAt": "", "updatedAt": "" },
+    "nodes": [
+      { "id": 1,  "position": { "x": -800, "y": 0    }, "size": { "width": 161,  "height": 72  } },
+      { "id": 10, "position": { "x": -580, "y": 0    }, "size": { "width": 246,  "height": 131 } },
+      { "id": 11, "position": { "x": -280, "y": 0    }, "size": { "width": 246,  "height": 131 } },
+      { "id": 23, "position": { "x": -580, "y": 200  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 30, "position": { "x": -580, "y": 300  }, "size": { "width": 340,  "height": 105 } },
+      { "id": 31, "position": { "x": -580, "y": 440  }, "size": { "width": 300,  "height": 43  } },
+      { "id": 32, "position": { "x": -200, "y": 0    }, "size": { "width": 260,  "height": 128 } },
+      { "id": 33, "position": { "x": 120,  "y": 0    }, "size": { "width": 246,  "height": 131 } },
+      { "id": 40, "position": { "x": 420,  "y": 100  }, "size": { "width": 300,  "height": 43  } },
+      { "id": 41, "position": { "x": 420,  "y": 0    }, "size": { "width": 260,  "height": 128 } },
+      { "id": 42, "position": { "x": 420,  "y": 180  }, "size": { "width": 240,  "height": 43  } },
+      { "id": 43, "position": { "x": 720,  "y": 100  }, "size": { "width": 180,  "height": 71  } },
+      { "id": 44, "position": { "x": 960,  "y": 0    }, "size": { "width": 200,  "height": 115 } },
+      { "id": 20, "position": { "x": 960,  "y": 200  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 21, "position": { "x": 960,  "y": 260  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 22, "position": { "x": 960,  "y": 320  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 50, "position": { "x": 960,  "y": 380  }, "size": { "width": 300,  "height": 43  } },
+      { "id": 51, "position": { "x": 960,  "y": 440  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 52, "position": { "x": 1220, "y": 0    }, "size": { "width": 340,  "height": 240 } },
+      { "id": 53, "position": { "x": 1620, "y": 0    }, "size": { "width": 246,  "height": 131 } },
+      { "id": 54, "position": { "x": 1620, "y": 180  }, "size": { "width": 320,  "height": 100 } },
+      { "id": 60, "position": { "x": 1220, "y": 300  }, "size": { "width": 300,  "height": 43  } },
+      { "id": 61, "position": { "x": 2000, "y": 0    }, "size": { "width": 400,  "height": 317 } },
+      { "id": 62, "position": { "x": 2460, "y": 100  }, "size": { "width": 340,  "height": 105 } },
+      { "id": 63, "position": { "x": 2460, "y": 260  }, "size": { "width": 300,  "height": 43  } },
+      { "id": 64, "position": { "x": 2860, "y": 100  }, "size": { "width": 260,  "height": 128 } },
+      { "id": 65, "position": { "x": 3180, "y": 100  }, "size": { "width": 246,  "height": 131 } },
+      { "id": 70, "position": { "x": 3480, "y": 100  }, "size": { "width": 193,  "height": 100 } },
+      { "id": 71, "position": { "x": 1220, "y": 400  }, "size": { "width": 193,  "height": 100 } }
+    ],
+    "viewInfo": {
+      "viewPosition": { "x": -400, "y": -100 },
+      "viewScale": 0.45
+    }
+  }
+}

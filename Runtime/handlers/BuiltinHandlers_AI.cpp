@@ -1754,6 +1754,132 @@ void RegisterHandlers_AI(
     };
 
     // ========================================================================
+    // Agent.Plan
+    // 让 LLM 把 Goal 分解为步骤列表 JSON，每步含 tool/arguments/reason
+    // ========================================================================
+    handlers["Agent.Plan"] = [&runner](ExecutionContext& ctx) -> bool {
+
+        IHttpClient* client = BP_GetHttpClient();
+        if (!client) {
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient registered")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        std::string baseUrl        = ctx.GetInputValue("BaseURL").asString();
+        std::string apiKey         = ctx.GetInputValue("ApiKey").asString();
+        std::string model          = ctx.GetInputValue("Model").asString();
+        std::string goal           = ctx.GetInputValue("Goal").asString();
+        std::string availableTools = ctx.GetInputValue("AvailableTools").asString();
+        int maxSteps               = static_cast<int>(ctx.GetInputValue("MaxSteps").asInt());
+        int maxTokens              = static_cast<int>(ctx.GetInputValue("MaxTokens").asInt());
+
+        if (baseUrl.empty())    baseUrl   = "https://api.openai.com/v1";
+        if (model.empty())      model     = "gpt-4o";
+        if (maxSteps  <= 0)     maxSteps  = 5;
+        if (maxTokens <= 0)     maxTokens = 1024;
+
+        // 构造规划 prompt
+        std::string sysPrompt =
+            "You are a task planner. Given a GOAL and available TOOLS, decompose the goal into "
+            "a minimal ordered sequence of steps (at most " + std::to_string(maxSteps) + " steps).\n"
+            "Respond with ONLY a valid JSON array, no markdown, no extra text.\n"
+            "Each element: {\"tool\": \"<tool_name>\", \"arguments\": {<key: value>}, \"reason\": \"<why>\"}";
+        std::string userMsg =
+            "GOAL: " + goal + "\n\n"
+            "AVAILABLE TOOLS: " + (availableTools.empty() ? "[]" : availableTools);
+
+        crude_json::array messages;
+        crude_json::object sysMsg, userMsgObj;
+        sysMsg["role"]        = crude_json::value(std::string("system"));
+        sysMsg["content"]     = crude_json::value(sysPrompt);
+        userMsgObj["role"]    = crude_json::value(std::string("user"));
+        userMsgObj["content"] = crude_json::value(userMsg);
+        messages.push_back(crude_json::value(std::move(sysMsg)));
+        messages.push_back(crude_json::value(std::move(userMsgObj)));
+
+        crude_json::object body;
+        body["model"]      = crude_json::value(model);
+        body["messages"]   = crude_json::value(std::move(messages));
+        body["max_tokens"] = crude_json::value(static_cast<double>(maxTokens));
+
+        HttpRequest req;
+        req.url    = baseUrl + "/chat/completions";
+        req.method = "POST";
+        req.body   = crude_json::value(std::move(body)).dump();
+        req.headers["Content-Type"]  = "application/json";
+        req.headers["Authorization"] = "Bearer " + apiKey;
+        req.timeoutSeconds = 60;
+
+        PinId donePinId  = ctx.GetPinId("onDone");
+        PinId errorPinId = ctx.GetPinId("onError");
+        ctx.MarkDownstreamAsHandled("onDone");
+        ctx.MarkDownstreamAsHandled("onError");
+
+        auto sharedResp = std::make_shared<HttpResponse>();
+        auto dispatcher = [client, req, sharedResp](ExecutionContext::AsyncResolve resolve) mutable
+        {
+            client->SendAsync(req, [sharedResp, resolve = std::move(resolve)](HttpResponse resp) mutable {
+                *sharedResp = std::move(resp);
+                resolve();
+            });
+        };
+
+        auto onComplete = [sharedResp, donePinId, errorPinId](ExecutionContext& c) mutable
+        {
+            const HttpResponse& resp = *sharedResp;
+            if (!resp.ok()) {
+                c.SetOutputValue("ErrorMessage", Variant(resp.error.empty() ?
+                    "HTTP " + std::to_string(resp.statusCode) : resp.error));
+                c.SetOutputValue("PlanJSON",  Variant(std::string("[]")));
+                c.SetOutputValue("StepCount", Variant(static_cast<int64_t>(0)));
+                c.ActivateOutputFlow(errorPinId);
+                return;
+            }
+            // 提取 LLM 回复内容
+            std::string content;
+            crude_json::value root = crude_json::value::parse(resp.body);
+            if (root.is_object() && root.contains("choices")) {
+                const auto& choices = root["choices"];
+                if (choices.is_array() && !choices.get<crude_json::array>().empty()) {
+                    const auto& first = choices.get<crude_json::array>()[0];
+                    if (first.is_object() && first.contains("message")) {
+                        const auto& msg = first["message"];
+                        if (msg.is_object() && msg.contains("content")) {
+                            const auto& cv = msg["content"];
+                            if (cv.is_string()) content = cv.get<std::string>();
+                        }
+                    }
+                }
+            }
+            // 解析步骤 JSON 数组
+            // 去掉可能的 markdown 代码块
+            auto trim = [](std::string s) -> std::string {
+                size_t p = s.find('[');
+                size_t q = s.rfind(']');
+                if (p != std::string::npos && q != std::string::npos && q > p)
+                    return s.substr(p, q - p + 1);
+                return s;
+            };
+            std::string planJson = trim(content);
+            crude_json::value planVal = crude_json::value::parse(planJson);
+            int stepCount = 0;
+            if (planVal.is_array())
+                stepCount = static_cast<int>(planVal.get<crude_json::array>().size());
+            else
+                planJson = "[]";
+
+            c.SetOutputValue("PlanJSON",      Variant(planJson));
+            c.SetOutputValue("StepCount",     Variant(static_cast<int64_t>(stepCount)));
+            c.SetOutputValue("ErrorMessage",  Variant(std::string("")));
+            c.ActivateOutputFlow(donePinId);
+        };
+
+        ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
+        return true;
+    };
+
+    // ========================================================================
     // Agent.Reflect
     // 让 LLM 评估输出是否满足评判标准（Criteria），输出 pass/fail + Feedback
     // ========================================================================
