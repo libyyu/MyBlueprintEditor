@@ -698,10 +698,12 @@ void BlueprintEditor::DrawVariablePanel()
     // ── 新建变量弹窗 ──────────────────────────────────────────────────────
     if (ImGui::BeginPopup("##AddVariable"))
     {
+        float dpi = ImGui::GetFontSize() / 13.0f;
+
         ImGui::TextUnformatted("New Variable");
         ImGui::Separator();
 
-        ImGui::SetNextItemWidth(160.0f);
+        ImGui::SetNextItemWidth(160.0f * dpi);
         ImGui::InputTextWithHint("##VarName", "Variable name...", newVarName, kVarNameBufSize);
 
         static const char* containerTypeNames[] = { "Single", "Array", "Map", "Set" };
@@ -715,18 +717,18 @@ void BlueprintEditor::DrawVariablePanel()
             RTPinDataType::Boolean, RTPinDataType::Integer, RTPinDataType::Float, RTPinDataType::String
         };
 
-        ImGui::SetNextItemWidth(90.0f);
+        ImGui::SetNextItemWidth(100.0f * dpi);
         ImGui::Combo("##ContType", &newVarTypeIdx, containerTypeNames, 4);
         ImGui::SameLine();
         static int newItemTypeIdx = 3;   // String
         static int newKeyTypeIdx  = 3;   // String
-        ImGui::SetNextItemWidth(80.0f);
+        ImGui::SetNextItemWidth(90.0f * dpi);
         ImGui::Combo("##ItemType", &newItemTypeIdx, baseTypeNames, 6);
         if (newVarTypeIdx == 2) {  // Map
             ImGui::SameLine();
             ImGui::TextUnformatted("Key:");
             ImGui::SameLine();
-            ImGui::SetNextItemWidth(70.0f);
+            ImGui::SetNextItemWidth(80.0f * dpi);
             ImGui::Combo("##KeyType", &newKeyTypeIdx, keyTypeNames, 4);
         }
 
@@ -846,7 +848,7 @@ void BlueprintEditor::DrawVariablePanel()
             ImGui::SetDragDropPayload(VAR_DRAG_DROP_TYPE, &payload, sizeof(payload));
             // 拖拽预览提示
             ImGui::TextColored(typeColor(var.dataType), "● %s  [%s]", var.name.c_str(), typeToStr(var).c_str());
-            ImGui::TextDisabled("Drop → Get node   Shift+Drop → Set node");
+            ImGui::TextDisabled("Drop → Get   Shift+Drop → Set   Alt+Drop → Menu");
             ImGui::EndDragDropSource();
         }
 
@@ -894,6 +896,8 @@ void BlueprintEditor::DrawVariablePanel()
 
         if (ImGui::BeginPopup("##VarType"))
         {
+            float dpi = ImGui::GetFontSize() / 13.0f;
+
             static const char* containerTypeNamesPopup[] = { "Single", "Array", "Map", "Set" };
             static const char* baseTypeNamesPopup[]      = { "Boolean", "Integer", "Float", "String", "Object", "Any" };
             static const RTPinDataType baseTypeValuesPopup[] = {
@@ -908,7 +912,7 @@ void BlueprintEditor::DrawVariablePanel()
             // 当前容器类型索引
             int curContIdx = static_cast<int>(var.containerType);
             ImGui::TextUnformatted("Container:");
-            ImGui::SetNextItemWidth(90.0f);
+            ImGui::SetNextItemWidth(100.0f * dpi);
             if (ImGui::Combo("##PopContType", &curContIdx, containerTypeNamesPopup, 4))
             {
                 PushUndoState();
@@ -925,7 +929,7 @@ void BlueprintEditor::DrawVariablePanel()
             for (int ti = 0; ti < 6; ++ti)
                 if (baseTypeValuesPopup[ti] == var.itemType) { curItemIdx = ti; break; }
             ImGui::TextUnformatted("Item type:");
-            ImGui::SetNextItemWidth(80.0f);
+            ImGui::SetNextItemWidth(100.0f * dpi);
             if (ImGui::Combo("##PopItemType", &curItemIdx, baseTypeNamesPopup, 6))
             {
                 PushUndoState();
@@ -942,7 +946,7 @@ void BlueprintEditor::DrawVariablePanel()
                 for (int ki = 0; ki < 4; ++ki)
                     if (keyTypeValuesPopup[ki] == var.mapKeyType) { curKeyIdx = ki; break; }
                 ImGui::TextUnformatted("Key type:");
-                ImGui::SetNextItemWidth(70.0f);
+                ImGui::SetNextItemWidth(100.0f * dpi);
                 if (ImGui::Combo("##PopKeyType", &curKeyIdx, keyTypeNamesPopup, 4))
                 {
                     PushUndoState();
