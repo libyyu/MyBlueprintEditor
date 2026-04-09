@@ -477,9 +477,12 @@ void LuaNodeRegistrar::registerEditorBindings(lua_State* L)
 
     lua_setglobal(L, "Blueprint");
 
-    // 注册运行时绑定（Variant / ExecutionContext metatables）以便 Lua 脚本引用
-    // 用一个临时 dummy runner（nullptr 安全）
-    NodeEditor::Runtime::RegisterLuaBindings(L, nullptr);
+    // 注册 Variant / ExecutionContext metatables（不调用 RegisterLuaBindings 避免覆盖 Blueprint 表）
+    // 直接注册 metatables：
+    NodeEditor::Runtime::RegisterLuaMetatables(L);
+
+    // 注册 json.* / http.* / file.* 全局库（agent_tools.lua 需要 json.*）
+    NodeEditor::Runtime::RegisterLuaJsonHttpLibs(L);
 }
 
 void LuaNodeRegistrar::resetLuaState()
