@@ -6,12 +6,14 @@
 #include "../Http/IHttpClient.h"
 #include "../../Utils/Json/crude_json.h"
 
-#include <thread>
-#include <future>
 #include <set>
 #include <sstream>
 #include <cstdio>
 #include <cctype>
+#ifndef __EMSCRIPTEN__
+#  include <thread>
+#  include <future>
+#endif
 
 #ifdef _WIN32
 #  ifndef WIN32_LEAN_AND_MEAN
@@ -796,19 +798,40 @@ void RegisterHandlers_Network(
         ctx.MarkDownstreamAsHandled("onSuccess");
         ctx.MarkDownstreamAsHandled("onError");
 
-        // 使用 shared_ptr 在递归 lambda 间共享状态
         struct RetryState {
             HttpResponse response;
             int retryCount = 0;
         };
         auto state = std::make_shared<RetryState>();
 
-        // 递归重试逻辑：通过 RunAsync 链式调用
-        // 为避免真正的递归，使用迭代式方法：把所有尝试打包到单个 dispatcher 中
+        // WebGL：Emscripten 不支持阻塞线程，降级为单次请求不重试
+#ifdef __EMSCRIPTEN__
+        auto sharedResp = std::make_shared<HttpResponse>();
+        auto dispatcher = [client, req, sharedResp](ExecutionContext::AsyncResolve resolve) mutable
+        {
+            client->SendAsync(req, [sharedResp, resolve = std::move(resolve)](HttpResponse resp) mutable {
+                *sharedResp = std::move(resp);
+                resolve();
+            });
+        };
+        auto onComplete = [sharedResp, state, successPinId, errorPinId](ExecutionContext& c) mutable
+        {
+            state->response = *sharedResp;
+            c.SetOutputValue("StatusCode",   Variant(static_cast<int64_t>(state->response.statusCode)));
+            c.SetOutputValue("ResponseBody", Variant(state->response.body));
+            c.SetOutputValue("RetryCount",   Variant(static_cast<int64_t>(0)));
+            c.SetOutputValue("ErrorMessage", Variant(state->response.error));
+            if (state->response.ok())
+                c.ActivateOutputFlow(successPinId);
+            else
+                c.ActivateOutputFlow(errorPinId);
+        };
+        ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
+#else
+        // Native：后台线程中循环重试（每次通过 promise/future 阻塞等待单次 SendAsync）
         auto dispatcher = [client, req, maxRetries, retryDelay, retryOnStatus, state]
                           (ExecutionContext::AsyncResolve resolve) mutable
         {
-            // 在后台线程同步循环（每次重试之间 sleep）
             std::thread([client, req, maxRetries, retryDelay, retryOnStatus, state,
                          resolve = std::move(resolve)]() mutable
             {
@@ -818,7 +841,7 @@ void RegisterHandlers_Network(
                             std::chrono::milliseconds(static_cast<int>(retryDelay * 1000)));
                         ++state->retryCount;
                     }
-                    // 同步发送（用 promise/future 阻塞当前线程等待回调）
+                    // 用 std::promise/future 将异步回调转为同步等待
                     std::promise<HttpResponse> prom;
                     auto fut = prom.get_future();
                     client->SendAsync(req, [&prom](HttpResponse resp) mutable {
@@ -830,11 +853,8 @@ void RegisterHandlers_Network(
                         (attempt < maxRetries) &&
                         (!resp.error.empty() || retryOnStatus.count(resp.statusCode) > 0);
 
-                    if (!shouldRetry) {
-                        state->response = std::move(resp);
-                        break;
-                    }
-                    state->response = std::move(resp); // 保留最后一次响应
+                    state->response = std::move(resp);
+                    if (!shouldRetry) break;
                 }
                 resolve();
             }).detach();
@@ -854,6 +874,7 @@ void RegisterHandlers_Network(
         };
 
         ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
+#endif // __EMSCRIPTEN__
         return true;
     };
 
