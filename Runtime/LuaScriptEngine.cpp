@@ -52,11 +52,7 @@ bool LuaScriptEngine::Initialize(BlueprintRunner* runner)
         m_lastError = "Lua VM already initialized";
         return false;
     }
-    if (!runner)
-    {
-        m_lastError = "runner is null";
-        return false;
-    }
+    // runner 允许为 nullptr（编辑器模式：不需要执行节点 handler）
 
     m_runner = runner;
 

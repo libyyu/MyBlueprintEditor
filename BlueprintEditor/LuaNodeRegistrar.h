@@ -18,6 +18,7 @@
 namespace NodeEditor { namespace Runtime {
     class INodeRegistry;
     class ExecutionContext;
+    class LuaScriptEngine;
     using NodeHandler = std::function<bool(ExecutionContext&)>;
 } }
 
@@ -107,6 +108,9 @@ private:
     NodeEditor::Runtime::INodeRegistry*                                    m_registry   = nullptr;
     std::unordered_map<std::string, NodeEditor::Runtime::NodeHandler>*     m_handlerMap = nullptr;
 
+    // Lua VM 由 LuaScriptEngine 统一管理（自动处理 json/http/file 库注册）
+    // m_L 是便捷访问指针，始终等于 m_engine.GetState()
+    NodeEditor::Runtime::LuaScriptEngine*   m_engine     = nullptr;  // 堆分配，避免头文件依赖
     lua_State*                      m_L            = nullptr;
     std::vector<std::string>        m_loadedFiles;
     std::unordered_set<std::string> m_registeredIds;

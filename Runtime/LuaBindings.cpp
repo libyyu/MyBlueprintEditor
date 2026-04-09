@@ -653,17 +653,10 @@ void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner)
     lua_pushcfunction(L, l_hasNodeDef);
     lua_setfield(L, -2, "HasNodeDef");
 
+
     lua_setglobal(L, "Blueprint");
 
 
-}
-
-void RegisterLuaMetatables(lua_State* L)
-{
-    // 只注册 Variant / ExecutionContext metatables，不触碰 Blueprint 全局表
-    // 供编辑器侧 LuaNodeRegistrar 使用
-    registerVariantMetatable(L);
-    registerCtxMetatable(L);
 }
 
 

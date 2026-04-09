@@ -9,6 +9,7 @@
 #include "../Runtime/BlueprintRunner.h"  // NodeHandler / ExecutionContext
 #include "../Runtime/Types.h"
 #include "../Runtime/LuaBindings.h"
+#include "../Runtime/LuaScriptEngine.h"
 #include "BpLogger.h"
 #include <lua.hpp>
 #include <filesystem>
@@ -420,20 +421,27 @@ bool LuaNodeRegistrar::ensureLuaState()
 {
     if (m_L) return true;
 
-    m_L = luaL_newstate();
-    if (!m_L) { m_lastError = "Failed to create Lua state"; return false; }
-    lua_atpanic(m_L, l_panic);
-    luaL_openlibs(m_L);
+    // 用 LuaScriptEngine 初始化 Lua VM（runner=nullptr 为编辑器模式）
+    // 自动完成：luaL_openlibs + RegisterLuaBindings(runner=null) + RegisterLuaJsonHttpLibs
+    // 以后 Runtime 新增任何 Lua 库，只改 LuaScriptEngine，编辑器自动受益
+    m_engine = new NodeEditor::Runtime::LuaScriptEngine();
+    if (!m_engine->Initialize(nullptr))
+    {
+        m_lastError = "Failed to init LuaScriptEngine: " + m_engine->GetLastError();
+        delete m_engine;
+        m_engine = nullptr;
+        return false;
+    }
 
+    m_L = m_engine->GetState();
+
+    // 覆盖标准 print/warn 输出到编辑器日志
     lua_register(m_L, "print", l_print);
-    lua_register(m_L, "warn", l_warn);
-	
-    // 注册运行时 Lua 绑定（Variant + ExecutionContext metatables）
-    // 需要一个临时 runner 只为注册 metatables 用
-    // 注：Blueprint.RegisterHandler 不在编辑器侧使用，但 metatables 需要
-    lua_pushlightuserdata(m_L, nullptr);  // runner=null，RegisterHandler 不可用
-    lua_setfield(m_L, LUA_REGISTRYINDEX, "__blueprint_runner");
+    lua_register(m_L, "warn",  l_warn);
+    lua_atpanic(m_L, l_panic);
 
+    // 在 LuaScriptEngine 注册的 Blueprint 表基础上，追加编辑器专属 API
+    // （RegisterNodeDef/RegisterHandler 覆盖 Runtime 版本，指向编辑器 registry）
     registerEditorBindings(m_L);
 
     return true;
@@ -476,22 +484,17 @@ void LuaNodeRegistrar::registerEditorBindings(lua_State* L)
     lua_setfield(L, -2, "RegisterHandler");
 
     lua_setglobal(L, "Blueprint");
-
-    // 注册 Variant / ExecutionContext metatables（不调用 RegisterLuaBindings 避免覆盖 Blueprint 表）
-    // 直接注册 metatables：
-    NodeEditor::Runtime::RegisterLuaMetatables(L);
-
-    // 注册 json.* / http.* / file.* 全局库（agent_tools.lua 需要 json.*）
-    NodeEditor::Runtime::RegisterLuaJsonHttpLibs(L);
+    // metatables 和 json/http/file 库已由 LuaScriptEngine::Initialize 注册，无需重复
 }
 
 void LuaNodeRegistrar::resetLuaState()
 {
-    if (m_L)
+    if (m_engine)
     {
-        lua_close(m_L);
-        m_L = nullptr;
+        delete m_engine;
+        m_engine = nullptr;
     }
+    m_L = nullptr;
 }
 
 int LuaNodeRegistrar::executeFile(const std::string& filePath)
