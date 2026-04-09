@@ -1181,7 +1181,7 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
                 {
                     var.dataType      = static_cast<PinDataType>(rawDataType);
                     var.containerType = ContainerType::Single;
-                    var.itemType      = PinDataType::Any;
+                    var.itemType      = var.dataType;   // Single 时 itemType == dataType
                     var.mapKeyType    = PinDataType::String;
                 }
             }
@@ -1232,8 +1232,8 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
                     {
                         if (rawDt2 == 6)      { vd.dataType = PinDataType::Array; vd.containerType = ContainerType::Array; vd.itemType = PinDataType::Any; }
                         else if (rawDt2 == 7) { vd.dataType = PinDataType::Map;   vd.containerType = ContainerType::Map;   vd.itemType = PinDataType::Any; vd.mapKeyType = PinDataType::String; }
-                        else if (rawDt2 == 8) { vd.dataType = PinDataType::Any;   vd.containerType = ContainerType::Single; }
-                        else                  { vd.dataType = static_cast<PinDataType>(rawDt2); vd.containerType = ContainerType::Single; }
+                        else if (rawDt2 == 8) { vd.dataType = PinDataType::Any;   vd.containerType = ContainerType::Single; vd.itemType = PinDataType::Any; }
+                        else                  { vd.dataType = static_cast<PinDataType>(rawDt2); vd.containerType = ContainerType::Single; vd.itemType = vd.dataType; }
                     }
                     func.inputs.push_back(std::move(vd));
                 }
@@ -1261,8 +1261,8 @@ ImportResult JsonBlueprintExporter::importRuntimeFromString(const std::string& c
                     {
                         if (rawDt3 == 6)      { vd.dataType = PinDataType::Array; vd.containerType = ContainerType::Array; vd.itemType = PinDataType::Any; }
                         else if (rawDt3 == 7) { vd.dataType = PinDataType::Map;   vd.containerType = ContainerType::Map;   vd.itemType = PinDataType::Any; vd.mapKeyType = PinDataType::String; }
-                        else if (rawDt3 == 8) { vd.dataType = PinDataType::Any;   vd.containerType = ContainerType::Single; }
-                        else                  { vd.dataType = static_cast<PinDataType>(rawDt3); vd.containerType = ContainerType::Single; }
+                        else if (rawDt3 == 8) { vd.dataType = PinDataType::Any;   vd.containerType = ContainerType::Single; vd.itemType = PinDataType::Any; }
+                        else                  { vd.dataType = static_cast<PinDataType>(rawDt3); vd.containerType = ContainerType::Single; vd.itemType = vd.dataType; }
                     }
                     func.outputs.push_back(std::move(vd));
                 }
