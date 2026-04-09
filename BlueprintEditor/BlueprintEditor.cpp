@@ -1105,7 +1105,7 @@ void BlueprintEditor::OnStart()
             exeDir = fs::current_path().string();
 		
         bool bLoaded = false;
-#if defined(_DEBUG) && defined(ROOT_DIR)
+#if defined(ROOT_DIR)
         {
             std::string dataDir = ROOT_DIR;
             dataDir += "/data";
@@ -1114,7 +1114,10 @@ void BlueprintEditor::OnStart()
 			// 工程跟目录/data
 			std::string globalEntry = dataDir + "/BlueprintEntry.lua";
             bLoaded = m_LuaNodeRegistrar.LoadEntrySilent(globalEntry, "global:BlueprintEntry");
-			BPLOG("Lua global path: " + dataDir);
+            if (bLoaded)
+			{
+				BPLOG("Lua global path: " + dataDir);
+			}
         }
 #endif
         m_LuaNodeRegistrar.AddLuaPath(exeDir);
