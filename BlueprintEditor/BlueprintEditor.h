@@ -222,6 +222,10 @@ public:
     VarDragPayload pendingVarPayload  = {};      // 拖拽的变量信息
     ImVec2         pendingVarDropPos  = {};      // 放置时的屏幕坐标
 
+    // canvas 屏幕区域（ed::Begin 前记录，供 drop target 使用）
+    ImVec2         canvasScreenMin    = {};
+    ImVec2         canvasScreenMax    = {};
+
     // 节点拖拽位置 Undo 状态（在位置变化检测处使用）
     bool           nodeDragUndoPushed = false;  // 本次拖拽是否已 push 过快照
 

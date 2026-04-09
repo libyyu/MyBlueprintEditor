@@ -1187,6 +1187,13 @@ void BlueprintEditor::OnFrame(float deltaTime)
     auto& newNodeLinkPin = _doc->newNodeLinkPin;
     auto& newLinkPin     = _doc->newLinkPin;
 
+    // 记录 canvas 屏幕区域（在 ed::Begin 前，此时 cursor 即 canvas 左上角）
+    ImVec2 canvasScreenMin = ImGui::GetCursorScreenPos();
+    ImVec2 canvasScreenMax = canvasScreenMin + ImVec2(rightWidth, editorHeight);
+    // 存入 doc，供 drop target 使用（ed::Begin/End 之间 GetItemRectMin 不可靠）
+    ActiveDoc()->canvasScreenMin = canvasScreenMin;
+    ActiveDoc()->canvasScreenMax = canvasScreenMax;
+
     ed::Begin("Node editor", ImVec2(rightWidth, editorHeight));
     {
         // 加载文件后延迟设置节点位置（必须在 ed::Begin/End 之间）
@@ -1497,8 +1504,9 @@ void BlueprintEditor::OnFrame(float deltaTime)
     // 平时不创建，以免截获节点编辑器的拖拽/连线鼠标事件
     if (ImGui::GetDragDropPayload() != nullptr)
     {
-        ImVec2 editorMin = ImGui::GetItemRectMin();
-        ImVec2 editorMax = ImGui::GetItemRectMax();
+        // 使用 ed::Begin 前记录的 canvas 屏幕区域，GetItemRectMin 在此处不可靠
+        ImVec2 editorMin = ActiveDoc()->canvasScreenMin;
+        ImVec2 editorMax = ActiveDoc()->canvasScreenMax;
         ImGui::SetCursorScreenPos(editorMin);
         ImGui::InvisibleButton("##canvas_drop_target", editorMax - editorMin,
                                ImGuiButtonFlags_AllowOverlap);
