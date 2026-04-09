@@ -855,7 +855,12 @@ void BlueprintEditor::DrawVariablePanel()
         // 变量名（可内联重命名）
         char nameBuf[64];
         snprintf(nameBuf, sizeof(nameBuf), "%s", var.name.c_str());
-        ImGui::SetNextItemWidth(paneWidth - 80.0f);
+        // 类型标签宽度（动态计算，避免截断）
+        std::string typeLabel = "[" + typeToStr(var) + "]";
+        float typeLabelW = ImGui::CalcTextSize(typeLabel.c_str()).x + 8.0f;
+        float nameW = paneWidth - 14.0f - 4.0f - typeLabelW - ImGui::GetStyle().ItemSpacing.x * 2;
+        if (nameW < 40.0f) nameW = 40.0f;
+        ImGui::SetNextItemWidth(nameW);
         if (ImGui::InputText("##vname", nameBuf, sizeof(nameBuf), ImGuiInputTextFlags_EnterReturnsTrue))
         {
             if (nameBuf[0] != '\0' && var.name != nameBuf)
@@ -877,8 +882,11 @@ void BlueprintEditor::DrawVariablePanel()
 
         ImGui::SameLine();
 
-        // 类型标签（点击切换类型）
-        ImGui::TextColored(typeColor(var.dataType), "[%s]", typeToStr(var).c_str());
+        // 类型标签（右对齐，点击切换类型）
+        float labelX = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - typeLabelW + 4.0f;
+        if (labelX > ImGui::GetCursorPosX())
+            ImGui::SetCursorPosX(labelX);
+        ImGui::TextColored(typeColor(var.dataType), "%s", typeLabel.c_str());
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Click to change type");
         if (ImGui::IsItemClicked())
