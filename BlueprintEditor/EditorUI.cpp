@@ -1498,13 +1498,16 @@ void BlueprintEditor::OnFrame(float deltaTime)
     }
 
     // ================================================================
-    // 变量拖拽放置（在 ed::End 之前，画布仍在 Begin/End 块内）
+    // 注：变量/节点库拖拽放置已移至 ed::End() 之后处理（见下方）
     // ================================================================
-    // 仅当有 DragDrop payload 飞行时才创建 InvisibleButton 接收投放，
-    // 平时不创建，以免截获节点编辑器的拖拽/连线鼠标事件
-    if (ImGui::GetDragDropPayload() != nullptr)
+
+    ed::End();
+
+    // ================================================================
+    // 变量/节点库拖拽放置（必须在 ed::End() 之后，NodeEditor 释放鼠标后才能接收）
+    // ================================================================
+    if (ActiveDoc() && ImGui::GetDragDropPayload() != nullptr)
     {
-        // 使用 ed::Begin 前记录的 canvas 屏幕区域，GetItemRectMin 在此处不可靠
         ImVec2 editorMin = ActiveDoc()->canvasScreenMin;
         ImVec2 editorMax = ActiveDoc()->canvasScreenMax;
         ImGui::SetCursorScreenPos(editorMin);
@@ -1515,29 +1518,26 @@ void BlueprintEditor::OnFrame(float deltaTime)
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(VAR_DRAG_DROP_TYPE))
             {
                 auto* p = static_cast<const VarDragPayload*>(payload->Data);
-                auto* doc = ActiveDoc();
-                if (doc)
+                if (p)
                 {
-                    doc->pendingVarDrop    = true;
-                    doc->pendingVarPayload = *p;
-                    doc->pendingVarDropPos = ImGui::GetMousePos();
+                    ActiveDoc()->pendingVarDrop    = true;
+                    ActiveDoc()->pendingVarPayload = *p;
+                    ActiveDoc()->pendingVarDropPos = ImGui::GetMousePos();
                 }
             }
-            // 节点库拖拽：从 Library 面板拖节点定义到画布
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("BP_NODE_DEF"))
             {
                 const char* defId = static_cast<const char*>(payload->Data);
                 if (defId && defId[0] != '\0')
                 {
                     PushUndoState();
+                    ed::SetCurrentEditor(ActiveDoc()->editorContext);
                     Node* node = SpawnNodeByDef(std::string(defId));
                     if (node)
                     {
                         FixupSpecialPinTypes(node, m_NodeRegistry.getNodeDefinition(defId));
                         BuildNodes();
-                        // 在鼠标释放位置生成节点（转换到画布坐标）
-                        ImVec2 canvasPos = ed::ScreenToCanvas(ImGui::GetMousePos());
-                        ed::SetNodePosition(node->ID, canvasPos);
+                        ed::SetNodePosition(node->ID, ed::ScreenToCanvas(ImGui::GetMousePos()));
                         ActiveDoc()->isDirty = true;
                     }
                 }
@@ -1545,11 +1545,6 @@ void BlueprintEditor::OnFrame(float deltaTime)
             ImGui::EndDragDropTarget();
         }
     }
-
-    ed::End();
-
-    // ================================================================
-    // 检测节点位置变化（拖拽移动节点 → 标记 dirty + Undo 快照）
     //
     // 策略：
     //   • 检测到位置变化 + 鼠标左键按下 → 视为拖拽进行中
