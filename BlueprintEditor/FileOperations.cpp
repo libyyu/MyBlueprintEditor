@@ -325,10 +325,19 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
 {
     // ── 重复检查：同路径文件已打开则直接切换到对应 Tab ─────────────────────
     {
-        std::string canonical = GetCanonicalPath(NormalizePath(path));
+        // 简单规范化：统一分隔符为 /，转小写（Windows 路径不区分大小写）
+        auto normPath = [](const std::string& s) -> std::string {
+            std::string r = s;
+            for (auto& c : r) {
+                if (c == '\\') c = '/';
+                else c = static_cast<char>(::tolower(static_cast<unsigned char>(c)));
+            }
+            return r;
+        };
+        std::string canonical = normPath(path);
         for (int i = 0; i < (int)m_Documents.size(); ++i)
         {
-            if (GetCanonicalPath(NormalizePath(m_Documents[i]->filePath)) == canonical)
+            if (normPath(m_Documents[i]->filePath) == canonical)
             {
                 m_PendingSwitchTabIndex = i;
                 return;
