@@ -828,66 +828,115 @@ void BlueprintEditor::DrawVariablePanel()
     };
 
     int deleteIdx = -1;  // 待删除的变量下标（延迟删除，避免迭代时修改容器）
+    // 当前正在编辑的变量下标（-1 = 无）
+    static int s_editingIdx = -1;
+    static char s_editBuf[64] = "";
 
     for (int i = 0; i < (int)doc->variables.size(); ++i)
     {
         auto& var = doc->variables[i];
         ImGui::PushID(i);
 
-        // 类型色标（同时作为拖拽手柄）
-        ImVec2 dotPos = ImGui::GetCursorScreenPos() + ImVec2(4.0f, ImGui::GetTextLineHeight() * 0.5f - 4.0f);
-        ImGui::GetWindowDrawList()->AddCircleFilled(dotPos + ImVec2(4,4), 5.0f, ImGui::ColorConvertFloat4ToU32(typeColor(var.dataType)));
-        ImGui::Dummy(ImVec2(14.0f, ImGui::GetTextLineHeight()));
+        float rowHeight  = ImGui::GetFrameHeight();
+        float dotRadius  = 5.0f;
+        float dotOffsetX = 8.0f;
 
-        // 拖拽源：从色标或变量名开始拖拽
+        // ── 类型色标 ──────────────────────────────────────────────────
+        ImVec2 rowMin = ImGui::GetCursorScreenPos();
+        ImGui::GetWindowDrawList()->AddCircleFilled(
+            rowMin + ImVec2(dotOffsetX, rowHeight * 0.5f),
+            dotRadius,
+            ImGui::ColorConvertFloat4ToU32(typeColor(var.dataType)));
+
+        // ── 计算各区域宽度 ────────────────────────────────────────────
+        std::string typeLabel = "[" + typeToStr(var) + "]";
+        float typeLabelW  = ImGui::CalcTextSize(typeLabel.c_str()).x + 8.0f;
+        float deleteW     = ImGui::CalcTextSize(ICON_FA_TRASH_CAN).x + ImGui::GetStyle().FramePadding.x * 2 + 4.0f;
+        float dotW        = dotOffsetX * 2.0f;                          // 色标占用宽度
+        float spacing     = ImGui::GetStyle().ItemSpacing.x;
+        float nameW       = paneWidth - dotW - typeLabelW - deleteW - spacing * 3;
+        if (nameW < 40.0f) nameW = 40.0f;
+
+        // ── 整行 Selectable（作为拖拽手柄 + 双击检测区域）───────────
+        ImGui::SetCursorScreenPos(rowMin);
+        // 用透明 Selectable 覆盖整行（不含删除按钮区域）
+        float selectableW = paneWidth - deleteW - spacing;
+        bool rowClicked = ImGui::Selectable("##varrow", false,
+            ImGuiSelectableFlags_AllowOverlap | ImGuiSelectableFlags_AllowDoubleClick,
+            ImVec2(selectableW, rowHeight));
+
+        // 双击进入编辑模式
+        if (rowClicked && ImGui::IsMouseDoubleClicked(0))
+        {
+            s_editingIdx = i;
+            snprintf(s_editBuf, sizeof(s_editBuf), "%s", var.name.c_str());
+            ImGui::SetKeyboardFocusHere(1); // 下帧聚焦输入框
+        }
+
+        // 拖拽源：整行都可以拖
         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
         {
             VarDragPayload payload;
             snprintf(payload.varName, sizeof(payload.varName), "%s", var.name.c_str());
             payload.dataType = static_cast<int>(var.dataType);
             ImGui::SetDragDropPayload(VAR_DRAG_DROP_TYPE, &payload, sizeof(payload));
-            // 拖拽预览提示
             ImGui::TextColored(typeColor(var.dataType), "● %s  [%s]", var.name.c_str(), typeToStr(var).c_str());
             ImGui::TextDisabled("Drop to canvas → select Get / Set");
             ImGui::EndDragDropSource();
         }
 
-        ImGui::SameLine(0, 2.0f);
-
-        // 变量名（可内联重命名）
-        char nameBuf[64];
-        snprintf(nameBuf, sizeof(nameBuf), "%s", var.name.c_str());
-        // 类型标签宽度（动态计算，避免截断）
-        std::string typeLabel = "[" + typeToStr(var) + "]";
-        float typeLabelW = ImGui::CalcTextSize(typeLabel.c_str()).x + 8.0f;
-        float nameW = paneWidth - 14.0f - 4.0f - typeLabelW - ImGui::GetStyle().ItemSpacing.x * 2;
-        if (nameW < 40.0f) nameW = 40.0f;
+        // ── 名字区域：编辑模式 = InputText，否则 = 文字 ───────────────
+        ImGui::SameLine(dotW + spacing, 0);
         ImGui::SetNextItemWidth(nameW);
-        if (ImGui::InputText("##vname", nameBuf, sizeof(nameBuf), ImGuiInputTextFlags_EnterReturnsTrue))
+
+        if (s_editingIdx == i)
         {
-            if (nameBuf[0] != '\0' && var.name != nameBuf)
+            // 编辑模式：显示输入框
+            ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue
+                                      | ImGuiInputTextFlags_AutoSelectAll;
+            bool confirmed = ImGui::InputText("##vedit", s_editBuf, sizeof(s_editBuf), flags);
+            bool lostFocus = !ImGui::IsItemActive() && ImGui::IsItemDeactivated();
+
+            if (confirmed || lostFocus)
             {
-                // 检查重名
-                bool dup = false;
-                for (int j = 0; j < (int)doc->variables.size(); ++j)
-                    if (j != i && doc->variables[j].name == nameBuf) { dup = true; break; }
-                if (!dup)
+                if (s_editBuf[0] != '\0' && var.name != s_editBuf)
                 {
-                    PushUndoState();  // 重命名前保存快照
-                    var.name = nameBuf;
-                    doc->isDirty = true;
+                    bool dup = false;
+                    for (int j = 0; j < (int)doc->variables.size(); ++j)
+                        if (j != i && doc->variables[j].name == s_editBuf) { dup = true; break; }
+                    if (!dup)
+                    {
+                        PushUndoState();
+                        var.name = s_editBuf;
+                        doc->isDirty = true;
+                    }
                 }
+                s_editingIdx = -1;
             }
+            // Esc 取消
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+                s_editingIdx = -1;
         }
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Press Enter to rename");
+        else
+        {
+            // 正常模式：显示变量名文字（截断过长名称）
+            // 用 Dummy 占位保持行高一致，TextUnformatted 叠在上面
+            ImVec2 textPos = ImGui::GetCursorScreenPos();
+            ImGui::Dummy(ImVec2(nameW, rowHeight));
+            // 裁剪渲染
+            ImGui::GetWindowDrawList()->PushClipRect(textPos, textPos + ImVec2(nameW, rowHeight), true);
+            ImGui::GetWindowDrawList()->AddText(
+                textPos + ImVec2(0, (rowHeight - ImGui::GetTextLineHeight()) * 0.5f),
+                ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_Text)),
+                var.name.c_str());
+            ImGui::GetWindowDrawList()->PopClipRect();
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Double-click to rename: %s", var.name.c_str());
+        }
 
-        ImGui::SameLine();
+        ImGui::SameLine(0, spacing);
 
-        // 类型标签（右对齐，点击切换类型）
-        float labelX = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - typeLabelW + 4.0f;
-        if (labelX > ImGui::GetCursorPosX())
-            ImGui::SetCursorPosX(labelX);
+        // ── 类型标签（右对齐，点击切换类型）─────────────────────────
         ImGui::TextColored(typeColor(var.dataType), "%s", typeLabel.c_str());
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Click to change type");
