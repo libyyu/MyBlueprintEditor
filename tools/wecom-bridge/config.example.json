@@ -32,9 +32,13 @@
     },
     "_comment_routes": "routes: 关键词 → 蓝图，匹配到关键词时覆盖 defaultBlueprint",
     "routes": {
-      "搜索":   "data/examples/WebSearchAgent.bjson",
-      "分析文件": "data/examples/FileAgent.bjson",
-      "ReAct":  "data/examples/ReActAgent.bjson"
+      "搜索":         "data/examples/WebSearchAgent.bjson",
+      "分析文件":      "data/examples/FileAgent.bjson",
+      "ReAct":        "data/examples/ReActAgent.bjson",
+      "review":       "data/p4review/P4ReviewAgent.bjson",
+      "代码审查":      "data/p4review/P4ReviewAgent.bjson",
+      "batch review": "data/p4review/P4BatchReviewAgent.bjson",
+      "批量审查":      "data/p4review/P4BatchReviewAgent.bjson"
     },
     "timeoutMs": 120000
   },

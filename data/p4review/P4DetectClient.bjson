@@ -1,0 +1,178 @@
+{
+  "runtime": {
+    "metadata": { "blueprintClass": 0, "name": "P4DetectClient", "schemaVersion": 2 },
+    "nodes": [
+      {
+        "id": 1, "definitionId": "OnBeginPlay", "name": "On Begin Play",
+        "pins": [{ "id": 1001, "kind": 1, "dataType": 0, "isExec": true }]
+      },
+      {
+        "id": 2, "definitionId": "GetVariable", "name": "Get P4User",
+        "pins": [
+          { "id": 2001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "P4User" },
+          { "id": 2010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 3, "definitionId": "FormatString", "name": "Build p4 clients cmd",
+        "pins": [
+          { "id": 3001, "kind": 0, "dataType": 4, "name": "Format",
+            "defaultValue": "cmd /c \"chcp 65001 >nul && p4 clients -u {0}\"" },
+          { "id": 3002, "kind": 0, "dataType": 9, "name": "Arg 0" },
+          { "id": 3010, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+      {
+        "id": 4, "definitionId": "Code.Run", "name": "Run p4 clients",
+        "pins": [
+          { "id": 4001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 4002, "kind": 0, "dataType": 4, "name": "Command" },
+          { "id": 4003, "kind": 0, "dataType": 4, "name": "WorkDir", "defaultValue": "" },
+          { "id": 4004, "kind": 0, "dataType": 2, "name": "TimeoutSeconds", "defaultValue": 30 },
+          { "id": 4010, "kind": 1, "dataType": 0, "isExec": true, "name": "onSuccess" },
+          { "id": 4011, "kind": 1, "dataType": 0, "isExec": true, "name": "onError" },
+          { "id": 4020, "kind": 1, "dataType": 4, "name": "Stdout" },
+          { "id": 4021, "kind": 1, "dataType": 4, "name": "Stderr" },
+          { "id": 4022, "kind": 1, "dataType": 2, "name": "ExitCode" }
+        ]
+      },
+      {
+        "id": 5, "definitionId": "LLM.Chat", "name": "Extract Client Name",
+        "pins": [
+          { "id": 5001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 5002, "kind": 0, "dataType": 4, "name": "BaseURL" },
+          { "id": 5003, "kind": 0, "dataType": 4, "name": "ApiKey" },
+          { "id": 5004, "kind": 0, "dataType": 4, "name": "Model" },
+          { "id": 5005, "kind": 0, "dataType": 4, "name": "Messages", "defaultValue": "[]" },
+          { "id": 5006, "kind": 0, "dataType": 4, "name": "SystemPrompt",
+            "defaultValue": "You are a Perforce expert. Given p4 clients output and a workspace path, extract the single best matching client name. Reply with ONLY the client name, no extra text." },
+          { "id": 5007, "kind": 0, "dataType": 2, "name": "MaxTokens", "defaultValue": 64 },
+          { "id": 5010, "kind": 1, "dataType": 0, "isExec": true, "name": "onReply" },
+          { "id": 5011, "kind": 1, "dataType": 0, "isExec": true, "name": "onToolCall" },
+          { "id": 5012, "kind": 1, "dataType": 0, "isExec": true, "name": "onError" },
+          { "id": 5020, "kind": 1, "dataType": 4, "name": "Reply" },
+          { "id": 5021, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
+        ]
+      },
+      {
+        "id": 6, "definitionId": "FormatString", "name": "Build LLM query",
+        "pins": [
+          { "id": 6001, "kind": 0, "dataType": 4, "name": "Format",
+            "defaultValue": "p4 clients output:\n{0}\n\nCurrent workspace path: {1}\n\nWhich client name best matches?" },
+          { "id": 6002, "kind": 0, "dataType": 9, "name": "Arg 0" },
+          { "id": 6003, "kind": 0, "dataType": 9, "name": "Arg 1" },
+          { "id": 6010, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+      {
+        "id": 7, "definitionId": "GetVariable", "name": "Get WorkDir",
+        "pins": [
+          { "id": 7001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "WorkDir" },
+          { "id": 7010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 8, "definitionId": "JSON.MakeMessage", "name": "Make User Msg",
+        "pins": [
+          { "id": 8001, "kind": 0, "dataType": 4, "name": "Role", "defaultValue": "user" },
+          { "id": 8002, "kind": 0, "dataType": 4, "name": "Content" },
+          { "id": 8003, "kind": 0, "dataType": 4, "name": "ToolCallId", "defaultValue": "" },
+          { "id": 8010, "kind": 1, "dataType": 4, "name": "Message" }
+        ]
+      },
+      {
+        "id": 9, "definitionId": "JSON.ArrayPush", "name": "Push Message",
+        "pins": [
+          { "id": 9001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 9002, "kind": 0, "dataType": 4, "name": "JSON", "defaultValue": "[]" },
+          { "id": 9003, "kind": 0, "dataType": 9, "name": "Element" },
+          { "id": 9010, "kind": 1, "dataType": 0, "isExec": true },
+          { "id": 9020, "kind": 1, "dataType": 4, "name": "JSON" },
+          { "id": 9021, "kind": 1, "dataType": 2, "name": "Length" }
+        ]
+      },
+      {
+        "id": 10, "definitionId": "StringTrimmed", "name": "Trim Client Name",
+        "pins": [
+          { "id": 10001, "kind": 0, "dataType": 4, "name": "String" },
+          { "id": 10010, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+      {
+        "id": 11, "definitionId": "SetVariable", "name": "Set P4Client",
+        "pins": [
+          { "id": 11001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 11002, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "P4Client" },
+          { "id": 11003, "kind": 0, "dataType": 9, "name": "Value" },
+          { "id": 11010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 12, "definitionId": "PrintString", "name": "Print Client",
+        "pins": [
+          { "id": 12001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 12002, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 12010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 13, "definitionId": "PrintString", "name": "Print Error",
+        "pins": [
+          { "id": 13001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 13002, "kind": 0, "dataType": 4, "name": "In String", "defaultValue": "[P4DetectClient] ERROR: p4 clients failed" },
+          { "id": 13010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 14, "definitionId": "GetVariable", "name": "Get BaseURL",
+        "pins": [
+          { "id": 14001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "BaseURL" },
+          { "id": 14010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 15, "definitionId": "GetVariable", "name": "Get ApiKey",
+        "pins": [
+          { "id": 15001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "ApiKey" },
+          { "id": 15010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 16, "definitionId": "GetVariable", "name": "Get Model",
+        "pins": [
+          { "id": 16001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Model" },
+          { "id": 16010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      }
+    ],
+    "links": [
+      { "id": 1, "startPinId": 1001, "endPinId": 4001, "isEnabled": true },
+      { "id": 2, "startPinId": 2010, "endPinId": 3002, "isEnabled": true },
+      { "id": 3, "startPinId": 3010, "endPinId": 4002, "isEnabled": true },
+      { "id": 4, "startPinId": 4011, "endPinId": 13001, "isEnabled": true },
+      { "id": 5, "startPinId": 4020, "endPinId": 6002, "isEnabled": true },
+      { "id": 6, "startPinId": 7010, "endPinId": 6003, "isEnabled": true },
+      { "id": 7, "startPinId": 6010, "endPinId": 8002, "isEnabled": true },
+      { "id": 8, "startPinId": 8010, "endPinId": 9003, "isEnabled": true },
+      { "id": 9, "startPinId": 4010, "endPinId": 9001, "isEnabled": true },
+      { "id": 10, "startPinId": 9010, "endPinId": 5001, "isEnabled": true },
+      { "id": 11, "startPinId": 9020, "endPinId": 5005, "isEnabled": true },
+      { "id": 12, "startPinId": 14010, "endPinId": 5002, "isEnabled": true },
+      { "id": 13, "startPinId": 15010, "endPinId": 5003, "isEnabled": true },
+      { "id": 14, "startPinId": 16010, "endPinId": 5004, "isEnabled": true },
+      { "id": 15, "startPinId": 5020, "endPinId": 10001, "isEnabled": true },
+      { "id": 16, "startPinId": 5010, "endPinId": 11001, "isEnabled": true },
+      { "id": 17, "startPinId": 10010, "endPinId": 11003, "isEnabled": true },
+      { "id": 18, "startPinId": 11010, "endPinId": 12001, "isEnabled": true },
+      { "id": 19, "startPinId": 10010, "endPinId": 12002, "isEnabled": true }
+    ],
+    "variables": [
+      { "name": "P4User",  "dataType": 4, "defaultValue": "" },
+      { "name": "P4Client","dataType": 4, "defaultValue": "" },
+      { "name": "WorkDir", "dataType": 4, "defaultValue": "" },
+      { "name": "ApiKey",  "dataType": 4, "defaultValue": "" },
+      { "name": "BaseURL", "dataType": 4, "defaultValue": "https://api.openai.com/v1" },
+      { "name": "Model",   "dataType": 4, "defaultValue": "gpt-4o" }
+    ]
+  }
+}

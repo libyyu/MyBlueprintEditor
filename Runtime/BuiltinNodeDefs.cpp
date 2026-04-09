@@ -815,6 +815,28 @@ static void RegisterNodeDefs_String(INodeRegistry& registry)
         { MakePin("String", PinDataType::String), MakePin("Position", PinDataType::Integer), MakePin("Length", PinDataType::Integer) },
         { MakePin("Result", PinDataType::String) },
         "", "Simple");
+
+    // String.Regex — 正则表达式匹配与提取
+    // Match:   在 String 中匹配 Pattern，Found=true 时 Match0..Match7 存各捕获组
+    // FindAll: 找到所有匹配（无捕获组），结果存入 Matches(Array)
+    // Replace: 将 Pattern 匹配替换为 Replacement（支持 $1 反向引用）
+    reg("String.Regex", "String Regex", "Misc/String",
+        {
+            MakePin("String",      PinDataType::String),
+            MakePin("Pattern",     PinDataType::String),
+            MakePin("Replacement", PinDataType::String),  // Replace 模式用
+            MakePin("Mode",        PinDataType::String),  // "match"(default)|"findall"|"replace"
+        },
+        {
+            MakePin("Found",   PinDataType::Boolean),
+            MakePin("Match0",  PinDataType::String),  // 整体匹配 / 第1组
+            MakePin("Match1",  PinDataType::String),  // 第2捕获组
+            MakePin("Match2",  PinDataType::String),
+            MakePin("Match3",  PinDataType::String),
+            MakePin("Matches", PinDataType::Array),   // findall 全部结果
+            MakePin("Result",  PinDataType::String),  // replace 结果
+        },
+        "C08040", "Simple"); // 橙色，区别于普通字符串节点
 }
 
 static void RegisterNodeDefs_Array(INodeRegistry& registry)

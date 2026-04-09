@@ -1,7 +1,10 @@
 // Runtime/BuiltinHandlers_String.cpp -- String 字符串节点处理器
 #include "BuiltinHandlers_String.h"
+#include "../../Utils/Json/crude_json.h"
 #include <algorithm>
 #include <cctype>
+#include <regex>
+#include <sstream>
 
 namespace NodeEditor {
 namespace Runtime {
@@ -328,6 +331,66 @@ void RegisterHandlers_String(std::unordered_map<std::string, NodeHandler>& handl
             str.erase(static_cast<size_t>(pos),
                       len < 0 ? std::string::npos : static_cast<size_t>(len));
         ctx.SetOutputValue("Result", Variant(str));
+        return true;
+    };
+
+    // ── String.Regex ─────────────────────────────────────────────────────────
+    // Mode="match"   : 找第一个匹配，Found=true 时 Match0=整体, Match1..3=捕获组
+    // Mode="findall" : 找所有匹配（无捕获组），结果填入 Matches(Array)
+    // Mode="replace" : 将所有匹配替换为 Replacement（支持 $1..$9 反向引用）
+    handlers["String.Regex"] = [](ExecutionContext& ctx) {
+        std::string str         = ctx.GetInputValue("String").asString();
+        std::string pattern     = ctx.GetInputValue("Pattern").asString();
+        std::string replacement = ctx.GetInputValue("Replacement").asString();
+        std::string mode        = ctx.GetInputValue("Mode").asString();
+        if (mode.empty()) mode = "match";
+
+        // 默认输出
+        ctx.SetOutputValue("Found",   Variant(false));
+        ctx.SetOutputValue("Match0",  Variant(std::string("")));
+        ctx.SetOutputValue("Match1",  Variant(std::string("")));
+        ctx.SetOutputValue("Match2",  Variant(std::string("")));
+        ctx.SetOutputValue("Match3",  Variant(std::string("")));
+        ctx.SetOutputValue("Matches", Variant(std::string("[]")));
+        ctx.SetOutputValue("Result",  Variant(str));
+
+        if (pattern.empty()) return true;
+
+        std::regex re;
+        try {
+            re = std::regex(pattern, std::regex::ECMAScript);
+        } catch (const std::regex_error&) {
+            return true; // 正则语法错误，返回默认值
+        }
+
+        if (mode == "findall") {
+            // 查找所有匹配，构建 JSON 数组
+            crude_json::array arr;
+            auto begin = std::sregex_iterator(str.begin(), str.end(), re);
+            auto end   = std::sregex_iterator();
+            for (auto it = begin; it != end; ++it) {
+                arr.push_back(crude_json::value((*it)[0].str()));
+            }
+            bool found = !arr.empty();
+            ctx.SetOutputValue("Found",   Variant(found));
+            ctx.SetOutputValue("Matches", Variant(crude_json::value(std::move(arr)).dump()));
+        } else if (mode == "replace") {
+            std::string result = std::regex_replace(str, re, replacement);
+            ctx.SetOutputValue("Result", Variant(result));
+            ctx.SetOutputValue("Found",  Variant(result != str));
+        } else {
+            // match（默认）
+            std::smatch m;
+            bool found = std::regex_search(str, m, re);
+            ctx.SetOutputValue("Found", Variant(found));
+            if (found) {
+                // Match0 = 整体匹配，Match1..3 = 捕获组
+                if (m.size() > 0) ctx.SetOutputValue("Match0", Variant(m[0].str()));
+                if (m.size() > 1) ctx.SetOutputValue("Match1", Variant(m[1].str()));
+                if (m.size() > 2) ctx.SetOutputValue("Match2", Variant(m[2].str()));
+                if (m.size() > 3) ctx.SetOutputValue("Match3", Variant(m[3].str()));
+            }
+        }
         return true;
     };
 }
