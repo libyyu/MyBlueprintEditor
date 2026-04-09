@@ -57,19 +57,23 @@ static bool tableGetBool(lua_State* L, int tableIdx, const char* key, bool def =
     return result;
 }
 
-// 将 Lua string → PinDataType
+// 将 Lua string → PinDataType（大小写不敏感）
 static NodeEditor::Runtime::PinDataType parsePinDataType(const std::string& s)
 {
     using namespace NodeEditor::Runtime;
-    if (s == "bool"    || s == "boolean") return PinDataType::Boolean;
-    if (s == "int"     || s == "integer") return PinDataType::Integer;
-    if (s == "float"   || s == "number")  return PinDataType::Float;
-    if (s == "string")                    return PinDataType::String;
-    if (s == "object")                    return PinDataType::Object;
-    if (s == "array")                     return PinDataType::Array;
-    if (s == "map")                       return PinDataType::Map;
-    if (s == "set")                       return PinDataType::Set;
-    if (s == "flow"    || s == "exec")    return PinDataType::Unknown; // Flow 由 isExec 标志控制
+    // 转小写比较
+    std::string lower = s;
+    for (char& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+    if (lower == "bool"    || lower == "boolean") return PinDataType::Boolean;
+    if (lower == "int"     || lower == "integer") return PinDataType::Integer;
+    if (lower == "float"   || lower == "number")  return PinDataType::Float;
+    if (lower == "string")                        return PinDataType::String;
+    if (lower == "object")                        return PinDataType::Object;
+    if (lower == "array")                         return PinDataType::Array;
+    if (lower == "map")                           return PinDataType::Map;
+    if (lower == "set")                           return PinDataType::Set;
+    if (lower == "flow"    || lower == "exec")    return PinDataType::Unknown; // Flow 由 isExec 标志控制
     return PinDataType::Unknown;
 }
 
@@ -94,7 +98,10 @@ static std::vector<NodeEditor::Runtime::PinDefinition> parsePinList(
         pin.tooltip = tableGetString(L, -1, "tooltip");
 
         std::string typeStr = tableGetString(L, -1, "type", "float");
-        pin.isExec    = (typeStr == "flow" || typeStr == "exec");
+        // 转小写判断是否为 flow
+        std::string typeLower = typeStr;
+        for (char& c : typeLower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        pin.isExec    = (typeLower == "flow" || typeLower == "exec");
         pin.dataType  = pin.isExec ? PinDataType::Unknown : parsePinDataType(typeStr);
         pin.isRequired = tableGetBool(L, -1, "required", false);
 
@@ -147,6 +154,56 @@ static std::vector<NodeEditor::Runtime::PinDefinition> parsePinList(
 //       },
 //   })
 // ============================================================================
+
+// ============================================================================
+// l_registerHandlerEditor
+// Blueprint.RegisterHandler(definitionId, function(ctx) ... end)
+// 把 handler 写入编辑器的 m_HandlerRegistry，执行时会批量注册到 persistentRunner。
+// ============================================================================
+static int l_registerHandlerEditor(lua_State* L)
+{
+    using namespace NodeEditor::Runtime;
+
+    const char* defId = luaL_checkstring(L, 1);
+    luaL_checktype(L, 2, LUA_TFUNCTION);
+
+    lua_getfield(L, LUA_REGISTRYINDEX, "__editor_handler_map");
+    auto* handlerMap = static_cast<std::unordered_map<std::string, NodeHandler>*>(
+        lua_touserdata(L, -1));
+    lua_pop(L, 1);
+
+    if (!handlerMap)
+        return luaL_error(L, "Blueprint.RegisterHandler: handler map not initialized");
+
+    // 保存函数到 Lua registry，防止 GC
+    lua_pushvalue(L, 2);
+    int funcRef = luaL_ref(L, LUA_REGISTRYINDEX);
+
+    lua_State* capturedL = L;
+    std::string capturedId(defId);
+
+    NodeHandler handler = [capturedL, funcRef, capturedId](ExecutionContext& ctx) -> bool {
+        lua_rawgeti(capturedL, LUA_REGISTRYINDEX, funcRef);
+        auto** udata = static_cast<ExecutionContext**>(
+            lua_newuserdata(capturedL, sizeof(ExecutionContext*)));
+        *udata = &ctx;
+        luaL_setmetatable(capturedL, "Blueprint.ExecutionContext");
+
+        if (lua_pcall(capturedL, 1, 1, 0) != LUA_OK) {
+            const char* err = lua_tostring(capturedL, -1);
+            ctx.PrintError(std::string("[Lua Handler '") + capturedId + "'] " +
+                           (err ? err : "unknown error"));
+            lua_pop(capturedL, 1);
+            return false;
+        }
+        bool result = lua_isboolean(capturedL, -1) ? lua_toboolean(capturedL, -1) != 0 : true;
+        lua_pop(capturedL, 1);
+        return result;
+    };
+
+    (*handlerMap)[defId] = std::move(handler);
+    return 0;
+}
 
 static int l_registerNode(lua_State* L)
 {
@@ -408,6 +465,15 @@ void LuaNodeRegistrar::registerEditorBindings(lua_State* L)
 
     lua_pushcfunction(L, l_registerNode);
     lua_setfield(L, -2, "RegisterNode");
+
+    // RegisterNodeDef 是 RegisterNode 的别名（兼容 Runtime 侧 BlueprintEntry.lua 的写法）
+    lua_pushcfunction(L, l_registerNode);
+    lua_setfield(L, -2, "RegisterNodeDef");
+
+    // RegisterHandler：编辑器侧把 handler 写入 m_HandlerRegistry
+    // 签名：Blueprint.RegisterHandler(definitionId, function(ctx) ... end)
+    lua_pushcfunction(L, l_registerHandlerEditor);
+    lua_setfield(L, -2, "RegisterHandler");
 
     lua_setglobal(L, "Blueprint");
 
