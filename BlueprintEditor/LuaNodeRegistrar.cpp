@@ -644,7 +644,11 @@ bool LuaNodeRegistrar::LoadEntrySilent(const std::string& filePath, const std::s
 
     if (lua_pcall(L, 0, 0, lua_gettop(L) - 1) != LUA_OK)
     {
-        // 运行时错误静默忽略
+        const char* err = lua_tostring(L, -1);
+        m_lastError = "Runtime error in [" + (chunkName.empty() ? filePath : chunkName) + "]: " +
+                      (err ? err : "unknown");
+        if (m_logCallback)
+            m_logCallback(1, "[BlueprintEntry] " + m_lastError);
         lua_pop(L, 1);
     }
     lua_pop(L, 1);  // pop errFunc
