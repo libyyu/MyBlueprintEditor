@@ -1675,6 +1675,14 @@ bool BlueprintRunner::StepNextNode()
             NodeId nodeId = order[i];
             if (!m_stepPendingNodes.count(nodeId)) continue;
             // 注意：Step 模式下不过滤 eventSubgraph，exec 流已明确指向该节点
+        // 但需要过滤 m_flowExecutedNodes 中已被 MarkDownstreamAsHandled 占位的节点
+        // （异步节点如 Code.Run/HTTP.Get 会预先标记 onSuccess/onError 两路下游，
+        //  真正触发的那路由 RunAsync 的 onComplete 回调通过 ActivateOutputFlow 来执行，
+        //  不应在此处 Step 进入两路都执行）
+        if (m_flowExecutedNodes.count(nodeId)) {
+            m_stepPendingNodes.erase(nodeId);
+            continue;
+        }
 
             const NodeInstance* node = m_blueprint.findNode(nodeId);
             if (!node) { m_stepPendingNodes.erase(nodeId); continue; }

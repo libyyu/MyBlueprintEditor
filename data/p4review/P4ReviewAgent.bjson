@@ -407,7 +407,7 @@
       { "id": 124, "startPinId": 11010, "endPinId": 13001, "isEnabled": true },
       { "id": 125, "startPinId": 12010, "endPinId": 13001, "isEnabled": true },
 
-      { "id": 130, "startPinId": 14010, "endPinId": 16003, "isEnabled": true },
+      { "id": 130, "startPinId": 22010, "endPinId": 16003, "isEnabled": true },
       { "id": 131, "startPinId": 6010,  "endPinId": 16002, "isEnabled": true },
       { "id": 132, "startPinId": 14010, "endPinId": 17001, "isEnabled": true },
       { "id": 133, "startPinId": 16010, "endPinId": 17002, "isEnabled": true },

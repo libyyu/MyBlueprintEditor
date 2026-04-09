@@ -323,6 +323,19 @@ void BlueprintEditor::OpenFile()
 
 void BlueprintEditor::DoOpenFile(const std::string& path)
 {
+    // ── 重复检查：同路径文件已打开则直接切换到对应 Tab ─────────────────────
+    {
+        std::string canonical = GetCanonicalPath(NormalizePath(path));
+        for (int i = 0; i < (int)m_Documents.size(); ++i)
+        {
+            if (GetCanonicalPath(NormalizePath(m_Documents[i]->filePath)) == canonical)
+            {
+                m_PendingSwitchTabIndex = i;
+                return;
+            }
+        }
+    }
+
     ::NodeEditor::Runtime::JsonBlueprintExporter exporter;
     ::NodeEditor::Runtime::ImportResult result;
     result = exporter.importRuntimeFromFile(path);

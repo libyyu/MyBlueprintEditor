@@ -109,7 +109,7 @@
         "name": "Get round",
         "pins": [
           { "id": 10001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "round" },
-          { "id": 10010, "kind": 1, "dataType": 4, "name": "Value" }
+          { "id": 10010, "kind": 1, "dataType": 2, "name": "Value" }
         ]
       },
       {

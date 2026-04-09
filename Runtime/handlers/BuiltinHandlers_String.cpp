@@ -356,15 +356,19 @@ void RegisterHandlers_String(std::unordered_map<std::string, NodeHandler>& handl
 
         if (pattern.empty()) return true;
 
+        // 构造正则：支持异常时捕获语法错误，不支持时直接构造（调用方应保证 pattern 合法）
+#if defined(__cpp_exceptions) && !defined(__EMSCRIPTEN__)
         std::regex re;
         try {
             re = std::regex(pattern, std::regex::ECMAScript);
         } catch (const std::regex_error&) {
             return true; // 正则语法错误，返回默认值
         }
+#else
+        std::regex re(pattern, std::regex::ECMAScript);
+#endif
 
         if (mode == "findall") {
-            // 查找所有匹配，构建 JSON 数组
             crude_json::array arr;
             auto begin = std::sregex_iterator(str.begin(), str.end(), re);
             auto end   = std::sregex_iterator();
@@ -384,7 +388,6 @@ void RegisterHandlers_String(std::unordered_map<std::string, NodeHandler>& handl
             bool found = std::regex_search(str, m, re);
             ctx.SetOutputValue("Found", Variant(found));
             if (found) {
-                // Match0 = 整体匹配，Match1..3 = 捕获组
                 if (m.size() > 0) ctx.SetOutputValue("Match0", Variant(m[0].str()));
                 if (m.size() > 1) ctx.SetOutputValue("Match1", Variant(m[1].str()));
                 if (m.size() > 2) ctx.SetOutputValue("Match2", Variant(m[2].str()));

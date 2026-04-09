@@ -1224,15 +1224,16 @@ static void RegisterNodeDefs_Misc(INodeRegistry& registry)
         registry.registerNode(d);
     }
 
-    reg("GetVariable", "Get Variable", "Misc",
+    reg("GetVariable", "Get Variable", "Variables",
         { MakePin("Name", PinDataType::String) },
         { MakePin("Value", PinDataType::String) },
-        "", "Simple");
+        "50C878", "Simple");
 
-    reg("SetVariable", "Set Variable", "Misc",
+    reg("SetVariable", "Set Variable", "Variables",
         { MakeFlowPin(""), MakePin("Name", PinDataType::String),
           MakePin("Value", PinDataType::String) },
-        { MakeFlowPin("") });
+        { MakeFlowPin("") },
+        "50C878");
 
     reg("IsValid", "Is Valid", "Misc",
         { MakePin("Value", PinDataType::Any) },

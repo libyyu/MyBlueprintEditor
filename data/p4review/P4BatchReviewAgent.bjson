@@ -192,14 +192,14 @@
         ]
       },
 
-      { "id": 21, "definitionId": "ForEach", "name": "For Each CL",
+      { "id": 21, "definitionId": "ForEachLoop", "name": "For Each CL",
         "pins": [
           { "id": 21001, "kind": 0, "dataType": 0, "isExec": true },
           { "id": 21002, "kind": 0, "dataType": 6, "name": "Array" },
-          { "id": 21010, "kind": 1, "dataType": 0, "isExec": true, "name": "LoopBody" },
+          { "id": 21010, "kind": 1, "dataType": 0, "isExec": true, "name": "Loop Body" },
           { "id": 21011, "kind": 1, "dataType": 0, "isExec": true, "name": "Completed" },
-          { "id": 21020, "kind": 1, "dataType": 9, "name": "Element" },
-          { "id": 21021, "kind": 1, "dataType": 2, "name": "Index" }
+          { "id": 21020, "kind": 1, "dataType": 9, "name": "Array Element" },
+          { "id": 21021, "kind": 1, "dataType": 2, "name": "Array Index" }
         ]
       },
 
