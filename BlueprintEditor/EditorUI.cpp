@@ -1654,15 +1654,33 @@ void BlueprintEditor::OnFrame(float deltaTime)
             {
                 BuildNodes();
                 ActiveDoc()->isDirty = true;
+
+                // 查找对应变量定义以获取正确类型
+                PinType varPinType = PinType::String;
+                for (const auto& varDef : ActiveDoc()->variables)
+                {
+                    if (varDef.name == vp.varName)
+                    {
+                        varPinType = MapRTPinDataType(varDef.dataType, false);
+                        break;
+                    }
+                }
+
                 for (auto& pin : node->Inputs)
                 {
                     if (pin.Name == "Name")
                     {
                         pin.StringValue = vp.varName;
-                        pin.IsHidden    = true;   // 隐藏 Name 输入引脚
-                        break;
+                        pin.IsHidden    = true;
+                    }
+                    else if (pin.Name == "Value")
+                    {
+                        pin.Type = varPinType;  // 修正类型
                     }
                 }
+                for (auto& pin : node->Outputs)
+                    if (pin.Name == "Value") { pin.Type = varPinType; break; }
+
                 node->Name = (isSetter ? "Set " : "Get ") + std::string(vp.varName);
                 ed::SetNodePosition(node->ID, ed::ScreenToCanvas(ActiveDoc()->pendingVarDropPos));
             }

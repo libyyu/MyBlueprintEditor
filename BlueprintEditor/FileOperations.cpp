@@ -636,30 +636,47 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
             }
         }
         
-        // ── UE4 风格变量节点：自动隐藏 Name 输入引脚 ──────────────────────
-        // GetVariable/SetVariable 的 Name 引脚只在内部保存变量名，不需要显示
+        // ── UE4 风格变量节点：自动隐藏 Name 输入引脚 + 修正 Value 引脚类型 ────
         if (node.DefinitionId == "GetVariable" || node.DefinitionId == "SetVariable")
         {
+            // 1. 找到变量名（从 Name 引脚的 StringValue）
+            std::string varName;
             for (auto& pin : node.Inputs)
             {
                 if (pin.Name == "Name")
                 {
                     pin.IsHidden = true;
+                    varName = pin.StringValue;
                     break;
                 }
             }
-            // 如果节点名还是通用名（Get Variable / Set Variable），
-            // 则根据 Name 引脚的 StringValue 自动改为 "Get XXX" / "Set XXX"
-            if (node.Name == "Get Variable" || node.Name == "Set Variable")
+
+            // 2. 根据变量名查找对应的变量定义，修正 Value 引脚类型
+            if (!varName.empty())
             {
-                for (const auto& pin : node.Inputs)
+                for (const auto& vd : data.variables)
                 {
-                    if (pin.Name == "Name" && !pin.StringValue.empty())
+                    if (vd.name == varName)
                     {
-                        bool isSetter = (node.DefinitionId == "SetVariable");
-                        node.Name = (isSetter ? "Set " : "Get ") + pin.StringValue;
+                        PinType correctType = MapRTPinDataType(vd.dataType, false);
+                        // 修正输出 Value 引脚（GetVariable）
+                        for (auto& pin : node.Outputs)
+                            if (pin.Name == "Value") { pin.Type = correctType; break; }
+                        // 修正输入 Value 引脚（SetVariable）
+                        for (auto& pin : node.Inputs)
+                            if (pin.Name == "Value") { pin.Type = correctType; break; }
                         break;
                     }
+                }
+            }
+
+            // 3. 如果节点名还是通用名，根据变量名自动改为 "Get XXX" / "Set XXX"
+            if (node.Name == "Get Variable" || node.Name == "Set Variable")
+            {
+                if (!varName.empty())
+                {
+                    bool isSetter = (node.DefinitionId == "SetVariable");
+                    node.Name = (isSetter ? "Set " : "Get ") + varName;
                 }
             }
         }

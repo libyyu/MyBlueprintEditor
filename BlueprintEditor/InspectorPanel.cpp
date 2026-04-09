@@ -936,12 +936,24 @@ void BlueprintEditor::DrawVariablePanel()
 
         ImGui::SameLine(0, spacing);
 
-        // ── 类型标签（右对齐，点击切换类型）─────────────────────────
-        ImGui::TextColored(typeColor(var.dataType), "%s", typeLabel.c_str());
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Click to change type");
-        if (ImGui::IsItemClicked())
-            ImGui::OpenPopup("##VarType");
+        // ── 类型标签（点击切换类型）──────────────────────────────────
+        // 先渲染可点击的 InvisibleButton，再叠加文字
+        {
+            ImVec2 labelSize = ImVec2(typeLabelW, rowHeight);
+            ImVec2 labelPos  = ImGui::GetCursorScreenPos();
+            // 透明按钮作为点击热区
+            ImGui::InvisibleButton("##vartype_btn", labelSize);
+            bool typeClicked = ImGui::IsItemClicked();
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Click to change type");
+            // 叠加彩色文字
+            ImGui::GetWindowDrawList()->AddText(
+                labelPos + ImVec2(0, (rowHeight - ImGui::GetTextLineHeight()) * 0.5f),
+                ImGui::ColorConvertFloat4ToU32(typeColor(var.dataType)),
+                typeLabel.c_str());
+            if (typeClicked)
+                ImGui::OpenPopup("##VarType");
+        }
 
         if (ImGui::BeginPopup("##VarType"))
         {
