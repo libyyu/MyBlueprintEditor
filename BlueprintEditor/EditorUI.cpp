@@ -1600,10 +1600,8 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
         const VarDragPayload& vp  = ActiveDoc()->pendingVarPayload;
         ImVec2                dropPos   = ActiveDoc()->pendingVarDropPos;
-        bool                  shiftHeld = ImGui::GetIO().KeyShift;
-        bool                  altHeld   = ImGui::GetIO().KeyAlt;
 
-        // 生成变量节点并设置 "Get VarName" / "Set VarName" 显示名
+        // 生成变量节点：隐藏 Name 输入引脚，节点标题显示 "Get/Set VarName"
         auto spawnVarNode = [&](const char* defId, bool isSetter)
         {
             ed::SetCurrentEditor(ActiveDoc()->editorContext);
@@ -1613,34 +1611,34 @@ void BlueprintEditor::OnFrame(float deltaTime)
             {
                 BuildNodes();
                 ActiveDoc()->isDirty = true;
-                // 设置 Name 引脚值
                 for (auto& pin : node->Inputs)
-                    if (pin.Name == "Name") { pin.StringValue = vp.varName; break; }
+                {
+                    if (pin.Name == "Name")
+                    {
+                        pin.StringValue = vp.varName;
+                        pin.IsHidden    = true;   // UE4 风格：隐藏 Name 引脚
+                        break;
+                    }
+                }
                 // UE4 风格：节点标题显示 "Get VarName" / "Set VarName"
                 node->Name = (isSetter ? "Set " : "Get ") + std::string(vp.varName);
                 ed::SetNodePosition(node->ID, ed::ScreenToCanvas(dropPos));
             }
         };
 
-        if (altHeld)
-        {
-            // Alt+拖拽：弹出 Get/Set 选择菜单
-            ImGui::SetNextWindowPos(dropPos, ImGuiCond_Always);
-            ImGui::OpenPopup("##VarDropMenu");
-        }
-        else if (shiftHeld)
-        {
-            // Shift+拖拽：直接生成 Set Variable
-            spawnVarNode("SetVariable", true);
-        }
-        else
-        {
-            // 无修饰键：直接生成 Get Variable（最常用）
-            spawnVarNode("GetVariable", false);
-        }
+        // 松手直接弹出 Get/Set 选择菜单（UE4 风格，无需额外修饰键）
+        ImGui::SetNextWindowPos(dropPos, ImGuiCond_Always);
+        ImGui::OpenPopup("##VarDropMenu");
+        // 把 spawnVarNode 函数传递给弹窗（通过 doc 状态中转）
+        // 这里用两个 flag 标记弹窗关联的动作，弹窗里直接 spawn
+        ActiveDoc()->pendingVarDrop    = false;  // 已消费
+        // 重新保存 payload 供弹窗使用（OpenPopup 同帧 BeginPopup 均有效）
+        ActiveDoc()->pendingVarPayload = vp;
+        ActiveDoc()->pendingVarDropPos = dropPos;
+        // 存 spawnVarNode 函数不便，直接在 BeginPopup 里重新实现
     }
 
-    // 变量 Get/Set 选择弹窗（Alt+拖拽时触发）
+    // 变量 Get/Set 选择弹窗
     if (ActiveDoc() && ImGui::BeginPopup("##VarDropMenu"))
     {
         const VarDragPayload& vp = ActiveDoc()->pendingVarPayload;
@@ -1657,7 +1655,14 @@ void BlueprintEditor::OnFrame(float deltaTime)
                 BuildNodes();
                 ActiveDoc()->isDirty = true;
                 for (auto& pin : node->Inputs)
-                    if (pin.Name == "Name") { pin.StringValue = vp.varName; break; }
+                {
+                    if (pin.Name == "Name")
+                    {
+                        pin.StringValue = vp.varName;
+                        pin.IsHidden    = true;   // 隐藏 Name 输入引脚
+                        break;
+                    }
+                }
                 node->Name = (isSetter ? "Set " : "Get ") + std::string(vp.varName);
                 ed::SetNodePosition(node->ID, ed::ScreenToCanvas(ActiveDoc()->pendingVarDropPos));
             }

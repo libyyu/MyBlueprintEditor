@@ -848,7 +848,7 @@ void BlueprintEditor::DrawVariablePanel()
             ImGui::SetDragDropPayload(VAR_DRAG_DROP_TYPE, &payload, sizeof(payload));
             // 拖拽预览提示
             ImGui::TextColored(typeColor(var.dataType), "● %s  [%s]", var.name.c_str(), typeToStr(var).c_str());
-            ImGui::TextDisabled("Drop → Get   Shift+Drop → Set   Alt+Drop → Menu");
+            ImGui::TextDisabled("Drop to canvas → select Get / Set");
             ImGui::EndDragDropSource();
         }
 

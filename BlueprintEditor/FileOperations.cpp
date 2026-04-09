@@ -636,6 +636,34 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
             }
         }
         
+        // ── UE4 风格变量节点：自动隐藏 Name 输入引脚 ──────────────────────
+        // GetVariable/SetVariable 的 Name 引脚只在内部保存变量名，不需要显示
+        if (node.DefinitionId == "GetVariable" || node.DefinitionId == "SetVariable")
+        {
+            for (auto& pin : node.Inputs)
+            {
+                if (pin.Name == "Name")
+                {
+                    pin.IsHidden = true;
+                    break;
+                }
+            }
+            // 如果节点名还是通用名（Get Variable / Set Variable），
+            // 则根据 Name 引脚的 StringValue 自动改为 "Get XXX" / "Set XXX"
+            if (node.Name == "Get Variable" || node.Name == "Set Variable")
+            {
+                for (const auto& pin : node.Inputs)
+                {
+                    if (pin.Name == "Name" && !pin.StringValue.empty())
+                    {
+                        bool isSetter = (node.DefinitionId == "SetVariable");
+                        node.Name = (isSetter ? "Set " : "Get ") + pin.StringValue;
+                        break;
+                    }
+                }
+            }
+        }
+
         // ============================================================
         // 恢复动态输入引脚属性（必须在引脚调和之前，否则 DynamicInputFixedCount 为 0）
         // ============================================================
