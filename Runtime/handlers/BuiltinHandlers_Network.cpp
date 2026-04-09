@@ -789,7 +789,14 @@ void RegisterHandlers_Network(
             std::stringstream ss(retryOnStatusStr);
             std::string tok;
             while (std::getline(ss, tok, ',')) {
-                try { retryOnStatus.insert(std::stoi(tok)); } catch (...) {}
+                // 手动解析，避免 try/catch（部分平台禁用异常）
+                int code = 0;
+                bool valid = !tok.empty();
+                for (char c : tok) {
+                    if (c < '0' || c > '9') { valid = false; break; }
+                    code = code * 10 + (c - '0');
+                }
+                if (valid && code > 0) retryOnStatus.insert(code);
             }
         }
 
