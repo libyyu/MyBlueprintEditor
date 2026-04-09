@@ -1,0 +1,417 @@
+{
+  "runtime": {
+    "fileType": "runtime",
+    "metadata": {
+      "schemaVersion": 2,
+      "blueprintClass": 0,
+      "name": "PlanExecuteAgent",
+      "description": "Plan-Execute Agent: Agent.Plan decomposes Goal into steps, ForLoop iterates each step, Tool.CallByName dispatches to tool functions. Variables: ApiKey, BaseURL, Model, Goal, AvailableTools.",
+      "version": "1.0"
+    },
+    "nodes": [
+      {
+        "id": 1,
+        "definitionId": "OnBeginPlay",
+        "name": "On Begin Play",
+        "pins": [
+          { "id": 2, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 10,
+        "definitionId": "GetVariable",
+        "name": "Get ApiKey",
+        "pins": [
+          { "id": 100, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "ApiKey" },
+          { "id": 101, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 11,
+        "definitionId": "GetVariable",
+        "name": "Get BaseURL",
+        "pins": [
+          { "id": 110, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "BaseURL" },
+          { "id": 111, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 12,
+        "definitionId": "GetVariable",
+        "name": "Get Model",
+        "pins": [
+          { "id": 120, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Model" },
+          { "id": 121, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 13,
+        "definitionId": "GetVariable",
+        "name": "Get Goal",
+        "pins": [
+          { "id": 130, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Goal" },
+          { "id": 131, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 14,
+        "definitionId": "GetVariable",
+        "name": "Get AvailableTools",
+        "pins": [
+          { "id": 140, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "AvailableTools" },
+          { "id": 141, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 20,
+        "definitionId": "Agent.Plan",
+        "name": "Plan Steps",
+        "pins": [
+          { "id": 200, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 201, "kind": 0, "dataType": 4, "name": "BaseURL" },
+          { "id": 202, "kind": 0, "dataType": 4, "name": "ApiKey" },
+          { "id": 203, "kind": 0, "dataType": 4, "name": "Model" },
+          { "id": 204, "kind": 0, "dataType": 4, "name": "Goal" },
+          { "id": 205, "kind": 0, "dataType": 4, "name": "AvailableTools" },
+          { "id": 206, "kind": 0, "dataType": 2, "name": "MaxSteps",  "defaultValue": 5 },
+          { "id": 207, "kind": 0, "dataType": 2, "name": "MaxTokens", "defaultValue": 1024 },
+          { "id": 208, "kind": 1, "dataType": 0, "name": "onDone",  "isExec": true },
+          { "id": 209, "kind": 1, "dataType": 0, "name": "onError", "isExec": true },
+          { "id": 210, "kind": 1, "dataType": 4, "name": "PlanJSON" },
+          { "id": 211, "kind": 1, "dataType": 2, "name": "StepCount" },
+          { "id": 212, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
+        ]
+      },
+      {
+        "id": 21,
+        "definitionId": "PrintString",
+        "name": "Print Plan",
+        "pins": [
+          { "id": 213, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 214, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 215, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 22,
+        "definitionId": "FormatString",
+        "name": "Format Plan Log",
+        "pins": [
+          { "id": 220, "kind": 0, "dataType": 4, "name": "Format", "defaultValue": "[Plan] {0} steps generated:\n{1}" },
+          { "id": 221, "kind": 0, "dataType": 4, "name": "count" },
+          { "id": 222, "kind": 0, "dataType": 4, "name": "plan" },
+          { "id": 223, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+      {
+        "id": 30,
+        "definitionId": "SetVariable",
+        "name": "Save Plan",
+        "pins": [
+          { "id": 300, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 301, "kind": 0, "dataType": 4, "name": "Name",  "defaultValue": "plan" },
+          { "id": 302, "kind": 0, "dataType": 4, "name": "Value" },
+          { "id": 303, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 31,
+        "definitionId": "SetVariable",
+        "name": "Init stepIdx",
+        "pins": [
+          { "id": 310, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 311, "kind": 0, "dataType": 4, "name": "Name",  "defaultValue": "stepIdx" },
+          { "id": 312, "kind": 0, "dataType": 2, "name": "Value", "defaultValue": 0 },
+          { "id": 313, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 40,
+        "definitionId": "ForLoop",
+        "name": "Execute Steps",
+        "pins": [
+          { "id": 400, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 401, "kind": 0, "dataType": 2, "name": "First Index", "defaultValue": 0 },
+          { "id": 402, "kind": 0, "dataType": 2, "name": "Last Index" },
+          { "id": 403, "kind": 1, "dataType": 0, "name": "LoopBody",  "isExec": true },
+          { "id": 404, "kind": 1, "dataType": 0, "name": "Completed", "isExec": true },
+          { "id": 405, "kind": 1, "dataType": 2, "name": "Index" }
+        ]
+      },
+      {
+        "id": 41,
+        "definitionId": "GetVariable",
+        "name": "Get plan",
+        "pins": [
+          { "id": 410, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "plan" },
+          { "id": 411, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 42,
+        "definitionId": "FormatString",
+        "name": "Get Step Path",
+        "pins": [
+          { "id": 420, "kind": 0, "dataType": 4, "name": "Format",    "defaultValue": "[{0}].tool" },
+          { "id": 421, "kind": 0, "dataType": 4, "name": "idx" },
+          { "id": 422, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+      {
+        "id": 43,
+        "definitionId": "JSON.GetPath",
+        "name": "Get ToolName",
+        "pins": [
+          { "id": 430, "kind": 0, "dataType": 4, "name": "JSON" },
+          { "id": 431, "kind": 0, "dataType": 4, "name": "Path" },
+          { "id": 432, "kind": 1, "dataType": 4, "name": "Value" },
+          { "id": 433, "kind": 1, "dataType": 1, "name": "Found" }
+        ]
+      },
+      {
+        "id": 44,
+        "definitionId": "FormatString",
+        "name": "Get Args Path",
+        "pins": [
+          { "id": 440, "kind": 0, "dataType": 4, "name": "Format",    "defaultValue": "[{0}].arguments" },
+          { "id": 441, "kind": 0, "dataType": 4, "name": "idx" },
+          { "id": 442, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+      {
+        "id": 45,
+        "definitionId": "JSON.GetPath",
+        "name": "Get Arguments",
+        "pins": [
+          { "id": 450, "kind": 0, "dataType": 4, "name": "JSON" },
+          { "id": 451, "kind": 0, "dataType": 4, "name": "Path" },
+          { "id": 452, "kind": 1, "dataType": 4, "name": "Value" },
+          { "id": 453, "kind": 1, "dataType": 1, "name": "Found" }
+        ]
+      },
+      {
+        "id": 46,
+        "definitionId": "FormatString",
+        "name": "Get Reason Path",
+        "pins": [
+          { "id": 460, "kind": 0, "dataType": 4, "name": "Format",    "defaultValue": "[{0}].reason" },
+          { "id": 461, "kind": 0, "dataType": 4, "name": "idx" },
+          { "id": 462, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+      {
+        "id": 47,
+        "definitionId": "JSON.GetPath",
+        "name": "Get Reason",
+        "pins": [
+          { "id": 470, "kind": 0, "dataType": 4, "name": "JSON" },
+          { "id": 471, "kind": 0, "dataType": 4, "name": "Path" },
+          { "id": 472, "kind": 1, "dataType": 4, "name": "Value" },
+          { "id": 473, "kind": 1, "dataType": 1, "name": "Found" }
+        ]
+      },
+      {
+        "id": 50,
+        "definitionId": "FormatString",
+        "name": "Log Step",
+        "pins": [
+          { "id": 500, "kind": 0, "dataType": 4, "name": "Format",
+            "defaultValue": "[Execute] Step {0}: {1}({2}) — {3}" },
+          { "id": 501, "kind": 0, "dataType": 4, "name": "idx" },
+          { "id": 502, "kind": 0, "dataType": 4, "name": "tool" },
+          { "id": 503, "kind": 0, "dataType": 4, "name": "args" },
+          { "id": 504, "kind": 0, "dataType": 4, "name": "reason" },
+          { "id": 505, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+      {
+        "id": 51,
+        "definitionId": "PrintString",
+        "name": "Print Step",
+        "pins": [
+          { "id": 510, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 511, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 512, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 60,
+        "definitionId": "Tool.CallByName",
+        "name": "Call Tool",
+        "pins": [
+          { "id": 600, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 601, "kind": 0, "dataType": 4, "name": "ToolName" },
+          { "id": 602, "kind": 0, "dataType": 4, "name": "Arguments" },
+          { "id": 603, "kind": 0, "dataType": 4, "name": "ToolCallId", "defaultValue": "" },
+          { "id": 604, "kind": 1, "dataType": 0, "name": "onSuccess",  "isExec": true },
+          { "id": 605, "kind": 1, "dataType": 0, "name": "onNotFound", "isExec": true },
+          { "id": 606, "kind": 1, "dataType": 4, "name": "Result" },
+          { "id": 607, "kind": 1, "dataType": 4, "name": "ToolCallId" }
+        ]
+      },
+      {
+        "id": 61,
+        "definitionId": "FormatString",
+        "name": "Log Result",
+        "pins": [
+          { "id": 610, "kind": 0, "dataType": 4, "name": "Format", "defaultValue": "[Result] {0}" },
+          { "id": 611, "kind": 0, "dataType": 4, "name": "result" },
+          { "id": 612, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+      {
+        "id": 62,
+        "definitionId": "PrintString",
+        "name": "Print Result",
+        "pins": [
+          { "id": 620, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 621, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 622, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 63,
+        "definitionId": "FormatString",
+        "name": "Log NotFound",
+        "pins": [
+          { "id": 630, "kind": 0, "dataType": 4, "name": "Format", "defaultValue": "[Warn] Tool '{0}' not found, skipping." },
+          { "id": 631, "kind": 0, "dataType": 4, "name": "tool" },
+          { "id": 632, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+      {
+        "id": 64,
+        "definitionId": "PrintString",
+        "name": "Print NotFound",
+        "pins": [
+          { "id": 640, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 641, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 642, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 70,
+        "definitionId": "PrintString",
+        "name": "Print Done",
+        "pins": [
+          { "id": 700, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 701, "kind": 0, "dataType": 4, "name": "In String",
+            "defaultValue": "[PlanExecute] All steps completed." },
+          { "id": 702, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 71,
+        "definitionId": "PrintString",
+        "name": "Print PlanError",
+        "pins": [
+          { "id": 710, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 711, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 712, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 80,
+        "definitionId": "IntToString",
+        "name": "Index to String",
+        "pins": [
+          { "id": 800, "kind": 0, "dataType": 2, "name": "Value" },
+          { "id": 801, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      }
+    ],
+    "links": [
+      { "id": 1,  "startPinId": 2,   "endPinId": 200, "isEnabled": true },
+      { "id": 2,  "startPinId": 111, "endPinId": 201, "isEnabled": true },
+      { "id": 3,  "startPinId": 101, "endPinId": 202, "isEnabled": true },
+      { "id": 4,  "startPinId": 121, "endPinId": 203, "isEnabled": true },
+      { "id": 5,  "startPinId": 131, "endPinId": 204, "isEnabled": true },
+      { "id": 6,  "startPinId": 141, "endPinId": 205, "isEnabled": true },
+      { "id": 7,  "startPinId": 208, "endPinId": 300, "isEnabled": true },
+      { "id": 8,  "startPinId": 210, "endPinId": 302, "isEnabled": true },
+      { "id": 9,  "startPinId": 303, "endPinId": 213, "isEnabled": true },
+      { "id": 10, "startPinId": 211, "endPinId": 221, "isEnabled": true },
+      { "id": 11, "startPinId": 210, "endPinId": 222, "isEnabled": true },
+      { "id": 12, "startPinId": 223, "endPinId": 214, "isEnabled": true },
+      { "id": 13, "startPinId": 215, "endPinId": 310, "isEnabled": true },
+      { "id": 14, "startPinId": 313, "endPinId": 400, "isEnabled": true },
+      { "id": 15, "startPinId": 211, "endPinId": 402, "isEnabled": true },
+      { "id": 16, "startPinId": 403, "endPinId": 510, "isEnabled": true },
+      { "id": 17, "startPinId": 404, "endPinId": 700, "isEnabled": true },
+      { "id": 18, "startPinId": 405, "endPinId": 800, "isEnabled": true },
+      { "id": 19, "startPinId": 801, "endPinId": 421, "isEnabled": true },
+      { "id": 20, "startPinId": 801, "endPinId": 441, "isEnabled": true },
+      { "id": 21, "startPinId": 801, "endPinId": 461, "isEnabled": true },
+      { "id": 22, "startPinId": 801, "endPinId": 501, "isEnabled": true },
+      { "id": 23, "startPinId": 411, "endPinId": 430, "isEnabled": true },
+      { "id": 24, "startPinId": 422, "endPinId": 431, "isEnabled": true },
+      { "id": 25, "startPinId": 432, "endPinId": 601, "isEnabled": true },
+      { "id": 26, "startPinId": 432, "endPinId": 502, "isEnabled": true },
+      { "id": 27, "startPinId": 411, "endPinId": 450, "isEnabled": true },
+      { "id": 28, "startPinId": 442, "endPinId": 451, "isEnabled": true },
+      { "id": 29, "startPinId": 452, "endPinId": 602, "isEnabled": true },
+      { "id": 30, "startPinId": 452, "endPinId": 503, "isEnabled": true },
+      { "id": 31, "startPinId": 411, "endPinId": 470, "isEnabled": true },
+      { "id": 32, "startPinId": 462, "endPinId": 471, "isEnabled": true },
+      { "id": 33, "startPinId": 472, "endPinId": 504, "isEnabled": true },
+      { "id": 34, "startPinId": 505, "endPinId": 511, "isEnabled": true },
+      { "id": 35, "startPinId": 512, "endPinId": 600, "isEnabled": true },
+      { "id": 36, "startPinId": 604, "endPinId": 620, "isEnabled": true },
+      { "id": 37, "startPinId": 606, "endPinId": 611, "isEnabled": true },
+      { "id": 38, "startPinId": 612, "endPinId": 621, "isEnabled": true },
+      { "id": 39, "startPinId": 605, "endPinId": 640, "isEnabled": true },
+      { "id": 40, "startPinId": 432, "endPinId": 631, "isEnabled": true },
+      { "id": 41, "startPinId": 632, "endPinId": 641, "isEnabled": true },
+      { "id": 42, "startPinId": 209, "endPinId": 710, "isEnabled": true },
+      { "id": 43, "startPinId": 212, "endPinId": 711, "isEnabled": true }
+    ],
+    "variables": [
+      { "name": "ApiKey",         "dataType": 4, "defaultValue": "sk-your-api-key-here" },
+      { "name": "BaseURL",        "dataType": 4, "defaultValue": "https://api.openai.com/v1" },
+      { "name": "Model",          "dataType": 4, "defaultValue": "gpt-4o" },
+      { "name": "Goal",           "dataType": 4, "defaultValue": "Search for latest AI news and summarize the top 3 findings" },
+      { "name": "AvailableTools", "dataType": 4, "defaultValue": "[{\"name\":\"web_search\",\"description\":\"Search the web for information\"},{\"name\":\"summarize\",\"description\":\"Summarize a list of texts\"}]" },
+      { "name": "plan",           "dataType": 4, "defaultValue": "[]" },
+      { "name": "stepIdx",        "dataType": 2, "defaultValue": 0 }
+    ]
+  },
+  "editor": {
+    "fileType": "editor",
+    "metadata": { "author": "", "createdAt": "", "updatedAt": "" },
+    "nodes": [
+      { "id": 1,  "position": { "x": -900, "y": 0    }, "size": { "width": 161,  "height": 72  } },
+      { "id": 10, "position": { "x": -900, "y": 120  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 11, "position": { "x": -900, "y": 180  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 12, "position": { "x": -900, "y": 240  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 13, "position": { "x": -900, "y": 300  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 14, "position": { "x": -900, "y": 360  }, "size": { "width": 240,  "height": 43  } },
+      { "id": 20, "position": { "x": -620, "y": 0    }, "size": { "width": 360,  "height": 240 } },
+      { "id": 22, "position": { "x": -200, "y": 100  }, "size": { "width": 380,  "height": 71  } },
+      { "id": 21, "position": { "x": 240,  "y": 100  }, "size": { "width": 193,  "height": 100 } },
+      { "id": 30, "position": { "x": -200, "y": 0    }, "size": { "width": 246,  "height": 131 } },
+      { "id": 31, "position": { "x": 240,  "y": 0    }, "size": { "width": 246,  "height": 131 } },
+      { "id": 40, "position": { "x": 540,  "y": 0    }, "size": { "width": 260,  "height": 155 } },
+      { "id": 80, "position": { "x": 540,  "y": 220  }, "size": { "width": 160,  "height": 57  } },
+      { "id": 41, "position": { "x": 760,  "y": 200  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 42, "position": { "x": 760,  "y": 280  }, "size": { "width": 260,  "height": 71  } },
+      { "id": 44, "position": { "x": 760,  "y": 380  }, "size": { "width": 260,  "height": 71  } },
+      { "id": 46, "position": { "x": 760,  "y": 480  }, "size": { "width": 260,  "height": 71  } },
+      { "id": 43, "position": { "x": 1080, "y": 280  }, "size": { "width": 290,  "height": 103 } },
+      { "id": 45, "position": { "x": 1080, "y": 420  }, "size": { "width": 290,  "height": 103 } },
+      { "id": 47, "position": { "x": 1080, "y": 560  }, "size": { "width": 290,  "height": 103 } },
+      { "id": 50, "position": { "x": 760,  "y": 0    }, "size": { "width": 440,  "height": 105 } },
+      { "id": 51, "position": { "x": 1260, "y": 0    }, "size": { "width": 193,  "height": 100 } },
+      { "id": 60, "position": { "x": 1260, "y": 280  }, "size": { "width": 280,  "height": 212 } },
+      { "id": 61, "position": { "x": 1600, "y": 280  }, "size": { "width": 280,  "height": 71  } },
+      { "id": 62, "position": { "x": 1940, "y": 280  }, "size": { "width": 193,  "height": 100 } },
+      { "id": 63, "position": { "x": 1600, "y": 420  }, "size": { "width": 380,  "height": 71  } },
+      { "id": 64, "position": { "x": 1940, "y": 420  }, "size": { "width": 193,  "height": 100 } },
+      { "id": 70, "position": { "x": 860,  "y": -120 }, "size": { "width": 340,  "height": 100 } },
+      { "id": 71, "position": { "x": -200, "y": 280  }, "size": { "width": 193,  "height": 100 } }
+    ],
+    "viewInfo": {
+      "viewPosition": { "x": -500, "y": -200 },
+      "viewScale": 0.5
+    }
+  }
+}
