@@ -1,0 +1,48 @@
+{
+  "_comment": "复制为 config.json 并填写实际值",
+
+  "wecom": {
+    "_comment_mode": "long_connection = 企微 AI Agent 双向通信（推荐）; webhook = 群机器人单向推送",
+    "mode": "long_connection",
+
+    "long_connection": {
+      "botId":  "你的企微AI应用BotId",
+      "secret": "你的企微AI应用Secret（长连接密钥）"
+    },
+
+    "webhook": {
+      "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY"
+    },
+
+    "_comment_notify": "notifyWebhookUrl 用于推送启动/断开通知（可与 webhook.url 相同，也可留空）",
+    "notifyWebhookUrl": ""
+  },
+
+  "blueprint": {
+    "mcpServerUrl": "http://localhost:7799",
+    "_comment_default": "defaultBlueprint: 收到消息时默认调用的蓝图（相对于 BLUEPRINT_ROOT）",
+    "defaultBlueprint": "data/examples/WebSearchAgent.bjson",
+    "_comment_var": "queryVariableName: 用户消息注入的蓝图变量名",
+    "queryVariableName": "UserQuery",
+    "_comment_fixed": "fixedVariables: 每次执行都注入的固定变量（ApiKey / BaseURL / Model 等）",
+    "fixedVariables": {
+      "ApiKey":  "sk-your-api-key-here",
+      "BaseURL": "https://api.openai.com/v1",
+      "Model":   "gpt-4o"
+    },
+    "_comment_routes": "routes: 关键词 → 蓝图，匹配到关键词时覆盖 defaultBlueprint",
+    "routes": {
+      "搜索":   "data/examples/WebSearchAgent.bjson",
+      "分析文件": "data/examples/FileAgent.bjson",
+      "ReAct":  "data/examples/ReActAgent.bjson"
+    },
+    "timeoutMs": 120000
+  },
+
+  "commands": {
+    "_comment": "内置命令前缀（以 - 开头），help/status/ping/blueprint 固定支持",
+    "enabled": true
+  },
+
+  "debug": false
+}

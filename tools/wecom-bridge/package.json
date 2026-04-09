@@ -1,0 +1,17 @@
+{
+  "name": "wecom-bridge",
+  "version": "1.0.0",
+  "description": "WeChat Work ↔ Blueprint MCP bridge — forwards WeCom messages to Blueprint workflows and streams replies back",
+  "main": "wecom_bridge.js",
+  "scripts": {
+    "start": "node wecom_bridge.js",
+    "dev": "node --watch wecom_bridge.js"
+  },
+  "dependencies": {
+    "@wecom/aibot-node-sdk": "^1.0.0",
+    "axios": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
