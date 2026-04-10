@@ -620,6 +620,62 @@ void RegisterHandlers_Flow(
         }
         return true;
     };
+
+    // ── Platform 判断节点 ────────────────────────────────────────────────────
+    // 纯数据节点，编译期常量
+#if defined(_WIN32) || defined(_WIN64)
+    handlers["Platform.IsWindows"] = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(true));  return true; };
+    handlers["Platform.IsLinux"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsMacOS"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsAndroid"] = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsIOS"]     = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsWebGL"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+#elif defined(__EMSCRIPTEN__)
+    handlers["Platform.IsWindows"] = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsLinux"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsMacOS"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsAndroid"] = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsIOS"]     = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsWebGL"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(true));  return true; };
+#elif defined(__ANDROID__)
+    handlers["Platform.IsWindows"] = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsLinux"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsMacOS"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsAndroid"] = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(true));  return true; };
+    handlers["Platform.IsIOS"]     = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsWebGL"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+#elif defined(__APPLE__)
+#  include <TargetConditionals.h>
+#  if TARGET_OS_IPHONE
+    handlers["Platform.IsWindows"] = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsLinux"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsMacOS"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsAndroid"] = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsIOS"]     = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(true));  return true; };
+    handlers["Platform.IsWebGL"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+#  else
+    handlers["Platform.IsWindows"] = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsLinux"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsMacOS"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(true));  return true; };
+    handlers["Platform.IsAndroid"] = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsIOS"]     = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsWebGL"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+#  endif
+#elif defined(__linux__)
+    handlers["Platform.IsWindows"] = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsLinux"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(true));  return true; };
+    handlers["Platform.IsMacOS"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsAndroid"] = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsIOS"]     = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsWebGL"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+#else
+    handlers["Platform.IsWindows"] = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsLinux"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsMacOS"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsAndroid"] = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsIOS"]     = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+    handlers["Platform.IsWebGL"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
+#endif
 }
 
 } // namespace Runtime

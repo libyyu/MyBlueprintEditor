@@ -1414,6 +1414,21 @@ static void RegisterNodeDefs_Event(INodeRegistry& registry)
         {},
         { MakeFlowPin("") },
         "FF6060");
+
+    // ── Platform 判断节点 ──────────────────────────────────────────────────────
+    // 纯数据节点，编译期常量，无 exec flow
+    reg("Platform.IsWindows", "Is Windows", "Platform",
+        {}, { MakePin("Result", PinDataType::Boolean) }, "4A90D9");
+    reg("Platform.IsLinux",   "Is Linux",   "Platform",
+        {}, { MakePin("Result", PinDataType::Boolean) }, "4A90D9");
+    reg("Platform.IsMacOS",   "Is macOS",   "Platform",
+        {}, { MakePin("Result", PinDataType::Boolean) }, "4A90D9");
+    reg("Platform.IsAndroid", "Is Android", "Platform",
+        {}, { MakePin("Result", PinDataType::Boolean) }, "4A90D9");
+    reg("Platform.IsIOS",     "Is iOS",     "Platform",
+        {}, { MakePin("Result", PinDataType::Boolean) }, "4A90D9");
+    reg("Platform.IsWebGL",   "Is WebGL",   "Platform",
+        {}, { MakePin("Result", PinDataType::Boolean) }, "4A90D9");
     
 
     reg("OnTick", "On Tick", "Event",
