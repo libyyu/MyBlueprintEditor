@@ -1948,6 +1948,33 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
         },
         "6A0572");
 
+    // ── LLM.AutoStream ──────────────────────────────────────────────────────
+    // 流式版 LLM.Auto：多 provider fallback + SSE 逐 token 推送
+    // Provider 引脚：空/"auto"=自动 fallback；填 provider name=直接使用指定 provider
+    reg("LLM.AutoStream", "LLM Auto Stream", "AI/LLM",
+        {
+            MakeFlowPin(""),
+            MakePin("ConfigFile",   PinDataType::String),
+            MakePin("Provider",     PinDataType::String),   // 空/"auto"=自动, 或指定 provider name
+            MakePin("Messages",     PinDataType::String),
+            MakePin("SystemPrompt", PinDataType::String),
+            MakePin("MaxTokens",    PinDataType::Integer),
+            MakePin("Temperature",  PinDataType::Float),
+            MakePin("Tools",        PinDataType::String),
+        },
+        {
+            MakeFlowPin("onChunk"),                          // 每个 token 激活一次
+            MakeFlowPin("onToolCall"),
+            MakeFlowPin("onDone"),                           // 全部 chunk 完毕
+            MakeFlowPin("onError"),
+            MakePin("Token",         PinDataType::String),   // 当前 token（onChunk 时）
+            MakePin("FullText",      PinDataType::String),   // 完整文本（onDone 时）
+            MakePin("ToolCallsJSON", PinDataType::String),
+            MakePin("UsedProvider",  PinDataType::String),   // 实际使用的 provider 名
+            MakePin("ErrorMessage",  PinDataType::String),
+        },
+        "6A0572");
+
     // ── LLM.StreamChat ──────────────────────────────────────────────────────
     // 流式 OpenAI 兼容 Chat（SSE 批量聚合）
     reg("LLM.StreamChat", "LLM Stream Chat", "AI/LLM",

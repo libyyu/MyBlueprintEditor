@@ -754,6 +754,290 @@ void RegisterHandlers_AI(
     };
 
     // ================================================================
+    // LLM.AutoStream
+    //   流式版 LLM.Auto：多 provider fallback + SSE 逐 token 推送
+    //   策略：依次尝试每个 provider 的流式请求；某个 provider 开始
+    //         收到 chunk 即视为"成功"，后续不再 fallback。
+    //   in:  ConfigFile, Provider, Messages, SystemPrompt,
+    //        MaxTokens, Temperature, Tools
+    //   exec out:
+    //     onChunk(Token)     — 每个 token
+    //     onToolCall         — finish_reason=tool_calls
+    //     onDone(FullText)   — 全部完成
+    //     onError(ErrorMessage)
+    //   out: Token / FullText / ToolCallsJSON / UsedProvider / ErrorMessage
+    // ================================================================
+    handlers["LLM.AutoStream"] = [](ExecutionContext& ctx) -> bool {
+        auto* client = BP_GetHttpClient();
+        if (!client) {
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient registered")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        // ── 读取并解析配置文件（同 LLM.Auto）──────────────────────────
+        std::string configFile = ctx.GetInputValue("ConfigFile").asString();
+        if (configFile.empty()) {
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("ConfigFile is empty")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+#ifdef __EMSCRIPTEN__
+        ctx.SetOutputValue("ErrorMessage", Variant(std::string("LLM.AutoStream: file I/O not supported on WebGL")));
+        ctx.ActivateOutputFlow("onError");
+        return true;
+#else
+        std::ifstream cfgFile(configFile, std::ios::binary);
+        if (!cfgFile.is_open()) {
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("Cannot open config file: " + configFile)));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+        std::ostringstream cfgSS; cfgSS << cfgFile.rdbuf();
+        crude_json::value cfg = crude_json::value::parse(cfgSS.str());
+
+        struct Provider { std::string name, baseURL, apiKey, model; int priority = 99; };
+        std::vector<Provider> providers;
+        if (cfg.is_object() && cfg.contains("providers")) {
+            const auto& arr = cfg["providers"];
+            if (arr.is_array()) {
+                for (const auto& p : arr.get<crude_json::array>()) {
+                    if (!p.is_object()) continue;
+                    Provider pv;
+                    if (p.contains("name")     && p["name"].is_string())     pv.name     = p["name"].get<std::string>();
+                    if (p.contains("baseURL")  && p["baseURL"].is_string())  pv.baseURL  = p["baseURL"].get<std::string>();
+                    if (p.contains("apiKey")   && p["apiKey"].is_string())   pv.apiKey   = p["apiKey"].get<std::string>();
+                    if (p.contains("model")    && p["model"].is_string())    pv.model    = p["model"].get<std::string>();
+                    if (p.contains("priority") && p["priority"].is_number()) pv.priority = (int)p["priority"].get<double>();
+                    if (!pv.baseURL.empty() && !pv.model.empty())
+                        providers.push_back(std::move(pv));
+                }
+            }
+        }
+        if (providers.empty()) {
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("No valid providers in config file")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        // 过滤指定 provider / 排序
+        std::string providerHint = ctx.GetInputValue("Provider").asString();
+        if (!providerHint.empty() && providerHint != "auto") {
+            std::vector<Provider> filtered;
+            for (auto& p : providers)
+                if (p.name == providerHint) { filtered.push_back(std::move(p)); break; }
+            if (filtered.empty()) {
+                ctx.SetOutputValue("ErrorMessage", Variant(std::string("Provider not found: " + providerHint)));
+                ctx.ActivateOutputFlow("onError");
+                return true;
+            }
+            providers = std::move(filtered);
+        } else {
+            std::sort(providers.begin(), providers.end(),
+                [](const Provider& a, const Provider& b){ return a.priority < b.priority; });
+        }
+
+        // ── Pin IDs ──────────────────────────────────────────────────────
+        PinId chunkPinId    = ctx.GetPinId("onChunk");
+        PinId toolCallPinId = ctx.GetPinId("onToolCall");
+        PinId donePinId     = ctx.GetPinId("onDone");
+        PinId errorPinId    = ctx.GetPinId("onError");
+        ctx.MarkDownstreamAsHandled("onChunk");
+        ctx.MarkDownstreamAsHandled("onToolCall");
+        ctx.MarkDownstreamAsHandled("onDone");
+        ctx.MarkDownstreamAsHandled("onError");
+
+        // ── 共享状态 ──────────────────────────────────────────────────────
+        struct AutoStreamState {
+            std::vector<Provider> providers;
+            size_t index = 0;
+            // 流结果（复用 LLM.StreamChat 的 StreamResult 结构）
+            std::vector<std::string> chunks;
+            std::string finishReason;
+            std::string errorMsg;
+            std::string successProvider;
+            struct ToolCallAccum { std::string id, name, arguments; };
+            std::vector<ToolCallAccum> toolCalls;
+        };
+        auto state = std::make_shared<AutoStreamState>();
+        state->providers = std::move(providers);
+
+        // ── SSE chunk 解析 lambda（与 LLM.StreamChat 完全一致）────────────
+        auto parseSSEChunk = [](std::shared_ptr<AutoStreamState> st, const std::string& sseData) {
+            if (sseData == "[DONE]") return;
+            auto v = crude_json::value::parse(sseData);
+            if (!v.is_object() || !v.contains("choices")) return;
+            const auto& choices = v["choices"];
+            if (!choices.is_array() || choices.get<crude_json::array>().empty()) return;
+            const auto& choice = choices.get<crude_json::array>()[0];
+            if (!choice.is_object()) return;
+
+            if (choice.contains("finish_reason")) {
+                const auto& fr = choice["finish_reason"];
+                if (fr.is_string() && !fr.get<std::string>().empty()
+                    && fr.get<std::string>() != "null")
+                    st->finishReason = fr.get<std::string>();
+            }
+            // Emscripten 降级：message
+            if (choice.contains("message")) {
+                const auto& msg = choice["message"];
+                if (msg.is_object()) {
+                    if (msg.contains("content") && msg["content"].is_string())
+                        st->chunks.push_back(msg["content"].get<std::string>());
+                    if (msg.contains("tool_calls") && msg["tool_calls"].is_array()) {
+                        size_t idx = 0;
+                        for (const auto& tc : msg["tool_calls"].get<crude_json::array>()) {
+                            if (!tc.is_object()) { ++idx; continue; }
+                            while (st->toolCalls.size() <= idx) st->toolCalls.push_back({});
+                            auto& ac = st->toolCalls[idx];
+                            if (tc.contains("id") && tc["id"].is_string()) ac.id = tc["id"].get<std::string>();
+                            if (tc.contains("function") && tc["function"].is_object()) {
+                                const auto& fn = tc["function"];
+                                if (fn.contains("name") && fn["name"].is_string()) ac.name = fn["name"].get<std::string>();
+                                if (fn.contains("arguments") && fn["arguments"].is_string()) ac.arguments = fn["arguments"].get<std::string>();
+                            }
+                            ++idx;
+                        }
+                    }
+                }
+                return;
+            }
+            // Native SSE delta
+            if (choice.contains("delta")) {
+                const auto& delta = choice["delta"];
+                if (!delta.is_object()) return;
+                if (delta.contains("content") && delta["content"].is_string()) {
+                    const auto& s = delta["content"].get<std::string>();
+                    if (!s.empty()) st->chunks.push_back(s);
+                }
+                if (delta.contains("tool_calls") && delta["tool_calls"].is_array()) {
+                    for (const auto& tc : delta["tool_calls"].get<crude_json::array>()) {
+                        if (!tc.is_object()) continue;
+                        size_t idx = 0;
+                        if (tc.contains("index") && tc["index"].is_number())
+                            idx = (size_t)tc["index"].get<double>();
+                        while (st->toolCalls.size() <= idx) st->toolCalls.push_back({});
+                        auto& ac = st->toolCalls[idx];
+                        if (tc.contains("id") && tc["id"].is_string() && ac.id.empty()) ac.id = tc["id"].get<std::string>();
+                        if (tc.contains("function") && tc["function"].is_object()) {
+                            const auto& fn = tc["function"];
+                            if (fn.contains("name") && fn["name"].is_string()) ac.name += fn["name"].get<std::string>();
+                            if (fn.contains("arguments") && fn["arguments"].is_string()) ac.arguments += fn["arguments"].get<std::string>();
+                        }
+                    }
+                }
+            }
+        };
+
+        // ── dispatcher：依次尝试每个 provider 的 StreamAsync ─────────────
+        auto dispatcher = [client, state, &ctx, parseSSEChunk](ExecutionContext::AsyncResolve resolve) mutable {
+            struct Retry {
+                static void attempt(
+                    IHttpClient* client,
+                    std::shared_ptr<AutoStreamState> state,
+                    ExecutionContext& ctx,
+                    ExecutionContext::AsyncResolve resolve,
+                    std::function<void(std::shared_ptr<AutoStreamState>, const std::string&)> parseChunk)
+                {
+                    if (state->index >= state->providers.size()) {
+                        resolve();
+                        return;
+                    }
+                    const auto& pv = state->providers[state->index];
+                    HttpRequest req = BuildLLMRequest(ctx, pv.baseURL, pv.apiKey, pv.model);
+                    // 清空上次可能残留的状态
+                    state->chunks.clear();
+                    state->toolCalls.clear();
+                    state->finishReason.clear();
+                    state->errorMsg.clear();
+
+                    client->StreamAsync(req,
+                        [state, parseChunk](const std::string& sseData) {
+                            parseChunk(state, sseData);
+                        },
+                        [client, state, &ctx, resolve = std::move(resolve), parseChunk]
+                        (const std::string& error) mutable {
+                            if (error.empty()) {
+                                // 流成功结束
+                                state->successProvider = state->providers[state->index].name;
+                                resolve();
+                            } else {
+                                // 流出错，尝试下一个
+                                ctx.Log("[LLM.AutoStream] provider '" + state->providers[state->index].name
+                                    + "' failed: " + error + ", trying next...",
+                                    ::NodeEditor::Runtime::LogLevel::Warning);
+                                ++state->index;
+                                Retry::attempt(client, state, ctx, std::move(resolve), parseChunk);
+                            }
+                        });
+                }
+            };
+            Retry::attempt(client, state, ctx, std::move(resolve), parseSSEChunk);
+        };
+
+        // ── onComplete：批量激活（与 LLM.StreamChat 的 onComplete 一致）──
+        auto onComplete = [state, chunkPinId, toolCallPinId, donePinId, errorPinId]
+            (ExecutionContext& c) mutable
+        {
+            if (state->successProvider.empty()) {
+                c.SetOutputValue("Token",         Variant(std::string("")));
+                c.SetOutputValue("FullText",      Variant(std::string("")));
+                c.SetOutputValue("ToolCallsJSON", Variant(std::string("[]")));
+                c.SetOutputValue("UsedProvider",  Variant(std::string("")));
+                c.SetOutputValue("ErrorMessage",  Variant(std::string("All providers failed")));
+                c.LogError("[LLM.AutoStream] All providers failed");
+                c.ActivateOutputFlow(errorPinId);
+                return;
+            }
+
+            c.SetOutputValue("UsedProvider",  Variant(state->successProvider));
+            c.SetOutputValue("ErrorMessage",  Variant(std::string("")));
+
+            // tool_calls 路径
+            if (!state->toolCalls.empty() || state->finishReason == "tool_calls") {
+                crude_json::array tcArr;
+                for (const auto& tc : state->toolCalls) {
+                    crude_json::object fn;
+                    fn["name"]      = crude_json::value(tc.name);
+                    fn["arguments"] = crude_json::value(tc.arguments);
+                    crude_json::object obj;
+                    obj["id"]       = crude_json::value(tc.id);
+                    obj["type"]     = crude_json::value(std::string("function"));
+                    obj["function"] = crude_json::value(std::move(fn));
+                    tcArr.push_back(crude_json::value(std::move(obj)));
+                }
+                std::string tcJson = crude_json::value(std::move(tcArr)).dump();
+                c.SetOutputValue("ToolCallsJSON", Variant(tcJson));
+                c.SetOutputValue("FullText",      Variant(std::string("")));
+                c.SetOutputValue("Token",         Variant(std::string("")));
+                c.ActivateOutputFlow(toolCallPinId);
+                return;
+            }
+
+            // 文本流路径：逐 token 激活 onChunk，最后激活 onDone
+            std::string fullText;
+            for (const auto& t : state->chunks) fullText += t;
+            c.SetOutputValue("FullText",      Variant(fullText));
+            c.SetOutputValue("ToolCallsJSON", Variant(std::string("")));
+            c.Log("[LLM.AutoStream] provider='" + state->successProvider
+                  + "', " + std::to_string(state->chunks.size())
+                  + " chunks, total=" + std::to_string(fullText.size()) + " chars");
+
+            for (const auto& tok : state->chunks) {
+                c.SetOutputValue("Token", Variant(tok));
+                c.ActivateOutputFlow(chunkPinId);
+            }
+            c.SetOutputValue("Token", Variant(std::string("")));
+            c.ActivateOutputFlow(donePinId);
+        };
+
+        ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
+        return true;
+#endif
+    };
+
+    // ================================================================
     // LLM.StreamChat
     //   流式 OpenAI 兼容 Chat（SSE，批量聚合模式）
     //   in:  BaseURL / ApiKey / Model / Messages / SystemPrompt /
