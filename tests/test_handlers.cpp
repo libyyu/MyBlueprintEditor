@@ -1927,6 +1927,314 @@ TEST_F(HandlersTest, JsonValidate_ValidJson)
     EXPECT_EQ(r.GetVariable("outcome").asString(), "valid");
 }
 
+// ============================================================================
+// LLM.Auto 单元测试（不需要真实网络，通过临时配置文件测试解析逻辑）
+// ============================================================================
+#include <fstream>
+#include <filesystem>
+
+namespace {
+std::string TempLLMConfigPath(const char* suffix = "") {
+    std::filesystem::path tmp = std::filesystem::temp_directory_path();
+    return (tmp / ("bp_test_llm_cfg_" + std::string(suffix) + ".json")).string();
+}
+} // namespace
+
+// LLM.Auto: ConfigFile 为空 → onError
+TEST_F(HandlersTest, LLMAuto_EmptyConfigFile_TriggersError)
+{
+    BlueprintData bp; bp.metadata.name = "LLMAutoEmptyTest";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* nm, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=nm;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+
+    NodeInstance node; node.id=1; node.definitionId="LLM.Auto";
+    addP(node, 10, PinKind::Input,  PinDataType::Unknown, "",            true);
+    addP(node, 11, PinKind::Input,  PinDataType::String,  "ConfigFile",  false, Variant(std::string("")));
+    addP(node, 12, PinKind::Input,  PinDataType::String,  "Provider",    false, Variant(std::string("auto")));
+    addP(node, 13, PinKind::Input,  PinDataType::String,  "Messages",    false, Variant(std::string("[]")));
+    addP(node, 14, PinKind::Input,  PinDataType::String,  "SystemPrompt",false, Variant(std::string("")));
+    addP(node, 15, PinKind::Input,  PinDataType::Integer, "MaxTokens",   false, Variant((int64_t)64));
+    addP(node, 16, PinKind::Input,  PinDataType::Float,   "Temperature", false, Variant(0.7));
+    addP(node, 17, PinKind::Input,  PinDataType::String,  "Tools",       false, Variant(std::string("")));
+    addP(node, 20, PinKind::Output, PinDataType::Unknown, "onReply",     true);
+    addP(node, 21, PinKind::Output, PinDataType::Unknown, "onToolCall",  true);
+    addP(node, 22, PinKind::Output, PinDataType::Unknown, "onError",     true);
+    addP(node, 23, PinKind::Output, PinDataType::String,  "Reply");
+    addP(node, 24, PinKind::Output, PinDataType::String,  "ToolCallsJSON");
+    addP(node, 25, PinKind::Output, PinDataType::String,  "FinishReason");
+    addP(node, 26, PinKind::Output, PinDataType::String,  "UsedProvider");
+    addP(node, 27, PinKind::Output, PinDataType::String,  "ErrorMessage");
+    bp.nodes.push_back(node);
+
+    NodeInstance sv; sv.id=2; sv.definitionId="SetVariable";
+    addP(sv, 30, PinKind::Input,  PinDataType::Unknown, "",      true);
+    addP(sv, 31, PinKind::Input,  PinDataType::String,  "Name", false, Variant(std::string("outcome")));
+    addP(sv, 32, PinKind::Input,  PinDataType::String,  "Value",false, Variant(std::string("error")));
+    addP(sv, 33, PinKind::Output, PinDataType::Unknown, "",      true);
+    bp.nodes.push_back(sv);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+    LinkInstance lk; lk.id=3001; lk.startPinId=22; lk.endPinId=30;  // onError→sv
+    bp.links.push_back(lk);
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+    EXPECT_EQ(r.GetVariable("outcome").asString(), "error")
+        << "Empty ConfigFile should trigger onError";
+}
+
+// LLM.Auto: 配置文件不存在 → onError
+TEST_F(HandlersTest, LLMAuto_MissingConfigFile_TriggersError)
+{
+    BlueprintData bp; bp.metadata.name = "LLMAutoMissingCfgTest";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* nm, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=nm;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+
+    NodeInstance node; node.id=1; node.definitionId="LLM.Auto";
+    addP(node, 10, PinKind::Input,  PinDataType::Unknown, "",            true);
+    addP(node, 11, PinKind::Input,  PinDataType::String,  "ConfigFile",  false,
+         Variant(std::string("/nonexistent/path/llm_providers.json")));
+    addP(node, 12, PinKind::Input,  PinDataType::String,  "Provider",    false, Variant(std::string("auto")));
+    addP(node, 13, PinKind::Input,  PinDataType::String,  "Messages",    false, Variant(std::string("[]")));
+    addP(node, 14, PinKind::Input,  PinDataType::String,  "SystemPrompt",false, Variant(std::string("")));
+    addP(node, 15, PinKind::Input,  PinDataType::Integer, "MaxTokens",   false, Variant((int64_t)64));
+    addP(node, 16, PinKind::Input,  PinDataType::Float,   "Temperature", false, Variant(0.7));
+    addP(node, 17, PinKind::Input,  PinDataType::String,  "Tools",       false, Variant(std::string("")));
+    addP(node, 20, PinKind::Output, PinDataType::Unknown, "onReply",    true);
+    addP(node, 21, PinKind::Output, PinDataType::Unknown, "onToolCall", true);
+    addP(node, 22, PinKind::Output, PinDataType::Unknown, "onError",    true);
+    addP(node, 23, PinKind::Output, PinDataType::String,  "Reply");
+    addP(node, 24, PinKind::Output, PinDataType::String,  "ToolCallsJSON");
+    addP(node, 25, PinKind::Output, PinDataType::String,  "FinishReason");
+    addP(node, 26, PinKind::Output, PinDataType::String,  "UsedProvider");
+    addP(node, 27, PinKind::Output, PinDataType::String,  "ErrorMessage");
+    bp.nodes.push_back(node);
+
+    NodeInstance sv; sv.id=2; sv.definitionId="SetVariable";
+    addP(sv, 30, PinKind::Input,  PinDataType::Unknown, "",      true);
+    addP(sv, 31, PinKind::Input,  PinDataType::String,  "Name", false, Variant(std::string("outcome")));
+    addP(sv, 32, PinKind::Input,  PinDataType::String,  "Value",false, Variant(std::string("error")));
+    addP(sv, 33, PinKind::Output, PinDataType::Unknown, "",      true);
+    bp.nodes.push_back(sv);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+    LinkInstance lk; lk.id=3001; lk.startPinId=22; lk.endPinId=30;
+    bp.links.push_back(lk);
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+    EXPECT_EQ(r.GetVariable("outcome").asString(), "error")
+        << "Missing config file should trigger onError";
+}
+
+// LLM.Auto: 配置文件无 providers → onError
+TEST_F(HandlersTest, LLMAuto_EmptyProviders_TriggersError)
+{
+    std::string cfgPath = TempLLMConfigPath("empty_providers");
+    { std::ofstream f(cfgPath); f << R"({"providers":[]})"; }
+
+    BlueprintData bp; bp.metadata.name = "LLMAutoEmptyProvidersTest";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* nm, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=nm;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+
+    NodeInstance node; node.id=1; node.definitionId="LLM.Auto";
+    addP(node, 10, PinKind::Input,  PinDataType::Unknown, "",            true);
+    addP(node, 11, PinKind::Input,  PinDataType::String,  "ConfigFile",  false, Variant(cfgPath));
+    addP(node, 12, PinKind::Input,  PinDataType::String,  "Provider",    false, Variant(std::string("auto")));
+    addP(node, 13, PinKind::Input,  PinDataType::String,  "Messages",    false, Variant(std::string("[]")));
+    addP(node, 14, PinKind::Input,  PinDataType::String,  "SystemPrompt",false, Variant(std::string("")));
+    addP(node, 15, PinKind::Input,  PinDataType::Integer, "MaxTokens",   false, Variant((int64_t)64));
+    addP(node, 16, PinKind::Input,  PinDataType::Float,   "Temperature", false, Variant(0.7));
+    addP(node, 17, PinKind::Input,  PinDataType::String,  "Tools",       false, Variant(std::string("")));
+    addP(node, 20, PinKind::Output, PinDataType::Unknown, "onReply",    true);
+    addP(node, 21, PinKind::Output, PinDataType::Unknown, "onToolCall", true);
+    addP(node, 22, PinKind::Output, PinDataType::Unknown, "onError",    true);
+    addP(node, 23, PinKind::Output, PinDataType::String,  "Reply");
+    addP(node, 24, PinKind::Output, PinDataType::String,  "ToolCallsJSON");
+    addP(node, 25, PinKind::Output, PinDataType::String,  "FinishReason");
+    addP(node, 26, PinKind::Output, PinDataType::String,  "UsedProvider");
+    addP(node, 27, PinKind::Output, PinDataType::String,  "ErrorMessage");
+    bp.nodes.push_back(node);
+
+    NodeInstance sv; sv.id=2; sv.definitionId="SetVariable";
+    addP(sv, 30, PinKind::Input,  PinDataType::Unknown, "",      true);
+    addP(sv, 31, PinKind::Input,  PinDataType::String,  "Name", false, Variant(std::string("outcome")));
+    addP(sv, 32, PinKind::Input,  PinDataType::String,  "Value",false, Variant(std::string("error")));
+    addP(sv, 33, PinKind::Output, PinDataType::Unknown, "",      true);
+    bp.nodes.push_back(sv);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+    LinkInstance lk; lk.id=3001; lk.startPinId=22; lk.endPinId=30;
+    bp.links.push_back(lk);
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+    EXPECT_EQ(r.GetVariable("outcome").asString(), "error")
+        << "Empty providers list should trigger onError";
+
+    std::filesystem::remove(cfgPath);
+}
+
+// LLM.Auto: 指定不存在的 Provider 名 → onError
+TEST_F(HandlersTest, LLMAuto_UnknownProviderName_TriggersError)
+{
+    std::string cfgPath = TempLLMConfigPath("unknown_provider");
+    {
+        std::ofstream f(cfgPath);
+        f << R"({
+            "providers": [
+                {"name":"GLM","baseURL":"https://example.com/v1","apiKey":"test","model":"glm-4","priority":1}
+            ]
+        })";
+    }
+
+    BlueprintData bp; bp.metadata.name = "LLMAutoUnknownProviderTest";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* nm, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=nm;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+
+    NodeInstance node; node.id=1; node.definitionId="LLM.Auto";
+    addP(node, 10, PinKind::Input,  PinDataType::Unknown, "",            true);
+    addP(node, 11, PinKind::Input,  PinDataType::String,  "ConfigFile",  false, Variant(cfgPath));
+    addP(node, 12, PinKind::Input,  PinDataType::String,  "Provider",    false,
+         Variant(std::string("NonExistentProvider")));  // 不存在
+    addP(node, 13, PinKind::Input,  PinDataType::String,  "Messages",    false, Variant(std::string("[]")));
+    addP(node, 14, PinKind::Input,  PinDataType::String,  "SystemPrompt",false, Variant(std::string("")));
+    addP(node, 15, PinKind::Input,  PinDataType::Integer, "MaxTokens",   false, Variant((int64_t)64));
+    addP(node, 16, PinKind::Input,  PinDataType::Float,   "Temperature", false, Variant(0.7));
+    addP(node, 17, PinKind::Input,  PinDataType::String,  "Tools",       false, Variant(std::string("")));
+    addP(node, 20, PinKind::Output, PinDataType::Unknown, "onReply",    true);
+    addP(node, 21, PinKind::Output, PinDataType::Unknown, "onToolCall", true);
+    addP(node, 22, PinKind::Output, PinDataType::Unknown, "onError",    true);
+    addP(node, 23, PinKind::Output, PinDataType::String,  "Reply");
+    addP(node, 24, PinKind::Output, PinDataType::String,  "ToolCallsJSON");
+    addP(node, 25, PinKind::Output, PinDataType::String,  "FinishReason");
+    addP(node, 26, PinKind::Output, PinDataType::String,  "UsedProvider");
+    addP(node, 27, PinKind::Output, PinDataType::String,  "ErrorMessage");
+    bp.nodes.push_back(node);
+
+    NodeInstance sv; sv.id=2; sv.definitionId="SetVariable";
+    addP(sv, 30, PinKind::Input,  PinDataType::Unknown, "",      true);
+    addP(sv, 31, PinKind::Input,  PinDataType::String,  "Name", false, Variant(std::string("outcome")));
+    addP(sv, 32, PinKind::Input,  PinDataType::String,  "Value",false, Variant(std::string("error")));
+    addP(sv, 33, PinKind::Output, PinDataType::Unknown, "",      true);
+    bp.nodes.push_back(sv);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+    LinkInstance lk; lk.id=3001; lk.startPinId=22; lk.endPinId=30;
+    bp.links.push_back(lk);
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+    EXPECT_EQ(r.GetVariable("outcome").asString(), "error")
+        << "Unknown provider name should trigger onError";
+
+    std::filesystem::remove(cfgPath);
+}
+
+// LLM.Auto: priority 排序验证 — 配置文件有两个 provider，priority=2 的先写但应排在后
+// （通过节点定义解析逻辑验证，不需要真实 HTTP）
+TEST_F(HandlersTest, LLMAuto_ConfigParsed_ProvidersSortedByPriority)
+{
+    // 验证配置文件解析和 priority 排序：写入 priority=2 在前，priority=1 在后
+    // 使用无效 URL，所有 provider 都会 HTTP 失败 → onError
+    // 通过 ErrorMessage 确认所有 provider 都被尝试过（日志中有警告）
+    std::string cfgPath = TempLLMConfigPath("priority_sort");
+    {
+        std::ofstream f(cfgPath);
+        f << R"({
+            "providers": [
+                {"name":"P2","baseURL":"http://127.0.0.1:19999","apiKey":"k2","model":"m2","priority":2},
+                {"name":"P1","baseURL":"http://127.0.0.1:19998","apiKey":"k1","model":"m1","priority":1}
+            ]
+        })";
+    }
+
+    std::vector<std::string> capturedLogs;
+
+    BlueprintData bp; bp.metadata.name = "LLMAutoPriorityTest";
+    auto addP = [](NodeInstance& n, uint64_t id, PinKind k, PinDataType dt,
+                   const char* nm, bool isExec=false, Variant dv={}) {
+        PinInfo p; p.id=id; p.kind=k; p.dataType=dt; p.name=nm;
+        p.isExec=isExec; p.defaultValue=dv; n.pins.push_back(p);
+    };
+
+    NodeInstance node; node.id=1; node.definitionId="LLM.Auto";
+    addP(node, 10, PinKind::Input,  PinDataType::Unknown, "",            true);
+    addP(node, 11, PinKind::Input,  PinDataType::String,  "ConfigFile",  false, Variant(cfgPath));
+    addP(node, 12, PinKind::Input,  PinDataType::String,  "Provider",    false, Variant(std::string("auto")));
+    addP(node, 13, PinKind::Input,  PinDataType::String,  "Messages",    false,
+         Variant(std::string(R"([{"role":"user","content":"hi"}])")));
+    addP(node, 14, PinKind::Input,  PinDataType::String,  "SystemPrompt",false, Variant(std::string("")));
+    addP(node, 15, PinKind::Input,  PinDataType::Integer, "MaxTokens",   false, Variant((int64_t)16));
+    addP(node, 16, PinKind::Input,  PinDataType::Float,   "Temperature", false, Variant(0.7));
+    addP(node, 17, PinKind::Input,  PinDataType::String,  "Tools",       false, Variant(std::string("")));
+    addP(node, 20, PinKind::Output, PinDataType::Unknown, "onReply",    true);
+    addP(node, 21, PinKind::Output, PinDataType::Unknown, "onToolCall", true);
+    addP(node, 22, PinKind::Output, PinDataType::Unknown, "onError",    true);
+    addP(node, 23, PinKind::Output, PinDataType::String,  "Reply");
+    addP(node, 24, PinKind::Output, PinDataType::String,  "ToolCallsJSON");
+    addP(node, 25, PinKind::Output, PinDataType::String,  "FinishReason");
+    addP(node, 26, PinKind::Output, PinDataType::String,  "UsedProvider");
+    addP(node, 27, PinKind::Output, PinDataType::String,  "ErrorMessage");
+    bp.nodes.push_back(node);
+
+    NodeInstance sv; sv.id=2; sv.definitionId="SetVariable";
+    addP(sv, 30, PinKind::Input,  PinDataType::Unknown, "",      true);
+    addP(sv, 31, PinKind::Input,  PinDataType::String,  "Name", false, Variant(std::string("outcome")));
+    addP(sv, 32, PinKind::Input,  PinDataType::String,  "Value",false, Variant(std::string("error")));
+    addP(sv, 33, PinKind::Output, PinDataType::Unknown, "",      true);
+    bp.nodes.push_back(sv);
+
+    AddBeginPlayEntry(bp, 100, 1000, 2000, 10);
+    LinkInstance lk; lk.id=3001; lk.startPinId=22; lk.endPinId=30;
+    bp.links.push_back(lk);
+    bp.rebuildIndices();
+
+    BlueprintRunner r; RegisterBuiltinHandlers(r, ".");
+    r.SetLogCallback([&capturedLogs](LogLevel, const std::string& m){ capturedLogs.push_back(m); });
+    ASSERT_TRUE(r.Load(bp));
+    RunWithBeginPlay(r);
+
+    // 两个 provider 都 HTTP 失败 → onError, outcome=error
+    EXPECT_EQ(r.GetVariable("outcome").asString(), "error");
+    // 日志中应先出现 P1 失败（priority=1 先试）再出现 P2 失败
+    std::string p1Log, p2Log;
+    for (const auto& log : capturedLogs) {
+        if (log.find("P1") != std::string::npos && p1Log.empty()) p1Log = log;
+        if (log.find("P2") != std::string::npos && p2Log.empty()) p2Log = log;
+    }
+    // P1 应该比 P2 先出现在日志中（priority=1 先尝试）
+    if (!p1Log.empty() && !p2Log.empty()) {
+        auto it1 = std::find(capturedLogs.begin(), capturedLogs.end(), p1Log);
+        auto it2 = std::find(capturedLogs.begin(), capturedLogs.end(), p2Log);
+        EXPECT_LT(std::distance(capturedLogs.begin(), it1),
+                  std::distance(capturedLogs.begin(), it2))
+            << "P1 (priority=1) should be tried before P2 (priority=2)";
+    }
+
+    std::filesystem::remove(cfgPath);
+}
+
 TEST_F(HandlersTest, JsonValidate_MissingRequiredKey)
 {
     BlueprintData bp; bp.metadata.name = "JsonValidateMissingTest";

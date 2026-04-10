@@ -1,0 +1,18 @@
+{
+  "providers": [
+    {
+      "name": "GLM-Flash",
+      "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+      "apiKey": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf",
+      "model": "glm-4-flash",
+      "priority": 1
+    },
+    {
+      "name": "GLM-Plus",
+      "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+      "apiKey": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf",
+      "model": "glm-4-plus",
+      "priority": 2
+    }
+  ]
+}

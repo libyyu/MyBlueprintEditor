@@ -193,17 +193,15 @@ static ToolCallInfo ExtractToolCall(const crude_json::value& tc)
 // BuildLLMRequest — LLM.Chat 和 LLM.StreamChat 共用的请求构建逻辑
 // 从 ExecutionContext 读取所有 LLM 参数，构建并返回 HttpRequest。
 // ============================================================================
-static HttpRequest BuildLLMRequest(ExecutionContext& ctx)
+// 核心重载：显式传入 baseURL/apiKey/model，其余参数从 ctx 读取
+static HttpRequest BuildLLMRequest(ExecutionContext& ctx,
+    const std::string& baseURL,
+    const std::string& apiKey,
+    const std::string& model)
 {
-    std::string baseURL      = ctx.GetInputValue("BaseURL").asString();
-    std::string apiKey       = ctx.GetInputValue("ApiKey").asString();
-    std::string model        = ctx.GetInputValue("Model").asString();
     std::string messagesStr  = ctx.GetInputValue("Messages").asString();
     std::string systemPrompt = ctx.GetInputValue("SystemPrompt").asString();
     std::string toolsStr     = ctx.GetInputValue("Tools").asString();
-
-    if (baseURL.empty()) baseURL = "https://api.openai.com/v1";
-    if (model.empty())   model   = "gpt-4o";
 
     int64_t maxTokens   = 1024;
     double  temperature = 0.7;
@@ -259,6 +257,17 @@ static HttpRequest BuildLLMRequest(ExecutionContext& ctx)
         req.headers["Authorization"] = "Bearer " + apiKey;
     req.timeoutSeconds = 120;
     return req;
+}
+
+// 原接口保持不变：从 ctx 引脚读取 baseURL/apiKey/model
+static HttpRequest BuildLLMRequest(ExecutionContext& ctx)
+{
+    std::string baseURL = ctx.GetInputValue("BaseURL").asString();
+    std::string apiKey  = ctx.GetInputValue("ApiKey").asString();
+    std::string model   = ctx.GetInputValue("Model").asString();
+    if (baseURL.empty()) baseURL = "https://api.openai.com/v1";
+    if (model.empty())   model   = "gpt-4o";
+    return BuildLLMRequest(ctx, baseURL, apiKey, model);
 }
 
 // ============================================================================
@@ -528,6 +537,220 @@ void RegisterHandlers_AI(
 
         ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
         return true;
+    };
+
+    // ================================================================
+    // LLM.Auto
+    //   从配置文件读取多个 provider，按 priority 依次尝试，第一个成功的返回结果。
+    //   配置文件格式（JSON）：
+    //   {
+    //     "providers": [
+    //       { "name":"GLM","baseURL":"...","apiKey":"...","model":"...","priority":1 },
+    //       { "name":"DeepSeek","baseURL":"...","apiKey":"...","model":"...","priority":2 }
+    //     ]
+    //   }
+    //   in:  exec, ConfigFile(String), Messages(String), SystemPrompt(String),
+    //        MaxTokens(Integer), Temperature(Float), Tools(String)
+    //   out: onReply, onToolCall, onError
+    //        Reply(String), ToolCallsJSON(String), FinishReason(String),
+    //        Provider(String), ErrorMessage(String)
+    // ================================================================
+    handlers["LLM.Auto"] = [](ExecutionContext& ctx) -> bool {
+        IHttpClient* client = BP_GetHttpClient();
+        if (!client) {
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient registered")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        // 读取配置文件
+        std::string configFile = ctx.GetInputValue("ConfigFile").asString();
+        if (configFile.empty()) {
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("ConfigFile is empty")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+#ifdef __EMSCRIPTEN__
+        ctx.SetOutputValue("ErrorMessage", Variant(std::string("LLM.Auto: file I/O not supported on WebGL")));
+        ctx.ActivateOutputFlow("onError");
+        return true;
+#else
+        std::ifstream f(configFile, std::ios::binary);
+        if (!f.is_open()) {
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("Cannot open config file: " + configFile)));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+        std::ostringstream ss; ss << f.rdbuf();
+        crude_json::value cfg = crude_json::value::parse(ss.str());
+
+        // 解析 providers 列表
+        struct Provider { std::string name, baseURL, apiKey, model; int priority = 99; };
+        std::vector<Provider> providers;
+
+        if (cfg.is_object() && cfg.contains("providers")) {
+            const auto& arr = cfg["providers"];
+            if (arr.is_array()) {
+                for (const auto& p : arr.get<crude_json::array>()) {
+                    if (!p.is_object()) continue;
+                    Provider pv;
+                    if (p.contains("name")     && p["name"].is_string())     pv.name     = p["name"].get<std::string>();
+                    if (p.contains("baseURL")  && p["baseURL"].is_string())  pv.baseURL  = p["baseURL"].get<std::string>();
+                    if (p.contains("apiKey")   && p["apiKey"].is_string())   pv.apiKey   = p["apiKey"].get<std::string>();
+                    if (p.contains("model")    && p["model"].is_string())    pv.model    = p["model"].get<std::string>();
+                    if (p.contains("priority") && p["priority"].is_number()) pv.priority = (int)p["priority"].get<double>();
+                    if (!pv.baseURL.empty() && !pv.model.empty())
+                        providers.push_back(std::move(pv));
+                }
+            }
+        }
+
+        if (providers.empty()) {
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("No valid providers in config file")));
+            ctx.ActivateOutputFlow("onError");
+            return true;
+        }
+
+        // 如果 Provider 引脚指定了名字（非空且非 "auto"），只保留该 provider
+        std::string providerHint = ctx.GetInputValue("Provider").asString();
+        if (!providerHint.empty() && providerHint != "auto") {
+            std::vector<Provider> filtered;
+            for (auto& p : providers)
+                if (p.name == providerHint) { filtered.push_back(std::move(p)); break; }
+            if (filtered.empty()) {
+                ctx.SetOutputValue("ErrorMessage", Variant(std::string("Provider not found: " + providerHint)));
+                ctx.ActivateOutputFlow("onError");
+                return true;
+            }
+            providers = std::move(filtered);
+        } else {
+            // auto 模式：按 priority 排序
+            std::sort(providers.begin(), providers.end(),
+                [](const Provider& a, const Provider& b) { return a.priority < b.priority; });
+        }
+
+        // 共享状态
+        struct AutoState {
+            std::vector<Provider> providers;
+            size_t index = 0;
+            HttpResponse resp;
+            std::string successProvider;
+        };
+        auto state = std::make_shared<AutoState>();
+        state->providers = std::move(providers);
+
+        PinId replyPinId    = ctx.GetPinId("onReply");
+        PinId toolPinId     = ctx.GetPinId("onToolCall");
+        PinId errorPinId    = ctx.GetPinId("onError");
+
+        ctx.MarkDownstreamAsHandled("onReply");
+        ctx.MarkDownstreamAsHandled("onToolCall");
+        ctx.MarkDownstreamAsHandled("onError");
+
+        // dispatcher：依次尝试每个 provider，直到成功
+        auto dispatcher = [client, state, &ctx](ExecutionContext::AsyncResolve resolve) mutable {
+            // 递归 lambda：尝试 state->index 对应的 provider
+            struct Retry {
+                static void attempt(
+                    IHttpClient* client,
+                    std::shared_ptr<AutoState> state,
+                    ExecutionContext& ctx,
+                    ExecutionContext::AsyncResolve resolve)
+                {
+                    if (state->index >= state->providers.size()) {
+                        resolve(); // 全部失败，进入 onComplete
+                        return;
+                    }
+                    const auto& pv = state->providers[state->index];
+                    HttpRequest req = BuildLLMRequest(ctx, pv.baseURL, pv.apiKey, pv.model);
+
+                    client->SendAsync(req,
+                        [client, state, &ctx, resolve = std::move(resolve)](HttpResponse resp) mutable {
+                            if (resp.ok()) {
+                                // 成功：记录结果
+                                state->successProvider = state->providers[state->index].name;
+                                state->resp = std::move(resp);
+                                resolve();
+                            } else {
+                                // 失败：尝试下一个
+                                ctx.Log("[LLM.Auto] provider '" + state->providers[state->index].name
+                                    + "' failed (" + (resp.error.empty()
+                                        ? "HTTP " + std::to_string(resp.statusCode)
+                                        : resp.error) + "), trying next...",
+                                    ::NodeEditor::Runtime::LogLevel::Warning);
+                                ++state->index;
+                                Retry::attempt(client, state, ctx, std::move(resolve));
+                            }
+                        });
+                }
+            };
+            Retry::attempt(client, state, ctx, std::move(resolve));
+        };
+
+        // onComplete：解析回复（与 LLM.Chat 相同逻辑）
+        auto onComplete = [state, replyPinId, toolPinId, errorPinId](ExecutionContext& c) mutable {
+            if (state->successProvider.empty()) {
+                // 全部失败
+                c.SetOutputValue("Reply",         Variant(std::string("")));
+                c.SetOutputValue("ToolCallsJSON", Variant(std::string("[]")));
+                c.SetOutputValue("FinishReason",  Variant(std::string("error")));
+                c.SetOutputValue("UsedProvider",  Variant(std::string("")));
+                c.SetOutputValue("ErrorMessage",  Variant(std::string("All providers failed")));
+                c.LogError("[LLM.Auto] All providers failed");
+                c.ActivateOutputFlow(errorPinId);
+                return;
+            }
+
+            const HttpResponse& resp = state->resp;
+            c.SetOutputValue("UsedProvider", Variant(state->successProvider));
+
+            crude_json::value j = crude_json::value::parse(resp.body);
+
+            // finish_reason
+            std::string finishReason;
+            const crude_json::value* first = GetFirstChoice(j);
+            if (first && first->contains("finish_reason")) {
+                const auto& fr = (*first)["finish_reason"];
+                if (fr.is_string()) finishReason = fr.get<std::string>();
+            }
+            c.SetOutputValue("FinishReason", Variant(finishReason));
+
+            // tool_calls 分支
+            if (finishReason == "tool_calls") {
+                std::string toolCallsJson = "[]";
+                if (first && first->contains("message")) {
+                    const auto& msg = (*first)["message"];
+                    if (msg.is_object() && msg.contains("tool_calls"))
+                        toolCallsJson = msg["tool_calls"].dump();
+                }
+                c.SetOutputValue("Reply",         Variant(std::string("")));
+                c.SetOutputValue("ToolCallsJSON", Variant(toolCallsJson));
+                c.SetOutputValue("ErrorMessage",  Variant(std::string("")));
+                c.ActivateOutputFlow(toolPinId);
+                return;
+            }
+
+            // 普通文本回复
+            std::string reply;
+            if (first && first->contains("message")) {
+                const auto& msg = (*first)["message"];
+                if (msg.is_object() && msg.contains("content")) {
+                    const auto& content = msg["content"];
+                    if (content.is_string()) reply = content.get<std::string>();
+                }
+            }
+            c.SetOutputValue("Reply",         Variant(reply));
+            c.SetOutputValue("ToolCallsJSON", Variant(std::string("[]")));
+            c.SetOutputValue("ErrorMessage",  Variant(std::string("")));
+            c.Log("[LLM.Auto] used provider='" + state->successProvider
+                  + "', reply length=" + std::to_string(reply.size()));
+            c.ActivateOutputFlow(replyPinId);
+        };
+
+        ctx.RunAsync(std::move(dispatcher), std::move(onComplete));
+        return true;
+#endif
     };
 
     // ================================================================

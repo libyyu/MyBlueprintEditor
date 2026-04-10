@@ -167,12 +167,12 @@
       { "id": 19, "startPinId": 10010, "endPinId": 12002, "isEnabled": true }
     ],
     "variables": [
-      { "name": "P4User",  "dataType": 4, "defaultValue": "" },
+      { "name": "P4User",  "dataType": 4, "defaultValue": "maxweili" },
       { "name": "P4Client","dataType": 4, "defaultValue": "" },
-      { "name": "WorkDir", "dataType": 4, "defaultValue": "" },
-      { "name": "ApiKey",  "dataType": 4, "defaultValue": "" },
-      { "name": "BaseURL", "dataType": 4, "defaultValue": "https://api.openai.com/v1" },
-      { "name": "Model",   "dataType": 4, "defaultValue": "gpt-4o" }
+      { "name": "WorkDir", "dataType": 4, "defaultValue": "E:\\NGRWorkspace\\maxweili_pub_market" },
+      { "name": "ApiKey",  "dataType": 4, "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf" },
+      { "name": "BaseURL", "dataType": 4, "defaultValue": "https://open.bigmodel.cn/api/paas/v4" },
+      { "name": "Model",   "dataType": 4, "defaultValue": "glm-4-flash" }
     ]
   }
 }
