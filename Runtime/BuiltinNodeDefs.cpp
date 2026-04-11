@@ -1415,6 +1415,52 @@ static void RegisterNodeDefs_Event(INodeRegistry& registry)
         { MakeFlowPin("") },
         "FF6060");
 
+    // ── Crypto 节点 ────────────────────────────────────────────────────────────
+    reg("Crypto.SHA256", "SHA256", "Crypto",
+        { MakePin("Data", PinDataType::String) },
+        { MakePin("Hash", PinDataType::String) },
+        "27AE60");
+
+    reg("Crypto.HMAC", "HMAC", "Crypto",
+        {
+            MakePin("Key",       PinDataType::String),
+            MakePin("Data",      PinDataType::String),
+            MakePin("Algorithm", PinDataType::String),  // "sha256"（默认）
+        },
+        {
+            MakePin("Hash",       PinDataType::String),  // hex
+            MakePin("HashBase64", PinDataType::String),  // base64
+        },
+        "27AE60");
+
+    reg("Crypto.MD5", "MD5", "Crypto",
+        { MakePin("Data", PinDataType::String) },
+        { MakePin("Hash", PinDataType::String) },
+        "27AE60");
+
+    reg("Crypto.Base64Enc", "Base64 Encode", "Crypto",
+        { MakePin("Data",   PinDataType::String) },
+        { MakePin("Result", PinDataType::String) },
+        "27AE60");
+
+    reg("Crypto.Base64Dec", "Base64 Decode", "Crypto",
+        { MakePin("Data",   PinDataType::String) },
+        { MakePin("Result", PinDataType::String) },
+        "27AE60");
+
+    reg("Crypto.HexEncode", "Hex Encode", "Crypto",
+        { MakePin("Data",   PinDataType::String) },
+        { MakePin("Result", PinDataType::String) },
+        "27AE60");
+
+    reg("Crypto.HexDecode", "Hex Decode", "Crypto",
+        { MakePin("Data",   PinDataType::String) },
+        {
+            MakePin("Result", PinDataType::String),
+            MakePin("Valid",  PinDataType::Boolean),
+        },
+        "27AE60");
+
     // ── HTTP Server 节点 ───────────────────────────────────────────────────────
     reg("HTTP.Listen", "HTTP Listen", "Network/Server",
         {
