@@ -132,7 +132,8 @@ inline std::string luaTableToHeadersJson(lua_State* L, int idx)
     std::string h = "{"; bool first = true;
     lua_pushnil(L);
     while (lua_next(L, abs)) {
-        if (!first) h += ","; first = false;
+        if (!first) h += ",";
+        first = false;
         h += "\"";
         if (lua_type(L, -2) == LUA_TSTRING)
             for (char c : std::string(lua_tostring(L, -2)))

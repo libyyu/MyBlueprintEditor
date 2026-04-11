@@ -15,11 +15,11 @@
 #
 # Platform support:
 #   Windows  MSVC / MinGW   ✅
-#   Linux    GCC / Clang    ✅  (-DHAVE_PTHREAD)
+#   Linux    GCC / Clang    ✅  (-fPIC, -DHAVE_PTHREAD)
 #   macOS    Clang          ✅  (-DHAVE_PTHREAD)
-#   Android                 ✅  (-DHAVE_PTHREAD)
+#   Android                 ✅  (-DHAVE_PTHREAD, links log)
 #   iOS                     ✅  (-DHAVE_PTHREAD)
-#   WebGL    Emscripten     ✅  (single-threaded stub, no pthread needed)
+#   WebGL    Emscripten     ✅  (single-threaded stub, -frtti required by arena.h)
 # ==============================================================================
 
 cmake_minimum_required(VERSION 3.14)
@@ -56,7 +56,13 @@ target_include_directories(protobuf_s PUBLIC
 )
 
 # ---------------------------------------------------------------------------
-# Platform-specific compile definitions
+# FIX 1: -fPIC — required when protobuf_s is linked into a shared library
+#         (Linux GCC shared BlueprintRuntime, Android .so, lprotos.so)
+# ---------------------------------------------------------------------------
+set_target_properties(protobuf_s PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# ---------------------------------------------------------------------------
+# Platform-specific compile definitions & options
 # ---------------------------------------------------------------------------
 target_compile_definitions(protobuf_s PUBLIC
     _SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS
@@ -64,15 +70,15 @@ target_compile_definitions(protobuf_s PUBLIC
 
 if(EMSCRIPTEN)
     # WebGL: single-threaded, no pthread, no threading header needed.
-    # GOOGLE_PROTOBUF_OS_EMSCRIPTEN is already set by platform_macros.h.
-    # We only need to tell common.cc to skip the pthread branch.
+    # FIX 3: arena.h uses typeid() via RTTI_TYPE_ID macro — must enable RTTI.
+    #         Emscripten defaults to -fno-rtti; override for protobuf only.
     target_compile_definitions(protobuf_s PRIVATE
         PROTOBUF_USE_EXCEPTIONS=0
     )
-    # Suppress warnings common in Emscripten Clang
     target_compile_options(protobuf_s PRIVATE
         -Wno-deprecated-declarations
         -Wno-unused-parameter
+        -frtti   # required by arena.h: RTTI_TYPE_ID(T) → &typeid(T)
     )
 elseif(WIN32)
     # Windows: uses win32 API internally, nothing extra needed
@@ -81,12 +87,15 @@ else()
     target_compile_definitions(protobuf_s PRIVATE
         HAVE_PTHREAD
     )
-    # Suppress common warnings in GCC/Clang
     target_compile_options(protobuf_s PRIVATE
         -Wno-deprecated-declarations
         -Wno-unused-parameter
         -Wno-sign-compare
     )
+    # FIX 2: Android — common.cc uses __android_log_write → link log library
+    if(ANDROID)
+        target_link_libraries(protobuf_s PRIVATE log)
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------
@@ -100,3 +109,4 @@ endif()
 # IDE folder grouping
 # ---------------------------------------------------------------------------
 set_target_properties(protobuf_s PROPERTIES FOLDER "external")
+

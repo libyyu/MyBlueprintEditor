@@ -76,6 +76,8 @@ endif()
 # ---------------------------------------------------------------------------
 add_library(lprotos_s STATIC ${_LP_SOURCES})
 
+set_target_properties(lprotos_s PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 target_include_directories(lprotos_s PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
     $<BUILD_INTERFACE:${_LPROTOS_LUA_INC}>
