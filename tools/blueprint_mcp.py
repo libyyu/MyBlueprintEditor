@@ -241,12 +241,16 @@ class BlueprintLib:
             if dispatch_beginplay:
                 self._lib.BP_DispatchEvent(runner, b"OnBeginPlay")
             max_sec = 30.0; tick = 0.016; elapsed = 0.0
+            prev_time = time.time()
             while self._lib.BP_HasPendingWork(runner) > 0:
                 if elapsed >= max_sec:
                     self._log_lines.append(f"[W] Tick loop timed out after {max_sec}s")
                     break
                 self._lib.BP_DrainQueue()
-                self._lib.BP_Tick(runner, ctypes.c_float(tick))
+                now = time.time()
+                dt = now - prev_time
+                prev_time = now
+                self._lib.BP_Tick(runner, ctypes.c_float(dt if dt > 0 else tick))
                 time.sleep(tick)
                 elapsed += tick
             return {"output": self._print_lines[:],
@@ -287,9 +291,13 @@ class BlueprintLib:
             self._lib.BP_Execute(runner)
             self._lib.BP_DispatchEvent(runner, b"OnBeginPlay")
             max_sec = 30.0; tick = 0.016; elapsed = 0.0
+            prev_time = time.time()
             while elapsed < max_sec and self._lib.BP_HasPendingWork(runner) > 0:
                 self._lib.BP_DrainQueue()
-                self._lib.BP_Tick(runner, ctypes.c_float(tick))
+                now = time.time()
+                dt = now - prev_time
+                prev_time = now
+                self._lib.BP_Tick(runner, ctypes.c_float(dt if dt > 0 else tick))
                 time.sleep(tick)
                 elapsed += tick
             # 先尝试读 String（最通用；int/float 也能转成字符串）
