@@ -4,7 +4,9 @@
 #include "../../Utils/Json/crude_json.h"
 #include <cstdlib>
 #include <algorithm>
-
+#if defined(__APPLE__)
+#  include <TargetConditionals.h>
+#endif
 namespace NodeEditor {
 namespace Runtime {
 
@@ -645,7 +647,6 @@ void RegisterHandlers_Flow(
     handlers["Platform.IsIOS"]     = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
     handlers["Platform.IsWebGL"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
 #elif defined(__APPLE__)
-#  include <TargetConditionals.h>
 #  if TARGET_OS_IPHONE
     handlers["Platform.IsWindows"] = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
     handlers["Platform.IsLinux"]   = [](ExecutionContext& ctx){ ctx.SetOutputValue("Result", Variant(false)); return true; };
