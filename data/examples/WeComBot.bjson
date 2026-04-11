@@ -5,322 +5,499 @@
 
       {
         "id": 1, "definitionId": "OnBeginPlay", "name": "On Begin Play",
-        "pins": [
-          { "id": 1001, "kind": 1, "dataType": 0, "isExec": true }
-        ]
+        "pins": [{ "id": 1001, "kind": 1, "dataType": 0, "isExec": true }]
       },
 
       {
-        "id": 2, "definitionId": "HTTP.Listen", "name": "WeComBot HTTP Server",
+        "id": 2, "definitionId": "PrintString", "name": "Print Connecting",
         "pins": [
           { "id": 2001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 2002, "kind": 0, "dataType": 2, "name": "Port",     "defaultValue": 7800 },
-          { "id": 2003, "kind": 0, "dataType": 4, "name": "Host",     "defaultValue": "127.0.0.1" },
-          { "id": 2004, "kind": 0, "dataType": 4, "name": "BasePath", "defaultValue": "/" },
-          { "id": 2010, "kind": 1, "dataType": 0, "isExec": true, "name": "onRequest" },
-          { "id": 2011, "kind": 1, "dataType": 0, "isExec": true, "name": "onError" },
-          { "id": 2020, "kind": 1, "dataType": 4, "name": "Method" },
-          { "id": 2021, "kind": 1, "dataType": 4, "name": "Path" },
-          { "id": 2022, "kind": 1, "dataType": 4, "name": "Body" },
-          { "id": 2023, "kind": 1, "dataType": 4, "name": "Headers" },
-          { "id": 2024, "kind": 1, "dataType": 4, "name": "RequestId" },
-          { "id": 2025, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
+          { "id": 2002, "kind": 0, "dataType": 4, "name": "In String", "defaultValue": "[WeComBot] Connecting to WeCom..." },
+          { "id": 2010, "kind": 1, "dataType": 0, "isExec": true }
         ]
       },
 
       {
-        "id": 3, "definitionId": "PrintString", "name": "Print Started",
+        "id": 3, "definitionId": "WS.Connect", "name": "WeCom WS Connect",
         "pins": [
           { "id": 3001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 3002, "kind": 0, "dataType": 4, "name": "In String", "defaultValue": "[WeComBot] Listening on port 7800..." },
-          { "id": 3010, "kind": 1, "dataType": 0, "isExec": true }
+          { "id": 3002, "kind": 0, "dataType": 4, "name": "URL",     "defaultValue": "wss://openws.work.weixin.qq.com" },
+          { "id": 3003, "kind": 0, "dataType": 4, "name": "Headers", "defaultValue": "" },
+          { "id": 3010, "kind": 1, "dataType": 0, "isExec": true, "name": "onOpen" },
+          { "id": 3011, "kind": 1, "dataType": 0, "isExec": true, "name": "onMessage" },
+          { "id": 3012, "kind": 1, "dataType": 0, "isExec": true, "name": "onClose" },
+          { "id": 3013, "kind": 1, "dataType": 0, "isExec": true, "name": "onError" },
+          { "id": 3020, "kind": 1, "dataType": 4, "name": "ConnectionId" },
+          { "id": 3021, "kind": 1, "dataType": 4, "name": "Message" },
+          { "id": 3022, "kind": 1, "dataType": 2, "name": "CloseCode" },
+          { "id": 3023, "kind": 1, "dataType": 4, "name": "CloseReason" },
+          { "id": 3024, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
         ]
       },
 
       {
-        "id": 4, "definitionId": "PrintString", "name": "Print Listen Error",
+        "id": 4, "definitionId": "SetVariable", "name": "Save ConnId",
         "pins": [
           { "id": 4001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 4002, "kind": 0, "dataType": 4, "name": "In String", "defaultValue": "[WeComBot] Failed to listen" },
+          { "id": 4002, "kind": 0, "dataType": 4, "name": "Name",  "defaultValue": "WsConnId" },
+          { "id": 4003, "kind": 0, "dataType": 9, "name": "Value" },
           { "id": 4010, "kind": 1, "dataType": 0, "isExec": true }
         ]
       },
 
       {
-        "id": 5, "definitionId": "JSON.GetPath", "name": "Get msg_type",
+        "id": 5, "definitionId": "FormatString", "name": "Build Auth JSON",
         "pins": [
-          { "id": 5001, "kind": 0, "dataType": 4, "name": "JSON" },
-          { "id": 5002, "kind": 0, "dataType": 4, "name": "Path",    "defaultValue": "msg_type" },
-          { "id": 5003, "kind": 0, "dataType": 9, "name": "Default", "defaultValue": "" },
-          { "id": 5010, "kind": 1, "dataType": 9, "name": "Value" },
-          { "id": 5011, "kind": 1, "dataType": 1, "name": "Found" }
+          { "id": 5001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 5002, "kind": 0, "dataType": 4, "name": "Format",
+            "defaultValue": "{\"cmd\":\"aibot_subscribe\",\"headers\":{\"req_id\":\"aibot_subscribe_{0}\"},\"body\":{\"bot_id\":\"{1}\",\"secret\":\"{2}\"}}" },
+          { "id": 5003, "kind": 0, "dataType": 9, "name": "Arg0" },
+          { "id": 5004, "kind": 0, "dataType": 9, "name": "Arg1" },
+          { "id": 5005, "kind": 0, "dataType": 9, "name": "Arg2" },
+          { "id": 5010, "kind": 1, "dataType": 0, "isExec": true },
+          { "id": 5020, "kind": 1, "dataType": 4, "name": "Result" }
         ]
       },
 
       {
-        "id": 6, "definitionId": "JSON.GetPath", "name": "Get UserText",
+        "id": 6, "definitionId": "Time.Now", "name": "Get Timestamp",
         "pins": [
-          { "id": 6001, "kind": 0, "dataType": 4, "name": "JSON" },
-          { "id": 6002, "kind": 0, "dataType": 4, "name": "Path",    "defaultValue": "text.content" },
-          { "id": 6003, "kind": 0, "dataType": 9, "name": "Default", "defaultValue": "" },
-          { "id": 6010, "kind": 1, "dataType": 9, "name": "Value" },
-          { "id": 6011, "kind": 1, "dataType": 1, "name": "Found" }
+          { "id": 6010, "kind": 1, "dataType": 3, "name": "Timestamp" },
+          { "id": 6011, "kind": 1, "dataType": 4, "name": "ISO8601" }
         ]
       },
 
       {
-        "id": 7, "definitionId": "JSON.GetPath", "name": "Get msgid",
+        "id": 7, "definitionId": "Float.ToString", "name": "Timestamp Str",
         "pins": [
-          { "id": 7001, "kind": 0, "dataType": 4, "name": "JSON" },
-          { "id": 7002, "kind": 0, "dataType": 4, "name": "Path",    "defaultValue": "msgid" },
-          { "id": 7003, "kind": 0, "dataType": 9, "name": "Default", "defaultValue": "" },
-          { "id": 7010, "kind": 1, "dataType": 9, "name": "Value" },
-          { "id": 7011, "kind": 1, "dataType": 1, "name": "Found" }
+          { "id": 7001, "kind": 0, "dataType": 3, "name": "Value" },
+          { "id": 7002, "kind": 0, "dataType": 2, "name": "Decimals", "defaultValue": 0 },
+          { "id": 7010, "kind": 1, "dataType": 4, "name": "Result" }
         ]
       },
 
       {
-        "id": 8, "definitionId": "JSON.GetPath", "name": "Get sender userid",
+        "id": 8, "definitionId": "GetVariable", "name": "Get BotId",
         "pins": [
-          { "id": 8001, "kind": 0, "dataType": 4, "name": "JSON" },
-          { "id": 8002, "kind": 0, "dataType": 4, "name": "Path",    "defaultValue": "from.userid" },
-          { "id": 8003, "kind": 0, "dataType": 9, "name": "Default", "defaultValue": "unknown" },
-          { "id": 8010, "kind": 1, "dataType": 9, "name": "Value" },
-          { "id": 8011, "kind": 1, "dataType": 1, "name": "Found" }
+          { "id": 8001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "BotId" },
+          { "id": 8010, "kind": 1, "dataType": 9, "name": "Value" }
         ]
       },
 
       {
-        "id": 9, "definitionId": "FormatString", "name": "Log Incoming",
+        "id": 9, "definitionId": "GetVariable", "name": "Get Secret",
         "pins": [
-          { "id": 9001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 9002, "kind": 0, "dataType": 4, "name": "Format", "defaultValue": "[WeComBot] From:{0}  Msg:{1}" },
-          { "id": 9003, "kind": 0, "dataType": 9, "name": "Arg0" },
-          { "id": 9004, "kind": 0, "dataType": 9, "name": "Arg1" },
-          { "id": 9010, "kind": 1, "dataType": 0, "isExec": true },
-          { "id": 9020, "kind": 1, "dataType": 4, "name": "Result" }
+          { "id": 9001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Secret" },
+          { "id": 9010, "kind": 1, "dataType": 9, "name": "Value" }
         ]
       },
 
       {
-        "id": 10, "definitionId": "PrintString", "name": "Print Log",
+        "id": 10, "definitionId": "WS.Send", "name": "Send Auth",
         "pins": [
           { "id": 10001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 10002, "kind": 0, "dataType": 4, "name": "In String" },
-          { "id": 10010, "kind": 1, "dataType": 0, "isExec": true }
+          { "id": 10002, "kind": 0, "dataType": 4, "name": "ConnectionId", "defaultValue": "" },
+          { "id": 10003, "kind": 0, "dataType": 4, "name": "Message" },
+          { "id": 10010, "kind": 1, "dataType": 0, "isExec": true, "name": "onSuccess" },
+          { "id": 10011, "kind": 1, "dataType": 0, "isExec": true, "name": "onError" },
+          { "id": 10012, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
         ]
       },
 
       {
-        "id": 11, "definitionId": "JSON.MakeMessage", "name": "Make User Message",
+        "id": 11, "definitionId": "PrintString", "name": "Print Auth Sent",
         "pins": [
-          { "id": 11001, "kind": 0, "dataType": 4, "name": "Role",       "defaultValue": "user" },
-          { "id": 11002, "kind": 0, "dataType": 4, "name": "Content" },
-          { "id": 11003, "kind": 0, "dataType": 4, "name": "ToolCallId", "defaultValue": "" },
-          { "id": 11010, "kind": 1, "dataType": 4, "name": "Message" }
+          { "id": 11001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 11002, "kind": 0, "dataType": 4, "name": "In String", "defaultValue": "[WeComBot] Auth frame sent, waiting for ack..." },
+          { "id": 11010, "kind": 1, "dataType": 0, "isExec": true }
         ]
       },
 
       {
-        "id": 12, "definitionId": "JSON.ArrayPush", "name": "Build Messages",
+        "id": 12, "definitionId": "JSON.Parse", "name": "Parse Frame",
         "pins": [
-          { "id": 12001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 12002, "kind": 0, "dataType": 4, "name": "JSON",    "defaultValue": "[]" },
-          { "id": 12003, "kind": 0, "dataType": 9, "name": "Element" },
-          { "id": 12010, "kind": 1, "dataType": 0, "isExec": true },
-          { "id": 12020, "kind": 1, "dataType": 4, "name": "JSON" },
-          { "id": 12021, "kind": 1, "dataType": 2, "name": "Length" }
+          { "id": 12001, "kind": 0, "dataType": 4, "name": "JSON" },
+          { "id": 12010, "kind": 1, "dataType": 4, "name": "Result" },
+          { "id": 12011, "kind": 1, "dataType": 1, "name": "Valid" }
         ]
       },
 
       {
-        "id": 13, "definitionId": "LLM.Auto", "name": "LLM Process",
+        "id": 13, "definitionId": "JSON.GetPath", "name": "Get cmd",
         "pins": [
-          { "id": 13001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 13002, "kind": 0, "dataType": 4, "name": "ConfigFile",   "defaultValue": "data/llm_providers.json" },
-          { "id": 13003, "kind": 0, "dataType": 4, "name": "Provider",     "defaultValue": "auto" },
-          { "id": 13004, "kind": 0, "dataType": 4, "name": "Messages",     "defaultValue": "[]" },
-          { "id": 13005, "kind": 0, "dataType": 4, "name": "SystemPrompt", "defaultValue": "你是企业微信智能助手。请用简洁、友好的中文回复用户问题。" },
-          { "id": 13006, "kind": 0, "dataType": 2, "name": "MaxTokens",    "defaultValue": 1024 },
-          { "id": 13007, "kind": 0, "dataType": 3, "name": "Temperature",  "defaultValue": 0.7 },
-          { "id": 13008, "kind": 0, "dataType": 4, "name": "Tools",        "defaultValue": "" },
-          { "id": 13010, "kind": 1, "dataType": 0, "isExec": true, "name": "onReply" },
-          { "id": 13011, "kind": 1, "dataType": 0, "isExec": true, "name": "onToolCall" },
-          { "id": 13012, "kind": 1, "dataType": 0, "isExec": true, "name": "onError" },
-          { "id": 13020, "kind": 1, "dataType": 4, "name": "Reply" },
-          { "id": 13021, "kind": 1, "dataType": 4, "name": "ToolCallsJSON" },
-          { "id": 13022, "kind": 1, "dataType": 4, "name": "FinishReason" },
-          { "id": 13023, "kind": 1, "dataType": 4, "name": "UsedProvider" },
-          { "id": 13024, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
+          { "id": 13001, "kind": 0, "dataType": 4, "name": "JSON" },
+          { "id": 13002, "kind": 0, "dataType": 4, "name": "Path",    "defaultValue": "cmd" },
+          { "id": 13003, "kind": 0, "dataType": 9, "name": "Default", "defaultValue": "" },
+          { "id": 13010, "kind": 1, "dataType": 9, "name": "Value" },
+          { "id": 13011, "kind": 1, "dataType": 1, "name": "Found" }
         ]
       },
 
       {
-        "id": 14, "definitionId": "JSON.BuildObject", "name": "Build Reply JSON",
+        "id": 14, "definitionId": "JSON.GetPath", "name": "Get errcode",
         "pins": [
-          { "id": 14001, "kind": 0, "dataType": 4, "name": "Keys",   "defaultValue": "[\"reply\", \"msgid\"]" },
-          { "id": 14002, "kind": 0, "dataType": 4, "name": "Values" },
-          { "id": 14010, "kind": 1, "dataType": 4, "name": "JSON" }
+          { "id": 14001, "kind": 0, "dataType": 4, "name": "JSON" },
+          { "id": 14002, "kind": 0, "dataType": 4, "name": "Path",    "defaultValue": "errcode" },
+          { "id": 14003, "kind": 0, "dataType": 9, "name": "Default", "defaultValue": 0 },
+          { "id": 14010, "kind": 1, "dataType": 9, "name": "Value" },
+          { "id": 14011, "kind": 1, "dataType": 1, "name": "Found" }
         ]
       },
 
       {
-        "id": 15, "definitionId": "JSON.ArrayPush", "name": "Pack Values",
+        "id": 15, "definitionId": "JSON.GetPath", "name": "Get req_id",
         "pins": [
-          { "id": 15001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 15002, "kind": 0, "dataType": 4, "name": "JSON",    "defaultValue": "[]" },
-          { "id": 15003, "kind": 0, "dataType": 9, "name": "Element" },
-          { "id": 15010, "kind": 1, "dataType": 0, "isExec": true },
-          { "id": 15020, "kind": 1, "dataType": 4, "name": "JSON" },
-          { "id": 15021, "kind": 1, "dataType": 2, "name": "Length" }
+          { "id": 15001, "kind": 0, "dataType": 4, "name": "JSON" },
+          { "id": 15002, "kind": 0, "dataType": 4, "name": "Path",    "defaultValue": "headers.req_id" },
+          { "id": 15003, "kind": 0, "dataType": 9, "name": "Default", "defaultValue": "" },
+          { "id": 15010, "kind": 1, "dataType": 9, "name": "Value" },
+          { "id": 15011, "kind": 1, "dataType": 1, "name": "Found" }
         ]
       },
 
       {
-        "id": 16, "definitionId": "JSON.ArrayPush", "name": "Pack msgid",
+        "id": 16, "definitionId": "String.StartsWith", "name": "Is Subscribe Ack",
         "pins": [
-          { "id": 16001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 16002, "kind": 0, "dataType": 4, "name": "JSON" },
-          { "id": 16003, "kind": 0, "dataType": 9, "name": "Element" },
-          { "id": 16010, "kind": 1, "dataType": 0, "isExec": true },
-          { "id": 16020, "kind": 1, "dataType": 4, "name": "JSON" },
-          { "id": 16021, "kind": 1, "dataType": 2, "name": "Length" }
+          { "id": 16001, "kind": 0, "dataType": 4, "name": "String" },
+          { "id": 16002, "kind": 0, "dataType": 4, "name": "Prefix", "defaultValue": "aibot_subscribe" },
+          { "id": 16010, "kind": 1, "dataType": 1, "name": "Result" }
         ]
       },
 
       {
-        "id": 17, "definitionId": "HTTP.Respond", "name": "Respond 200 with Reply",
+        "id": 17, "definitionId": "Branch", "name": "Is Auth Ack?",
         "pins": [
           { "id": 17001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 17002, "kind": 0, "dataType": 4, "name": "RequestId",   "defaultValue": "" },
-          { "id": 17003, "kind": 0, "dataType": 2, "name": "StatusCode",  "defaultValue": 200 },
-          { "id": 17004, "kind": 0, "dataType": 4, "name": "Body" },
-          { "id": 17005, "kind": 0, "dataType": 4, "name": "ContentType", "defaultValue": "application/json; charset=utf-8" },
-          { "id": 17010, "kind": 1, "dataType": 0, "isExec": true }
+          { "id": 17002, "kind": 0, "dataType": 1, "name": "Condition" },
+          { "id": 17010, "kind": 1, "dataType": 0, "isExec": true, "name": "True" },
+          { "id": 17011, "kind": 1, "dataType": 0, "isExec": true, "name": "False" }
         ]
       },
 
       {
-        "id": 18, "definitionId": "HTTP.Respond", "name": "Respond 500 on LLM Error",
+        "id": 18, "definitionId": "Compare.Equal", "name": "errcode == 0",
         "pins": [
-          { "id": 18001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 18002, "kind": 0, "dataType": 4, "name": "RequestId",   "defaultValue": "" },
-          { "id": 18003, "kind": 0, "dataType": 2, "name": "StatusCode",  "defaultValue": 500 },
-          { "id": 18004, "kind": 0, "dataType": 4, "name": "Body" },
-          { "id": 18005, "kind": 0, "dataType": 4, "name": "ContentType", "defaultValue": "application/json; charset=utf-8" },
-          { "id": 18010, "kind": 1, "dataType": 0, "isExec": true }
+          { "id": 18001, "kind": 0, "dataType": 9, "name": "A" },
+          { "id": 18002, "kind": 0, "dataType": 9, "name": "B", "defaultValue": 0 },
+          { "id": 18010, "kind": 1, "dataType": 1, "name": "Result" }
         ]
       },
 
       {
-        "id": 19, "definitionId": "JSON.BuildObject", "name": "Build Error JSON",
+        "id": 19, "definitionId": "Branch", "name": "Auth OK?",
         "pins": [
-          { "id": 19001, "kind": 0, "dataType": 4, "name": "Keys",   "defaultValue": "[\"error\"]" },
-          { "id": 19002, "kind": 0, "dataType": 4, "name": "Values" },
-          { "id": 19010, "kind": 1, "dataType": 4, "name": "JSON" }
+          { "id": 19001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 19002, "kind": 0, "dataType": 1, "name": "Condition" },
+          { "id": 19010, "kind": 1, "dataType": 0, "isExec": true, "name": "True" },
+          { "id": 19011, "kind": 1, "dataType": 0, "isExec": true, "name": "False" }
         ]
       },
 
       {
-        "id": 20, "definitionId": "JSON.ArrayPush", "name": "Pack Error Msg",
+        "id": 20, "definitionId": "PrintString", "name": "Print Auth OK",
         "pins": [
           { "id": 20001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 20002, "kind": 0, "dataType": 4, "name": "JSON",    "defaultValue": "[]" },
-          { "id": 20003, "kind": 0, "dataType": 9, "name": "Element" },
-          { "id": 20010, "kind": 1, "dataType": 0, "isExec": true },
-          { "id": 20020, "kind": 1, "dataType": 4, "name": "JSON" },
-          { "id": 20021, "kind": 1, "dataType": 2, "name": "Length" }
+          { "id": 20002, "kind": 0, "dataType": 4, "name": "In String", "defaultValue": "[WeComBot] Authenticated! Ready to receive messages." },
+          { "id": 20010, "kind": 1, "dataType": 0, "isExec": true }
         ]
       },
 
       {
-        "id": 21, "definitionId": "PrintString", "name": "Print LLM Error",
+        "id": 21, "definitionId": "PrintString", "name": "Print Auth Fail",
         "pins": [
           { "id": 21001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 21002, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 21002, "kind": 0, "dataType": 4, "name": "In String", "defaultValue": "[WeComBot] Auth FAILED! Check BotId/Secret." },
           { "id": 21010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      {
+        "id": 22, "definitionId": "String.Contains", "name": "Is Msg Callback",
+        "pins": [
+          { "id": 22001, "kind": 0, "dataType": 4, "name": "String" },
+          { "id": 22002, "kind": 0, "dataType": 4, "name": "Substring", "defaultValue": "aibot_msg_callback" },
+          { "id": 22010, "kind": 1, "dataType": 1, "name": "Result" }
+        ]
+      },
+
+      {
+        "id": 23, "definitionId": "Branch", "name": "Is Msg Callback?",
+        "pins": [
+          { "id": 23001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 23002, "kind": 0, "dataType": 1, "name": "Condition" },
+          { "id": 23010, "kind": 1, "dataType": 0, "isExec": true, "name": "True" },
+          { "id": 23011, "kind": 1, "dataType": 0, "isExec": true, "name": "False" }
+        ]
+      },
+
+      {
+        "id": 24, "definitionId": "JSON.GetPath", "name": "Get msgid",
+        "pins": [
+          { "id": 24001, "kind": 0, "dataType": 4, "name": "JSON" },
+          { "id": 24002, "kind": 0, "dataType": 4, "name": "Path",    "defaultValue": "body.msgid" },
+          { "id": 24003, "kind": 0, "dataType": 9, "name": "Default", "defaultValue": "" },
+          { "id": 24010, "kind": 1, "dataType": 9, "name": "Value" },
+          { "id": 24011, "kind": 1, "dataType": 1, "name": "Found" }
+        ]
+      },
+
+      {
+        "id": 25, "definitionId": "JSON.GetPath", "name": "Get text content",
+        "pins": [
+          { "id": 25001, "kind": 0, "dataType": 4, "name": "JSON" },
+          { "id": 25002, "kind": 0, "dataType": 4, "name": "Path",    "defaultValue": "body.text.content" },
+          { "id": 25003, "kind": 0, "dataType": 9, "name": "Default", "defaultValue": "" },
+          { "id": 25010, "kind": 1, "dataType": 9, "name": "Value" },
+          { "id": 25011, "kind": 1, "dataType": 1, "name": "Found" }
+        ]
+      },
+
+      {
+        "id": 26, "definitionId": "JSON.MakeMessage", "name": "Make User Message",
+        "pins": [
+          { "id": 26001, "kind": 0, "dataType": 4, "name": "Role",       "defaultValue": "user" },
+          { "id": 26002, "kind": 0, "dataType": 4, "name": "Content" },
+          { "id": 26003, "kind": 0, "dataType": 4, "name": "ToolCallId", "defaultValue": "" },
+          { "id": 26010, "kind": 1, "dataType": 4, "name": "Message" }
+        ]
+      },
+
+      {
+        "id": 27, "definitionId": "JSON.ArrayPush", "name": "Build Messages",
+        "pins": [
+          { "id": 27001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 27002, "kind": 0, "dataType": 4, "name": "JSON",    "defaultValue": "[]" },
+          { "id": 27003, "kind": 0, "dataType": 9, "name": "Element" },
+          { "id": 27010, "kind": 1, "dataType": 0, "isExec": true },
+          { "id": 27020, "kind": 1, "dataType": 4, "name": "JSON" },
+          { "id": 27021, "kind": 1, "dataType": 2, "name": "Length" }
+        ]
+      },
+
+      {
+        "id": 28, "definitionId": "LLM.Auto", "name": "LLM Process",
+        "pins": [
+          { "id": 28001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 28002, "kind": 0, "dataType": 4, "name": "ConfigFile",   "defaultValue": "data/llm_providers.json" },
+          { "id": 28003, "kind": 0, "dataType": 4, "name": "Provider",     "defaultValue": "auto" },
+          { "id": 28004, "kind": 0, "dataType": 4, "name": "Messages",     "defaultValue": "[]" },
+          { "id": 28005, "kind": 0, "dataType": 4, "name": "SystemPrompt", "defaultValue": "你是企业微信智能助手，请用简洁友好的中文回复。" },
+          { "id": 28006, "kind": 0, "dataType": 2, "name": "MaxTokens",    "defaultValue": 1024 },
+          { "id": 28007, "kind": 0, "dataType": 3, "name": "Temperature",  "defaultValue": 0.7 },
+          { "id": 28008, "kind": 0, "dataType": 4, "name": "Tools",        "defaultValue": "" },
+          { "id": 28010, "kind": 1, "dataType": 0, "isExec": true, "name": "onReply" },
+          { "id": 28011, "kind": 1, "dataType": 0, "isExec": true, "name": "onToolCall" },
+          { "id": 28012, "kind": 1, "dataType": 0, "isExec": true, "name": "onError" },
+          { "id": 28020, "kind": 1, "dataType": 4, "name": "Reply" },
+          { "id": 28021, "kind": 1, "dataType": 4, "name": "ToolCallsJSON" },
+          { "id": 28022, "kind": 1, "dataType": 4, "name": "FinishReason" },
+          { "id": 28023, "kind": 1, "dataType": 4, "name": "UsedProvider" },
+          { "id": 28024, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
+        ]
+      },
+
+      {
+        "id": 29, "definitionId": "Time.Now", "name": "Get StreamId Ts",
+        "pins": [
+          { "id": 29010, "kind": 1, "dataType": 3, "name": "Timestamp" },
+          { "id": 29011, "kind": 1, "dataType": 4, "name": "ISO8601" }
+        ]
+      },
+
+      {
+        "id": 30, "definitionId": "Float.ToString", "name": "StreamId Ts Str",
+        "pins": [
+          { "id": 30001, "kind": 0, "dataType": 3, "name": "Value" },
+          { "id": 30002, "kind": 0, "dataType": 2, "name": "Decimals", "defaultValue": 0 },
+          { "id": 30010, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+
+      {
+        "id": 31, "definitionId": "FormatString", "name": "Build Reply JSON",
+        "pins": [
+          { "id": 31001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 31002, "kind": 0, "dataType": 4, "name": "Format",
+            "defaultValue": "{\"cmd\":\"aibot_respond_msg\",\"headers\":{\"req_id\":\"{0}\"},\"body\":{\"msgtype\":\"stream\",\"stream\":{\"id\":\"stream_{1}\",\"finish\":true,\"content\":\"{2}\"}}}" },
+          { "id": 31003, "kind": 0, "dataType": 9, "name": "Arg0" },
+          { "id": 31004, "kind": 0, "dataType": 9, "name": "Arg1" },
+          { "id": 31005, "kind": 0, "dataType": 9, "name": "Arg2" },
+          { "id": 31010, "kind": 1, "dataType": 0, "isExec": true },
+          { "id": 31020, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+
+      {
+        "id": 32, "definitionId": "GetVariable", "name": "Get ConnId",
+        "pins": [
+          { "id": 32001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "WsConnId" },
+          { "id": 32010, "kind": 1, "dataType": 9, "name": "Value" }
+        ]
+      },
+
+      {
+        "id": 33, "definitionId": "WS.Send", "name": "Send Reply",
+        "pins": [
+          { "id": 33001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 33002, "kind": 0, "dataType": 4, "name": "ConnectionId" },
+          { "id": 33003, "kind": 0, "dataType": 4, "name": "Message" },
+          { "id": 33010, "kind": 1, "dataType": 0, "isExec": true, "name": "onSuccess" },
+          { "id": 33011, "kind": 1, "dataType": 0, "isExec": true, "name": "onError" },
+          { "id": 33012, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
+        ]
+      },
+
+      {
+        "id": 34, "definitionId": "PrintString", "name": "Print Replied",
+        "pins": [
+          { "id": 34001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 34002, "kind": 0, "dataType": 4, "name": "In String", "defaultValue": "[WeComBot] Reply sent." },
+          { "id": 34010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      {
+        "id": 35, "definitionId": "PrintString", "name": "Print WS Error",
+        "pins": [
+          { "id": 35001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 35002, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 35010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      {
+        "id": 36, "definitionId": "PrintString", "name": "Print Closed",
+        "pins": [
+          { "id": 36001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 36002, "kind": 0, "dataType": 4, "name": "In String", "defaultValue": "[WeComBot] WS connection closed." },
+          { "id": 36010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      {
+        "id": 37, "definitionId": "PrintString", "name": "Print LLM Error",
+        "pins": [
+          { "id": 37001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 37002, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 37010, "kind": 1, "dataType": 0, "isExec": true }
         ]
       }
 
     ],
     "links": [
-      { "id": 1,  "startPinId": 1001,  "endPinId": 2001,  "isEnabled": true },
+      { "id": 1,  "startPinId": 1001,  "endPinId":  2001, "isEnabled": true },
+      { "id": 2,  "startPinId": 2010,  "endPinId":  3001, "isEnabled": true },
 
-      { "id": 2,  "startPinId": 2010,  "endPinId": 9001,  "isEnabled": true },
-      { "id": 3,  "startPinId": 2011,  "endPinId": 4001,  "isEnabled": true },
+      { "id": 3,  "startPinId": 3010,  "endPinId":  4001, "isEnabled": true },
+      { "id": 4,  "startPinId": 3020,  "endPinId":  4003, "isEnabled": true },
+      { "id": 5,  "startPinId": 4010,  "endPinId":  5001, "isEnabled": true },
 
-      { "id": 4,  "startPinId": 2022,  "endPinId": 5001,  "isEnabled": true },
-      { "id": 5,  "startPinId": 2022,  "endPinId": 6001,  "isEnabled": true },
-      { "id": 6,  "startPinId": 2022,  "endPinId": 7001,  "isEnabled": true },
-      { "id": 7,  "startPinId": 2022,  "endPinId": 8001,  "isEnabled": true },
+      { "id": 6,  "startPinId": 6010,  "endPinId":  7001, "isEnabled": true },
+      { "id": 7,  "startPinId": 7010,  "endPinId":  5003, "isEnabled": true },
+      { "id": 8,  "startPinId": 8010,  "endPinId":  5004, "isEnabled": true },
+      { "id": 9,  "startPinId": 9010,  "endPinId":  5005, "isEnabled": true },
+      { "id": 10, "startPinId": 5020,  "endPinId": 10003, "isEnabled": true },
+      { "id": 11, "startPinId": 5010,  "endPinId": 10001, "isEnabled": true },
+      { "id": 12, "startPinId": 3020,  "endPinId": 10002, "isEnabled": true },
+      { "id": 13, "startPinId": 10010, "endPinId": 11001, "isEnabled": true },
 
-      { "id": 8,  "startPinId": 8010,  "endPinId": 9003,  "isEnabled": true },
-      { "id": 9,  "startPinId": 6010,  "endPinId": 9004,  "isEnabled": true },
+      { "id": 14, "startPinId": 3021,  "endPinId": 12001, "isEnabled": true },
+      { "id": 15, "startPinId": 12010, "endPinId": 13001, "isEnabled": true },
+      { "id": 16, "startPinId": 12010, "endPinId": 14001, "isEnabled": true },
+      { "id": 17, "startPinId": 12010, "endPinId": 15001, "isEnabled": true },
 
-      { "id": 10, "startPinId": 9020,  "endPinId": 10002, "isEnabled": true },
-      { "id": 11, "startPinId": 9010,  "endPinId": 10001, "isEnabled": true },
-      { "id": 12, "startPinId": 10010, "endPinId": 12001, "isEnabled": true },
+      { "id": 18, "startPinId": 15010, "endPinId": 16001, "isEnabled": true },
+      { "id": 19, "startPinId": 14010, "endPinId": 18001, "isEnabled": true },
 
-      { "id": 13, "startPinId": 6010,  "endPinId": 11002, "isEnabled": true },
-      { "id": 14, "startPinId": 11010, "endPinId": 12003, "isEnabled": true },
-      { "id": 15, "startPinId": 12020, "endPinId": 13004, "isEnabled": true },
-      { "id": 16, "startPinId": 12010, "endPinId": 13001, "isEnabled": true },
+      { "id": 20, "startPinId": 3011,  "endPinId": 17001, "isEnabled": true },
+      { "id": 21, "startPinId": 16010, "endPinId": 17002, "isEnabled": true },
+      { "id": 22, "startPinId": 17010, "endPinId": 19001, "isEnabled": true },
+      { "id": 23, "startPinId": 18010, "endPinId": 19002, "isEnabled": true },
+      { "id": 24, "startPinId": 19010, "endPinId": 20001, "isEnabled": true },
+      { "id": 25, "startPinId": 19011, "endPinId": 21001, "isEnabled": true },
 
-      { "id": 17, "startPinId": 13010, "endPinId": 15001, "isEnabled": true },
-      { "id": 18, "startPinId": 13020, "endPinId": 15003, "isEnabled": true },
-      { "id": 19, "startPinId": 7010,  "endPinId": 16003, "isEnabled": true },
-      { "id": 20, "startPinId": 15010, "endPinId": 16001, "isEnabled": true },
-      { "id": 21, "startPinId": 15020, "endPinId": 16002, "isEnabled": true },
-      { "id": 22, "startPinId": 16020, "endPinId": 14002, "isEnabled": true },
-      { "id": 23, "startPinId": 14010, "endPinId": 17004, "isEnabled": true },
-      { "id": 24, "startPinId": 16010, "endPinId": 17001, "isEnabled": true },
-      { "id": 25, "startPinId": 2024,  "endPinId": 17002, "isEnabled": true },
+      { "id": 26, "startPinId": 17011, "endPinId": 23001, "isEnabled": true },
+      { "id": 27, "startPinId": 13010, "endPinId": 22001, "isEnabled": true },
+      { "id": 28, "startPinId": 22010, "endPinId": 23002, "isEnabled": true },
 
-      { "id": 26, "startPinId": 13012, "endPinId": 21001, "isEnabled": true },
-      { "id": 27, "startPinId": 13024, "endPinId": 21002, "isEnabled": true },
-      { "id": 28, "startPinId": 21010, "endPinId": 20001, "isEnabled": true },
-      { "id": 29, "startPinId": 13024, "endPinId": 20003, "isEnabled": true },
-      { "id": 30, "startPinId": 20020, "endPinId": 19002, "isEnabled": true },
-      { "id": 31, "startPinId": 19010, "endPinId": 18004, "isEnabled": true },
-      { "id": 32, "startPinId": 20010, "endPinId": 18001, "isEnabled": true },
-      { "id": 33, "startPinId": 2024,  "endPinId": 18002, "isEnabled": true },
+      { "id": 29, "startPinId": 12010, "endPinId": 24001, "isEnabled": true },
+      { "id": 30, "startPinId": 12010, "endPinId": 25001, "isEnabled": true },
+      { "id": 31, "startPinId": 25010, "endPinId": 26002, "isEnabled": true },
+      { "id": 32, "startPinId": 26010, "endPinId": 27003, "isEnabled": true },
+      { "id": 33, "startPinId": 23010, "endPinId": 27001, "isEnabled": true },
+      { "id": 34, "startPinId": 27020, "endPinId": 28004, "isEnabled": true },
+      { "id": 35, "startPinId": 27010, "endPinId": 28001, "isEnabled": true },
 
-      { "id": 34, "startPinId": 2001,  "endPinId": 3001,  "isEnabled": true },
-      { "id": 35, "startPinId": 3010,  "endPinId": 2001,  "isEnabled": false }
+      { "id": 36, "startPinId": 29010, "endPinId": 30001, "isEnabled": true },
+      { "id": 37, "startPinId": 30010, "endPinId": 31004, "isEnabled": true },
+      { "id": 38, "startPinId": 24010, "endPinId": 31003, "isEnabled": true },
+      { "id": 39, "startPinId": 28020, "endPinId": 31005, "isEnabled": true },
+      { "id": 40, "startPinId": 28010, "endPinId": 31001, "isEnabled": true },
+      { "id": 41, "startPinId": 31020, "endPinId": 33003, "isEnabled": true },
+      { "id": 42, "startPinId": 32010, "endPinId": 33002, "isEnabled": true },
+      { "id": 43, "startPinId": 31010, "endPinId": 33001, "isEnabled": true },
+      { "id": 44, "startPinId": 33010, "endPinId": 34001, "isEnabled": true },
+
+      { "id": 45, "startPinId": 3013,  "endPinId": 35001, "isEnabled": true },
+      { "id": 46, "startPinId": 3024,  "endPinId": 35002, "isEnabled": true },
+      { "id": 47, "startPinId": 3012,  "endPinId": 36001, "isEnabled": true },
+
+      { "id": 48, "startPinId": 28012, "endPinId": 37001, "isEnabled": true },
+      { "id": 49, "startPinId": 28024, "endPinId": 37002, "isEnabled": true }
     ],
-    "variables": []
+    "variables": [
+      { "name": "BotId",    "dataType": 4, "defaultValue": "your-bot-id-here" },
+      { "name": "Secret",   "dataType": 4, "defaultValue": "your-secret-here" },
+      { "name": "WsConnId", "dataType": 4, "defaultValue": "" }
+    ]
   },
   "editor": {
     "metadata": { "author": "", "createdAt": "", "updatedAt": "" },
     "nodes": [
-      { "id":  1, "position": { "x": -700, "y":   0 }, "size": { "width": 161, "height":  72 } },
-      { "id":  2, "position": { "x": -460, "y":   0 }, "size": { "width": 340, "height": 260 } },
-      { "id":  3, "position": { "x": -460, "y": 320 }, "size": { "width": 380, "height":  72 } },
-      { "id":  4, "position": { "x": -460, "y": 440 }, "size": { "width": 320, "height":  72 } },
+      { "id":  1, "position": { "x": -800, "y":    0 }, "size": { "width": 161, "height":  72 } },
+      { "id":  2, "position": { "x": -580, "y":    0 }, "size": { "width": 380, "height":  72 } },
+      { "id":  3, "position": { "x": -580, "y":  120 }, "size": { "width": 340, "height": 280 } },
 
-      { "id":  5, "position": { "x":  -60, "y":   0 }, "size": { "width": 280, "height": 105 } },
-      { "id":  6, "position": { "x":  -60, "y": 140 }, "size": { "width": 280, "height": 105 } },
-      { "id":  7, "position": { "x":  -60, "y": 280 }, "size": { "width": 280, "height": 105 } },
-      { "id":  8, "position": { "x":  -60, "y": 420 }, "size": { "width": 280, "height": 105 } },
+      { "id":  4, "position": { "x": -160, "y":    0 }, "size": { "width": 280, "height": 105 } },
+      { "id":  6, "position": { "x": -160, "y":  140 }, "size": { "width": 240, "height":  72 } },
+      { "id":  7, "position": { "x": -160, "y":  240 }, "size": { "width": 240, "height":  90 } },
+      { "id":  8, "position": { "x": -160, "y":  360 }, "size": { "width": 240, "height":  72 } },
+      { "id":  9, "position": { "x": -160, "y":  460 }, "size": { "width": 240, "height":  72 } },
+      { "id":  5, "position": { "x":  160, "y":  120 }, "size": { "width": 600, "height": 165 } },
+      { "id": 10, "position": { "x":  160, "y":  360 }, "size": { "width": 320, "height": 125 } },
+      { "id": 11, "position": { "x":  160, "y":  520 }, "size": { "width": 380, "height":  72 } },
 
-      { "id":  9, "position": { "x":  280, "y":   0 }, "size": { "width": 340, "height": 125 } },
-      { "id": 10, "position": { "x":  280, "y": 160 }, "size": { "width": 320, "height":  72 } },
+      { "id": 12, "position": { "x": -160, "y":  580 }, "size": { "width": 280, "height": 105 } },
+      { "id": 13, "position": { "x":  200, "y":  580 }, "size": { "width": 280, "height": 105 } },
+      { "id": 14, "position": { "x":  200, "y":  720 }, "size": { "width": 280, "height": 105 } },
+      { "id": 15, "position": { "x":  200, "y":  860 }, "size": { "width": 280, "height": 105 } },
+      { "id": 16, "position": { "x":  560, "y":  860 }, "size": { "width": 300, "height":  90 } },
+      { "id": 18, "position": { "x":  560, "y":  720 }, "size": { "width": 280, "height":  90 } },
+      { "id": 17, "position": { "x":  560, "y":  580 }, "size": { "width": 260, "height": 105 } },
+      { "id": 19, "position": { "x":  560, "y":  440 }, "size": { "width": 260, "height": 105 } },
+      { "id": 20, "position": { "x":  900, "y":  360 }, "size": { "width": 380, "height":  72 } },
+      { "id": 21, "position": { "x":  900, "y":  460 }, "size": { "width": 380, "height":  72 } },
 
-      { "id": 11, "position": { "x":  280, "y": 280 }, "size": { "width": 280, "height": 105 } },
-      { "id": 12, "position": { "x":  280, "y": 420 }, "size": { "width": 280, "height": 105 } },
+      { "id": 22, "position": { "x":  900, "y":  580 }, "size": { "width": 300, "height":  90 } },
+      { "id": 23, "position": { "x":  900, "y":  720 }, "size": { "width": 260, "height": 105 } },
 
-      { "id": 13, "position": { "x":  640, "y": 280 }, "size": { "width": 380, "height": 280 } },
+      { "id": 24, "position": { "x": 1260, "y":  720 }, "size": { "width": 280, "height": 105 } },
+      { "id": 25, "position": { "x": 1260, "y":  860 }, "size": { "width": 280, "height": 105 } },
+      { "id": 26, "position": { "x": 1620, "y":  860 }, "size": { "width": 280, "height": 105 } },
+      { "id": 27, "position": { "x": 1620, "y":  720 }, "size": { "width": 280, "height": 105 } },
+      { "id": 28, "position": { "x": 1980, "y":  680 }, "size": { "width": 380, "height": 280 } },
 
-      { "id": 14, "position": { "x": 1100, "y": 140 }, "size": { "width": 280, "height": 105 } },
-      { "id": 15, "position": { "x": 1100, "y": 280 }, "size": { "width": 280, "height": 105 } },
-      { "id": 16, "position": { "x": 1100, "y": 420 }, "size": { "width": 280, "height": 105 } },
-      { "id": 17, "position": { "x": 1460, "y": 280 }, "size": { "width": 340, "height": 165 } },
+      { "id": 29, "position": { "x": 2440, "y":  860 }, "size": { "width": 240, "height":  72 } },
+      { "id": 30, "position": { "x": 2440, "y":  960 }, "size": { "width": 240, "height":  90 } },
+      { "id": 32, "position": { "x": 2440, "y": 1080 }, "size": { "width": 240, "height":  72 } },
+      { "id": 31, "position": { "x": 2760, "y":  820 }, "size": { "width": 700, "height": 165 } },
+      { "id": 33, "position": { "x": 2760, "y": 1020 }, "size": { "width": 320, "height": 125 } },
+      { "id": 34, "position": { "x": 2760, "y": 1180 }, "size": { "width": 280, "height":  72 } },
 
-      { "id": 18, "position": { "x": 1460, "y": 500 }, "size": { "width": 340, "height": 165 } },
-      { "id": 19, "position": { "x": 1100, "y": 580 }, "size": { "width": 280, "height": 105 } },
-      { "id": 20, "position": { "x": 1100, "y": 700 }, "size": { "width": 280, "height": 105 } },
-      { "id": 21, "position": { "x":  640, "y": 620 }, "size": { "width": 320, "height":  72 } }
+      { "id": 35, "position": { "x": -160, "y":  740 }, "size": { "width": 340, "height":  72 } },
+      { "id": 36, "position": { "x": -160, "y":  840 }, "size": { "width": 340, "height":  72 } },
+      { "id": 37, "position": { "x": 1980, "y": 1000 }, "size": { "width": 340, "height":  72 } }
     ],
-    "viewInfo": { "viewPosition": { "x": -200, "y": -50 }, "viewScale": 0.75 }
+    "viewInfo": { "viewPosition": { "x": -400, "y": -100 }, "viewScale": 0.6 }
   }
 }
