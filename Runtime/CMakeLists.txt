@@ -665,8 +665,10 @@ install(FILES
 #                              is the sole Lua user in the final binary.
 # ==============================================================================
 
-option(BUILD_BUNDLE "Build merged static library BlueprintBundle for engine delivery" OFF)
-option(BUNDLE_LUA   "Include liblua54 in BlueprintBundle (OFF = use external Lua VM)" OFF)
+option(BUILD_BUNDLE    "Build merged static library BlueprintBundle for engine delivery" OFF)
+option(BUNDLE_LUA      "Include liblua54 in BlueprintBundle (OFF = use external Lua VM)" OFF)
+option(BUNDLE_PROTOBUF "Include libprotobuf_s in BlueprintBundle" OFF)
+option(BUNDLE_LPROTOS  "Include liblprotos_s in BlueprintBundle (requires BUNDLE_PROTOBUF)" OFF)
 
 if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
 
@@ -691,15 +693,38 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
         message(STATUS "[BlueprintBundle] Lua will NOT be merged (BUNDLE_LUA=OFF) — use BP_SetExternalLuaState() to provide external VM")
     endif()
 
+    # Include protobuf_s when requested
+    if(BUNDLE_PROTOBUF AND TARGET protobuf_s)
+        list(APPEND _BUNDLE_INPUTS $<TARGET_FILE:protobuf_s>)
+        message(STATUS "[BlueprintBundle] protobuf_s WILL be merged into bundle (BUNDLE_PROTOBUF=ON)")
+    elseif(TARGET protobuf_s)
+        message(STATUS "[BlueprintBundle] protobuf_s will NOT be merged (BUNDLE_PROTOBUF=OFF)")
+    endif()
+
+    # Include lprotos_s when requested (requires BUNDLE_PROTOBUF)
+    if(BUNDLE_LPROTOS AND TARGET lprotos_s)
+        if(NOT BUNDLE_PROTOBUF)
+            message(WARNING "[BlueprintBundle] BUNDLE_LPROTOS=ON requires BUNDLE_PROTOBUF=ON — forcing BUNDLE_PROTOBUF=ON")
+            list(APPEND _BUNDLE_INPUTS $<TARGET_FILE:protobuf_s>)
+        endif()
+        list(APPEND _BUNDLE_INPUTS $<TARGET_FILE:lprotos_s>)
+        message(STATUS "[BlueprintBundle] lprotos_s WILL be merged into bundle (BUNDLE_LPROTOS=ON)")
+    elseif(TARGET lprotos_s)
+        message(STATUS "[BlueprintBundle] lprotos_s will NOT be merged (BUNDLE_LPROTOS=OFF)")
+    endif()
+
     # Output path ------------------------------------------------------------
     # BUNDLE_NAME 可由外部指定文件名（不含 lib 前缀和 .a 后缀），
     # 默认为 BlueprintBundle；BUNDLE_LUA=OFF 时自动降级为 BlueprintBundleNoLua。
     if(NOT DEFINED BUNDLE_NAME OR BUNDLE_NAME STREQUAL "")
-        if(BUNDLE_LUA)
-            set(BUNDLE_NAME "BlueprintBundle")
-        else()
-            set(BUNDLE_NAME "BlueprintBundleNoLua")
+        set(_bname "BlueprintBundle")
+        if(NOT BUNDLE_LUA)
+            string(APPEND _bname "NoLua")
         endif()
+        if(NOT BUNDLE_PROTOBUF)
+            string(APPEND _bname "NoProto")
+        endif()
+        set(BUNDLE_NAME "${_bname}")
     endif()
     set(_BUNDLE_OUT "${CMAKE_BINARY_DIR}/bin/Release/lib${BUNDLE_NAME}.a")
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -764,26 +789,42 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
         )
     else()
         # Linux/Android: two-step (write MRI then ar -M).
-        # Generator expressions in _MRI_CONTENT are evaluated at build time.
         set(_MRI_FILE "${CMAKE_CURRENT_BINARY_DIR}/bundle.mri")
+        set(_BUNDLE_DEPENDS BlueprintRuntime crude_json)
+        set(_MRI_ECHO_CMDS
+            COMMAND ${CMAKE_COMMAND} -E echo "CREATE ${_BUNDLE_OUT}"                           > "${_MRI_FILE}"
+            COMMAND ${CMAKE_COMMAND} -E echo "ADDLIB $<TARGET_FILE:BlueprintRuntime>"          >> "${_MRI_FILE}"
+            COMMAND ${CMAKE_COMMAND} -E echo "ADDLIB $<TARGET_FILE:crude_json>"                >> "${_MRI_FILE}"
+        )
+        if(BLUEPRINT_LUA AND BUNDLE_LUA AND TARGET ${LUA_LIBRARIES})
+            list(APPEND _MRI_ECHO_CMDS
+                COMMAND ${CMAKE_COMMAND} -E echo "ADDLIB $<TARGET_FILE:${LUA_LIBRARIES}>"      >> "${_MRI_FILE}"
+            )
+            list(APPEND _BUNDLE_DEPENDS ${LUA_LIBRARIES})
+        endif()
+        if(BUNDLE_PROTOBUF AND TARGET protobuf_s)
+            list(APPEND _MRI_ECHO_CMDS
+                COMMAND ${CMAKE_COMMAND} -E echo "ADDLIB $<TARGET_FILE:protobuf_s>"            >> "${_MRI_FILE}"
+            )
+            list(APPEND _BUNDLE_DEPENDS protobuf_s)
+        endif()
+        if(BUNDLE_LPROTOS AND TARGET lprotos_s)
+            list(APPEND _MRI_ECHO_CMDS
+                COMMAND ${CMAKE_COMMAND} -E echo "ADDLIB $<TARGET_FILE:lprotos_s>"             >> "${_MRI_FILE}"
+            )
+            list(APPEND _BUNDLE_DEPENDS lprotos_s)
+        endif()
+        list(APPEND _MRI_ECHO_CMDS
+            COMMAND ${CMAKE_COMMAND} -E echo "SAVE"                                            >> "${_MRI_FILE}"
+            COMMAND ${CMAKE_COMMAND} -E echo "END"                                             >> "${_MRI_FILE}"
+        )
+
         add_custom_target(BlueprintBundle ${_BUNDLE_ALL}
             COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/bin/Release"
-            # Step 1: write the MRI file with resolved archive paths
-            COMMAND ${CMAKE_COMMAND} -E echo
-                "CREATE ${_BUNDLE_OUT}"    > "${_MRI_FILE}"
-            COMMAND ${CMAKE_COMMAND} -E echo
-                "ADDLIB $<TARGET_FILE:BlueprintRuntime>" >> "${_MRI_FILE}"
-            COMMAND ${CMAKE_COMMAND} -E echo
-                "ADDLIB $<TARGET_FILE:crude_json>"       >> "${_MRI_FILE}"
-            COMMAND ${CMAKE_COMMAND} -E echo
-                "SAVE"                                   >> "${_MRI_FILE}"
-            COMMAND ${CMAKE_COMMAND} -E echo
-                "END"                                    >> "${_MRI_FILE}"
-            # Step 2: merge
+            ${_MRI_ECHO_CMDS}
             COMMAND ${CMAKE_AR} -M < "${_MRI_FILE}"
-            COMMAND ${CMAKE_COMMAND} -E echo
-                "[BlueprintBundle] merged → ${_BUNDLE_OUT}"
-            DEPENDS BlueprintRuntime crude_json
+            COMMAND ${CMAKE_COMMAND} -E echo "[BlueprintBundle] merged → ${_BUNDLE_OUT}"
+            DEPENDS ${_BUNDLE_DEPENDS}
             COMMENT "Merging static libs → libBlueprintBundle.a"
             VERBATIM
         )
