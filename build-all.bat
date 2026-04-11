@@ -154,19 +154,21 @@ goto :after_run_build
 :: ── BlueprintBundle 构建辅助 ──────────────────────────────────────────────────
 goto :after_build_bundle
 :build_bundle
-    :: %1=build目录  %2=cmake源码目录  %3=BUILD_TYPE  %4=BUNDLE_LUA(ON|OFF)
+    :: %1=build目录  %2=cmake源码目录  %3=BUILD_TYPE  %4=BUNDLE_LUA(ON|OFF)  %5=BUNDLE_PROTOBUF(ON|OFF)
     set _BD=%~1
     set _SD=%~2
     set _BT=%~3
     set _BL=%~4
+    set _BP=%~5
+    if "%_BP%"=="" set _BP=OFF
     if not exist "%_BD%" exit /b 0
-    echo   Configuring BlueprintBundle (BUNDLE_LUA=%_BL%) in %_BD% ...
-    cmake -S "%_SD%" -B "%_BD%" -DBUILD_BUNDLE=ON -DBUNDLE_LUA=%_BL% -DCMAKE_BUILD_TYPE=%_BT% >nul
+    echo   Configuring BlueprintBundle (BUNDLE_LUA=%_BL%, BUNDLE_PROTOBUF=%_BP%) in %_BD% ...
+    cmake -S "%_SD%" -B "%_BD%" -DBUILD_BUNDLE=ON -DBUNDLE_LUA=%_BL% -DBUNDLE_PROTOBUF=%_BP% -DCMAKE_BUILD_TYPE=%_BT% >nul
     cmake --build "%_BD%" --target BlueprintBundle --config %_BT% --parallel
     if %ERRORLEVEL% neq 0 (
-        echo [WARN] BlueprintBundle ^(BUNDLE_LUA=%_BL%^) failed in %_BD%
+        echo [WARN] BlueprintBundle ^(LUA=%_BL% PROTO=%_BP%^) failed in %_BD%
     ) else (
-        echo [OK]   BlueprintBundle ^(BUNDLE_LUA=%_BL%^) built in %_BD%
+        echo [OK]   BlueprintBundle ^(LUA=%_BL% PROTO=%_BP%^) built in %_BD%
     )
     exit /b 0
 :after_build_bundle
@@ -259,13 +261,17 @@ if not errorlevel 1 (
     set STATUS_wasm=NA
     echo [--] emcmake not found - skipping WASM. Pass --emsdk ^<path^> to enable.
 )
-:: 构建两个 BlueprintBundle（含 Lua + 不含 Lua）
+:: 构建四个 BlueprintBundle 变体
 if "!STATUS_wasm!"=="OK" (
     echo.
-    echo [2b] Building BlueprintBundle with Lua (wasm^)...
-    call :build_bundle "%PROJECT_DIR%\build-wasm" "%PROJECT_DIR%" %BUILD_TYPE% ON
-    echo [2c] Building BlueprintBundleNoLua (wasm^)...
-    call :build_bundle "%PROJECT_DIR%\build-wasm" "%PROJECT_DIR%" %BUILD_TYPE% OFF
+    echo [2b] Building BlueprintBundle +Lua +Proto (wasm^)...
+    call :build_bundle "%PROJECT_DIR%\build-wasm" "%PROJECT_DIR%" %BUILD_TYPE% ON ON
+    echo [2c] Building BlueprintBundleNoLua +Proto (wasm^)...
+    call :build_bundle "%PROJECT_DIR%\build-wasm" "%PROJECT_DIR%" %BUILD_TYPE% OFF ON
+    echo [2d] Building BlueprintBundle +Lua -Proto (wasm^)...
+    call :build_bundle "%PROJECT_DIR%\build-wasm" "%PROJECT_DIR%" %BUILD_TYPE% ON OFF
+    echo [2e] Building BlueprintBundleMin -Lua -Proto (wasm^)...
+    call :build_bundle "%PROJECT_DIR%\build-wasm" "%PROJECT_DIR%" %BUILD_TYPE% OFF OFF
 )
 echo.
 
@@ -312,25 +318,18 @@ call :collect android "%AND_BIN%\libBlueprintRuntimeNoLua.so" ^
 call :collect android "%AND_BIN%\liblua54.so" ^
     "%UNITY_PLUGINS_DIR%\Android\arm64-v8a" "liblua54.so"
 
-:: WebGL – 收集含 Lua 和不含 Lua 两个 Bundle
+:: WebGL – 收集各 Bundle 变体
 set WASM_BIN=%PROJECT_DIR%\build-wasm\bin\%BUILD_TYPE%
-if exist "%WASM_BIN%\libBlueprintBundle.a" (
-    call :collect_req wasm "%WASM_BIN%\libBlueprintBundle.a" ^
-        "%UNITY_PLUGINS_DIR%\WebGL" "libBlueprintBundle.a"
-) else if exist "%PROJECT_DIR%\build-wasm\Runtime\libBlueprintBundle.a" (
-    call :collect_req wasm "%PROJECT_DIR%\build-wasm\Runtime\libBlueprintBundle.a" ^
-        "%UNITY_PLUGINS_DIR%\WebGL" "libBlueprintBundle.a"
+for %%B in (libBlueprintBundle.a libBlueprintBundleNoLua.a libBlueprintBundleNoProto.a libBlueprintBundleMin.a) do (
+    if exist "%WASM_BIN%\%%B" (
+        call :collect wasm "%WASM_BIN%\%%B" "%UNITY_PLUGINS_DIR%\WebGL" "%%B"
+    ) else if exist "%PROJECT_DIR%\build-wasm\Runtime\%%B" (
+        call :collect wasm "%PROJECT_DIR%\build-wasm\Runtime\%%B" "%UNITY_PLUGINS_DIR%\WebGL" "%%B"
+    )
 )
-if exist "%WASM_BIN%\libBlueprintBundleNoLua.a" (
-    call :collect wasm "%WASM_BIN%\libBlueprintBundleNoLua.a" ^
-        "%UNITY_PLUGINS_DIR%\WebGL" "libBlueprintBundleNoLua.a"
-) else if exist "%PROJECT_DIR%\build-wasm\Runtime\libBlueprintBundleNoLua.a" (
-    call :collect wasm "%PROJECT_DIR%\build-wasm\Runtime\libBlueprintBundleNoLua.a" ^
-        "%UNITY_PLUGINS_DIR%\WebGL" "libBlueprintBundleNoLua.a"
-)
-:: 若两个都没有，回退到裸 Runtime
+:: 若所有 Bundle 都没有，回退到裸 Runtime
 if not exist "%UNITY_PLUGINS_DIR%\WebGL\libBlueprintBundle.a" ^
-if not exist "%UNITY_PLUGINS_DIR%\WebGL\libBlueprintBundleNoLua.a" (
+if not exist "%UNITY_PLUGINS_DIR%\WebGL\libBlueprintBundleMin.a" (
     call :collect_req wasm "%PROJECT_DIR%\build-wasm\Runtime\libBlueprintRuntime.a" ^
         "%UNITY_PLUGINS_DIR%\WebGL" "libBlueprintRuntime.a"
 )
@@ -355,8 +354,10 @@ echo                     liblua54.dll
 echo    Android\arm64\   libBlueprintRuntime.so      (含 Lua VM)
 echo                     libBlueprintRuntimeNoLua.so (无 Lua)
 echo                     liblua54.so
-echo    WebGL\           libBlueprintBundle.a          (Runtime+JSON+Lua)
-echo    WebGL\           libBlueprintBundleNoLua.a     (Runtime+JSON, no Lua)
+echo    WebGL\           libBlueprintBundle.a          (Runtime+JSON+Lua+Proto)
+echo    WebGL\           libBlueprintBundleNoLua.a     (Runtime+JSON+Proto, no Lua)
+echo    WebGL\           libBlueprintBundleNoProto.a   (Runtime+JSON+Lua, no Proto)
+echo    WebGL\           libBlueprintBundleMin.a       (Runtime+JSON only)
 echo.
 echo  iOS / macOS: run build-all.sh on a macOS host
 echo  Unity Plugins: %UNITY_PLUGINS_DIR%

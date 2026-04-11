@@ -668,7 +668,7 @@ install(FILES
 option(BUILD_BUNDLE    "Build merged static library BlueprintBundle for engine delivery" OFF)
 option(BUNDLE_LUA      "Include liblua54 in BlueprintBundle (OFF = use external Lua VM)" OFF)
 option(BUNDLE_PROTOBUF "Include libprotobuf_s in BlueprintBundle" OFF)
-option(BUNDLE_LPROTOS  "Include liblprotos_s in BlueprintBundle (requires BUNDLE_PROTOBUF)" OFF)
+# lprotos_s 跟随 BUNDLE_LUA + BUNDLE_PROTOBUF：两者都开时自动合并
 
 if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
 
@@ -701,16 +701,11 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
         message(STATUS "[BlueprintBundle] protobuf_s will NOT be merged (BUNDLE_PROTOBUF=OFF)")
     endif()
 
-    # Include lprotos_s when requested (requires BUNDLE_PROTOBUF)
-    if(BUNDLE_LPROTOS AND TARGET lprotos_s)
-        if(NOT BUNDLE_PROTOBUF)
-            message(WARNING "[BlueprintBundle] BUNDLE_LPROTOS=ON requires BUNDLE_PROTOBUF=ON — forcing BUNDLE_PROTOBUF=ON")
-            list(APPEND _BUNDLE_INPUTS $<TARGET_FILE:protobuf_s>)
-        endif()
+    # Include lprotos_s when both BUNDLE_LUA and BUNDLE_PROTOBUF are ON
+    # （无需独立选项，自动跟随 Lua+Protobuf 一起合并）
+    if(BUNDLE_LUA AND BUNDLE_PROTOBUF AND TARGET lprotos_s)
         list(APPEND _BUNDLE_INPUTS $<TARGET_FILE:lprotos_s>)
-        message(STATUS "[BlueprintBundle] lprotos_s WILL be merged into bundle (BUNDLE_LPROTOS=ON)")
-    elseif(TARGET lprotos_s)
-        message(STATUS "[BlueprintBundle] lprotos_s will NOT be merged (BUNDLE_LPROTOS=OFF)")
+        message(STATUS "[BlueprintBundle] lprotos_s WILL be merged (BUNDLE_LUA=ON + BUNDLE_PROTOBUF=ON)")
     endif()
 
     # Output path ------------------------------------------------------------
@@ -723,6 +718,10 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
         endif()
         if(NOT BUNDLE_PROTOBUF)
             string(APPEND _bname "NoProto")
+        endif()
+        # 全部默认 OFF 时：BlueprintBundleNoLuaNoProto → 简化为 BlueprintBundleMin
+        if(NOT BUNDLE_LUA AND NOT BUNDLE_PROTOBUF)
+            set(_bname "BlueprintBundleMin")
         endif()
         set(BUNDLE_NAME "${_bname}")
     endif()
@@ -808,7 +807,7 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
             )
             list(APPEND _BUNDLE_DEPENDS protobuf_s)
         endif()
-        if(BUNDLE_LPROTOS AND TARGET lprotos_s)
+        if(BUNDLE_LUA AND BUNDLE_PROTOBUF AND TARGET lprotos_s)
             list(APPEND _MRI_ECHO_CMDS
                 COMMAND ${CMAKE_COMMAND} -E echo "ADDLIB $<TARGET_FILE:lprotos_s>"             >> "${_MRI_FILE}"
             )
