@@ -1,0 +1,116 @@
+{
+  "runtime": {
+    "metadata": { "blueprintClass": 0, "name": "WebSocketExample", "schemaVersion": 2 },
+    "nodes": [
+      {
+        "id": 1, "definitionId": "OnBeginPlay", "name": "On Begin Play",
+        "pins": [{ "id": 1001, "kind": 1, "dataType": 0, "isExec": true }]
+      },
+      {
+        "id": 2, "definitionId": "WS.Connect", "name": "Connect to WS",
+        "pins": [
+          { "id": 2001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 2002, "kind": 0, "dataType": 4, "name": "URL",     "defaultValue": "ws://echo.websocket.org" },
+          { "id": 2003, "kind": 0, "dataType": 4, "name": "Headers", "defaultValue": "" },
+          { "id": 2010, "kind": 1, "dataType": 0, "isExec": true, "name": "onOpen" },
+          { "id": 2011, "kind": 1, "dataType": 0, "isExec": true, "name": "onMessage" },
+          { "id": 2012, "kind": 1, "dataType": 0, "isExec": true, "name": "onClose" },
+          { "id": 2013, "kind": 1, "dataType": 0, "isExec": true, "name": "onError" },
+          { "id": 2020, "kind": 1, "dataType": 4, "name": "ConnectionId" },
+          { "id": 2021, "kind": 1, "dataType": 4, "name": "Message" },
+          { "id": 2022, "kind": 1, "dataType": 2, "name": "CloseCode" },
+          { "id": 2023, "kind": 1, "dataType": 4, "name": "CloseReason" },
+          { "id": 2024, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
+        ]
+      },
+      {
+        "id": 3, "definitionId": "WS.Send", "name": "Send Hello",
+        "pins": [
+          { "id": 3001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 3002, "kind": 0, "dataType": 4, "name": "ConnectionId", "defaultValue": "" },
+          { "id": 3003, "kind": 0, "dataType": 4, "name": "Message",      "defaultValue": "Hello from Blueprint!" },
+          { "id": 3010, "kind": 1, "dataType": 0, "isExec": true, "name": "onSuccess" },
+          { "id": 3011, "kind": 1, "dataType": 0, "isExec": true, "name": "onError" },
+          { "id": 3020, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
+        ]
+      },
+      {
+        "id": 4, "definitionId": "PrintString", "name": "Print Connected",
+        "pins": [
+          { "id": 4001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 4002, "kind": 0, "dataType": 4, "name": "In String", "defaultValue": "[WS] Connected!" },
+          { "id": 4010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 5, "definitionId": "FormatString", "name": "Format Echo",
+        "pins": [
+          { "id": 5001, "kind": 0, "dataType": 4, "name": "Format",  "defaultValue": "[WS] Echo received: {0}" },
+          { "id": 5002, "kind": 0, "dataType": 9, "name": "Arg 0" },
+          { "id": 5010, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+      {
+        "id": 6, "definitionId": "PrintString", "name": "Print Echo",
+        "pins": [
+          { "id": 6001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 6002, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 6010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 7, "definitionId": "PrintString", "name": "Print Closed",
+        "pins": [
+          { "id": 7001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 7002, "kind": 0, "dataType": 4, "name": "In String", "defaultValue": "[WS] Connection closed" },
+          { "id": 7010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 8, "definitionId": "FormatString", "name": "Format Error",
+        "pins": [
+          { "id": 8001, "kind": 0, "dataType": 4, "name": "Format",  "defaultValue": "[WS] Error: {0}" },
+          { "id": 8002, "kind": 0, "dataType": 9, "name": "Arg 0" },
+          { "id": 8010, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+      {
+        "id": 9, "definitionId": "PrintString", "name": "Print Error",
+        "pins": [
+          { "id": 9001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 9002, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 9010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      }
+    ],
+    "links": [
+      { "id": 1,  "startPinId": 1001, "endPinId": 2001, "isEnabled": true },
+      { "id": 2,  "startPinId": 2010, "endPinId": 4001, "isEnabled": true },
+      { "id": 3,  "startPinId": 4010, "endPinId": 3001, "isEnabled": true },
+      { "id": 4,  "startPinId": 2020, "endPinId": 3002, "isEnabled": true },
+      { "id": 5,  "startPinId": 2021, "endPinId": 5002, "isEnabled": true },
+      { "id": 6,  "startPinId": 2011, "endPinId": 6001, "isEnabled": true },
+      { "id": 7,  "startPinId": 5010, "endPinId": 6002, "isEnabled": true },
+      { "id": 8,  "startPinId": 2012, "endPinId": 7001, "isEnabled": true },
+      { "id": 9,  "startPinId": 2013, "endPinId": 9001, "isEnabled": true },
+      { "id": 10, "startPinId": 2024, "endPinId": 8002, "isEnabled": true },
+      { "id": 11, "startPinId": 8010, "endPinId": 9002, "isEnabled": true }
+    ],
+    "variables": []
+  },
+  "editor": {
+    "metadata": { "author": "", "createdAt": "", "updatedAt": "" },
+    "nodes": [
+      { "id": 1, "position": { "x": -600, "y":   0 }, "size": { "width": 161, "height":  72 } },
+      { "id": 2, "position": { "x": -360, "y":   0 }, "size": { "width": 320, "height": 300 } },
+      { "id": 3, "position": { "x":  80,  "y":   0 }, "size": { "width": 300, "height": 130 } },
+      { "id": 4, "position": { "x":  80,  "y": -120}, "size": { "width": 280, "height":  72 } },
+      { "id": 5, "position": { "x":  80,  "y": 200 }, "size": { "width": 300, "height":  85 } },
+      { "id": 6, "position": { "x":  460, "y": 200 }, "size": { "width": 280, "height":  72 } },
+      { "id": 7, "position": { "x":  80,  "y": 360 }, "size": { "width": 280, "height":  72 } },
+      { "id": 8, "position": { "x":  80,  "y": 480 }, "size": { "width": 300, "height":  85 } },
+      { "id": 9, "position": { "x":  460, "y": 480 }, "size": { "width": 280, "height":  72 } }
+    ],
+    "viewInfo": { "viewPosition": { "x": -250, "y": -80 }, "viewScale": 0.85 }
+  }
+}
