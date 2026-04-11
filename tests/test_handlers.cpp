@@ -1206,10 +1206,10 @@ TEST_F(HandlersTest, RetryBackoff_SucceedOnFirstAttempt)
     addP(rb, 19, PinKind::Output, PinDataType::Unknown, "onExceeded",true);
     bp.nodes.push_back(rb);
 
-    // SetVariable(__retry_succeeded, true)  id=2
+    // SetVariable(__retry_succeeded1, true)  id=2  (node id=1 → key suffix "1")
     NodeInstance sv1; sv1.id=2; sv1.definitionId="SetVariable";
     addP(sv1, 20, PinKind::Input,  PinDataType::Unknown, "", true);
-    addP(sv1, 21, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("__retry_succeeded")));
+    addP(sv1, 21, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("__retry_succeeded1")));
     addP(sv1, 22, PinKind::Input,  PinDataType::Boolean, "Value", false, Variant(true));
     addP(sv1, 23, PinKind::Output, PinDataType::Unknown, "", true);
     bp.nodes.push_back(sv1);
@@ -1348,7 +1348,7 @@ TEST_F(HandlersTest, RetryBackoff_SucceedOnSecondAttempt)
 
     NodeInstance sv; sv.id=3; sv.definitionId="SetVariable";
     addP(sv, 30, PinKind::Input,  PinDataType::Unknown, "", true);
-    addP(sv, 31, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("__retry_succeeded")));
+    addP(sv, 31, PinKind::Input,  PinDataType::String,  "Name",  false, Variant(std::string("__retry_succeeded1")));
     addP(sv, 32, PinKind::Input,  PinDataType::Boolean, "Value", false, Variant(true));
     addP(sv, 33, PinKind::Output, PinDataType::Unknown, "", true);
     bp.nodes.push_back(sv);
