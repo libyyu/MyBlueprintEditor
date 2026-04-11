@@ -1415,6 +1415,107 @@ static void RegisterNodeDefs_Event(INodeRegistry& registry)
         { MakeFlowPin("") },
         "FF6060");
 
+    // ── HTTP Server 节点 ───────────────────────────────────────────────────────
+    reg("HTTP.Listen", "HTTP Listen", "Network/Server",
+        {
+            MakeFlowPin(""),
+            MakePin("Port",     PinDataType::Integer),  // 默认 7788
+            MakePin("Host",     PinDataType::String),   // 默认 0.0.0.0
+            MakePin("BasePath", PinDataType::String),   // 默认 /
+        },
+        {
+            MakeFlowPin("onRequest"),
+            MakeFlowPin("onError"),
+            MakePin("Method",    PinDataType::String),
+            MakePin("Path",      PinDataType::String),
+            MakePin("Body",      PinDataType::String),
+            MakePin("Headers",   PinDataType::String),  // JSON
+            MakePin("RequestId", PinDataType::String),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "2E86AB");
+
+    reg("HTTP.Respond", "HTTP Respond", "Network/Server",
+        {
+            MakeFlowPin(""),
+            MakePin("RequestId",   PinDataType::String),  // 空则读变量 __http_request_id
+            MakePin("StatusCode",  PinDataType::Integer), // 默认 200
+            MakePin("Body",        PinDataType::String),
+            MakePin("ContentType", PinDataType::String),  // 默认 application/json
+        },
+        { MakeFlowPin("") },
+        "2E86AB");
+
+    reg("HTTP.Stop", "HTTP Stop", "Network/Server",
+        {
+            MakeFlowPin(""),
+            MakePin("ListenKey", PinDataType::String),  // "host:port"，空则停止全部
+        },
+        { MakeFlowPin("") },
+        "2E86AB");
+
+    // ── WebSocket 节点 ────────────────────────────────────────────────────────
+    reg("WS.Connect", "WS Connect", "Network/WebSocket",
+        {
+            MakeFlowPin(""),
+            MakePin("URL",     PinDataType::String),  // ws://host:port/path
+            MakePin("Headers", PinDataType::String),  // JSON，可选
+        },
+        {
+            MakeFlowPin("onOpen"),
+            MakeFlowPin("onMessage"),
+            MakeFlowPin("onClose"),
+            MakeFlowPin("onError"),
+            MakePin("ConnectionId",  PinDataType::String),
+            MakePin("Message",       PinDataType::String),
+            MakePin("CloseCode",     PinDataType::Integer),
+            MakePin("CloseReason",   PinDataType::String),
+            MakePin("ErrorMessage",  PinDataType::String),
+        },
+        "E8A838");
+
+    reg("WS.Send", "WS Send", "Network/WebSocket",
+        {
+            MakeFlowPin(""),
+            MakePin("ConnectionId", PinDataType::String),  // 空则读 __ws_conn_id
+            MakePin("Message",      PinDataType::String),
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "E8A838");
+
+    reg("WS.Close", "WS Close", "Network/WebSocket",
+        {
+            MakeFlowPin(""),
+            MakePin("ConnectionId", PinDataType::String),
+            MakePin("Code",         PinDataType::Integer),
+            MakePin("Reason",       PinDataType::String),
+        },
+        { MakeFlowPin("") },
+        "E8A838");
+
+    reg("WS.Server", "WS Server", "Network/WebSocket",
+        {
+            MakeFlowPin(""),
+            MakePin("Port", PinDataType::Integer),  // 默认 7790
+            MakePin("Host", PinDataType::String),   // 默认 0.0.0.0
+            MakePin("Path", PinDataType::String),   // 默认 /ws
+        },
+        {
+            MakeFlowPin("onConnect"),
+            MakeFlowPin("onMessage"),
+            MakeFlowPin("onClose"),
+            MakeFlowPin("onError"),
+            MakePin("ConnectionId", PinDataType::String),
+            MakePin("Message",      PinDataType::String),
+            MakePin("CloseCode",    PinDataType::Integer),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "E8A838");
+
     // ── Platform 判断节点 ──────────────────────────────────────────────────────
     // 纯数据节点，编译期常量，无 exec flow
     reg("Platform.IsWindows", "Is Windows", "Platform",
