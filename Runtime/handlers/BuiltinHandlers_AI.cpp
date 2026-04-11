@@ -15,10 +15,7 @@
 #include <sstream>
 #include <regex>
 #include <atomic>
-#ifndef __EMSCRIPTEN__
-#  include <fstream>
-#  include <filesystem>
-#endif
+#include "../FileSystem.h"
 
 namespace NodeEditor {
 namespace Runtime {
@@ -576,14 +573,14 @@ void RegisterHandlers_AI(
         ctx.ActivateOutputFlow("onError");
         return true;
 #else
-        std::ifstream f(configFile, std::ios::binary);
-        if (!f.is_open()) {
-            ctx.SetOutputValue("ErrorMessage", Variant(std::string("Cannot open config file: " + configFile)));
+        auto* fs = GetDefaultFileSystem().get();
+        std::string cfgContent, cfgErr;
+        if (!fs || !fs->ReadFile(configFile, cfgContent, cfgErr)) {
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("Cannot open config file: " + configFile + (cfgErr.empty() ? "" : " (" + cfgErr + ")"))));
             ctx.ActivateOutputFlow("onError");
             return true;
         }
-        std::ostringstream ss; ss << f.rdbuf();
-        crude_json::value cfg = crude_json::value::parse(ss.str());
+        crude_json::value cfg = crude_json::value::parse(cfgContent);
 
         // 解析 providers 列表
         struct Provider { std::string name, baseURL, apiKey, model; int priority = 99; };
@@ -788,14 +785,14 @@ void RegisterHandlers_AI(
         ctx.ActivateOutputFlow("onError");
         return true;
 #else
-        std::ifstream cfgFile(configFile, std::ios::binary);
-        if (!cfgFile.is_open()) {
-            ctx.SetOutputValue("ErrorMessage", Variant(std::string("Cannot open config file: " + configFile)));
+        auto* fs = GetDefaultFileSystem().get();
+        std::string cfgContent, cfgErr;
+        if (!fs || !fs->ReadFile(configFile, cfgContent, cfgErr)) {
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("Cannot open config file: " + configFile + (cfgErr.empty() ? "" : " (" + cfgErr + ")"))));
             ctx.ActivateOutputFlow("onError");
             return true;
         }
-        std::ostringstream cfgSS; cfgSS << cfgFile.rdbuf();
-        crude_json::value cfg = crude_json::value::parse(cfgSS.str());
+        crude_json::value cfg = crude_json::value::parse(cfgContent);
 
         struct Provider { std::string name, baseURL, apiKey, model; int priority = 99; };
         std::vector<Provider> providers;
@@ -1342,13 +1339,8 @@ void RegisterHandlers_AI(
         std::string path = ctx.GetInputValue("Path").asString();
         int maxMsg = (int)ctx.GetInputValue("MaxMessages").asInt();
 
-#ifdef __EMSCRIPTEN__
-        ctx.SetOutputValue("Messages",     Variant(std::string("[]")));
-        ctx.SetOutputValue("Count",        Variant((int64_t)0));
-        ctx.SetOutputValue("ErrorMessage", Variant(std::string("")));
-        ctx.ActivateOutputFlow("onNew");
-        return true;
-#else
+        auto* fs = GetDefaultFileSystem().get();
+
         if (path.empty()) {
             ctx.SetOutputValue("Messages",     Variant(std::string("[]")));
             ctx.SetOutputValue("Count",        Variant((int64_t)0));
@@ -1358,29 +1350,24 @@ void RegisterHandlers_AI(
         }
 
         // 文件不存在 → onNew（正常首次启动）
-        {
-            std::error_code ec;
-            if (!std::filesystem::exists(std::filesystem::path(path), ec)) {
-                ctx.SetOutputValue("Messages",     Variant(std::string("[]")));
-                ctx.SetOutputValue("Count",        Variant((int64_t)0));
-                ctx.SetOutputValue("ErrorMessage", Variant(std::string("")));
-                ctx.ActivateOutputFlow("onNew");
-                return true;
-            }
+        if (!fs || !fs->FileExists(path)) {
+            ctx.SetOutputValue("Messages",     Variant(std::string("[]")));
+            ctx.SetOutputValue("Count",        Variant((int64_t)0));
+            ctx.SetOutputValue("ErrorMessage", Variant(std::string("")));
+            ctx.ActivateOutputFlow("onNew");
+            return true;
         }
 
         // 读取文件
-        std::ifstream f(path, std::ios::binary);
-        if (!f.is_open()) {
+        std::string raw, readErr;
+        if (!fs->ReadFile(path, raw, readErr)) {
             ctx.SetOutputValue("Messages",     Variant(std::string("[]")));
             ctx.SetOutputValue("Count",        Variant((int64_t)0));
             ctx.SetOutputValue("ErrorMessage", Variant(std::string(
-                "Cannot open history file: " + path)));
+                "Cannot open history file: " + path + (readErr.empty() ? "" : " (" + readErr + ")"))));
             ctx.ActivateOutputFlow("onError");
             return true;
         }
-        std::ostringstream ss; ss << f.rdbuf();
-        std::string raw = ss.str();
 
         // 解析 JSON 数组
         auto v = crude_json::value::parse(raw);
@@ -1409,7 +1396,6 @@ void RegisterHandlers_AI(
         ctx.SetOutputValue("ErrorMessage", Variant(std::string("")));
         ctx.ActivateOutputFlow("onSuccess");
         return true;
-#endif
     };
 
     // ================================================================
@@ -1428,11 +1414,8 @@ void RegisterHandlers_AI(
         std::string messages = ctx.GetInputValue("Messages").asString();
         int maxMsg = (int)ctx.GetInputValue("MaxMessages").asInt();
 
-#ifdef __EMSCRIPTEN__
-        ctx.SetOutputValue("ErrorMessage", Variant(std::string("")));
-        ctx.ActivateOutputFlow("onSuccess");
-        return true;
-#else
+        auto* fs = GetDefaultFileSystem().get();
+
         if (path.empty()) {
             ctx.SetOutputValue("ErrorMessage", Variant(std::string("Path is empty")));
             ctx.ActivateOutputFlow("onError");
@@ -1453,26 +1436,25 @@ void RegisterHandlers_AI(
             }
         }
 
-        // 自动建父目录
-        {
-            std::error_code ec2;
-            std::filesystem::path p(path);
-            if (p.has_parent_path())
-                std::filesystem::create_directories(p.parent_path(), ec2);
+        // 自动建父目录（通过 FileSystem.MakeDir）
+        if (fs) {
+            std::string dirName = fs->GetDirName(path);
+            if (!dirName.empty()) {
+                std::string mkErr;
+                fs->MakeDir(dirName, mkErr); // 忽略错误（目录可能已存在）
+            }
         }
 
-        std::ofstream f(path, std::ios::out | std::ios::trunc | std::ios::binary);
-        if (!f.is_open()) {
+        std::string writeErr;
+        if (!fs || !fs->WriteFile(path, toWrite, writeErr)) {
             ctx.SetOutputValue("ErrorMessage", Variant(std::string(
-                "Cannot write history file: " + path)));
+                "Cannot write history file: " + path + (writeErr.empty() ? "" : " (" + writeErr + ")"))));
             ctx.ActivateOutputFlow("onError");
             return true;
         }
-        f << toWrite;
         ctx.SetOutputValue("ErrorMessage", Variant(std::string("")));
         ctx.ActivateOutputFlow("onSuccess");
         return true;
-#endif
     };
 
     // ========================================================================
