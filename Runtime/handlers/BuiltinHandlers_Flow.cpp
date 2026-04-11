@@ -588,8 +588,11 @@ void RegisterHandlers_Flow(
 
         double currentDelayMs = initialDelayMs;
         bool succeeded = false;
+        auto* node = ctx.GetCurrentNode();
+		std::string nodeIdStr = node ? std::to_string(node->id) : "0";
+		std::string retryKey = "__retry_succeeded" + nodeIdStr;
 
-        ctx.SetVariable("__retry_succeeded", Variant(false));
+        ctx.SetVariable(retryKey, Variant(false));
 
         for (int64_t attempt = 0; attempt < maxRetries; ++attempt)
         {
@@ -602,7 +605,7 @@ void RegisterHandlers_Flow(
             if (!ctx.ActivateOutputFlow("onTry"))
                 return false;
 
-            if (ctx.GetVariable("__retry_succeeded").asBool())
+            if (ctx.GetVariable(retryKey).asBool())
             {
                 succeeded = true;
                 ctx.Log("  [Retry.Backoff] succeeded at attempt " + std::to_string(attempt));
