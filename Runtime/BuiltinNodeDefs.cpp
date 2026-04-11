@@ -1415,6 +1415,62 @@ static void RegisterNodeDefs_Event(INodeRegistry& registry)
         { MakeFlowPin("") },
         "FF6060");
 
+    // ── Proto 节点 ─────────────────────────────────────────────────────────────
+    // Protobuf 编解码（需链接 protobuf_s）
+    // 内置 schema：pbbp2.Frame（飞书长连接帧，无需 LoadSchema）
+    reg("Proto.LoadSchema", "Proto Load Schema", "Protobuf",
+        {
+            MakeFlowPin(""),
+            MakePin("SchemaName", PinDataType::String),  // 唯一标识，如 "my.proto"
+            MakePin("ProtoText",  PinDataType::String),  // proto 源文本
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "8E6BBF");
+
+    reg("Proto.Decode", "Proto Decode", "Protobuf",
+        {
+            MakeFlowPin(""),
+            MakePin("Data",        PinDataType::String),  // 二进制数据（bytes）
+            MakePin("MessageType", PinDataType::String),  // 如 "pbbp2.Frame"，默认即 pbbp2.Frame
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("JSON",         PinDataType::String),  // 解码后的 JSON 字符串
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "8E6BBF");
+
+    reg("Proto.Encode", "Proto Encode", "Protobuf",
+        {
+            MakeFlowPin(""),
+            MakePin("JSON",        PinDataType::String),  // JSON 对象字符串
+            MakePin("MessageType", PinDataType::String),  // 如 "pbbp2.Frame"
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("Data",         PinDataType::String),  // 序列化后的二进制
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "8E6BBF");
+
+    reg("Proto.GetField", "Proto Get Field", "Protobuf",
+        {
+            MakePin("JSON",    PinDataType::String),  // Proto.Decode 输出的 JSON
+            MakePin("Path",    PinDataType::String),  // dot-path，如 "headers.0.value"
+            MakePin("Default", PinDataType::Unknown),
+        },
+        {
+            MakePin("Value",   PinDataType::Unknown),
+            MakePin("Found",   PinDataType::Boolean),
+        },
+        "8E6BBF");
+
     // ── Crypto 节点 ────────────────────────────────────────────────────────────
     reg("Crypto.SHA256", "SHA256", "Crypto",
         { MakePin("Data", PinDataType::String) },

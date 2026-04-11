@@ -86,6 +86,11 @@ endif()
 
 
 # ---------------------------------------------------------------------------
+# protobuf  (vendored, supports Windows/Linux/macOS/iOS/Android/WebGL)
+# ---------------------------------------------------------------------------
+add_subdirectory(external/protobuf)
+
+# ---------------------------------------------------------------------------
 # crude_json  (lightweight JSON parser – used by Runtime and Editor)
 # ---------------------------------------------------------------------------
 add_subdirectory(Utils/Json)

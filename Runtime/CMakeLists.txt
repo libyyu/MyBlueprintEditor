@@ -82,6 +82,7 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_File.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Server.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Crypto.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Proto.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Http/IHttpClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Http/HttpClient_Default.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Http/HttpClient_Emscripten.cpp
@@ -370,6 +371,28 @@ message(STATUS "[BlueprintRuntime] Output name: ${RUNTIME_NAME}")
 # Dependencies
 # ---------------------------------------------------------------------------
 target_link_libraries(BlueprintRuntime PUBLIC crude_json)
+
+# Protobuf (vendored, all platforms including WebGL)
+if(TARGET protobuf_s)
+    target_link_libraries(BlueprintRuntime PRIVATE protobuf_s)
+    target_include_directories(BlueprintRuntime PRIVATE
+        ${BLUEPRINT_ROOT_DIR}/external/protobuf
+    )
+    target_compile_definitions(BlueprintRuntime PRIVATE BLUEPRINT_HAS_PROTOBUF)
+    message(STATUS "[BlueprintRuntime] protobuf_s linked → Proto.* nodes enabled")
+elseif(EXISTS "${BLUEPRINT_ROOT_DIR}/external/protobuf/CMakeLists.txt")
+    # standalone Runtime build: add protobuf ourselves
+    add_subdirectory("${BLUEPRINT_ROOT_DIR}/external/protobuf"
+                     "${CMAKE_CURRENT_BINARY_DIR}/protobuf")
+    target_link_libraries(BlueprintRuntime PRIVATE protobuf_s)
+    target_include_directories(BlueprintRuntime PRIVATE
+        ${BLUEPRINT_ROOT_DIR}/external/protobuf
+    )
+    target_compile_definitions(BlueprintRuntime PRIVATE BLUEPRINT_HAS_PROTOBUF)
+    message(STATUS "[BlueprintRuntime] protobuf_s linked (standalone) → Proto.* nodes enabled")
+else()
+    message(STATUS "[BlueprintRuntime] protobuf not found → Proto.* nodes disabled")
+endif()
 
 # Lua scripting (conditional)
 if(BLUEPRINT_LUA)

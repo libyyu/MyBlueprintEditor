@@ -36,6 +36,7 @@
 #include "handlers/BuiltinHandlers_File.h"
 #include "handlers/BuiltinHandlers_Server.h"
 #include "handlers/BuiltinHandlers_Crypto.h"
+#include "handlers/BuiltinHandlers_Proto.h"
 
 namespace NodeEditor {
 namespace Runtime {
@@ -65,6 +66,7 @@ void RegisterBuiltinHandlers(
     RegisterHandlers_File(allHandlers);
     RegisterHandlers_Server(allHandlers, runner);
     RegisterHandlers_Crypto(allHandlers);
+    RegisterHandlers_Proto(allHandlers);
 
     // 设置默认处理器
     runner.SetDefaultHandler([](ExecutionContext& ctx) {
