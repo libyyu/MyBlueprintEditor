@@ -1,97 +1,306 @@
 {
-  "runtime": {
+    "runtime": {
     "fileType": "runtime",
     "metadata": {
-      "schemaVersion": 2,
-      "blueprintClass": 0,
-      "name": "LuaReActAgent",
-      "description": "ReAct Agent implemented in Lua. OnBeginPlay → GetVariable → LuaAgent.RunReAct. Agent runs async, result is printed. Tools: get_weather (wttr.in) + web_search (DuckDuckGo). Node registered in BlueprintEntry.lua.",
-      "version": "2.0"
+        "schemaVersion": 2,
+        "blueprintClass": 0,
+        "name": "LuaReActAgent",
+        "description": "Blueprint Editor file",
+        "version": ""
     },
     "nodes": [
-      {
-        "id": 1,
-        "definitionId": "OnBeginPlay",
-        "name": "On Begin Play",
-        "pins": [
-          { "id": 2, "kind": 1, "dataType": 0, "isExec": true }
-        ]
-      },
-      {
-        "id": 3,
-        "definitionId": "LuaAgent.RunReAct",
-        "name": "Run ReAct Agent",
-        "pins": [
-          { "id": 4, "kind": 0, "dataType": 0, "isExec": true,  "name": "In" },
-          { "id": 5, "kind": 0, "dataType": 4, "isExec": false, "name": "UserQuery" },
-          { "id": 6, "kind": 0, "dataType": 4, "isExec": false, "name": "ApiKey" },
-          { "id": 7, "kind": 0, "dataType": 4, "isExec": false, "name": "BaseURL" },
-          { "id": 8, "kind": 0, "dataType": 4, "isExec": false, "name": "Model" },
-          { "id": 9, "kind": 1, "dataType": 0, "isExec": true,  "name": "Out" }
-        ]
-      },
-      {
-        "id": 10,
-        "definitionId": "GetVariable",
-        "name": "Get ApiKey",
-        "pins": [
-          { "id": 11, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "ApiKey" },
-          { "id": 12, "kind": 1, "dataType": 4, "name": "Value" }
-        ]
-      },
-      {
-        "id": 13,
-        "definitionId": "GetVariable",
-        "name": "Get UserQuery",
-        "pins": [
-          { "id": 14, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "UserQuery" },
-          { "id": 15, "kind": 1, "dataType": 4, "name": "Value" }
-        ]
-      },
-      {
-        "id": 16,
-        "definitionId": "GetVariable",
-        "name": "Get BaseURL",
-        "pins": [
-          { "id": 17, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "BaseURL" },
-          { "id": 18, "kind": 1, "dataType": 4, "name": "Value" }
-        ]
-      },
-      {
-        "id": 19,
-        "definitionId": "GetVariable",
-        "name": "Get Model",
-        "pins": [
-          { "id": 20, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Model" },
-          { "id": 21, "kind": 1, "dataType": 4, "name": "Value" }
-        ]
-      }
+        {
+            "id": 1,
+            "definitionId": "OnBeginPlay",
+            "definitionVersion": 1,
+            "name": "On Begin Play",
+            "pins": [
+                {
+                    "id": 2,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "definitionId": "LuaAgent.RunReAct",
+            "definitionVersion": 1,
+            "name": "Run ReAct Agent",
+            "pins": [
+                {
+                    "id": 4,
+                    "kind": 0,
+                    "dataType": 0,
+                    "name": "In",
+                    "isExec": true
+                },
+                {
+                    "id": 5,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "UserQuery",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 6,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "ApiKey",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 7,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "BaseURL",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 8,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Model",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 9,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "Out",
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 10,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get ApiKey",
+            "pins": [
+                {
+                    "id": 11,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "ApiKey"
+                },
+                {
+                    "id": 12,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 13,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get UserQuery",
+            "pins": [
+                {
+                    "id": 14,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "UserQuery"
+                },
+                {
+                    "id": 15,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 16,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get BaseURL",
+            "pins": [
+                {
+                    "id": 17,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "BaseURL"
+                },
+                {
+                    "id": 18,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 19,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get Model",
+            "pins": [
+                {
+                    "id": 20,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "Model"
+                },
+                {
+                    "id": 21,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        }
     ],
     "links": [
-      { "id": 1, "startPinId": 2,  "endPinId": 4,  "isEnabled": true },
-      { "id": 2, "startPinId": 12, "endPinId": 6,  "isEnabled": true },
-      { "id": 3, "startPinId": 15, "endPinId": 5,  "isEnabled": true },
-      { "id": 4, "startPinId": 18, "endPinId": 7,  "isEnabled": true },
-      { "id": 5, "startPinId": 21, "endPinId": 8,  "isEnabled": true }
+        {
+            "id": 22,
+            "startPinId": 2,
+            "endPinId": 4,
+            "isEnabled": true
+        },
+        {
+            "id": 23,
+            "startPinId": 12,
+            "endPinId": 6,
+            "isEnabled": true
+        },
+        {
+            "id": 24,
+            "startPinId": 15,
+            "endPinId": 5,
+            "isEnabled": true
+        },
+        {
+            "id": 25,
+            "startPinId": 18,
+            "endPinId": 7,
+            "isEnabled": true
+        },
+        {
+            "id": 26,
+            "startPinId": 21,
+            "endPinId": 8,
+            "isEnabled": true
+        }
     ],
     "variables": [
-      { "name": "ApiKey",    "dataType": 4, "defaultValue": "sk-your-api-key-here" },
-      { "name": "BaseURL",   "dataType": 4, "defaultValue": "https://api.openai.com/v1" },
-      { "name": "Model",     "dataType": 4, "defaultValue": "gpt-4o" },
-      { "name": "UserQuery", "dataType": 4, "defaultValue": "What's the weather in Beijing and Shanghai today, and any recent AI news?" }
+        {
+            "name": "ApiKey",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": "sk-your-api-key-here"
+        },
+        {
+            "name": "BaseURL",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": "https://api.openai.com/v1"
+        },
+        {
+            "name": "Model",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": "gpt-4o"
+        },
+        {
+            "name": "UserQuery",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": "What's the weather in Beijing and Shanghai today, and any recent AI news?"
+        }
     ]
-  },
-  "editor": {
+},
+    "editor": {
     "fileType": "editor",
-    "metadata": { "author": "", "createdAt": "", "updatedAt": "" },
+    "metadata": {
+        "author": "",
+        "createdAt": "",
+        "updatedAt": ""
+    },
     "nodes": [
-      { "id": 1,  "position": { "x": -400, "y":   0 }, "size": { "width": 161, "height":  72 } },
-      { "id": 10, "position": { "x": -200, "y": -120 }, "size": { "width": 160, "height":  72 } },
-      { "id": 13, "position": { "x": -200, "y":  -40 }, "size": { "width": 180, "height":  72 } },
-      { "id": 16, "position": { "x": -200, "y":   40 }, "size": { "width": 170, "height":  72 } },
-      { "id": 19, "position": { "x": -200, "y":  120 }, "size": { "width": 160, "height":  72 } },
-      { "id": 3,  "position": { "x":  80,  "y":   0  }, "size": { "width": 220, "height": 160 } }
+        {
+            "id": 1,
+            "position": {
+                "x": -400,
+                "y": 0
+            },
+            "size": {
+                "width": 161,
+                "height": 72
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 3,
+            "position": {
+                "x": 376,
+                "y": -8
+            },
+            "size": {
+                "width": 203,
+                "height": 184
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 10,
+            "position": {
+                "x": -200,
+                "y": -120
+            },
+            "size": {
+                "width": 379,
+                "height": 43
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 13,
+            "position": {
+                "x": -200,
+                "y": -40
+            },
+            "size": {
+                "width": 403,
+                "height": 43
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 16,
+            "position": {
+                "x": -200,
+                "y": 40
+            },
+            "size": {
+                "width": 393,
+                "height": 43
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 19,
+            "position": {
+                "x": -200,
+                "y": 120
+            },
+            "size": {
+                "width": 374,
+                "height": 43
+            },
+            "isCollapsed": false
+        }
     ],
-    "viewInfo": { "viewPosition": { "x": -200, "y": -80 }, "viewScale": 0.9 }
-  }
+    "viewInfo": {
+        "viewPosition": { "x": 0, "y": 0 },
+        "viewScale": 1
+    }
+}
 }

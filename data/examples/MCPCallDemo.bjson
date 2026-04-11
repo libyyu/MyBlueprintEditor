@@ -1,145 +1,512 @@
 {
-  "runtime": {
+    "runtime": {
     "fileType": "runtime",
     "metadata": {
-      "schemaVersion": 2,
-      "blueprintClass": 0,
-      "name": "MCPCallDemo",
-      "description": "Demonstrates MCP.Call node with JSON-RPC 2.0 protocol. Calls a local MCP Server tool. Variables: ServerURL, ToolName, Arguments.",
-      "version": "1.0"
+        "schemaVersion": 2,
+        "blueprintClass": 0,
+        "name": "MCPCallDemo",
+        "description": "Blueprint Editor file",
+        "version": ""
     },
     "nodes": [
-      {
-        "id": 1,
-        "definitionId": "OnBeginPlay",
-        "name": "On Begin Play",
-        "pins": [
-          { "id": 2, "kind": 1, "dataType": 0, "isExec": true }
-        ]
-      },
-      {
-        "id": 10,
-        "definitionId": "GetVariable",
-        "name": "Get ServerURL",
-        "pins": [
-          { "id": 11, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "ServerURL" },
-          { "id": 12, "kind": 1, "dataType": 4, "name": "Value" }
-        ]
-      },
-      {
-        "id": 20,
-        "definitionId": "GetVariable",
-        "name": "Get ToolName",
-        "pins": [
-          { "id": 21, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "ToolName" },
-          { "id": 22, "kind": 1, "dataType": 4, "name": "Value" }
-        ]
-      },
-      {
-        "id": 30,
-        "definitionId": "GetVariable",
-        "name": "Get Arguments",
-        "pins": [
-          { "id": 31, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Arguments" },
-          { "id": 32, "kind": 1, "dataType": 4, "name": "Value" }
-        ]
-      },
-      {
-        "id": 40,
-        "definitionId": "MCP.Call",
-        "name": "MCP Tool Call",
-        "comment": "JSON-RPC 2.0: POST ServerURL with {jsonrpc,id,method:tools/call,params:{name,arguments}}",
-        "pins": [
-          { "id": 400, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 401, "kind": 0, "dataType": 4, "name": "ServerURL",  "defaultValue": "http://localhost:7788" },
-          { "id": 402, "kind": 0, "dataType": 4, "name": "ToolName",   "defaultValue": "read_file" },
-          { "id": 403, "kind": 0, "dataType": 4, "name": "Arguments",  "defaultValue": "{\"path\":\"README.md\"}" },
-          { "id": 404, "kind": 0, "dataType": 4, "name": "Protocol",   "defaultValue": "jsonrpc2" },
-          { "id": 405, "kind": 0, "dataType": 2, "name": "TimeoutSec", "defaultValue": 30 },
-          { "id": 410, "kind": 1, "dataType": 0, "name": "onSuccess",    "isExec": true },
-          { "id": 411, "kind": 1, "dataType": 0, "name": "onError",      "isExec": true },
-          { "id": 412, "kind": 1, "dataType": 4, "name": "Result" },
-          { "id": 413, "kind": 1, "dataType": 4, "name": "RawResult" },
-          { "id": 414, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
-        ]
-      },
-      {
-        "id": 50,
-        "definitionId": "FormatString",
-        "name": "Format Result",
-        "pins": [
-          { "id": 500, "kind": 0, "dataType": 4, "name": "Format",  "defaultValue": "[MCP] Tool={0} Result:\n{1}" },
-          { "id": 501, "kind": 0, "dataType": 4, "name": "tool" },
-          { "id": 502, "kind": 0, "dataType": 4, "name": "result" },
-          { "id": 503, "kind": 1, "dataType": 4, "name": "Result" }
-        ]
-      },
-      {
-        "id": 60,
-        "definitionId": "PrintString",
-        "name": "Print Result",
-        "pins": [
-          { "id": 600, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 601, "kind": 0, "dataType": 4, "name": "In String" },
-          { "id": 602, "kind": 1, "dataType": 0, "isExec": true }
-        ]
-      },
-      {
-        "id": 70,
-        "definitionId": "FormatString",
-        "name": "Format Error",
-        "pins": [
-          { "id": 700, "kind": 0, "dataType": 4, "name": "Format",  "defaultValue": "[MCP] Error calling {0}: {1}" },
-          { "id": 701, "kind": 0, "dataType": 4, "name": "tool" },
-          { "id": 702, "kind": 0, "dataType": 4, "name": "err" },
-          { "id": 703, "kind": 1, "dataType": 4, "name": "Result" }
-        ]
-      },
-      {
-        "id": 80,
-        "definitionId": "PrintString",
-        "name": "Print Error",
-        "pins": [
-          { "id": 800, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 801, "kind": 0, "dataType": 4, "name": "In String" },
-          { "id": 802, "kind": 1, "dataType": 0, "isExec": true }
-        ]
-      }
+        {
+            "id": 1,
+            "definitionId": "OnBeginPlay",
+            "definitionVersion": 1,
+            "name": "On Begin Play",
+            "pins": [
+                {
+                    "id": 2,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get ServerURL",
+            "pins": [
+                {
+                    "id": 4,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "ServerURL"
+                },
+                {
+                    "id": 5,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get ToolName",
+            "pins": [
+                {
+                    "id": 7,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "ToolName"
+                },
+                {
+                    "id": 8,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 9,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get Arguments",
+            "pins": [
+                {
+                    "id": 10,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "Arguments"
+                },
+                {
+                    "id": 11,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 12,
+            "definitionId": "MCP.Call",
+            "definitionVersion": 1,
+            "name": "MCP Tool Call",
+            "pins": [
+                {
+                    "id": 13,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 14,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "ServerURL",
+                    "defaultValue": "http://localhost:7788"
+                },
+                {
+                    "id": 15,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "ToolName",
+                    "defaultValue": "read_file"
+                },
+                {
+                    "id": 16,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Arguments",
+                    "defaultValue": "{\"path\":\"README.md\"}"
+                },
+                {
+                    "id": 17,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Protocol",
+                    "defaultValue": "jsonrpc2"
+                },
+                {
+                    "id": 18,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "TimeoutSec",
+                    "defaultValue": 30
+                },
+                {
+                    "id": 19,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onSuccess",
+                    "isExec": true
+                },
+                {
+                    "id": 20,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onError",
+                    "isExec": true
+                },
+                {
+                    "id": 21,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Result"
+                },
+                {
+                    "id": 22,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "RawResult"
+                },
+                {
+                    "id": 23,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "ErrorMessage"
+                }
+            ]
+        },
+        {
+            "id": 24,
+            "definitionId": "FormatString",
+            "definitionVersion": 1,
+            "name": "Format Result",
+            "pins": [
+                {
+                    "id": 25,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Format",
+                    "defaultValue": "[MCP] Tool={0} Result:\n{1}"
+                },
+                {
+                    "id": 26,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "tool",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 27,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "result",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 28,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Result"
+                }
+            ]
+        },
+        {
+            "id": 29,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print Result",
+            "pins": [
+                {
+                    "id": 30,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 31,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 32,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 33,
+            "definitionId": "FormatString",
+            "definitionVersion": 1,
+            "name": "Format Error",
+            "pins": [
+                {
+                    "id": 34,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Format",
+                    "defaultValue": "[MCP] Error calling {0}: {1}"
+                },
+                {
+                    "id": 35,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "tool",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 36,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "err",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 37,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Result"
+                }
+            ]
+        },
+        {
+            "id": 38,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print Error",
+            "pins": [
+                {
+                    "id": 39,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 40,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 41,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        }
     ],
     "links": [
-      { "id": 1,  "startPinId": 2,   "endPinId": 400, "isEnabled": true },
-      { "id": 2,  "startPinId": 12,  "endPinId": 401, "isEnabled": true },
-      { "id": 3,  "startPinId": 22,  "endPinId": 402, "isEnabled": true },
-      { "id": 4,  "startPinId": 32,  "endPinId": 403, "isEnabled": true },
-      { "id": 5,  "startPinId": 410, "endPinId": 600, "isEnabled": true },
-      { "id": 6,  "startPinId": 22,  "endPinId": 501, "isEnabled": true },
-      { "id": 7,  "startPinId": 412, "endPinId": 502, "isEnabled": true },
-      { "id": 8,  "startPinId": 503, "endPinId": 601, "isEnabled": true },
-      { "id": 9,  "startPinId": 411, "endPinId": 800, "isEnabled": true },
-      { "id": 10, "startPinId": 22,  "endPinId": 701, "isEnabled": true },
-      { "id": 11, "startPinId": 414, "endPinId": 702, "isEnabled": true },
-      { "id": 12, "startPinId": 703, "endPinId": 801, "isEnabled": true }
+        {
+            "id": 42,
+            "startPinId": 2,
+            "endPinId": 13,
+            "isEnabled": true
+        },
+        {
+            "id": 43,
+            "startPinId": 5,
+            "endPinId": 14,
+            "isEnabled": true
+        },
+        {
+            "id": 44,
+            "startPinId": 8,
+            "endPinId": 15,
+            "isEnabled": true
+        },
+        {
+            "id": 45,
+            "startPinId": 11,
+            "endPinId": 16,
+            "isEnabled": true
+        },
+        {
+            "id": 46,
+            "startPinId": 19,
+            "endPinId": 30,
+            "isEnabled": true
+        },
+        {
+            "id": 47,
+            "startPinId": 8,
+            "endPinId": 26,
+            "isEnabled": true
+        },
+        {
+            "id": 48,
+            "startPinId": 21,
+            "endPinId": 27,
+            "isEnabled": true
+        },
+        {
+            "id": 49,
+            "startPinId": 28,
+            "endPinId": 31,
+            "isEnabled": true
+        },
+        {
+            "id": 50,
+            "startPinId": 20,
+            "endPinId": 39,
+            "isEnabled": true
+        },
+        {
+            "id": 51,
+            "startPinId": 8,
+            "endPinId": 35,
+            "isEnabled": true
+        },
+        {
+            "id": 52,
+            "startPinId": 23,
+            "endPinId": 36,
+            "isEnabled": true
+        },
+        {
+            "id": 53,
+            "startPinId": 37,
+            "endPinId": 40,
+            "isEnabled": true
+        }
     ],
     "variables": [
-      { "name": "ServerURL",  "dataType": 4, "defaultValue": "http://localhost:7788" },
-      { "name": "ToolName",   "dataType": 4, "defaultValue": "read_file" },
-      { "name": "Arguments",  "dataType": 4, "defaultValue": "{\"path\":\"README.md\"}" }
+        {
+            "name": "ServerURL",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": "http://localhost:7788"
+        },
+        {
+            "name": "ToolName",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": "read_file"
+        },
+        {
+            "name": "Arguments",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": "{\"path\":\"README.md\"}"
+        }
     ]
-  },
-  "editor": {
+},
+    "editor": {
     "fileType": "editor",
-    "metadata": { "author": "", "createdAt": "", "updatedAt": "" },
+    "metadata": {
+        "author": "",
+        "createdAt": "",
+        "updatedAt": ""
+    },
     "nodes": [
-      { "id": 1,  "position": { "x": -600, "y": 0    }, "size": { "width": 161,  "height": 72  } },
-      { "id": 10, "position": { "x": -600, "y": 120  }, "size": { "width": 200,  "height": 43  } },
-      { "id": 20, "position": { "x": -600, "y": 180  }, "size": { "width": 200,  "height": 43  } },
-      { "id": 30, "position": { "x": -600, "y": 240  }, "size": { "width": 200,  "height": 43  } },
-      { "id": 40, "position": { "x": -320, "y": 0    }, "size": { "width": 340,  "height": 212 } },
-      { "id": 50, "position": { "x":  80,  "y": -80  }, "size": { "width": 380,  "height": 88  } },
-      { "id": 60, "position": { "x":  520, "y": -80  }, "size": { "width": 193,  "height": 100 } },
-      { "id": 70, "position": { "x":  80,  "y":  80  }, "size": { "width": 380,  "height": 88  } },
-      { "id": 80, "position": { "x":  520, "y":  80  }, "size": { "width": 193,  "height": 100 } }
+        {
+            "id": 1,
+            "position": {
+                "x": -600,
+                "y": 0
+            },
+            "size": {
+                "width": 161,
+                "height": 72
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 3,
+            "position": {
+                "x": -600,
+                "y": 120
+            },
+            "size": {
+                "width": 403,
+                "height": 43
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 6,
+            "position": {
+                "x": -600,
+                "y": 180
+            },
+            "size": {
+                "width": 403,
+                "height": 43
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 9,
+            "position": {
+                "x": -600,
+                "y": 240
+            },
+            "size": {
+                "width": 409,
+                "height": 43
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 12,
+            "position": {
+                "x": -109,
+                "y": 0
+            },
+            "size": {
+                "width": 373,
+                "height": 218
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 24,
+            "position": {
+                "x": 291,
+                "y": -80
+            },
+            "size": {
+                "width": 417,
+                "height": 99
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 29,
+            "position": {
+                "x": 731,
+                "y": -80
+            },
+            "size": {
+                "width": 155,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 33,
+            "position": {
+                "x": 291,
+                "y": 80
+            },
+            "size": {
+                "width": 407,
+                "height": 99
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 38,
+            "position": {
+                "x": 731,
+                "y": 80
+            },
+            "size": {
+                "width": 155,
+                "height": 100
+            },
+            "isCollapsed": false
+        }
     ],
-    "viewInfo": { "viewPosition": { "x": -200, "y": -100 }, "viewScale": 0.9 }
-  }
+    "viewInfo": {
+        "viewPosition": { "x": 0, "y": 0 },
+        "viewScale": 1
+    }
+}
 }
