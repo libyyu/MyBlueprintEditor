@@ -101,6 +101,41 @@ add_subdirectory(Utils/Json)
 add_subdirectory(Runtime)
 
 # ---------------------------------------------------------------------------
+# lprotos  — Lua bindings for protobuf dynamic messages (requires BLUEPRINT_LUA)
+# LUA_INCLUDE_DIR / LUA_LIBRARIES are set by Runtime/CMakeLists.txt above.
+# ---------------------------------------------------------------------------
+if(BLUEPRINT_LUA AND TARGET lua54)
+    # 强制使用 FetchContent Lua 5.4 路径，不使用系统 Lua 5.1
+    set(LUA_INCLUDE_DIR "${LUA_INCLUDE_DIR}" CACHE PATH "Lua 5.4 include dir for lprotos" FORCE)
+    set(LUA_LIBRARIES   "${LUA_LIBRARIES}"   CACHE STRING "Lua 5.4 libraries for lprotos" FORCE)
+    add_subdirectory(external/lprotos)
+    # 额外强制：把正确的 Lua 5.4 include 加到 lprotos targets
+    if(TARGET lprotos_s)
+        target_include_directories(lprotos_s BEFORE PUBLIC
+            $<BUILD_INTERFACE:${LUA_INCLUDE_DIR}>)
+    endif()
+    if(TARGET lprotos)
+        target_include_directories(lprotos BEFORE PRIVATE
+            $<BUILD_INTERFACE:${LUA_INCLUDE_DIR}>)
+    endif()
+    # Link lprotos_s into BlueprintRuntime after the target exists
+    if(TARGET lprotos_s)
+        target_link_libraries(BlueprintRuntime PRIVATE lprotos_s)
+        target_include_directories(BlueprintRuntime PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/external/lprotos
+            ${CMAKE_CURRENT_SOURCE_DIR}/external/protobuf
+        )
+        target_compile_definitions(BlueprintRuntime PRIVATE BLUEPRINT_HAS_LPROTOS)
+        message(STATUS "[lprotos] lprotos_s linked into BlueprintRuntime → Lua protobuf bindings enabled")
+        # 加入导出集，避免 install(EXPORT) 报 "target not in any export set"
+        install(TARGETS lprotos_s
+            EXPORT BlueprintRuntimeTargets
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        )
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
 # runtime-example — built only on desktop platforms (not iOS/Android/Emscripten)
 #   Use:  runtime-example --test [flow_test.json]
 # ---------------------------------------------------------------------------

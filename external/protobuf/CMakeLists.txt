@@ -51,7 +51,8 @@ list(REMOVE_ITEM _PB_SOURCES ${_PB_SOURCES_EXCLUDE})
 add_library(protobuf_s STATIC ${_PB_SOURCES})
 
 target_include_directories(protobuf_s PUBLIC
-    ${CMAKE_CURRENT_LIST_DIR}
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+    $<INSTALL_INTERFACE:include>
 )
 
 # ---------------------------------------------------------------------------

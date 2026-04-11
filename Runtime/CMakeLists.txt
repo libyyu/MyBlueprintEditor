@@ -577,7 +577,7 @@ set_property(TARGET BlueprintRuntime PROPERTY FOLDER "Libraries")
 # ---------------------------------------------------------------------------
 include(GNUInstallDirs)
 
-install(TARGETS BlueprintRuntime crude_json
+install(TARGETS BlueprintRuntime crude_json protobuf_s
     EXPORT BlueprintRuntimeTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
