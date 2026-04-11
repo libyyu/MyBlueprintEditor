@@ -2287,6 +2287,10 @@ void BlueprintRunner::Tick(float deltaTime)
             return;
     }
 
+    // 注入帧时间，供 OnTick handler 通过 GetVariable("__DeltaTime") 读取
+    // 编辑器侧也会注入，但 Runtime 独立运行时只有这里注入
+    SetVariable("__DeltaTime", Variant(static_cast<double>(deltaTime)));
+
     // 消费后台线程（或 emscripten_fetch）dispatch 回来的主线程任务
     MainThreadDispatcher::Get().DrainQueue();
 

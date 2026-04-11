@@ -16,9 +16,10 @@ void RegisterHandlers_Time(
     };
 
     handlers["DeltaTime"] = [](ExecutionContext& ctx) {
-        // 从 TimerManager 获取上一帧 deltaTime（近似值）
-        // 注意：实际精确值需要从外部传入，这里用 timer manager 的最后 tick 间隔
-        ctx.SetOutputValue("Seconds", Variant(0.016));  // 默认 ~60fps
+        // 从 __DeltaTime 变量读取 Tick() 注入的真实帧时间
+        double dt = ctx.GetVariable("__DeltaTime").asFloat();
+        if (dt <= 0.0) dt = 0.016; // 未注入时降级为 ~60fps
+        ctx.SetOutputValue("Seconds", Variant(dt));
         return true;
     };
 
