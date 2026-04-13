@@ -379,9 +379,13 @@ if(TARGET protobuf_s)
         ${BLUEPRINT_ROOT_DIR}/external/protobuf
     )
     target_compile_definitions(BlueprintRuntime PRIVATE BLUEPRINT_HAS_PROTOBUF)
+    if(EMSCRIPTEN)
+        target_compile_definitions(BlueprintRuntime PRIVATE GOOGLE_PROTOBUF_NO_RTTI)
+    endif()
     message(STATUS "[BlueprintRuntime] protobuf_s linked → Proto.* nodes enabled")
 elseif(EXISTS "${BLUEPRINT_ROOT_DIR}/external/protobuf/CMakeLists.txt")
     # standalone Runtime build: add protobuf ourselves
+
     add_subdirectory("${BLUEPRINT_ROOT_DIR}/external/protobuf"
                      "${CMAKE_CURRENT_BINARY_DIR}/protobuf")
     target_link_libraries(BlueprintRuntime PRIVATE protobuf_s)
@@ -389,6 +393,9 @@ elseif(EXISTS "${BLUEPRINT_ROOT_DIR}/external/protobuf/CMakeLists.txt")
         ${BLUEPRINT_ROOT_DIR}/external/protobuf
     )
     target_compile_definitions(BlueprintRuntime PRIVATE BLUEPRINT_HAS_PROTOBUF)
+    if(EMSCRIPTEN)
+        target_compile_definitions(BlueprintRuntime PRIVATE GOOGLE_PROTOBUF_NO_RTTI)
+    endif()
     message(STATUS "[BlueprintRuntime] protobuf_s linked (standalone) → Proto.* nodes enabled")
 else()
     message(STATUS "[BlueprintRuntime] protobuf not found → Proto.* nodes disabled")

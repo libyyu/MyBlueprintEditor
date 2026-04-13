@@ -70,15 +70,16 @@ target_compile_definitions(protobuf_s PUBLIC
 
 if(EMSCRIPTEN)
     # WebGL: single-threaded, no pthread, no threading header needed.
-    # FIX 3: arena.h uses typeid() via RTTI_TYPE_ID macro — must enable RTTI.
-    #         Emscripten defaults to -fno-rtti; override for protobuf only.
+    # FIX 3: arena.h uses RTTI_TYPE_ID(T) → &typeid(T).
+    #         Define GOOGLE_PROTOBUF_NO_RTTI so it falls back to NULL
+    #         instead of requiring -frtti (which bloats wasm size).
     target_compile_definitions(protobuf_s PRIVATE
         PROTOBUF_USE_EXCEPTIONS=0
+        GOOGLE_PROTOBUF_NO_RTTI
     )
     target_compile_options(protobuf_s PRIVATE
         -Wno-deprecated-declarations
         -Wno-unused-parameter
-        -frtti   # required by arena.h: RTTI_TYPE_ID(T) → &typeid(T)
     )
 elseif(WIN32)
     # Windows: uses win32 API internally, nothing extra needed
