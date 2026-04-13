@@ -1,41 +1,40 @@
 @echo off
 setlocal enabledelayedexpansion
 :: ==============================================================================
-:: build-all.bat – 一键构建所有平台产物并收集到 Unity 插件目录（Windows 宿主）
+:: build-all.bat - Build all platforms and collect artifacts to Unity Plugins dir
 ::
-:: 用法:
+:: Usage:
 ::   build-all.bat [options]
 ::
-:: 选项:
-::   debug              构建 Debug（默认 Release）
-::   clean              每个平台构建前清理 build 目录
-::   --ndk <path>       Android NDK 路径（android 平台必填）
-::   --api <N>          Android 最低 API Level（默认 21）
-::   --emsdk <path>     Emscripten SDK 根目录（默认 %EMSDK% 环境变量）
-::   --unity <path>     Unity Plugins 目标目录（默认 Unity\Runtime\Plugins）
-::   --skip <platform>  跳过指定平台（可多次使用）
-::   --only <platform>  只构建指定平台（可多次使用）
+:: Options:
+::   debug              Build Debug (default: Release)
+::   clean              Clean build dirs before each platform build
+::   --ndk <path>       Android NDK root (required for android)
+::   --api <N>          Android min API level (default: 21)
+::   --emsdk <path>     Emscripten SDK root (default: %EMSDK% env var)
+::   --unity <path>     Unity Plugins output dir (default: Unity\Runtime\Plugins)
+::   --skip <platform>  Skip a platform (repeatable)
+::   --only <platform>  Build only this platform (repeatable)
 ::   /?  /help
 ::
-:: 构建的平台（Windows 宿主）:
-::   windows  Windows x64 MSVC – 完整编辑器 + BlueprintRuntime.dll（默认启用）
-::   wasm     WebAssembly 静态库（需 Emscripten）
-::   android  Android ARM64-v8a .so（需 Android NDK）
+:: Platforms (Windows host):
+::   windows  Windows x64 MSVC - full editor + BlueprintRuntime.dll
+::   wasm     WebAssembly static lib (requires Emscripten)
+::   android  Android ARM64-v8a .so (requires Android NDK)
 ::
-:: 产物收集到 Unity\Runtime\Plugins\:
+:: Artifacts collected to Unity\Runtime\Plugins\:
 ::   Windows\x86_64\
-::     BlueprintRuntime.dll          ← 运行时主体
-::     liblua54.dll                  ← Lua VM（动态链接时）
+::     BlueprintRuntime.dll
+::     liblua54.dll
 ::   Android\arm64-v8a\
 ::     libBlueprintRuntime.so
 ::     liblua54.so
 ::   WebGL\
-::     libBlueprintBundle.a          ← Runtime + crude_json + lua54 全合并包
+::     libBlueprintBundle.a  (Runtime + crude_json + lua54 + protobuf, all merged)
 ::
-:: 注: iOS/macOS 需要 macOS 宿主，请使用 build-all.sh。
-::     iOS/WebGL 使用 BlueprintBundle（Runtime+JSON+Lua 全合并静态库）。
+:: Note: iOS/macOS requires a macOS host - use build-all.sh instead.
 ::
-:: 示例:
+:: Examples:
 ::   build-all.bat
 ::   build-all.bat debug
 ::   build-all.bat --skip android
@@ -62,7 +61,7 @@ set STATUS_wasm=NA
 set STATUS_android=NA
 set OVERALL_OK=1
 
-:: ── 参数解析 ──────────────────────────────────────────────────────────────────
+:: ── Argument parsing ──────────────────────────────────────────────────────────
 :parse_args
 if "%~1"=="" goto :banner
 
@@ -108,7 +107,7 @@ if not "%SKIP_LIST%"=="" echo  Skip          : %SKIP_LIST%
 if not "%ONLY_LIST%"=="" echo  Only          : %ONLY_LIST%
 echo ============================================
 
-:: ── 平台过滤 ──────────────────────────────────────────────────────────────────
+:: ── Platform filter ───────────────────────────────────────────────────────────
 goto :after_should_build
 :should_build
     set _P=%~1
@@ -123,7 +122,7 @@ goto :after_should_build
     exit /b 0
 :after_should_build
 
-:: ── 构建辅助 ──────────────────────────────────────────────────────────────────
+:: ── Build helper ──────────────────────────────────────────────────────────────
 goto :after_run_build
 :run_build
     set _PLAT=%~1
@@ -151,10 +150,10 @@ goto :after_run_build
     exit /b 0
 :after_run_build
 
-:: ── BlueprintBundle 构建辅助 ──────────────────────────────────────────────────
+:: ── BlueprintBundle helper ────────────────────────────────────────────────────
+:: %1=build_dir  %2=src_dir  %3=BUILD_TYPE  %4=BUNDLE_LUA(ON|OFF)  %5=BUNDLE_PROTOBUF(ON|OFF)
 goto :after_build_bundle
 :build_bundle
-    :: %1=build目录  %2=cmake源码目录  %3=BUILD_TYPE  %4=BUNDLE_LUA(ON|OFF)  %5=BUNDLE_PROTOBUF(ON|OFF)
     set _BD=%~1
     set _SD=%~2
     set _BT=%~3
@@ -173,11 +172,10 @@ goto :after_build_bundle
     exit /b 0
 :after_build_bundle
 
+:: ── NoLua variant helper ──────────────────────────────────────────────────────
+:: Re-configure with BLUEPRINT_LUA=OFF, build, then restore LUA=ON.
 goto :after_build_nolua
 :build_nolua
-    :: %1=build目录  %2=cmake源码目录  %3=BUILD_TYPE
-    :: 在已有 build 目录重新 configure（BLUEPRINT_LUA=OFF），
-    :: OUTPUT_NAME 自动变为 BlueprintRuntimeNoLua，然后恢复 LUA=ON。
     set _BD=%~1
     set _SD=%~2
     set _BT=%~3
@@ -190,7 +188,7 @@ goto :after_build_nolua
     ) else (
         echo [OK]   BlueprintRuntimeNoLua built in %_BD%
     )
-    :: 恢复含 Lua 版本
+    :: Restore Lua=ON
     cmake -S "%_SD%" -B "%_BD%" -DBLUEPRINT_LUA=ON -DCMAKE_BUILD_TYPE=%_BT% >nul
     cmake --build "%_BD%" --target BlueprintRuntime --config %_BT% --parallel
     if %ERRORLEVEL% neq 0 (
@@ -241,7 +239,7 @@ goto :after_collect_req
     exit /b 0
 :after_collect_req
 
-:: ── 1. Windows x64（完整编辑器 + 共享 DLL） ──────────────────────────────────
+:: ── 1. Windows x64 (full editor + shared DLL) ────────────────────────────────
 call :run_build windows windows
 if "!STATUS_windows!"=="OK" (
     echo.
@@ -265,14 +263,14 @@ if not errorlevel 1 (
         echo [--] emcmake not found - skipping WASM. Pass --emsdk ^<path^> to enable.
     )
 )
-:: 构建四个 BlueprintBundle 变体
+:: Build 4 BlueprintBundle variants
 if "!STATUS_wasm!"=="OK" (
     echo.
     echo [2b] Building BlueprintBundle +Lua +Proto (wasm^)...
     call :build_bundle "%PROJECT_DIR%\build-wasm" "%PROJECT_DIR%" %BUILD_TYPE% ON ON
     echo [2c] Building BlueprintBundleNoLua +Proto (wasm^)...
     call :build_bundle "%PROJECT_DIR%\build-wasm" "%PROJECT_DIR%" %BUILD_TYPE% OFF ON
-    echo [2d] Building BlueprintBundle +Lua -Proto (wasm^)...
+    echo [2d] Building BlueprintBundleNoProto +Lua (wasm^)...
     call :build_bundle "%PROJECT_DIR%\build-wasm" "%PROJECT_DIR%" %BUILD_TYPE% ON OFF
     echo [2e] Building BlueprintBundleMin -Lua -Proto (wasm^)...
     call :build_bundle "%PROJECT_DIR%\build-wasm" "%PROJECT_DIR%" %BUILD_TYPE% OFF OFF
@@ -297,7 +295,7 @@ if not "%NDK_PATH%"=="" (
 )
 echo.
 
-:: ── 收集产物 ──────────────────────────────────────────────────────────────────
+:: ── Collect artifacts ─────────────────────────────────────────────────────────
 echo.
 echo Collecting artifacts to: %UNITY_PLUGINS_DIR%
 echo.
@@ -319,10 +317,8 @@ call :collect android "%AND_BIN%\liblua54.so" ^
     "%UNITY_PLUGINS_DIR%\Android\arm64-v8a" "liblua54.so"
 call :collect android "%AND_BIN%\libBlueprintRuntimeNoLua.so" ^
     "%UNITY_PLUGINS_DIR%\Android\arm64-v8a" "libBlueprintRuntimeNoLua.so"
-call :collect android "%AND_BIN%\liblua54.so" ^
-    "%UNITY_PLUGINS_DIR%\Android\arm64-v8a" "liblua54.so"
 
-:: WebGL – 收集各 Bundle 变体
+:: WebGL - collect all Bundle variants
 set WASM_BIN=%PROJECT_DIR%\build-wasm\bin\%BUILD_TYPE%
 for %%B in (libBlueprintBundle.a libBlueprintBundleNoLua.a libBlueprintBundleNoProto.a libBlueprintBundleMin.a) do (
     if exist "%WASM_BIN%\%%B" (
@@ -333,14 +329,14 @@ for %%B in (libBlueprintBundle.a libBlueprintBundleNoLua.a libBlueprintBundleNoP
         )
     )
 )
-:: 若所有 Bundle 都没有，回退到裸 Runtime
+:: Fallback to bare Runtime if no Bundle found
 if not exist "%UNITY_PLUGINS_DIR%\WebGL\libBlueprintBundle.a" ^
 if not exist "%UNITY_PLUGINS_DIR%\WebGL\libBlueprintBundleMin.a" (
     call :collect_req wasm "%PROJECT_DIR%\build-wasm\Runtime\libBlueprintRuntime.a" ^
         "%UNITY_PLUGINS_DIR%\WebGL" "libBlueprintRuntime.a"
 )
 
-:: ── 汇总报告 ──────────────────────────────────────────────────────────────────
+:: ── Summary ───────────────────────────────────────────────────────────────────
 echo.
 echo ============================================
 echo  Build All - Summary
@@ -354,11 +350,11 @@ for %%P in (windows wasm android) do (
 )
 echo.
 echo  Collected artifacts:
-echo    Windows\x86_64\  BlueprintRuntime.dll        (含 Lua VM)
-echo                     BlueprintRuntimeNoLua.dll   (无 Lua, 配合 xLua/tolua)
+echo    Windows\x86_64\  BlueprintRuntime.dll        (with Lua VM)
+echo                     BlueprintRuntimeNoLua.dll   (no Lua, for xLua/tolua)
 echo                     liblua54.dll
-echo    Android\arm64\   libBlueprintRuntime.so      (含 Lua VM)
-echo                     libBlueprintRuntimeNoLua.so (无 Lua)
+echo    Android\arm64\   libBlueprintRuntime.so      (with Lua VM)
+echo                     libBlueprintRuntimeNoLua.so (no Lua)
 echo                     liblua54.so
 echo    WebGL\           libBlueprintBundle.a          (Runtime+JSON+Lua+Proto)
 echo    WebGL\           libBlueprintBundleNoLua.a     (Runtime+JSON+Proto, no Lua)
