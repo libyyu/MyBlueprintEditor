@@ -200,6 +200,8 @@ goto :after_build_nolua
     )
     exit /b 0
 :after_build_nolua
+
+goto :after_collect
 :collect
     set _CP=%~1
     set _SRC=%~2
@@ -255,11 +257,13 @@ if not "%EMSDK_PATH%"=="" set WASM_ARGS=--emsdk "%EMSDK_PATH%"
 where emcmake >nul 2>&1
 if not errorlevel 1 (
     call :run_build wasm wasm %WASM_ARGS%
-) else if not "%EMSDK_PATH%"=="" (
-    call :run_build wasm wasm %WASM_ARGS%
 ) else (
-    set STATUS_wasm=NA
-    echo [--] emcmake not found - skipping WASM. Pass --emsdk ^<path^> to enable.
+    if not "%EMSDK_PATH%"=="" (
+        call :run_build wasm wasm %WASM_ARGS%
+    ) else (
+        set STATUS_wasm=NA
+        echo [--] emcmake not found - skipping WASM. Pass --emsdk ^<path^> to enable.
+    )
 )
 :: 构建四个 BlueprintBundle 变体
 if "!STATUS_wasm!"=="OK" (
@@ -323,8 +327,10 @@ set WASM_BIN=%PROJECT_DIR%\build-wasm\bin\%BUILD_TYPE%
 for %%B in (libBlueprintBundle.a libBlueprintBundleNoLua.a libBlueprintBundleNoProto.a libBlueprintBundleMin.a) do (
     if exist "%WASM_BIN%\%%B" (
         call :collect wasm "%WASM_BIN%\%%B" "%UNITY_PLUGINS_DIR%\WebGL" "%%B"
-    ) else if exist "%PROJECT_DIR%\build-wasm\Runtime\%%B" (
-        call :collect wasm "%PROJECT_DIR%\build-wasm\Runtime\%%B" "%UNITY_PLUGINS_DIR%\WebGL" "%%B"
+    ) else (
+        if exist "%PROJECT_DIR%\build-wasm\Runtime\%%B" (
+            call :collect wasm "%PROJECT_DIR%\build-wasm\Runtime\%%B" "%UNITY_PLUGINS_DIR%\WebGL" "%%B"
+        )
     )
 )
 :: 若所有 Bundle 都没有，回退到裸 Runtime
