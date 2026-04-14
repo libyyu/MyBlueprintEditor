@@ -74,6 +74,8 @@ void BlueprintEditor::CopySelectedNodes()
             cp.stringValue = pin.StringValue;
             cp.objectValue = pin.ObjectValue;
             cp.hiddenWhen = pin.HiddenWhen;
+            cp.enumValues = pin.EnumValues;
+            cp.enumStrict  = pin.EnumStrict;
             cp.originalLocalIndex = i;
             cn.inputs.push_back(cp);
 
@@ -206,6 +208,8 @@ void BlueprintEditor::PasteNodes(ImVec2 pastePosition)
             pin.StringValue = cp.stringValue;
             pin.ObjectValue = cp.objectValue;
             pin.HiddenWhen = cp.hiddenWhen;
+            pin.EnumValues = cp.enumValues;
+            pin.EnumStrict  = cp.enumStrict;
             info.inputPinIds.push_back(ed::PinId(newPinId));
         }
 

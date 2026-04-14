@@ -25,8 +25,25 @@ struct PinDefinition
     bool            isExec = false;
     bool            isRequired = false;  // 是否必须连接
     std::string     tooltip;             // 提示信息
-    
-    // 自定义属性
+
+    // ── 枚举候选项（方案A：通过 customProperties["enumValues"] 传递给编辑器）──
+    // 编辑器渲染时：非空 → Combo；空 → InputText
+    // 运行时完全透明：handler 拿到的仍是字符串值
+    //
+    // 赋值方式（二选一，效果相同）：
+    //   方式1: pin.setEnumValues({"GET","POST","PUT","DELETE","PATCH","HEAD"});
+    //   方式2: pin.customProperties["enumValues"] = "GET,POST,PUT,DELETE,PATCH,HEAD";
+    void setEnumValues(const std::vector<std::string>& values, bool strict = false)
+    {
+        if (values.empty()) { customProperties.erase("enumValues"); customProperties.erase("enumStrict"); return; }
+        std::string joined;
+        for (size_t i = 0; i < values.size(); ++i) { if (i) joined += ','; joined += values[i]; }
+        customProperties["enumValues"] = joined;
+        if (strict) customProperties["enumStrict"] = "true";
+        else        customProperties.erase("enumStrict");
+    }
+
+    // 自定义属性（含 enumValues / enumStrict / hiddenWhen / dynamicInputs 等）
     std::unordered_map<std::string, std::string> customProperties;
 };
 

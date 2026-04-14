@@ -62,6 +62,12 @@ struct Pin
     //        被引用的引脚若被连线，则视为条件不满足（保守显示）
     std::string HiddenWhen;
 
+    // 枚举候选项（来自 PinDefinition::customProperties["enumValues"]）
+    // 非空时 NodeRenderer 将 String 引脚渲染为 Combo 下拉而非 InputText
+    std::vector<std::string> EnumValues;
+    // true = 严格模式：只能从下拉选，不允许手动输入（来自 customProperties["enumStrict"]）
+    bool EnumStrict = false;
+
     Pin(int id, const char* name, PinType type):
         ID(id), Node(nullptr), Name(name), Type(type), Kind(PinKind::Input)
     {

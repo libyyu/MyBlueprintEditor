@@ -458,17 +458,74 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                         }
                         else if (input.Type == PinType::String)
                         {
-                            auto key = reinterpret_cast<uintptr_t>(input.ID.AsPointer());
-                            auto& buf = s_StringBuffers[key];
-                            if (buf[0] == '\0' && !input.StringValue.empty())
-                                snprintf(buf.data(), buf.size(), "%s", input.StringValue.c_str());
-                            ImGui::SetNextItemWidth(100.0f);
-                            if (ImGui::InputText("##value", buf.data(), buf.size()))
+                            if (!input.EnumValues.empty())
                             {
-                                input.StringValue = buf.data();
-                                ActiveDoc()->isDirty = true;
+                                // ── 枚举 Combo ─────────────────────────────────────
+                                // 计算当前值的下标
+                                int curIdx = 0;
+                                for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
+                                    if (input.EnumValues[ei] == input.StringValue) { curIdx = ei; break; }
+
+                                // 宽度：各选项文字最大宽 + Combo 箭头 + padding
+                                float comboW = 60.0f;
+                                for (const auto& ev : input.EnumValues)
+                                    comboW = std::max(comboW, ImGui::CalcTextSize(ev.c_str()).x + 28.0f);
+                                ImGui::SetNextItemWidth(comboW);
+
+                                // Combo 下拉
+                                const char* preview = (curIdx >= 0 && curIdx < (int)input.EnumValues.size())
+                                    ? input.EnumValues[curIdx].c_str() : "...";
+                                if (ImGui::BeginCombo("##enum", preview,
+                                        ImGuiComboFlags_HeightRegular))
+                                {
+                                    for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
+                                    {
+                                        bool sel = (ei == curIdx);
+                                        if (ImGui::Selectable(input.EnumValues[ei].c_str(), sel))
+                                        {
+                                            PushUndoState();
+                                            input.StringValue = input.EnumValues[ei];
+                                            ActiveDoc()->isDirty = true;
+                                        }
+                                        if (sel) ImGui::SetItemDefaultFocus();
+                                    }
+                                    ImGui::EndCombo();
+                                }
+
+                                // 宽松模式：Combo 旁边加小 InputText 允许自定义输入
+                                if (!input.EnumStrict)
+                                {
+                                    auto key = reinterpret_cast<uintptr_t>(input.ID.AsPointer());
+                                    auto& buf = s_StringBuffers[key];
+                                    // 同步 buf 和 StringValue
+                                    if (input.StringValue != buf.data())
+                                        snprintf(buf.data(), buf.size(), "%s", input.StringValue.c_str());
+
+                                    ImGui::SameLine(0, 2);
+                                    ImGui::SetNextItemWidth(60.0f);
+                                    if (ImGui::InputText("##evalfree", buf.data(), buf.size()))
+                                    {
+                                        input.StringValue = buf.data();
+                                        ActiveDoc()->isDirty = true;
+                                    }
+                                    if (ImGui::IsItemActivated()) PushUndoState();
+                                }
                             }
-                            if (ImGui::IsItemActivated()) PushUndoState();  // 输入框获焦时保存
+                            else
+                            {
+                                // ── 普通 InputText（原有逻辑不变）─────────────────
+                                auto key = reinterpret_cast<uintptr_t>(input.ID.AsPointer());
+                                auto& buf = s_StringBuffers[key];
+                                if (buf[0] == '\0' && !input.StringValue.empty())
+                                    snprintf(buf.data(), buf.size(), "%s", input.StringValue.c_str());
+                                ImGui::SetNextItemWidth(100.0f);
+                                if (ImGui::InputText("##value", buf.data(), buf.size()))
+                                {
+                                    input.StringValue = buf.data();
+                                    ActiveDoc()->isDirty = true;
+                                }
+                                if (ImGui::IsItemActivated()) PushUndoState();  // 输入框获焦时保存
+                            }
                         }
                         else if (input.Type == PinType::Object)
                         {

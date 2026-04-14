@@ -28,6 +28,37 @@ static PinDefinition MakeFlowPin(const char* name = "")
     return MakePin(name, PinDataType::Unknown, true);
 }
 
+// 枚举引脚辅助：String 引脚 + 编辑器渲染为 Combo 下拉
+// values: 逗号分隔的枚举值，如 "GET,POST,PUT,DELETE,PATCH,HEAD"
+// strict: true = 只能选，false = 选 + 可手输
+// defaultVal: 可选默认值（默认取第一个选项）
+static PinDefinition MakePinEnum(const char* name,
+                                  const char* values,
+                                  const char* defaultVal = nullptr,
+                                  bool strict = true)
+{
+    PinDefinition p;
+    p.name = name;
+    p.dataType = PinDataType::String;
+    p.customProperties["enumValues"] = values;
+    if (strict) p.customProperties["enumStrict"] = "true";
+    // 设置默认值：若显式传入则用之，否则取第一个选项
+    std::string firstVal;
+    if (defaultVal)
+    {
+        firstVal = defaultVal;
+    }
+    else
+    {
+        std::string v(values);
+        auto comma = v.find(',');
+        firstVal = (comma != std::string::npos) ? v.substr(0, comma) : v;
+    }
+    if (!firstVal.empty())
+        p.defaultValue = Variant(firstVal);
+    return p;
+}
+
 // 统一的节点定义注册辅助函数（原先在 9 个 RegisterNodeDefs_* 函数中各自以 lambda 形式重复定义）
 static void RegisterNodeDef(INodeRegistry& registry,
     const char* id, const char* name, const char* category,
@@ -825,7 +856,7 @@ static void RegisterNodeDefs_String(INodeRegistry& registry)
             MakePin("String",      PinDataType::String),
             MakePin("Pattern",     PinDataType::String),
             MakePin("Replacement", PinDataType::String),  // Replace 模式用
-            MakePin("Mode",        PinDataType::String),  // "match"(default)|"findall"|"replace"
+            MakePinEnum("Mode",    "match,findall,replace", "match"),
         },
         {
             MakePin("Found",   PinDataType::Boolean),
@@ -1543,7 +1574,9 @@ static void RegisterNodeDefs_Event(INodeRegistry& registry)
             MakePin("RequestId",   PinDataType::String),  // 空则读变量 __http_request_id
             MakePin("StatusCode",  PinDataType::Integer), // 默认 200
             MakePin("Body",        PinDataType::String),
-            MakePin("ContentType", PinDataType::String),  // 默认 application/json
+            MakePinEnum("ContentType",
+                "application/json,text/plain,text/html,application/x-www-form-urlencoded,multipart/form-data",
+                "application/json"),
         },
         { MakeFlowPin("") },
         "2E86AB");
@@ -1902,7 +1935,7 @@ static void RegisterNodeDefs_Network(INodeRegistry& registry)
         {
             MakeFlowPin(""),
             MakePin("URL",            PinDataType::String),
-            MakePin("Method",         PinDataType::String),  // GET / POST / PUT / DELETE
+            MakePinEnum("Method",     "GET,POST,PUT,DELETE,PATCH,HEAD", "GET"),
             MakePin("Body",           PinDataType::String),
             MakePin("Headers",        PinDataType::String),  // JSON 格式 {"Key":"Value"}
             MakePin("TimeoutSeconds", PinDataType::Integer),
@@ -2440,7 +2473,7 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
         {
             MakeFlowPin(""),
             MakePin("URL",           PinDataType::String),
-            MakePin("Method",        PinDataType::String),   // "GET" | "POST"
+            MakePinEnum("Method",    "GET,POST,PUT,DELETE,PATCH,HEAD", "GET"),
             MakePin("Body",          PinDataType::String),
             MakePin("Headers",       PinDataType::String),
             MakePin("MaxRetries",    PinDataType::Integer),  // default 3

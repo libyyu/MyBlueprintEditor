@@ -416,6 +416,8 @@ struct BlueprintEditor : public Application
             std::string stringValue;
             std::string objectValue;
             std::string hiddenWhen;
+            std::vector<std::string> enumValues;  // 枚举候选项（复制时一并保存）
+            bool        enumStrict  = false;
             int         originalLocalIndex = 0;  // 在原节点引脚列表中的索引
         };
         std::vector<ClipboardPin> inputs;
