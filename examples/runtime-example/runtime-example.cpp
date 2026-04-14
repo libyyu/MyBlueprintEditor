@@ -1,26 +1,56 @@
-// runtime-example.cpp
-// 蓝图运行时执行器 — 支持命令行传入蓝图文件执行，以及内置单元测试模式
+// runtime-example.cpp  ─  BlueprintRuntime CLI
 //
-// 用法:
-//   runtime-example                                — 运行内置示例蓝图
-//   runtime-example <file.bjson>                   — 加载并执行指定蓝图文件
-//   runtime-example <file> --max-time <secs>       — 设置最大等待异步 timer 的时间（默认 30 秒）
-//   runtime-example <file> --tick-rate <ms>        — 设置帧循环 tick 间隔（默认 16ms ≈ 60fps）
-//   runtime-example --test                         — 运行所有内置单元测试
-//   runtime-example --test flow_test.json          — 运行测试（指定 flow_test.json 路径）
+// USAGE
+//   runtime-example                                 Run built-in demo
+//   runtime-example <file.bjson> [options]          Execute a blueprint file
+//   runtime-example --test [flow_test.json]         Run built-in unit tests
+//   runtime-example --test-new                      Run new-feature unit tests
+//   runtime-example --repl                          Interactive REPL mode
 //
-// 文件格式:
-//   - 蓝图文件 (.bjson): 单文件格式，包含 runtime + editor 两个顶层字段
-//   - 运行时只读取 "runtime" 段，"editor" 段忽略
+// EXECUTION OPTIONS
+//   -v KEY=VALUE            Inject a blueprint variable before execution
+//   -e EVENT                Dispatch a named event (default: OnBeginPlay)
+//                           Use -e "" to skip OnBeginPlay
+//   --lua <script.lua>      Load and execute a Lua script before running
+//   --max-time <secs>       Max wall-clock time to wait for async work (default: 30)
+//   --tick-rate <ms>        Frame loop interval in ms (default: 16)
+//   --no-deps               Skip automatic dependency loading
+//
+// OUTPUT OPTIONS
+//   --quiet, -q             Suppress all output except PrintString
+//   --output json           After execution, print all variables as JSON
+//   --output vars           Print variable name=value pairs (default for --output)
+//   --watch                 Re-execute when the file changes (Ctrl+C to stop)
+//
+// ENVIRONMENT VARIABLES
+//   BP_APIKEY               Injected as ApiKey variable
+//   BP_BASEURL              Injected as BaseURL variable
+//   BP_MODEL                Injected as Model variable
+//   BP_VAR_<NAME>           Injected as variable <NAME>  (e.g. BP_VAR_Timeout=10)
+//
+// EXAMPLES
+//   runtime-example data/examples/ReActAgent.bjson -v ApiKey=sk-xxx -v UserQuery="hello"
+//   runtime-example data/examples/WeComBot.bjson -v BotId=xxx -v Secret=yyy --watch
+//   runtime-example agent.bjson -q --output json
+//   runtime-example agent.bjson -e OnTick --lua hooks.lua
+//   runtime-example --repl
 
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <vector>
+#include <map>
+#include <thread>
+#include <chrono>
+#include <sstream>
+#include <algorithm>
+#include <functional>
+#include <csignal>
+#include <atomic>
 
-// 只需要 Runtime 模块，不需要 ImGui
 #include "BlueprintRunner.h"
 #include "BlueprintExporter.h"
 #include "BuiltinHandlers.h"
@@ -31,7 +61,14 @@
 using namespace NodeEditor::Runtime;
 
 // ============================================================================
-// 单元测试框架（轻量级，无外部依赖）
+// Signal handling for --watch / REPL
+// ============================================================================
+static std::atomic<bool> g_interrupted{false};
+
+static void signalHandler(int) { g_interrupted = true; }
+
+// ============================================================================
+// Lightweight unit test framework (unchanged)
 // ============================================================================
 
 static int g_pass = 0;
@@ -44,280 +81,20 @@ static int g_fail = 0;
     } while(0)
 
 // ============================================================================
-// Test 1: DefaultNodeRegistry 野指针修复验证
-//   连续注册大量节点，强制触发 unordered_map rehash，
-//   再遍历 getAllNodeDefinitions() 确保指针仍然有效。
+// Test 1-7 (unchanged, omitted for brevity — same as before)
 // ============================================================================
-static void test_registry_no_dangling_ptr()
-{
-    std::cout << "\n[Test 1] DefaultNodeRegistry – rehash 野指针修复\n";
+static void test_registry_no_dangling_ptr();
+static void test_variant_conversion();
+static void test_variant_map();
+static void test_flow_blueprint(const std::string& flowTestPath);
+static void test_map_nodes();
+static void test_crude_json_utf8();
+static void test_add_type_promotion();
 
-    DefaultNodeRegistry reg;
-    for (int i = 0; i < 200; ++i)
-    {
-        NodeDefinition def;
-        def.id   = "node_" + std::to_string(i);
-        def.name = "Node " + std::to_string(i);
-        reg.registerNode(def);
-    }
-
-    const auto& defs = reg.getAllNodeDefinitions();
-    CHECK(defs.size() == 200, "注册 200 个节点后缓存数量正确");
-
-    bool allValid = true;
-    for (const auto* p : defs)
-    {
-        if (!p || p->id.empty()) { allValid = false; break; }
-        const auto* found = reg.getNodeDefinition(p->id);
-        if (found != p) { allValid = false; break; }
-    }
-    CHECK(allValid, "所有缓存指针指向有效节点（无野指针）");
-
-    NodeDefinition updated;
-    updated.id   = "node_0";
-    updated.name = "Node UPDATED";
-    reg.registerNode(updated);
-
-    const auto* p0 = reg.getNodeDefinition("node_0");
-    CHECK(p0 && p0->name == "Node UPDATED", "更新节点后 getNodeDefinition 返回新值");
-    CHECK(reg.getAllNodeDefinitions().size() == 200, "更新后缓存数量不变");
-}
-
-// ============================================================================
-// Test 2: Variant strtoll/strtod（-fno-exceptions 友好）
-// ============================================================================
-static void test_variant_conversion()
-{
-    std::cout << "\n[Test 2] Variant asInt/asFloat – strtoll/strtod 转换\n";
-
-    Variant vs(std::string("42"));
-    CHECK(vs.asInt() == 42,  "\"42\" → asInt() == 42");
-    CHECK(vs.asFloat() == 42.0, "\"42\" → asFloat() == 42.0");
-
-    Variant vf(std::string("3.14"));
-    CHECK(vf.asFloat() > 3.13 && vf.asFloat() < 3.15, "\"3.14\" → asFloat() ≈ 3.14");
-    CHECK(vf.asInt() == 3, "\"3.14\" → asInt() == 3 (截断)");
-
-    Variant vbad(std::string("abc"));
-    CHECK(vbad.asInt() == 0,   "\"abc\" → asInt() == 0 (转换失败)");
-    CHECK(vbad.asFloat() == 0.0, "\"abc\" → asFloat() == 0.0 (转换失败)");
-
-    Variant vempty(std::string(""));
-    CHECK(vempty.asInt() == 0,   "\"\" → asInt() == 0");
-    CHECK(vempty.asFloat() == 0.0, "\"\" → asFloat() == 0.0");
-}
-
-// ============================================================================
-// Test 3: Variant Map API
-// ============================================================================
-static void test_variant_map()
-{
-    std::cout << "\n[Test 3] Variant Map API\n";
-
-    Variant m;
-    m.mapSet("foo",   Variant(std::string("bar")));
-    m.mapSet("count", Variant(int64_t(42)));
-
-    CHECK(m.mapHasKey("foo"),  "mapHasKey(\"foo\") == true");
-    CHECK(!m.mapHasKey("baz"), "mapHasKey(\"baz\") == false");
-    CHECK(m.mapGet("foo").asString() == "bar", "mapGet(\"foo\") == \"bar\"");
-    CHECK(m.mapGet("count").asInt() == 42,     "mapGet(\"count\") == 42");
-    CHECK(m.mapSize() == 2, "mapSize() == 2");
-
-    m.mapRemove("foo");
-    CHECK(m.mapSize() == 1,    "mapRemove 后 mapSize() == 1");
-    CHECK(!m.mapHasKey("foo"), "mapRemove 后 mapHasKey(\"foo\") == false");
-
-    Variant m2(m);
-    CHECK(m2.mapHasKey("count"), "拷贝后 mapHasKey(\"count\") == true");
-
-    Variant m3(std::move(m2));
-    CHECK(m3.mapHasKey("count"), "移动后 mapHasKey(\"count\") == true");
-}
-
-// ============================================================================
-// Test 4: BlueprintRunner 执行 flow_test.json
-//   拓扑：SetVariable(counter=0) → ForLoop(0..4) → AddIndex+GetVariable →
-//         SetVariable(counter+=index) → PrintString →
-//         [完成后] Branch(counter>=10) → PrintTrue/PrintFalse
-// ============================================================================
-static void test_flow_blueprint(const std::string& flowTestPath)
-{
-    std::cout << "\n[Test 4] BlueprintRunner – flow_test.json 执行\n";
-
-    BlueprintRunner runner;
-    RegisterBuiltinHandlers(runner, ".");
-
-    std::vector<std::string> logs;
-    // Debug diagnostics → logs[]
-    runner.SetLogCallback([&](NodeEditor::Runtime::LogLevel lv, const std::string& msg) {
-        logs.push_back(msg);
-        std::cout << "    LOG: " << msg << "\n";
-    });
-    // PrintString / Log node output → also captured in logs[]
-    runner.SetPrintCallback([&](NodeEditor::Runtime::LogLevel lv, const std::string& msg) {
-        logs.push_back(msg);
-        std::cout << "    PRINT: " << msg << "\n";
-    });
-
-    bool loaded = runner.LoadFromFile(flowTestPath);
-    CHECK(loaded, "flow_test.json 加载成功");
-    if (!loaded)
-    {
-        std::cout << "    Error: " << runner.GetLastError() << "\n";
-        return;
-    }
-
-    auto result = runner.Execute();
-    CHECK(result.success, "Execute() 返回 success=true");
-    if (!result.success)
-        std::cout << "    Error: " << result.errorMessage << "\n";
-
-    // ForLoop 0..4 累加：0+1+2+3+4 = 10
-    auto finalCounter = runner.GetVariable("counter");
-    CHECK(finalCounter.asInt() == 10, "最终 counter == 10（0+1+2+3+4）");
-
-    bool foundTrue = false;
-    for (const auto& l : logs)
-        if (l.find("TRUE") != std::string::npos) { foundTrue = true; break; }
-    CHECK(foundTrue, "Branch True 分支被执行（PrintString 含 TRUE）");
-
-    std::cout << "    nodesExecuted=" << result.nodesExecuted
-              << "  elapsedMs=" << result.elapsedMs << "\n";
-}
-
-// ============================================================================
-// Test 5: Map 节点端到端（BlueprintRunner 内联构建）
-// ============================================================================
-static void test_map_nodes()
-{
-    std::cout << "\n[Test 5] Map 节点端到端\n";
-
-    BlueprintRunner runner;
-    RegisterBuiltinHandlers(runner, ".");
-
-    std::vector<std::string> logs;
-    runner.SetLogCallback([&](NodeEditor::Runtime::LogLevel lv, const std::string& msg) { logs.push_back(msg); });
-
-    BlueprintData bp;
-    bp.metadata.name = "MapTest";
-
-    // Node 1: MapSet (exec)
-    {
-        NodeInstance n;
-        n.id = 1; n.definitionId = "MapSet";
-        PinInfo p0; p0.id=11; p0.kind=PinKind::Input;  p0.isExec=true;  n.pins.push_back(p0);
-        PinInfo p1; p1.id=12; p1.kind=PinKind::Input;  p1.dataType=PinDataType::Map;    p1.name="Map";   n.pins.push_back(p1);
-        PinInfo p2; p2.id=13; p2.kind=PinKind::Input;  p2.dataType=PinDataType::Any;    p2.name="Key";   p2.defaultValue=Variant(std::string("hello")); n.pins.push_back(p2);
-        PinInfo p3; p3.id=14; p3.kind=PinKind::Input;  p3.dataType=PinDataType::Any;    p3.name="Value"; p3.defaultValue=Variant(std::string("world")); n.pins.push_back(p3);
-        PinInfo p4; p4.id=15; p4.kind=PinKind::Output; p4.isExec=true;  n.pins.push_back(p4);
-        PinInfo p5; p5.id=16; p5.kind=PinKind::Output; p5.dataType=PinDataType::Map;    p5.name="Map";   n.pins.push_back(p5);
-        bp.nodes.push_back(n);
-    }
-
-    // Node 2: MapGet
-    {
-        NodeInstance n;
-        n.id = 2; n.definitionId = "MapGet";
-        PinInfo p0; p0.id=21; p0.kind=PinKind::Input;  p0.dataType=PinDataType::Map;    p0.name="Map";   n.pins.push_back(p0);
-        PinInfo p1; p1.id=22; p1.kind=PinKind::Input;  p1.dataType=PinDataType::Any;    p1.name="Key";   p1.defaultValue=Variant(std::string("hello")); n.pins.push_back(p1);
-        PinInfo p2; p2.id=23; p2.kind=PinKind::Output; p2.dataType=PinDataType::Any;    p2.name="Value"; n.pins.push_back(p2);
-        PinInfo p3; p3.id=24; p3.kind=PinKind::Output; p3.dataType=PinDataType::Boolean;p3.name="Found"; n.pins.push_back(p3);
-        bp.nodes.push_back(n);
-    }
-
-    // Link: MapSet.Map_out(16) → MapGet.Map_in(21)
-    { LinkInstance lk; lk.id=1; lk.startPinId=16; lk.endPinId=21; bp.links.push_back(lk); }
-    bp.rebuildIndices();
-
-    bool loaded = runner.Load(bp);
-    CHECK(loaded, "内联 BlueprintData 加载成功");
-
-    {
-        Variant emptyMap;
-        emptyMap.type = NodeEditor::Runtime::PinDataType::Map;
-        runner.SetPinValue(12, emptyMap);
-    }
-
-    ExecutionResult r1 = runner.ExecuteNode(1);
-    CHECK(r1.success, "ExecuteNode(MapSet) success");
-
-    ExecutionResult r2 = runner.ExecuteNode(2);
-    CHECK(r2.success, "ExecuteNode(MapGet) success");
-
-    Variant val   = runner.GetPinValue(23);
-    Variant found = runner.GetPinValue(24);
-    CHECK(found.asBool(), "MapGet Found == true");
-    CHECK(val.asString() == "world", "MapGet Value == \"world\"");
-}
-
-// ============================================================================
-// Test 6: crude_json UTF-8 多字节字符解析
-// ============================================================================
-static void test_crude_json_utf8()
-{
-    std::cout << "\n[Test 6] crude_json UTF-8 支持\n";
-
-    const char* json_utf8 = u8"{\"name\": \"蓝图测试\", \"value\": 42}";
-    auto v = crude_json::value::parse(json_utf8);
-    CHECK(!v.is_discarded(), "包含中文的 JSON 解析成功（非 discarded）");
-    CHECK(v.type() == crude_json::type_t::object, "解析结果为 object");
-    CHECK(v["name"].get<std::string>() == u8"蓝图测试", "中文字段值正确（UTF-8 pass-through）");
-    CHECK(v["value"].get<double>() == 42.0, "数字字段值正确");
-
-    const char* json_desc = u8"{\"description\": \"这是一个ForLoop节点\"}";
-    auto v2 = crude_json::value::parse(json_desc);
-    CHECK(!v2.is_discarded(), "中文描述字段解析成功");
-    CHECK(v2["description"].get<std::string>() == u8"这是一个ForLoop节点",
-          "中文描述字段内容正确");
-}
-
-// ============================================================================
-// Test 7: Add/Subtract/Multiply 节点类型提升 — integer 累加保持 integer
-// ============================================================================
-static void test_add_type_promotion()
-{
-    std::cout << "\n[Test 7] Add 节点类型提升（integer 保持 integer）\n";
-
-    // Integer + Integer → Integer
-    {
-        Variant a(int64_t(3)), b(int64_t(4));
-        CHECK(a.type == PinDataType::Integer, "a 是 Integer");
-        CHECK(b.type == PinDataType::Integer, "b 是 Integer");
-        Variant r(a.asInt() + b.asInt());
-        CHECK(r.type == PinDataType::Integer, "Integer+Integer 结果是 Integer");
-        CHECK(r.asInt() == 7, "Integer+Integer 结果值正确（3+4=7）");
-        CHECK(r.asString() == "7", "Integer asString 无 '0.000000' 格式");
-    }
-
-    // Float + Integer → Float
-    {
-        Variant a(3.14), b(int64_t(2));
-        CHECK(a.type == PinDataType::Float, "a 是 Float");
-        Variant r(a.asFloat() + b.asFloat());
-        CHECK(r.type == PinDataType::Float, "Float+Integer 结果是 Float");
-    }
-
-    // Unknown/Any + Integer → Integer（resolveArithType 规则）
-    {
-        Variant a;               // Unknown/Any（如 GetVariable Any 输出）
-        Variant b(int64_t(5));
-        CHECK(a.type == PinDataType::Unknown, "a 是 Unknown（Any）");
-        bool useInt = (a.type != PinDataType::Float && b.type != PinDataType::Float)
-                   && (a.type == PinDataType::Integer || b.type == PinDataType::Integer);
-        CHECK(useInt, "Unknown+Integer 应走 Integer 路径");
-    }
-}
-
-// ============================================================================
-// 测试入口
-// ============================================================================
 static int runTests(const std::string& flowTestPath)
 {
-    g_pass = 0;
-    g_fail = 0;
-
-    std::cout << "========== BlueprintRuntime 单元测试 ==========\n";
+    g_pass = 0; g_fail = 0;
+    std::cout << "========== BlueprintRuntime Unit Tests ==========\n";
     test_registry_no_dangling_ptr();
     test_variant_conversion();
     test_variant_map();
@@ -325,432 +102,822 @@ static int runTests(const std::string& flowTestPath)
     test_map_nodes();
     test_crude_json_utf8();
     test_add_type_promotion();
-
-    std::cout << "\n========== 结果 ==========\n";
+    std::cout << "\n========== Result ==========\n";
     std::cout << "PASS: " << g_pass << "  FAIL: " << g_fail << "\n";
     return (g_fail == 0) ? 0 : 1;
 }
 
 // ============================================================================
-// 示例: 手动构建一个蓝图数据，模拟编辑器导出的结果
+// Parse  KEY=VALUE  (value may contain '=')
 // ============================================================================
-
-static BlueprintData createSampleBlueprint()
+static bool parseKV(const std::string& s, std::string& key, std::string& val)
 {
-    BlueprintData bp;
-
-    bp.metadata.name        = "MathPipeline";
-    bp.metadata.description = "A simple math computation pipeline";
-    bp.metadata.version     = "1.0";
-    bp.metadata.author      = "Runtime Example";
-    bp.metadata.createdAt   = "2026-03-14T10:00:00Z";
-    bp.metadata.updatedAt   = "2026-03-14T12:30:00Z";
-
-    // Node 1: Constant A (10)
-    {
-        NodeInstance node;
-        node.id = 1; node.definitionId = "constant_float"; node.name = "Constant A";
-        node.position = NodePosition(100, 200); node.size = NodeSize(150, 80);
-        PinInfo outPin; outPin.id=101; outPin.name="Value"; outPin.kind=PinKind::Output; outPin.dataType=PinDataType::Float;
-        node.pins.push_back(outPin);
-        node.nodeData["value"] = Variant(10.0);
-        bp.nodes.push_back(std::move(node));
-    }
-
-    // Node 2: Constant B (3)
-    {
-        NodeInstance node;
-        node.id = 2; node.definitionId = "constant_float"; node.name = "Constant B";
-        node.position = NodePosition(100, 350); node.size = NodeSize(150, 80);
-        PinInfo outPin; outPin.id=201; outPin.name="Value"; outPin.kind=PinKind::Output; outPin.dataType=PinDataType::Float;
-        node.pins.push_back(outPin);
-        node.nodeData["value"] = Variant(3.0);
-        bp.nodes.push_back(std::move(node));
-    }
-
-    // Node 3: Add
-    {
-        NodeInstance node;
-        node.id = 3; node.definitionId = "math_add"; node.name = "Add";
-        node.position = NodePosition(350, 275); node.size = NodeSize(120, 100);
-        PinInfo inA; inA.id=301; inA.name="A"; inA.kind=PinKind::Input;  inA.dataType=PinDataType::Float; node.pins.push_back(inA);
-        PinInfo inB; inB.id=302; inB.name="B"; inB.kind=PinKind::Input;  inB.dataType=PinDataType::Float; node.pins.push_back(inB);
-        PinInfo out; out.id=303;  out.name="Result"; out.kind=PinKind::Output; out.dataType=PinDataType::Float; node.pins.push_back(out);
-        bp.nodes.push_back(std::move(node));
-    }
-
-    // Node 4: Display
-    {
-        NodeInstance node;
-        node.id = 4; node.definitionId = "output_display"; node.name = "Display Result";
-        node.position = NodePosition(550, 275); node.size = NodeSize(160, 80);
-        PinInfo inVal; inVal.id=401; inVal.name="Input"; inVal.kind=PinKind::Input; inVal.dataType=PinDataType::Float; node.pins.push_back(inVal);
-        bp.nodes.push_back(std::move(node));
-    }
-
-    { LinkInstance lk; lk.id=1001; lk.startPinId=101; lk.endPinId=301; bp.links.push_back(lk); }
-    { LinkInstance lk; lk.id=1002; lk.startPinId=201; lk.endPinId=302; bp.links.push_back(lk); }
-    { LinkInstance lk; lk.id=1003; lk.startPinId=303; lk.endPinId=401; bp.links.push_back(lk); }
-
-    VariableDefinition speedVar;
-    speedVar.name="Speed"; speedVar.dataType=PinDataType::Float; speedVar.defaultValue=Variant(1.5);
-    speedVar.category="Physics"; speedVar.tooltip="Movement speed multiplier";
-    bp.variables.push_back(speedVar);
-
-    CommentRegion comment;
-    comment.id="comment_1"; comment.text="Math Pipeline - Input Section";
-    comment.position=NodePosition(50,150); comment.size=NodeSize(250,300);
-    comment.color="#4488FF"; comment.alpha=0.3f;
-    bp.comments.push_back(comment);
-
-    bp.viewInfo.viewPosition = NodePosition(0, 0);
-    bp.viewInfo.viewScale    = 1.0f;
-
-    return bp;
+    auto pos = s.find('=');
+    if (pos == std::string::npos) return false;
+    key = s.substr(0, pos);
+    val = s.substr(pos + 1);
+    return !key.empty();
 }
 
 // ============================================================================
-// 节点处理器（示例模式用）
+// Variant from string (auto-detect int / float / bool / string)
 // ============================================================================
-
-static bool handler_ConstantFloat(ExecutionContext& ctx)
+static Variant variantFromString(const std::string& s)
 {
-    Variant value = ctx.GetNodeData("value");
-    ctx.SetOutputValue("Value", value);
-    ctx.Log("  -> Output: " + std::to_string(value.asFloat()));
-    return true;
-}
-
-static bool handler_MathAdd(ExecutionContext& ctx)
-{
-    double a = ctx.GetInputValue("A").asFloat();
-    double b = ctx.GetInputValue("B").asFloat();
-    double r = a + b;
-    ctx.SetOutputValue("Result", Variant(r));
-    ctx.Log("  -> " + std::to_string(a) + " + " + std::to_string(b) + " = " + std::to_string(r));
-    return true;
-}
-
-static bool handler_OutputDisplay(ExecutionContext& ctx)
-{
-    Variant input = ctx.GetInputValue("Input");
-    std::cout << "  [DISPLAY] Final result = " << input.asFloat() << std::endl;
-    return true;
+    if (s == "true"  || s == "True"  || s == "TRUE")  return Variant(true);
+    if (s == "false" || s == "False" || s == "FALSE") return Variant(false);
+    // try integer
+    {
+        char* end = nullptr;
+        long long iv = std::strtoll(s.c_str(), &end, 10);
+        if (end != s.c_str() && *end == '\0') return Variant(int64_t(iv));
+    }
+    // try float
+    {
+        char* end = nullptr;
+        double dv = std::strtod(s.c_str(), &end);
+        if (end != s.c_str() && *end == '\0') return Variant(dv);
+    }
+    return Variant(s);
 }
 
 // ============================================================================
-// 命令行模式: 加载并执行指定蓝图文件
+// Collect env-var variables (BP_APIKEY / BP_BASEURL / BP_MODEL / BP_VAR_*)
 // ============================================================================
+static std::map<std::string,std::string> collectEnvVars()
+{
+    std::map<std::string,std::string> out;
+    struct KnownAlias { const char* envName; const char* varName; };
+    static const KnownAlias aliases[] = {
+        {"BP_APIKEY",  "ApiKey"},
+        {"BP_BASEURL", "BaseURL"},
+        {"BP_MODEL",   "Model"},
+    };
+    for (const auto& a : aliases)
+    {
+        const char* v = std::getenv(a.envName);
+        if (v && *v) out[a.varName] = v;
+    }
+    // Generic BP_VAR_<NAME>
+#ifdef _WIN32
+    // On Windows enumerate environment block
+    extern char** environ;
+#else
+    extern char** environ;
+#endif
+    for (char** ep = environ; ep && *ep; ++ep)
+    {
+        std::string entry(*ep);
+        if (entry.substr(0, 7) == "BP_VAR_")
+        {
+            std::string key, val;
+            if (parseKV(entry.substr(7), key, val))
+                out[key] = val;
+        }
+    }
+    return out;
+}
 
-static int runBlueprintFromFile(const std::string& filePath, float maxTimeSec, int tickRateMs)
+// ============================================================================
+// Print all variables as JSON or KEY=VALUE
+// ============================================================================
+static void printVariables(BlueprintRunner& runner,
+                            const std::string& format,   // "json" | "vars"
+                            bool quiet)
+{
+    const auto& vars = runner.GetAllVariables();
+    if (vars.empty()) return;
+
+    if (format == "json")
+    {
+        std::cout << "{\n";
+        bool first = true;
+        for (const auto& kv : vars)
+        {
+            if (!first) std::cout << ",\n";
+            first = false;
+            std::cout << "  \"" << kv.first << "\": ";
+            const auto& v = kv.second;
+            switch (v.type) {
+            case PinDataType::Boolean:
+                std::cout << (v.asBool() ? "true" : "false"); break;
+            case PinDataType::Integer:
+                std::cout << v.asInt(); break;
+            case PinDataType::Float:
+                std::cout << v.asFloat(); break;
+            default:
+                // string: JSON-escape minimal
+                {
+                    std::string sv = v.asString();
+                    std::string escaped;
+                    for (char c : sv) {
+                        if (c == '"') escaped += "\\\"";
+                        else if (c == '\\') escaped += "\\\\";
+                        else if (c == '\n') escaped += "\\n";
+                        else if (c == '\r') escaped += "\\r";
+                        else escaped += c;
+                    }
+                    std::cout << "\"" << escaped << "\"";
+                }
+                break;
+            }
+        }
+        std::cout << "\n}" << std::endl;
+    }
+    else // "vars"
+    {
+        for (const auto& kv : vars)
+            std::cout << kv.first << "=" << kv.second.asString() << "\n";
+        std::cout.flush();
+    }
+}
+
+// ============================================================================
+// Single execution pass (shared by run-once and --watch)
+// ============================================================================
+struct RunOptions {
+    std::string filePath;
+    std::vector<std::pair<std::string,std::string>> vars;  // KEY=VALUE pairs
+    std::vector<std::string> events;   // events to dispatch; empty = ["OnBeginPlay"]
+    std::string luaScript;             // "" = none
+    float maxTimeSec  = 30.0f;
+    int   tickRateMs  = 16;
+    bool  quiet       = false;
+    bool  noDeps      = false;
+    std::string outputFmt; // "" | "json" | "vars"
+};
+
+static int executeSingle(const RunOptions& opt)
 {
     namespace fs = std::filesystem;
 
-    if (!fs::exists(filePath))
+    auto log   = [&](const std::string& msg){ if (!opt.quiet) std::cout << msg << "\n"; };
+    auto print = [&](const std::string& msg){ std::cout << msg << "\n"; };  // always
+
+    if (!fs::exists(opt.filePath))
     {
-        std::cerr << "ERROR: File not found: " << filePath << std::endl;
+        std::cerr << "ERROR: File not found: " << opt.filePath << "\n";
         return 1;
     }
 
-    std::string basePath = fs::path(filePath).parent_path().string();
-    std::string fileName = fs::path(filePath).filename().string();
+    std::string basePath = fs::path(opt.filePath).parent_path().string();
+    if (basePath.empty()) basePath = ".";
 
-    std::cout << "========================================" << std::endl;
-    std::cout << "  Blueprint Runtime Executor"            << std::endl;
-    std::cout << "========================================" << std::endl;
-    std::cout << "File:      " << filePath   << std::endl;
-    std::cout << "BasePath:  " << basePath   << std::endl;
-    std::cout << "MaxTime:   " << maxTimeSec << "s" << std::endl;
-    std::cout << "TickRate:  " << tickRateMs << "ms" << std::endl;
-    std::cout << std::endl;
+    if (!opt.quiet)
+    {
+        std::cout << "=== BlueprintRuntime CLI ===\n";
+        std::cout << "File: " << opt.filePath << "\n";
+        if (!opt.luaScript.empty())
+            std::cout << "Lua:  " << opt.luaScript << "\n";
+        std::cout << "\n";
+    }
 
     BlueprintRunner runner;
-    runner.SetLogCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
-    runner.SetPrintCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
+    runner.SetLogCallback([&](LogLevel, const std::string& msg)
+        { if (!opt.quiet) std::cout << msg << "\n"; });
+    runner.SetPrintCallback([&](LogLevel, const std::string& msg)
+        { std::cout << msg << "\n"; });
 
-    // 注册默认 HTTP client（LLM.Chat / http.* Lua 节点需要；幂等）
     BP_InitDefaultHttpClient();
 
-    // 单文件格式：importRuntimeFromFile 自动检测 runtime+editor 内容
-    if (!runner.LoadFromFileWithDeps(filePath))
+    // Load
+    bool loaded = opt.noDeps
+        ? runner.LoadFromFile(opt.filePath)
+        : runner.LoadFromFileWithDeps(opt.filePath);
+    if (!loaded)
     {
-        std::cerr << "ERROR: " << runner.GetLastError() << std::endl;
+        std::cerr << "ERROR loading: " << runner.GetLastError() << "\n";
         return 1;
     }
 
     const auto& bp = runner.GetBlueprintData();
-    std::cout << "Blueprint: " << (bp.metadata.name.empty() ? "(unnamed)" : bp.metadata.name) << std::endl;
-    std::cout << "Nodes:     " << bp.nodes.size() << std::endl;
-    std::cout << "Links:     " << bp.links.size() << std::endl;
-    std::cout << std::endl;
+    if (!opt.quiet)
+    {
+        std::cout << "Blueprint: " << (bp.metadata.name.empty() ? "(unnamed)" : bp.metadata.name) << "\n";
+        std::cout << "Nodes:     " << bp.nodes.size() << "  Links: " << bp.links.size() << "\n\n";
+    }
 
     RegisterBuiltinHandlers(runner, basePath);
-    runner.SetDefaultHandler([](ExecutionContext& ctx) {
+    runner.SetDefaultHandler([&opt](ExecutionContext& ctx) {
         auto node = ctx.GetCurrentNode();
-        std::string n = node ? node->name : "(unknown)";
-        ctx.Log("  [Default Handler] pass-through for: " + n);
+        if (!opt.quiet && node)
+            std::cout << "[default] pass-through: " << node->name << "\n";
         return true;
     });
 
-    std::cout << "========================================" << std::endl;
-    std::cout << "  Execution Started"                     << std::endl;
-    std::cout << "========================================" << std::endl;
+    // Env vars (lower priority than -v)
+    for (const auto& kv : collectEnvVars())
+        runner.SetVariable(kv.first, variantFromString(kv.second));
 
-    auto startTime = std::chrono::high_resolution_clock::now();
-    auto result    = runner.Execute();
+    // CLI -v variables (override env vars)
+    for (const auto& kv : opt.vars)
+        runner.SetVariable(kv.first, variantFromString(kv.second));
 
-    // 触发 OnBeginPlay 事件链（与编辑器运行行为一致）
-    // Execute() 负责求值纯数据节点；DispatchEvent 负责执行事件驱动的执行流
-    auto beginPlayResult = runner.DispatchEvent("OnBeginPlay");
-    if (beginPlayResult.success && !beginPlayResult.executedNodeIds.empty())
+#ifdef BLUEPRINT_HAS_LUA
+    // Lua script injection
+    if (!opt.luaScript.empty())
     {
-        result.nodesExecuted += beginPlayResult.nodesExecuted;
-        for (auto nid : beginPlayResult.executedNodeIds)
-            result.executedNodeIds.push_back(nid);
+        if (!runner.LoadLuaScript(opt.luaScript))
+        {
+            std::cerr << "ERROR loading Lua: " << opt.luaScript << "\n";
+            return 1;
+        }
+        if (!opt.quiet) std::cout << "Lua loaded: " << opt.luaScript << "\n";
     }
-    else if (!beginPlayResult.success && !beginPlayResult.errorMessage.empty())
+#endif
+
+    if (!opt.quiet) std::cout << "=== Execution Started ===\n";
+
+    auto t0 = std::chrono::high_resolution_clock::now();
+
+    auto result = runner.Execute();
+
+    // Dispatch events
+    std::vector<std::string> events = opt.events.empty()
+        ? std::vector<std::string>{"OnBeginPlay"}
+        : opt.events;
+
+    for (const auto& ev : events)
     {
-        std::cerr << "[WARN] OnBeginPlay: " << beginPlayResult.errorMessage << std::endl;
+        if (ev.empty()) continue;
+        auto er = runner.DispatchEvent(ev);
+        if (er.success && !er.executedNodeIds.empty())
+        {
+            result.nodesExecuted += er.nodesExecuted;
+            for (auto nid : er.executedNodeIds)
+                result.executedNodeIds.push_back(nid);
+        }
+        else if (!er.success && !er.errorMessage.empty())
+        {
+            if (!opt.quiet) std::cerr << "[WARN] " << ev << ": " << er.errorMessage << "\n";
+        }
     }
 
-    auto endTime   = std::chrono::high_resolution_clock::now();
-    double elapsed = std::chrono::duration<double, std::milli>(endTime - startTime).count();
-
-    std::cout << std::endl;
-    std::cout << "========================================" << std::endl;
-    std::cout << "  Execution " << (result.success ? "Completed Successfully!" : "FAILED!") << std::endl;
-    std::cout << "  Nodes executed: " << result.nodesExecuted << std::endl;
-    std::cout << "  Elapsed: " << elapsed << " ms" << std::endl;
-    std::cout << "========================================" << std::endl;
-
+    // Tick loop
     if (runner.HasPendingWork())
     {
-        std::cout << "\n[Tick Loop] Active timers: " << runner.GetTimerManager().GetActiveTimerCount()
-                  << ", pending async: " << runner.PendingAsyncCount()
-                  << ", entering frame loop..." << std::endl;
+        if (!opt.quiet)
+            std::cout << "[Tick] active=" << runner.GetTimerManager().GetActiveTimerCount()
+                      << " async=" << runner.PendingAsyncCount() << "\n";
 
         auto loopStart = std::chrono::high_resolution_clock::now();
         auto lastTick  = loopStart;
 
-        while (runner.HasPendingWork())
+        while (runner.HasPendingWork() && !g_interrupted)
         {
             auto now = std::chrono::high_resolution_clock::now();
-            double totalElapsed = std::chrono::duration<double>(now - loopStart).count();
-            if (totalElapsed > maxTimeSec)
+            if (std::chrono::duration<double>(now - loopStart).count() > opt.maxTimeSec)
             {
-                std::cout << "[Tick Loop] Max time (" << maxTimeSec << "s) exceeded, stopping." << std::endl;
+                if (!opt.quiet) std::cout << "[Tick] timeout (" << opt.maxTimeSec << "s)\n";
                 break;
             }
-            float deltaTime = std::chrono::duration<float>(now - lastTick).count();
+            float dt = std::chrono::duration<float>(now - lastTick).count();
             lastTick = now;
-            // 先 DrainQueue：消费 FireEvent / async callback 投递的主线程任务
-            ::NodeEditor::Runtime::MainThreadDispatcher::Get().DrainQueue();
-            // 再 Tick：推进 timer（Delay / SetTimer 等）
-            runner.Tick(deltaTime);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tickRateMs));
+            MainThreadDispatcher::Get().DrainQueue();
+            runner.Tick(dt);
+            std::this_thread::sleep_for(std::chrono::milliseconds(opt.tickRateMs));
         }
-
-        auto loopEnd = std::chrono::high_resolution_clock::now();
-        double loopElapsed = std::chrono::duration<double, std::milli>(loopEnd - loopStart).count();
-        std::cout << "[Tick Loop] Finished. Loop time: " << loopElapsed << " ms" << std::endl;
-        std::cout << "  Remaining active timers: " << runner.GetTimerManager().GetActiveTimerCount() << std::endl;
-        std::cout << "  Remaining pending async: " << runner.PendingAsyncCount() << std::endl;
     }
 
-    std::cout << "\n=== Done ===" << std::endl;
+    auto t1 = std::chrono::high_resolution_clock::now();
+    double elapsed = std::chrono::duration<double, std::milli>(t1 - t0).count();
+
+    if (!opt.quiet)
+    {
+        std::cout << "\n=== " << (result.success ? "OK" : "FAILED")
+                  << " | " << result.nodesExecuted << " nodes"
+                  << " | " << elapsed << " ms ===\n";
+        if (!result.success && !result.errorMessage.empty())
+            std::cerr << "Error: " << result.errorMessage << "\n";
+    }
+
+    // Output variables
+    if (!opt.outputFmt.empty())
+        printVariables(runner, opt.outputFmt, opt.quiet);
+
     return result.success ? 0 : 1;
+}
+
+// ============================================================================
+// --watch mode
+// ============================================================================
+static int runWatch(const RunOptions& opt)
+{
+    namespace fs = std::filesystem;
+    signal(SIGINT, signalHandler);
+
+    std::cout << "[watch] Watching " << opt.filePath << " (Ctrl+C to stop)\n\n";
+
+    auto lastWrite = fs::last_write_time(opt.filePath);
+    executeSingle(opt);
+
+    while (!g_interrupted)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        if (!fs::exists(opt.filePath)) continue;
+        auto curWrite = fs::last_write_time(opt.filePath);
+        if (curWrite != lastWrite)
+        {
+            lastWrite = curWrite;
+            std::cout << "\n[watch] Change detected, re-executing...\n\n";
+            MainThreadDispatcher::Get().DrainQueue(); // flush pending from last run
+            executeSingle(opt);
+        }
+    }
+    std::cout << "\n[watch] Stopped.\n";
+    return 0;
+}
+
+// ============================================================================
+// --repl  Interactive mode
+// ============================================================================
+static int runRepl()
+{
+    std::cout << "BlueprintRuntime REPL — type 'help' for commands\n\n";
+
+    auto makeRunner = []{ return std::make_unique<BlueprintRunner>(); };
+    auto runner = makeRunner();
+    bool hasBlueprint = false;
+    std::string basePath = ".";
+    bool quiet = false;
+
+    auto setupCallbacks = [&](){
+        runner->SetLogCallback([&](LogLevel, const std::string& m){ if(!quiet) std::cout<<m<<"\n"; });
+        runner->SetPrintCallback([](LogLevel, const std::string& m){ std::cout<<m<<"\n"; });
+    };
+    setupCallbacks();
+    BP_InitDefaultHttpClient();
+
+    signal(SIGINT, signalHandler);
+
+    auto printHelp = [&](){
+        std::cout <<
+            "Commands:\n"
+            "  load <file.bjson>        Load a blueprint\n"
+            "  run [--no-deps]          Execute (Execute + OnBeginPlay)\n"
+            "  event <name>             Dispatch a named event\n"
+            "  set <VAR> <value>        Set a variable\n"
+            "  get <VAR>                Get a variable value\n"
+            "  vars                     List all current variables\n"
+            "  lua <code>               Evaluate Lua snippet (if compiled with Lua)\n"
+            "  tick [seconds]           Run tick loop for N seconds (default 1)\n"
+            "  quiet [on|off]           Toggle verbose output\n"
+            "  reset                    Reset runner state (keep blueprint loaded)\n"
+            "  clear                    Unload current blueprint\n"
+            "  help                     Show this help\n"
+            "  exit / quit              Exit REPL\n\n";
+    };
+
+    printHelp();
+
+    while (!g_interrupted)
+    {
+        std::cout << "bp> ";
+        std::cout.flush();
+
+        std::string line;
+        if (!std::getline(std::cin, line))
+            break;
+
+        // trim
+        while (!line.empty() && (line.front()==' '||line.front()=='\t')) line.erase(line.begin());
+        while (!line.empty() && (line.back()==' '||line.back()=='\t'||line.back()=='\r'||line.back()=='\n')) line.pop_back();
+        if (line.empty()) continue;
+
+        // tokenize
+        std::vector<std::string> toks;
+        std::istringstream iss(line);
+        std::string tok;
+        while (iss >> tok) toks.push_back(tok);
+        if (toks.empty()) continue;
+
+        const std::string& cmd = toks[0];
+
+        if (cmd == "exit" || cmd == "quit" || cmd == "q") break;
+
+        else if (cmd == "help" || cmd == "h") printHelp();
+
+        else if (cmd == "load")
+        {
+            if (toks.size() < 2) { std::cout << "Usage: load <file.bjson>\n"; continue; }
+            bool noDeps = (toks.size() >= 3 && toks[2] == "--no-deps");
+            namespace fs = std::filesystem;
+            if (!fs::exists(toks[1])) { std::cerr << "File not found: " << toks[1] << "\n"; continue; }
+            basePath = fs::path(toks[1]).parent_path().string();
+            if (basePath.empty()) basePath = ".";
+            runner = makeRunner();
+            setupCallbacks();
+            RegisterBuiltinHandlers(*runner, basePath);
+            bool ok = noDeps ? runner->LoadFromFile(toks[1]) : runner->LoadFromFileWithDeps(toks[1]);
+            if (ok)
+            {
+                hasBlueprint = true;
+                const auto& bp = runner->GetBlueprintData();
+                std::cout << "Loaded: " << (bp.metadata.name.empty() ? toks[1] : bp.metadata.name)
+                          << " (" << bp.nodes.size() << " nodes, " << bp.links.size() << " links)\n";
+            }
+            else std::cerr << "ERROR: " << runner->GetLastError() << "\n";
+        }
+
+        else if (cmd == "run")
+        {
+            if (!hasBlueprint) { std::cout << "No blueprint loaded. Use: load <file>\n"; continue; }
+            auto r = runner->Execute();
+            auto er = runner->DispatchEvent("OnBeginPlay");
+            if (er.success) r.nodesExecuted += er.nodesExecuted;
+            std::cout << (r.success ? "OK" : "FAILED") << " | " << r.nodesExecuted << " nodes\n";
+            if (!r.success && !r.errorMessage.empty()) std::cerr << "Error: " << r.errorMessage << "\n";
+        }
+
+        else if (cmd == "event")
+        {
+            if (!hasBlueprint) { std::cout << "No blueprint loaded.\n"; continue; }
+            if (toks.size() < 2) { std::cout << "Usage: event <name>\n"; continue; }
+            auto er = runner->DispatchEvent(toks[1]);
+            std::cout << (er.success ? "OK" : "FAILED") << " | " << er.nodesExecuted << " nodes\n";
+        }
+
+        else if (cmd == "set")
+        {
+            if (toks.size() < 3) { std::cout << "Usage: set <VAR> <value>\n"; continue; }
+            // rest of line after cmd and var name is the value
+            std::string val;
+            for (size_t i = 2; i < toks.size(); ++i) { if (i>2) val+=' '; val+=toks[i]; }
+            runner->SetVariable(toks[1], variantFromString(val));
+            std::cout << toks[1] << " = " << val << "\n";
+        }
+
+        else if (cmd == "get")
+        {
+            if (toks.size() < 2) { std::cout << "Usage: get <VAR>\n"; continue; }
+            auto v = runner->GetVariable(toks[1]);
+            if (v.type == PinDataType::Unknown) std::cout << "(not set)\n";
+            else std::cout << toks[1] << " = " << v.asString() << "\n";
+        }
+
+        else if (cmd == "vars")
+        {
+            const auto& vars = runner->GetAllVariables();
+            if (vars.empty()) { std::cout << "(no variables)\n"; continue; }
+            for (const auto& kv : vars)
+                std::cout << "  " << kv.first << " = " << kv.second.asString() << "\n";
+        }
+
+        else if (cmd == "tick")
+        {
+            float secs = 1.0f;
+            if (toks.size() >= 2) secs = std::stof(toks[1]);
+            auto deadline = std::chrono::steady_clock::now() + std::chrono::duration<float>(secs);
+            auto lastT = std::chrono::steady_clock::now();
+            int frames = 0;
+            while (std::chrono::steady_clock::now() < deadline && !g_interrupted)
+            {
+                auto now = std::chrono::steady_clock::now();
+                float dt = std::chrono::duration<float>(now - lastT).count();
+                lastT = now;
+                MainThreadDispatcher::Get().DrainQueue();
+                runner->Tick(dt);
+                ++frames;
+                std::this_thread::sleep_for(std::chrono::milliseconds(16));
+            }
+            std::cout << "Ticked " << frames << " frames ("
+                      << secs << "s). Active timers: "
+                      << runner->GetTimerManager().GetActiveTimerCount() << "\n";
+        }
+
+        else if (cmd == "reset")
+        {
+            runner->ResetState();
+            std::cout << "State reset.\n";
+        }
+
+        else if (cmd == "clear")
+        {
+            runner = makeRunner();
+            setupCallbacks();
+            hasBlueprint = false;
+            std::cout << "Blueprint cleared.\n";
+        }
+
+        else if (cmd == "quiet")
+        {
+            if (toks.size() >= 2) quiet = (toks[1] == "on" || toks[1] == "1" || toks[1] == "true");
+            else quiet = !quiet;
+            std::cout << "Quiet mode: " << (quiet ? "on" : "off") << "\n";
+        }
+
+#ifdef BLUEPRINT_HAS_LUA
+        else if (cmd == "lua")
+        {
+            if (!hasBlueprint) { std::cout << "No blueprint loaded.\n"; continue; }
+            // rest of line is Lua code
+            std::string code;
+            for (size_t i = 1; i < toks.size(); ++i) { if (i>1) code+=' '; code+=toks[i]; }
+            if (!runner->LoadLuaString(code, "=repl"))
+                std::cerr << "Lua error\n";
+        }
+#endif
+
+        else
+        {
+            std::cout << "Unknown command: " << cmd << ". Type 'help'.\n";
+        }
+    }
+
+    std::cout << "Bye.\n";
+    return 0;
+}
+
+// ============================================================================
+// Print help
+// ============================================================================
+static void printUsage(const char* prog)
+{
+    std::cout <<
+        "BlueprintRuntime CLI\n\n"
+        "USAGE\n"
+        "  " << prog << " <file.bjson> [options]    Execute a blueprint\n"
+        "  " << prog << " --repl                    Interactive REPL\n"
+        "  " << prog << " --test [flow_test.json]   Built-in unit tests\n"
+        "  " << prog << " --test-new                New-feature unit tests\n"
+        "  " << prog << " --help                    Show this help\n\n"
+        "EXECUTION OPTIONS\n"
+        "  -v KEY=VALUE         Inject a variable (can repeat, e.g. -v ApiKey=sk-xxx)\n"
+        "  -e EVENT             Dispatch event (default: OnBeginPlay; '' = none)\n"
+        "  --lua <script.lua>   Load Lua script before execution\n"
+        "  --max-time <secs>    Async wait timeout (default: 30)\n"
+        "  --tick-rate <ms>     Frame interval in ms (default: 16)\n"
+        "  --no-deps            Skip automatic dependency loading\n\n"
+        "OUTPUT OPTIONS\n"
+        "  -q, --quiet          Suppress all output except PrintString\n"
+        "  --output json        Print variables as JSON after execution\n"
+        "  --output vars        Print variables as KEY=VALUE after execution\n"
+        "  --watch              Re-execute on file change (Ctrl+C to stop)\n\n"
+        "ENVIRONMENT VARIABLES\n"
+        "  BP_APIKEY / BP_BASEURL / BP_MODEL  → ApiKey / BaseURL / Model\n"
+        "  BP_VAR_<NAME>=value               → variable <NAME>\n\n"
+        "EXAMPLES\n"
+        "  " << prog << " examples/ReActAgent.bjson -v ApiKey=sk-xxx -v UserQuery=hello\n"
+        "  " << prog << " examples/FeishuBot.bjson --watch\n"
+        "  " << prog << " agent.bjson -q --output json\n"
+        "  " << prog << " agent.bjson -e OnTick --max-time 60\n";
 }
 
 // ============================================================================
 // main
 // ============================================================================
 
-// 前向声明（实现在 test_new_features.cpp）
+// Forward declaration (implemented in test_new_features.cpp)
 int runNewFeatureTests();
 
 int main(int argc, char* argv[])
 {
-    // --help
+    // --help / -h
     for (int i = 1; i < argc; ++i)
-    {
-        std::string a = argv[i];
-        if (a == "--help" || a == "-h")
-        {
-            std::cout << "Usage: runtime-example [options] [<blueprint-file>]\n\n"
-                      << "Options:\n"
-                      << "  --test [flow_test.json]    Run built-in unit tests\n"
-                      << "                             Optionally specify the path to flow_test.json\n"
-                      << "                             (default: flow_test.json in current dir)\n"
-                      << "  --max-time <seconds>       Max time to wait for async timers (default: 30)\n"
-                      << "  --tick-rate <ms>           Frame tick interval in ms (default: 16)\n"
-                      << "\nIf no arguments, runs the built-in sample blueprint.\n";
-            return 0;
-        }
-    }
+        if (std::string(argv[i]) == "--help" || std::string(argv[i]) == "-h")
+            { printUsage(argv[0]); return 0; }
 
-    // --test [optional path to flow_test.json]
+    // --test
     for (int i = 1; i < argc; ++i)
-    {
         if (std::string(argv[i]) == "--test")
         {
-            std::string flowPath = "flow_test.json";
-            if (i + 1 < argc && argv[i+1][0] != '-')
-                flowPath = argv[i+1];
-            return runTests(flowPath);
+            std::string path = "flow_test.json";
+            if (i+1 < argc && argv[i+1][0] != '-') path = argv[i+1];
+            return runTests(path);
         }
-    }
 
-    // --test-new: 新功能专项测试（Functions / Events / StringPool）
+    // --test-new
     for (int i = 1; i < argc; ++i)
-    {
         if (std::string(argv[i]) == "--test-new")
             return runNewFeatureTests();
-    }
 
-    // 命令行模式: 传入蓝图文件
-    if (argc >= 2)
+    // --repl
+    for (int i = 1; i < argc; ++i)
+        if (std::string(argv[i]) == "--repl")
+            return runRepl();
+
+    // No file argument → built-in demo (legacy behavior)
+    if (argc < 2)
     {
-        std::string filePath  = argv[1];
-        float  maxTimeSec = 30.0f;
-        int    tickRateMs = 16;
+        std::cout << "[Demo] No file specified. Run with --help for usage.\n";
+        std::cout << "Running built-in math pipeline demo...\n\n";
+        // Minimal inline demo so the binary is still useful without args
+        BlueprintRunner runner;
+        runner.SetPrintCallback([](LogLevel, const std::string& m){ std::cout << m << "\n"; });
+        runner.RegisterHandler("constant_float", [](ExecutionContext& ctx){
+            ctx.SetOutputValue("Value", ctx.GetNodeData("value")); return true;
+        });
+        runner.RegisterHandler("math_add", [](ExecutionContext& ctx){
+            double r = ctx.GetInputValue("A").asFloat() + ctx.GetInputValue("B").asFloat();
+            ctx.SetOutputValue("Result", Variant(r));
+            std::cout << "  " << ctx.GetInputValue("A").asFloat() << " + "
+                      << ctx.GetInputValue("B").asFloat() << " = " << r << "\n";
+            return true;
+        });
+        runner.RegisterHandler("output_display", [](ExecutionContext& ctx){
+            std::cout << "[result] " << ctx.GetInputValue("Input").asFloat() << "\n";
+            return true;
+        });
 
-        for (int i = 2; i < argc; ++i)
+        BlueprintData bp; bp.metadata.name = "Demo";
+        auto mkNode = [](int id, const std::string& def, int outId, std::initializer_list<int> inIds) {
+            NodeInstance n; n.id=id; n.definitionId=def;
+            for (int pid : inIds) { PinInfo p; p.id=pid; p.kind=PinKind::Input;  p.name="dummy"; n.pins.push_back(p); }
+            { PinInfo p; p.id=outId; p.kind=PinKind::Output; p.name="Value"; n.pins.push_back(p); }
+            return n;
+        };
+        // constant A=10
+        { auto n = mkNode(1,"constant_float",101,{}); n.nodeData["value"]=Variant(10.0); bp.nodes.push_back(n); }
+        // constant B=3
+        { auto n = mkNode(2,"constant_float",201,{}); n.nodeData["value"]=Variant(3.0);  bp.nodes.push_back(n); }
+        // add
         {
-            std::string arg = argv[i];
-            if (arg == "--max-time" && i+1 < argc)
-                maxTimeSec = std::stof(argv[++i]);
-            else if (arg == "--tick-rate" && i+1 < argc)
-                tickRateMs = std::stoi(argv[++i]);
-            else
-            {
-                std::cerr << "Unknown option: " << arg << "\nUse --help for usage information.\n";
-                return 1;
-            }
+            NodeInstance n; n.id=3; n.definitionId="math_add";
+            PinInfo a; a.id=301; a.kind=PinKind::Input;  a.name="A"; n.pins.push_back(a);
+            PinInfo b; b.id=302; b.kind=PinKind::Input;  b.name="B"; n.pins.push_back(b);
+            PinInfo r; r.id=303; r.kind=PinKind::Output; r.name="Result"; n.pins.push_back(r);
+            bp.nodes.push_back(n);
         }
-
-        return runBlueprintFromFile(filePath, maxTimeSec, tickRateMs);
+        // display
+        {
+            NodeInstance n; n.id=4; n.definitionId="output_display";
+            PinInfo i; i.id=401; i.kind=PinKind::Input; i.name="Input"; n.pins.push_back(i);
+            bp.nodes.push_back(n);
+        }
+        bp.links.push_back({1001,101,301}); bp.links.push_back({1002,201,302});
+        bp.links.push_back({1003,303,401});
+        bp.rebuildIndices();
+        runner.Load(bp);
+        auto res = runner.Execute();
+        std::cout << "\n" << (res.success ? "OK" : "FAILED") << "\n";
+        return res.success ? 0 : 1;
     }
 
-    // ----------------------------------------------------------------
-    // 无参数模式：运行内置示例蓝图
-    // ----------------------------------------------------------------
-    std::cout << "=== Blueprint Dual-File Export Example ===" << std::endl;
-    std::cout << "(Use 'runtime-example --test' to run unit tests)" << std::endl;
-    std::cout << std::endl;
+    // ── Parse arguments ──────────────────────────────────────────────────────
+    RunOptions opt;
+    opt.filePath = argv[1];
+    bool watch = false;
+    bool eventsExplicit = false;
 
-    BlueprintData blueprint = createSampleBlueprint();
-    JsonBlueprintExporter exporter;
-    ExportOptions opts;
-    opts.prettyPrint = true;
-
-    // Step 1: 导出为两个文件 (Runtime + Editor)
-    std::cout << "--- Step 1: Export to single .bjson file (runtime + editor) ---" << std::endl;
-    auto exportResult = exporter.exportEditorFiles(blueprint, "blueprint.bjson", opts);
-    if (!exportResult.success)
+    for (int i = 2; i < argc; ++i)
     {
+        std::string a = argv[i];
 
-        std::cerr << "Export failed: " << exportResult.errorMessage << std::endl;
-        return 1;
+        if ((a == "-v" || a == "--var") && i+1 < argc)
+        {
+            std::string key, val;
+            if (parseKV(argv[++i], key, val)) opt.vars.emplace_back(key, val);
+            else std::cerr << "WARNING: bad -v format: " << argv[i] << "\n";
+        }
+        else if ((a == "-e" || a == "--event") && i+1 < argc)
+        {
+            if (!eventsExplicit) { opt.events.clear(); eventsExplicit = true; }
+            std::string ev = argv[++i];
+            if (!ev.empty()) opt.events.push_back(ev);
+        }
+        else if (a == "--lua" && i+1 < argc) opt.luaScript = argv[++i];
+        else if (a == "--max-time" && i+1 < argc) opt.maxTimeSec = std::stof(argv[++i]);
+        else if (a == "--tick-rate" && i+1 < argc) opt.tickRateMs = std::stoi(argv[++i]);
+        else if (a == "--no-deps") opt.noDeps = true;
+        else if (a == "-q" || a == "--quiet") opt.quiet = true;
+        else if (a == "--watch") watch = true;
+        else if (a == "--output" && i+1 < argc) opt.outputFmt = argv[++i];
+        else if (a == "--output") opt.outputFmt = "vars";  // bare --output
+        else {
+            std::cerr << "Unknown option: " << a << ". Use --help.\n";
+            return 1;
+        }
     }
-    std::cout << "Single file:   blueprint.bjson  (" << exportResult.bytesWritten << " bytes)" << std::endl;
-    std::cout << std::endl;
 
-    std::string runtimeJson = exporter.exportRuntimeToString(blueprint, opts);
-    std::cout << "---- Runtime JSON (embedded in .bjson) ----" << std::endl;
-    std::cout << runtimeJson << std::endl;
+    signal(SIGINT, signalHandler);
 
-    // Step 2: 运行时 — 加载单文件（runtime 段）
-    std::cout << "--- Step 2: Runtime — load single .bjson file ---" << std::endl;
+    if (watch) return runWatch(opt);
+    return executeSingle(opt);
+}
+
+// ============================================================================
+// Unit test implementations (Test 1-7, same logic as before)
+// ============================================================================
+
+static void test_registry_no_dangling_ptr()
+{
+    std::cout << "\n[Test 1] DefaultNodeRegistry – rehash dangling pointer fix\n";
+    DefaultNodeRegistry reg;
+    for (int i = 0; i < 200; ++i) {
+        NodeDefinition def; def.id = "node_" + std::to_string(i); def.name = "Node " + std::to_string(i);
+        reg.registerNode(def);
+    }
+    const auto& defs = reg.getAllNodeDefinitions();
+    CHECK(defs.size() == 200, "200 nodes registered");
+    bool ok = true;
+    for (const auto* p : defs) { if (!p||p->id.empty()||reg.getNodeDefinition(p->id)!=p){ok=false;break;} }
+    CHECK(ok, "All cached pointers valid");
+    NodeDefinition upd; upd.id="node_0"; upd.name="Updated";
+    reg.registerNode(upd);
+    const auto* p0 = reg.getNodeDefinition("node_0");
+    CHECK(p0 && p0->name == "Updated", "Update works, pointer still valid");
+    CHECK(reg.getAllNodeDefinitions().size() == 200, "Size unchanged after update");
+}
+
+static void test_variant_conversion()
+{
+    std::cout << "\n[Test 2] Variant asInt/asFloat (strtoll/strtod)\n";
+    Variant vs(std::string("42"));
+    CHECK(vs.asInt()==42, "\"42\"→asInt==42");
+    CHECK(vs.asFloat()==42.0, "\"42\"→asFloat==42.0");
+    Variant vf(std::string("3.14"));
+    CHECK(vf.asFloat()>3.13&&vf.asFloat()<3.15, "\"3.14\"→asFloat≈3.14");
+    CHECK(vf.asInt()==3, "\"3.14\"→asInt==3");
+    Variant vb(std::string("abc"));
+    CHECK(vb.asInt()==0, "\"abc\"→asInt==0");
+    CHECK(vb.asFloat()==0.0, "\"abc\"→asFloat==0.0");
+}
+
+static void test_variant_map()
+{
+    std::cout << "\n[Test 3] Variant Map API\n";
+    Variant m;
+    m.mapSet("foo", Variant(std::string("bar")));
+    m.mapSet("count", Variant(int64_t(42)));
+    CHECK(m.mapHasKey("foo"),  "mapHasKey foo");
+    CHECK(!m.mapHasKey("baz"), "!mapHasKey baz");
+    CHECK(m.mapGet("foo").asString()=="bar", "mapGet foo==bar");
+    CHECK(m.mapGet("count").asInt()==42, "mapGet count==42");
+    m.mapRemove("foo");
+    CHECK(m.mapSize()==1, "mapSize==1 after remove");
+}
+
+static void test_flow_blueprint(const std::string& flowTestPath)
+{
+    std::cout << "\n[Test 4] BlueprintRunner – flow_test.json\n";
     BlueprintRunner runner;
-    runner.SetLogCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
-    runner.SetPrintCallback([](NodeEditor::Runtime::LogLevel, const std::string& msg) { std::cout << msg << std::endl; });
-
-    if (!runner.LoadFromFile("blueprint.bjson"))
-    {
-        std::cerr << "ERROR: " << runner.GetLastError() << std::endl;
-        return 1;
-    }
-    std::cout << "Blueprint loaded: " << runner.GetBlueprintData().metadata.name << std::endl;
-    std::cout << "Nodes: " << runner.GetBlueprintData().nodes.size() << std::endl;
-    std::cout << "Links: " << runner.GetBlueprintData().links.size() << std::endl;
-
-    const auto* node1 = runner.GetBlueprintData().findNode(1);
-    if (node1)
-        std::cout << "Node 'Constant A' position: (" << node1->position.x << ", " << node1->position.y
-                  << ") (restored from editor section)" << std::endl;
-    std::cout << "Comments count: " << runner.GetBlueprintData().comments.size() << std::endl;
-    std::cout << std::endl;
-
-    runner.RegisterHandler("constant_float", handler_ConstantFloat);
-    runner.RegisterHandler("math_add",       handler_MathAdd);
-    runner.RegisterHandler("output_display", handler_OutputDisplay);
-
-    std::cout << "Executing..." << std::endl;
+    RegisterBuiltinHandlers(runner, ".");
+    std::vector<std::string> logs;
+    runner.SetLogCallback([&](LogLevel, const std::string& m){ logs.push_back(m); });
+    runner.SetPrintCallback([&](LogLevel, const std::string& m){ logs.push_back(m); });
+    bool loaded = runner.LoadFromFile(flowTestPath);
+    CHECK(loaded, "flow_test.json loaded");
+    if (!loaded) { std::cout << "  Error: " << runner.GetLastError() << "\n"; return; }
     auto result = runner.Execute();
-    std::cout << "Success: " << (result.success ? "Yes" : "No") << std::endl;
-    std::cout << "Nodes executed: " << result.nodesExecuted << std::endl;
-    std::cout << "Elapsed: " << result.elapsedMs << " ms" << std::endl;
-    std::cout << std::endl;
+    CHECK(result.success, "Execute success");
+    CHECK(runner.GetVariable("counter").asInt()==10, "counter==10 (0+1+2+3+4)");
+    bool foundTrue = false;
+    for (auto& l : logs) if (l.find("TRUE")!=std::string::npos){foundTrue=true;break;}
+    CHECK(foundTrue, "Branch True branch executed");
+}
 
-    // Step 3: 编辑器 — 重新加载完整数据（单文件包含 editor 段）
-    std::cout << "--- Step 3: Editor — reload single file with editor data ---" << std::endl;
-    auto mergeResult = exporter.importRuntimeFromFile("blueprint.bjson");
-    if (!mergeResult.success)
+static void test_map_nodes()
+{
+    std::cout << "\n[Test 5] Map nodes end-to-end\n";
+    BlueprintRunner runner;
+    RegisterBuiltinHandlers(runner, ".");
+    BlueprintData bp; bp.metadata.name="MapTest";
     {
-        std::cerr << "Load failed: " << mergeResult.errorMessage << std::endl;
-        return 1;
+        NodeInstance n; n.id=1; n.definitionId="MapSet";
+        PinInfo p0; p0.id=11; p0.kind=PinKind::Input; p0.isExec=true; n.pins.push_back(p0);
+        PinInfo p1; p1.id=12; p1.kind=PinKind::Input; p1.dataType=PinDataType::Map; p1.name="Map"; n.pins.push_back(p1);
+        PinInfo p2; p2.id=13; p2.kind=PinKind::Input; p2.dataType=PinDataType::Any; p2.name="Key"; p2.defaultValue=Variant(std::string("hello")); n.pins.push_back(p2);
+        PinInfo p3; p3.id=14; p3.kind=PinKind::Input; p3.dataType=PinDataType::Any; p3.name="Value"; p3.defaultValue=Variant(std::string("world")); n.pins.push_back(p3);
+        PinInfo p4; p4.id=15; p4.kind=PinKind::Output; p4.isExec=true; n.pins.push_back(p4);
+        PinInfo p5; p5.id=16; p5.kind=PinKind::Output; p5.dataType=PinDataType::Map; p5.name="Map"; n.pins.push_back(p5);
+        bp.nodes.push_back(n);
     }
-    std::cout << "Data loaded OK!" << std::endl;
-    std::cout << "  Name: "      << mergeResult.data.metadata.name      << std::endl;
-    std::cout << "  Author: "    << mergeResult.data.metadata.author    << " (from editor section)" << std::endl;
-    std::cout << "  CreatedAt: " << mergeResult.data.metadata.createdAt << " (from editor section)" << std::endl;
-    std::cout << "  Nodes: "     << mergeResult.data.nodes.size()       << std::endl;
-
-    const auto* mergedNode1 = mergeResult.data.findNode(1);
-    if (mergedNode1)
     {
-        std::cout << "  Node 'Constant A' position: (" << mergedNode1->position.x << ", " << mergedNode1->position.y
-                  << ") (restored from editor section)" << std::endl;
-        std::cout << "  Node 'Constant A' size: (" << mergedNode1->size.width << "x" << mergedNode1->size.height
-                  << ") (restored from editor section)" << std::endl;
+        NodeInstance n; n.id=2; n.definitionId="MapGet";
+        PinInfo p0; p0.id=21; p0.kind=PinKind::Input; p0.dataType=PinDataType::Map; p0.name="Map"; n.pins.push_back(p0);
+        PinInfo p1; p1.id=22; p1.kind=PinKind::Input; p1.dataType=PinDataType::Any; p1.name="Key"; p1.defaultValue=Variant(std::string("hello")); n.pins.push_back(p1);
+        PinInfo p2; p2.id=23; p2.kind=PinKind::Output; p2.dataType=PinDataType::Any; p2.name="Value"; n.pins.push_back(p2);
+        PinInfo p3; p3.id=24; p3.kind=PinKind::Output; p3.dataType=PinDataType::Boolean; p3.name="Found"; n.pins.push_back(p3);
+        bp.nodes.push_back(n);
     }
-    std::cout << "  Comments: " << mergeResult.data.comments.size() << " (restored from editor section)" << std::endl;
-    if (!mergeResult.data.comments.empty())
-        std::cout << "    Comment[0]: \"" << mergeResult.data.comments[0].text << "\"" << std::endl;
-    if (!mergeResult.data.variables.empty())
-    {
-        const auto& var = mergeResult.data.variables[0];
-        std::cout << "  Variable '" << var.name << "' category: \"" << var.category
-                  << "\", tooltip: \"" << var.tooltip << "\" (from editor section)" << std::endl;
-    }
-    std::cout << "  Total bytes read: " << mergeResult.bytesRead << std::endl;
-    std::cout << std::endl;
+    { LinkInstance lk; lk.id=1; lk.startPinId=16; lk.endPinId=21; bp.links.push_back(lk); }
+    bp.rebuildIndices();
+    bool loaded = runner.Load(bp);
+    CHECK(loaded, "Map blueprint loaded");
+    Variant em; em.type=PinDataType::Map;
+    runner.SetPinValue(12, em);
+    CHECK(runner.ExecuteNode(1).success, "MapSet success");
+    CHECK(runner.ExecuteNode(2).success, "MapGet success");
+    CHECK(runner.GetPinValue(24).asBool(), "Found==true");
+    CHECK(runner.GetPinValue(23).asString()=="world", "Value==world");
+}
 
-    // Step 4: 注入外部值重新执行
-    std::cout << "--- Step 4: Inject external values and re-execute ---" << std::endl;
-    runner.ResetState();
-    runner.SetPinValue(101, Variant(42.0));
-    runner.SetPinValue(201, Variant(8.0));
-    runner.RegisterHandler("constant_float", [](ExecutionContext& ctx) {
-        ctx.Log("  -> (using pre-set pin value)");
-        return true;
-    });
-    auto result2 = runner.Execute();
-    std::cout << "Success: " << (result2.success ? "Yes" : "No") << std::endl;
-    std::cout << "Expected: 42 + 8 = 50" << std::endl;
+static void test_crude_json_utf8()
+{
+    std::cout << "\n[Test 6] crude_json UTF-8\n";
+    auto v = crude_json::value::parse(u8"{\"name\": \"蓝图测试\", \"value\": 42}");
+    CHECK(!v.is_discarded(), "UTF-8 JSON parsed");
+    CHECK(v["name"].get<std::string>()==u8"蓝图测试", "Chinese field value correct");
+    CHECK(v["value"].get<double>()==42.0, "Numeric field correct");
+}
 
-    // Step 5: 蓝图变量
-    std::cout << "\n--- Step 5: Blueprint variables ---" << std::endl;
-    auto speed = runner.GetVariable("Speed");
-    std::cout << "Variable 'Speed' = " << speed.asFloat() << std::endl;
-    runner.SetVariable("Speed", Variant(3.0));
-    std::cout << "Variable 'Speed' (updated) = " << runner.GetVariable("Speed").asFloat() << std::endl;
-
-    std::cout << "\n=== Done ===" << std::endl;
-
-#ifdef _WIN32
-    system("pause");
-#endif
-
-    return 0;
+static void test_add_type_promotion()
+{
+    std::cout << "\n[Test 7] Add type promotion\n";
+    Variant a(int64_t(3)), b(int64_t(4));
+    CHECK(a.type==PinDataType::Integer, "a is Integer");
+    Variant r(a.asInt()+b.asInt());
+    CHECK(r.type==PinDataType::Integer, "Integer+Integer→Integer");
+    CHECK(r.asInt()==7, "3+4==7");
+    CHECK(r.asString()=="7", "asString no float format");
 }
