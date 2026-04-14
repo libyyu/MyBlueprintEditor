@@ -395,7 +395,8 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
         {
             auto* doc = ActiveDoc();
 
-            // ── 工具栏：过滤框 + Copy + Clear ────────────────────────────────
+
+            // ── 工具栏第一行：关键字过滤框 + Copy + Clear ───────────────────────
             float copyW  = ImGui::CalcTextSize(ICON_FA_COPY  " Copy").x  + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f;
             float clearW = ImGui::CalcTextSize(ICON_FA_ERASER " Clear").x + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f;
             float filterW = paneWidth - copyW - clearW - ImGui::GetStyle().ItemSpacing.x * 2.0f - 4.0f;
@@ -436,6 +437,47 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
                 doc->lastExecutionResult = RTExecutionResult{};
             }
 
+            // ── 工具栏第二行：日志级别过滤切换 ────────────────────────────────
+            {
+                // Error 按钮（红色切换）
+                ImVec4 errColor  = doc->logShowErrors   ? ImVec4(0.90f,0.25f,0.25f,1.0f) : ImVec4(0.35f,0.18f,0.18f,0.7f);
+                ImVec4 warnColor = doc->logShowWarnings ? ImVec4(0.85f,0.60f,0.10f,1.0f) : ImVec4(0.35f,0.28f,0.08f,0.7f);
+                ImVec4 infoColor = doc->logShowInfo     ? ImVec4(0.30f,0.60f,0.90f,1.0f) : ImVec4(0.10f,0.22f,0.35f,0.7f);
+
+                ImGui::PushStyleColor(ImGuiCol_Button,        errColor);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(errColor.x+0.1f, errColor.y+0.05f, errColor.z+0.05f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,  errColor);
+                if (ImGui::SmallButton("E##logE")) doc->logShowErrors = !doc->logShowErrors;
+                ImGui::PopStyleColor(3);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Toggle: show ERROR lines");
+
+                ImGui::SameLine(0, 3);
+                ImGui::PushStyleColor(ImGuiCol_Button,        warnColor);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(warnColor.x+0.05f, warnColor.y+0.1f, warnColor.z, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,  warnColor);
+                if (ImGui::SmallButton("W##logW")) doc->logShowWarnings = !doc->logShowWarnings;
+                ImGui::PopStyleColor(3);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Toggle: show WARNING lines");
+
+                ImGui::SameLine(0, 3);
+                ImGui::PushStyleColor(ImGuiCol_Button,        infoColor);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(infoColor.x+0.05f, infoColor.y+0.1f, infoColor.z+0.1f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,  infoColor);
+                if (ImGui::SmallButton("I##logI")) doc->logShowInfo = !doc->logShowInfo;
+                ImGui::PopStyleColor(3);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Toggle: show INFO / general lines");
+
+                ImGui::SameLine(0, 8);
+                if (!doc->lastExecutionStatus.empty())
+                {
+                    bool ok = doc->lastExecutionStatus.find("OK") == 0 ||
+                              doc->lastExecutionStatus.find("Paused") == 0;
+                    ImGui::TextColored(
+                        ok ? ImVec4(0.4f,0.9f,0.4f,1.0f) : ImVec4(0.9f,0.35f,0.35f,1.0f),
+                        "%s", doc->lastExecutionStatus.c_str());
+                }
+            }
+
             // ── 日志颜色分类（按行关键词） ─────────────────────────────────────
             auto getLogLineColor = [](const std::string& line) -> ImVec4 {
                 auto has = [&](const char* s){ return line.find(s) != std::string::npos; };
@@ -464,6 +506,18 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
             float logH = ImGui::GetContentRegionAvail().y - 4.0f;
             if (logH < 40.0f) logH = 40.0f;
 
+            // 级别过滤判断
+            auto passLevelFilter = [&doc](const std::string& line) -> bool {
+                auto has = [&](const char* s){ return line.find(s) != std::string::npos; };
+                bool isError   = has("[ERROR]") || has("FAILED") || has("ABORTED");
+                bool isWarning = !isError && has("[WARN]");
+                bool isInfo    = !isError && !isWarning;
+                if (isError   && !doc->logShowErrors)   return false;
+                if (isWarning && !doc->logShowWarnings) return false;
+                if (isInfo    && !doc->logShowInfo)     return false;
+                return true;
+            };
+
             ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.082f, 0.086f, 0.102f, 1.0f));
             bool scrollToBottom = false;
             if (ImGui::BeginChild("##ExecLogChild", ImVec2(paneWidth, logH), ImGuiChildFlags_Borders))
@@ -476,6 +530,8 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
                 {
                     const auto& line = logLines[i];
                     if (!filter.empty() && line.find(filter) == std::string::npos)
+                        continue;
+                    if (!passLevelFilter(line))
                         continue;
                     ImVec4 col = getLogLineColor(line);
                     ImGui::TextColored(col, "%s", line.c_str());

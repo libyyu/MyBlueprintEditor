@@ -1739,11 +1739,13 @@ bool BlueprintRunner::StepNextNode()
 // 内部辅助：将用户回调包装为带 context save/restore 的 TimerCallback
 // timer 回调在未来帧触发时 m_state->currentNode / pinNameToId / nodeData
 // 已被其他节点覆盖，需要先恢复再调用用户回调
+//
+// 优化（P3）：不再深拷贝 savedPinNameToId unordered_map，
+// 只保存 savedNode 指针，回调触发时从节点 pins 重建，避免高频 Timer 的 map 深拷贝开销。
 TimerCallback ExecutionContext::wrapCallbackWithContextRestore(TimerCallback callback)
 {
-    auto savedNode        = m_state->currentNode;
-    auto savedPinNameToId = m_state->pinNameToId;
-    auto savedNodeData    = m_state->nodeData;
+    auto savedNode     = m_state->currentNode;
+    auto savedNodeData = m_state->nodeData;
 
     if (m_runner)
         m_runner->AcquireAsync();
@@ -1754,7 +1756,7 @@ TimerCallback ExecutionContext::wrapCallbackWithContextRestore(TimerCallback cal
     NodeExecutionState* state = m_state;
 
     return [state, runner, alive, callback = std::move(callback),
-            savedNode, savedPinNameToId, savedNodeData]() mutable -> bool
+            savedNode, savedNodeData]() mutable -> bool
     {
         // 检查 runner 是否已析构
         if (alive && !alive->load(std::memory_order_acquire))
@@ -1763,21 +1765,48 @@ TimerCallback ExecutionContext::wrapCallbackWithContextRestore(TimerCallback cal
         }
 
         // 保存当前状态
-        auto prevNode        = state->currentNode;
-        auto prevPinNameToId = state->pinNameToId;
-        auto prevNodeData    = state->nodeData;
+        auto prevNode     = state->currentNode;
+        auto prevNodeData = state->nodeData;
 
         // 恢复注册时的状态
-        state->currentNode  = savedNode;
-        state->pinNameToId  = savedPinNameToId;
-        state->nodeData     = savedNodeData;
+        state->currentNode = savedNode;
+        state->nodeData    = savedNodeData;
+        // 从节点 pins 重建 pinNameToId（避免深拷贝 map，直接按需重建）
+        state->pinNameToId.clear();
+        state->inputPinNameToId.clear();
+        state->outputPinNameToId.clear();
+        if (savedNode)
+        {
+            for (const auto& pin : savedNode->pins)
+            {
+                state->pinNameToId[pin.name] = pin.id;
+                if (pin.kind == PinKind::Input)
+                    state->inputPinNameToId[pin.name] = pin.id;
+                else
+                    state->outputPinNameToId[pin.name] = pin.id;
+            }
+        }
 
         const bool ret = callback();
 
         // 恢复调用前的状态
-        state->currentNode  = prevNode;
-        state->pinNameToId  = prevPinNameToId;
-        state->nodeData     = prevNodeData;
+        state->currentNode = prevNode;
+        state->nodeData    = prevNodeData;
+        // 重建前一个节点的 pinNameToId
+        state->pinNameToId.clear();
+        state->inputPinNameToId.clear();
+        state->outputPinNameToId.clear();
+        if (prevNode)
+        {
+            for (const auto& pin : prevNode->pins)
+            {
+                state->pinNameToId[pin.name] = pin.id;
+                if (pin.kind == PinKind::Input)
+                    state->inputPinNameToId[pin.name] = pin.id;
+                else
+                    state->outputPinNameToId[pin.name] = pin.id;
+            }
+        }
 
         if (!ret && runner)
             runner->ReleaseAsync();
@@ -1838,9 +1867,9 @@ void ExecutionContext::RunAsync(
 {
     if (!m_runner) return;
 
-    auto savedNode        = m_state->currentNode;
-    auto savedPinNameToId = m_state->pinNameToId;
-    auto savedNodeData    = m_state->nodeData;
+    // 优化（P3）：只保存节点指针，回调时从 pins 重建 pinNameToId，避免深拷贝 map
+    auto savedNode     = m_state->currentNode;
+    auto savedNodeData = m_state->nodeData;
 
     m_runner->AcquireAsync();
     BlueprintRunner*    runner = m_runner;
@@ -1848,14 +1877,31 @@ void ExecutionContext::RunAsync(
     NodeExecutionState* state  = m_state;
     ExecutionContext*   ctx    = this;
 
+    // 辅助：从节点 pins 重建三个 pinName→ID map
+    auto rebuildPinMaps = [](NodeExecutionState* st, const NodeInstance* node)
+    {
+        st->pinNameToId.clear();
+        st->inputPinNameToId.clear();
+        st->outputPinNameToId.clear();
+        if (!node) return;
+        for (const auto& pin : node->pins)
+        {
+            st->pinNameToId[pin.name] = pin.id;
+            if (pin.kind == PinKind::Input)
+                st->inputPinNameToId[pin.name] = pin.id;
+            else
+                st->outputPinNameToId[pin.name] = pin.id;
+        }
+    };
+
     // resolve：无论哪个平台，都 Post 到 MainThreadDispatcher，
     // 由 Tick() → DrainQueue() 在安全上下文中执行 onComplete。
-    auto resolve = [ctx, state, runner, alive, onComplete,
-                    savedNode, savedPinNameToId, savedNodeData]() mutable
+    auto resolve = [ctx, state, runner, alive, onComplete, savedNode, savedNodeData,
+                    rebuildPinMaps]() mutable
     {
         MainThreadDispatcher::Get().Post(
             [ctx, state, runner, alive, onComplete = std::move(onComplete),
-             savedNode, savedPinNameToId, savedNodeData]() mutable
+             savedNode, savedNodeData, rebuildPinMaps]() mutable
             {
                 if (!alive->load(std::memory_order_acquire))
                 {
@@ -1863,19 +1909,18 @@ void ExecutionContext::RunAsync(
                     return;
                 }
 
-                auto prevNode        = state->currentNode;
-                auto prevPinNameToId = state->pinNameToId;
-                auto prevNodeData    = state->nodeData;
+                auto prevNode     = state->currentNode;
+                auto prevNodeData = state->nodeData;
 
-                state->currentNode  = savedNode;
-                state->pinNameToId  = savedPinNameToId;
-                state->nodeData     = savedNodeData;
+                state->currentNode = savedNode;
+                state->nodeData    = savedNodeData;
+                rebuildPinMaps(state, savedNode);
 
                 if (onComplete) onComplete(*ctx);
 
-                state->currentNode  = prevNode;
-                state->pinNameToId  = prevPinNameToId;
-                state->nodeData     = prevNodeData;
+                state->currentNode = prevNode;
+                state->nodeData    = prevNodeData;
+                rebuildPinMaps(state, prevNode);
 
                 runner->ReleaseAsync();
             });
@@ -2028,10 +2073,10 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     }
 
     // 保存当前 context 状态（递归执行会修改它）
-    auto savedNode = m_state.currentNode;
-    auto savedPinNameToId = m_state.pinNameToId;
-    auto savedNodeData = m_state.nodeData;
-    auto savedActivatedInputPinId = m_state.activatedInputPinId;
+    auto savedNode                 = m_state.currentNode;
+    // 不再保存 savedPinNameToId（深拷贝），恢复时从 savedNode->pins 重建
+    auto savedNodeData             = m_state.nodeData;
+    auto savedActivatedInputPinId  = m_state.activatedInputPinId;
 
     // 传播当前节点的所有输出引脚值到下游（不仅是触发的 exec 引脚）
     if (savedNode)
@@ -2143,7 +2188,16 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
     {
         // 恢复 context
         m_state.currentNode = savedNode;
-        m_state.pinNameToId = savedPinNameToId;
+        m_state.pinNameToId.clear();
+        m_state.inputPinNameToId.clear();
+        m_state.outputPinNameToId.clear();
+        if (savedNode)
+            for (const auto& pin : savedNode->pins)
+            {
+                m_state.pinNameToId[pin.name] = pin.id;
+                if (pin.kind == PinKind::Input) m_state.inputPinNameToId[pin.name] = pin.id;
+                else                            m_state.outputPinNameToId[pin.name] = pin.id;
+            }
         m_state.nodeData = savedNodeData;
         m_state.activatedInputPinId = savedActivatedInputPinId;
         --m_flowDepth;
@@ -2228,7 +2282,21 @@ bool BlueprintRunner::executeDownstreamFromPin(PinId outputPinId)
 
     // 恢复 context 状态
     m_state.currentNode = savedNode;
-    m_state.pinNameToId = savedPinNameToId;
+    // 从节点 pins 重建 pinNameToId（避免保存/恢复 map 的深拷贝）
+    m_state.pinNameToId.clear();
+    m_state.inputPinNameToId.clear();
+    m_state.outputPinNameToId.clear();
+    if (savedNode)
+    {
+        for (const auto& pin : savedNode->pins)
+        {
+            m_state.pinNameToId[pin.name] = pin.id;
+            if (pin.kind == PinKind::Input)
+                m_state.inputPinNameToId[pin.name] = pin.id;
+            else
+                m_state.outputPinNameToId[pin.name] = pin.id;
+        }
+    }
     m_state.nodeData = savedNodeData;
     m_state.activatedInputPinId = savedActivatedInputPinId;
 

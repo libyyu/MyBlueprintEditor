@@ -208,7 +208,8 @@ void BlueprintEditor::DrawNodeLibraryPanel()
 
     const auto& catMap = s_libCatMap;
 
-    static std::unordered_map<std::string, bool> catOpenState;
+    // 分类展开状态：使用成员变量 m_LibCatOpenState 保持跨 Tab/重启的一致性
+    auto& catOpenState = m_LibCatOpenState;
 
     for (const auto& [cat, nodes] : catMap)
     {

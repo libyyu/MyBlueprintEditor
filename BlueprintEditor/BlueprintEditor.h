@@ -201,6 +201,10 @@ public:
     RTExecutionResult           lastExecutionResult;
     char                        execLogFilter[128] = {};  // 日志过滤输入框
     std::string                 execLogCachedFilter;      // 上次构建 executionLogText 时的过滤条件
+    // Log 面板级别过滤开关（默认全显示）
+    bool                        logShowErrors   = true;
+    bool                        logShowWarnings = true;
+    bool                        logShowInfo     = true;
 
     // 持久 Runner
     RTBlueprintRunner           persistentRunner;
@@ -714,6 +718,9 @@ struct BlueprintEditor : public Application
     bool                 m_ShowTimerWindow = false;       // 计时器监控面板可见
     bool                 m_ShowStyleEditorWindow = false; // 样式编辑器窗口可见
     bool                 m_ShowLibraryWindow = false;     // 节点库浮动面板可见
+
+    // 节点库面板：分类折叠状态（持久化，重启后保留，替代静态局部变量）
+    std::unordered_map<std::string, bool> m_LibCatOpenState;
 
     // VSCode 风格布局尺寸（可拖拽调整）
     float                m_LeftPanelWidth  = 320.0f;
