@@ -932,32 +932,13 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
             }
 
             // --- 7) 恢复枚举候选项（enumValues）---
-            // 辅助 lambda：解析 "A,B,C" → vector<string>
-            auto parseEnumValues = [](const std::string& raw) -> std::vector<std::string>
-            {
-                std::vector<std::string> out;
-                std::string item;
-                for (size_t ci = 0; ci <= raw.size(); ++ci)
-                {
-                    if (ci == raw.size() || raw[ci] == ',')
-                    {
-                        size_t s = item.find_first_not_of(' ');
-                        size_t e = item.find_last_not_of(' ');
-                        if (s != std::string::npos)
-                            out.push_back(item.substr(s, e - s + 1));
-                        item.clear();
-                    }
-                    else item += raw[ci];
-                }
-                return out;
-            };
-
+            // 使用 EditorTypes.h 中的共享工具函数 ParseEnumValues
             for (size_t i = 0; i < def->inputPins.size(); ++i)
             {
                 auto evIt = def->inputPins[i].customProperties.find("enumValues");
                 if (evIt == def->inputPins[i].customProperties.end() || evIt->second.empty())
                     continue;
-                auto enumVals = parseEnumValues(evIt->second);
+                auto enumVals = ParseEnumValues(evIt->second);
                 bool strict = (def->inputPins[i].customProperties.count("enumStrict") &&
                                def->inputPins[i].customProperties.at("enumStrict") == "true");
                 for (auto& edPin : node.Inputs)

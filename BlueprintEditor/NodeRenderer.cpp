@@ -2,6 +2,7 @@
 // 由 OnFrame 通过 DrawNodes(builder) 调用（builder 在调用方创建后传入）
 #include "BlueprintEditor.h"
 #include <cinttypes>
+#include <cmath>
 
 // 辅助：获取引脚的运行时值字符串
 // 优先从 persistentRunner 的实时 pinValues 取（断点暂停时有正确值，
@@ -436,6 +437,41 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                         }
                         else if (input.Type == PinType::Int)
                         {
+                            if (!input.EnumValues.empty())
+                            {
+                                // Int 枚举 Combo：选项字符串按 stoi 转换为整数
+                                int curIdx = 0;
+                                for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
+                                {
+                                    try {
+                                        if (std::stoll(input.EnumValues[ei]) == input.IntValue)
+                                            { curIdx = ei; break; }
+                                    } catch (...) {}
+                                }
+                                float comboW = 60.0f;
+                                for (const auto& ev : input.EnumValues)
+                                    comboW = std::max(comboW, ImGui::CalcTextSize(ev.c_str()).x + 28.0f);
+                                ImGui::SetNextItemWidth(comboW);
+                                const char* preview = input.EnumValues[curIdx].c_str();
+                                if (ImGui::BeginCombo("##enumI", preview, ImGuiComboFlags_HeightRegular))
+                                {
+                                    for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
+                                    {
+                                        bool sel = (ei == curIdx);
+                                        if (ImGui::Selectable(input.EnumValues[ei].c_str(), sel))
+                                        {
+                                            PushUndoState();
+                                            try { input.IntValue = std::stoll(input.EnumValues[ei]); }
+                                            catch (...) { input.IntValue = (int64_t)ei; }
+                                            ActiveDoc()->isDirty = true;
+                                        }
+                                        if (sel) ImGui::SetItemDefaultFocus();
+                                    }
+                                    ImGui::EndCombo();
+                                }
+                            }
+                            else
+                            {
                             ImGui::SetNextItemWidth(80.0f);
                             ImS64 v = static_cast<ImS64>(input.IntValue);
                             if (ImGui::DragScalar("##value", ImGuiDataType_S64, &v, 1.0f))
@@ -444,9 +480,46 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 ActiveDoc()->isDirty = true;
                             }
                             if (ImGui::IsItemActivated()) PushUndoState();  // 拖拽开始帧保存
+                            }
                         }
                         else if (input.Type == PinType::Float)
                         {
+                            if (!input.EnumValues.empty())
+                            {
+                                // Float 枚举 Combo：选项字符串按 stof 转换
+                                int curIdx = 0;
+                                for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
+                                {
+                                    try {
+                                        if (std::fabsf(std::stof(input.EnumValues[ei]) -
+                                                        static_cast<float>(input.FloatValue)) < 1e-5f)
+                                            { curIdx = ei; break; }
+                                    } catch (...) {}
+                                }
+                                float comboW = 60.0f;
+                                for (const auto& ev : input.EnumValues)
+                                    comboW = std::max(comboW, ImGui::CalcTextSize(ev.c_str()).x + 28.0f);
+                                ImGui::SetNextItemWidth(comboW);
+                                const char* preview = input.EnumValues[curIdx].c_str();
+                                if (ImGui::BeginCombo("##enumF", preview, ImGuiComboFlags_HeightRegular))
+                                {
+                                    for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
+                                    {
+                                        bool sel = (ei == curIdx);
+                                        if (ImGui::Selectable(input.EnumValues[ei].c_str(), sel))
+                                        {
+                                            PushUndoState();
+                                            try { input.FloatValue = static_cast<double>(std::stof(input.EnumValues[ei])); }
+                                            catch (...) { input.FloatValue = static_cast<double>(ei); }
+                                            ActiveDoc()->isDirty = true;
+                                        }
+                                        if (sel) ImGui::SetItemDefaultFocus();
+                                    }
+                                    ImGui::EndCombo();
+                                }
+                            }
+                            else
+                            {
                             ImGui::SetNextItemWidth(80.0f);
                             float fval = static_cast<float>(input.FloatValue);
                             if (ImGui::DragFloat("##value", &fval, 0.01f))
@@ -455,6 +528,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 ActiveDoc()->isDirty = true;
                             }
                             if (ImGui::IsItemActivated()) PushUndoState();  // 拖拽开始帧保存
+                            }
                         }
                         else if (input.Type == PinType::String)
                         {
@@ -475,6 +549,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 // Combo 下拉
                                 const char* preview = (curIdx >= 0 && curIdx < (int)input.EnumValues.size())
                                     ? input.EnumValues[curIdx].c_str() : "...";
+                                bool comboSelected = false;  // 本帧是否通过 Combo 选了新值
                                 if (ImGui::BeginCombo("##enum", preview,
                                         ImGuiComboFlags_HeightRegular))
                                 {
@@ -486,6 +561,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                             PushUndoState();
                                             input.StringValue = input.EnumValues[ei];
                                             ActiveDoc()->isDirty = true;
+                                            comboSelected = true;
                                         }
                                         if (sel) ImGui::SetItemDefaultFocus();
                                     }
@@ -497,9 +573,15 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 {
                                     auto key = reinterpret_cast<uintptr_t>(input.ID.AsPointer());
                                     auto& buf = s_StringBuffers[key];
-                                    // 同步 buf 和 StringValue
-                                    if (input.StringValue != buf.data())
+                                    // Bug 修复：只有以下情况才把 StringValue 同步回 buf：
+                                    //   1) buf 还从未初始化（buf[0]=='\0' 且 StringValue 非空）
+                                    //   2) 本帧刚通过 Combo 选了新值（comboSelected）
+                                    // 其他情况保持 buf 不变，避免用户键入时被外部值覆盖。
+                                    if (comboSelected ||
+                                        (buf[0] == '\0' && !input.StringValue.empty()))
+                                    {
                                         snprintf(buf.data(), buf.size(), "%s", input.StringValue.c_str());
+                                    }
 
                                     ImGui::SameLine(0, 2);
                                     ImGui::SetNextItemWidth(60.0f);

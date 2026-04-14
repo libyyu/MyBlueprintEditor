@@ -9,6 +9,7 @@
 
 #include <string>
 #include <vector>
+#include <sstream>
 
 namespace ed = ax::NodeEditor;
 
@@ -122,6 +123,29 @@ struct Link
     {
     }
 };
+
+// ── 共享工具：解析逗号分隔的枚举字符串 → vector<string> ──────────────────────
+// 支持每项两端空格 trim，例：" GET , POST , PUT " → ["GET","POST","PUT"]
+// 被 BlueprintEditor.cpp / FileOperations.cpp / ClipboardOps.cpp 共同使用
+inline std::vector<std::string> ParseEnumValues(const std::string& raw)
+{
+    std::vector<std::string> out;
+    if (raw.empty()) return out;
+    std::string item;
+    for (size_t i = 0; i <= raw.size(); ++i)
+    {
+        if (i == raw.size() || raw[i] == ',')
+        {
+            size_t s = item.find_first_not_of(' ');
+            size_t e = item.find_last_not_of(' ');
+            if (s != std::string::npos)
+                out.push_back(item.substr(s, e - s + 1));
+            item.clear();
+        }
+        else item += raw[i];
+    }
+    return out;
+}
 
 struct NodeIdLess
 {

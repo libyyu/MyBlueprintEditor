@@ -524,21 +524,7 @@ Node* BlueprintEditor::SpawnNodeByDef(const std::string& defId)
         auto evIt = pd.customProperties.find("enumValues");
         if (evIt != pd.customProperties.end() && !evIt->second.empty())
         {
-            std::string raw = evIt->second;
-            std::string item;
-            for (size_t i = 0; i <= raw.size(); ++i)
-            {
-                if (i == raw.size() || raw[i] == ',')
-                {
-                    // trim
-                    size_t s = item.find_first_not_of(' ');
-                    size_t e = item.find_last_not_of(' ');
-                    if (s != std::string::npos)
-                        pin.EnumValues.push_back(item.substr(s, e - s + 1));
-                    item.clear();
-                }
-                else item += raw[i];
-            }
+            pin.EnumValues = ParseEnumValues(evIt->second);
             pin.EnumStrict = (pd.customProperties.count("enumStrict") &&
                               pd.customProperties.at("enumStrict") == "true");
             // 若 StringValue 为空，用第一个枚举值作为默认
