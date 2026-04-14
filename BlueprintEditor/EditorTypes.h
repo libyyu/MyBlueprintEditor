@@ -63,10 +63,19 @@ struct Pin
     //        被引用的引脚若被连线，则视为条件不满足（保守显示）
     std::string HiddenWhen;
 
-    // 枚举候选项（来自 PinDefinition::customProperties["enumValues"]）
-    // 非空时 NodeRenderer 将 String 引脚渲染为 Combo 下拉而非 InputText
-    std::vector<std::string> EnumValues;
-    // true = 严格模式：只能从下拉选，不允许手动输入（来自 customProperties["enumStrict"]）
+    // ── 枚举条目（来自 PinDefinition::customProperties["enumValues"]）──
+    // 支持两种格式（可混用）：
+    //   纯字符串:  "GET,POST,PUT"       → label="GET",  value="GET"
+    //   Name=val:  "Monday=1,Tuesday=2" → label="Monday", value="1"
+    // - String 引脚：StringValue 存 value 字段
+    // - Int 引脚：IntValue 存 stoll(value)，显示 label
+    // - Float 引脚：FloatValue 存 stof(value)，显示 label
+    struct EnumEntry {
+        std::string label;   // 显示文本（如 "Monday"）
+        std::string value;   // 存储值（如 "1"；无 = 号时 value == label）
+    };
+    std::vector<EnumEntry> EnumValues;
+    // true = 严格模式：只能从下拉选，不允许手动输入
     bool EnumStrict = false;
 
     Pin(int id, const char* name, PinType type):
@@ -124,23 +133,53 @@ struct Link
     }
 };
 
-// ── 共享工具：解析逗号分隔的枚举字符串 → vector<string> ──────────────────────
-// 支持每项两端空格 trim，例：" GET , POST , PUT " → ["GET","POST","PUT"]
+// ── 共享工具：解析枚举字符串 → vector<EnumEntry> ───────────────────────────
+// 格式（可混用）：
+//   "GET,POST,PUT"            → [{label="GET",value="GET"}, ...]
+//   "Monday=1,Tuesday=2"      → [{label="Monday",value="1"}, ...]
+//   " A = 10 , B = 20 "       → [{label="A",value="10"}, ...] （自动 trim）
 // 被 BlueprintEditor.cpp / FileOperations.cpp / ClipboardOps.cpp 共同使用
-inline std::vector<std::string> ParseEnumValues(const std::string& raw)
+inline std::vector<Pin::EnumEntry> ParseEnumValues(const std::string& raw)
 {
-    std::vector<std::string> out;
+    std::vector<Pin::EnumEntry> out;
     if (raw.empty()) return out;
+
+    // 按逗号分割
     std::string item;
     for (size_t i = 0; i <= raw.size(); ++i)
     {
         if (i == raw.size() || raw[i] == ',')
         {
+            // trim item
             size_t s = item.find_first_not_of(' ');
             size_t e = item.find_last_not_of(' ');
-            if (s != std::string::npos)
-                out.push_back(item.substr(s, e - s + 1));
+            if (s == std::string::npos) { item.clear(); continue; }
+            std::string tok = item.substr(s, e - s + 1);
             item.clear();
+
+            // 解析 "Label=Value" 或纯 "Value"
+            auto eq = tok.find('=');
+            Pin::EnumEntry entry;
+            if (eq != std::string::npos)
+            {
+                entry.label = tok.substr(0, eq);
+                entry.value = tok.substr(eq + 1);
+                // trim label/value
+                auto trimStr = [](std::string& str) {
+                    size_t ls = str.find_first_not_of(' ');
+                    size_t le = str.find_last_not_of(' ');
+                    str = (ls == std::string::npos) ? "" : str.substr(ls, le - ls + 1);
+                };
+                trimStr(entry.label);
+                trimStr(entry.value);
+            }
+            else
+            {
+                entry.label = tok;
+                entry.value = tok;
+            }
+            if (!entry.label.empty())
+                out.push_back(std::move(entry));
         }
         else item += raw[i];
     }

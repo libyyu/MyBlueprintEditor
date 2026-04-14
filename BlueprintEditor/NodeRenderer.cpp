@@ -439,29 +439,31 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                         {
                             if (!input.EnumValues.empty())
                             {
-                                // Int 枚举 Combo：选项字符串按 stoi 转换为整数
+                                // Int 枚举 Combo：显示 label，存 stoll(value)
                                 int curIdx = 0;
                                 for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
                                 {
                                     try {
-                                        if (std::stoll(input.EnumValues[ei]) == input.IntValue)
+                                        if (std::stoll(input.EnumValues[ei].value) == input.IntValue)
                                             { curIdx = ei; break; }
                                     } catch (...) {}
                                 }
                                 float comboW = 60.0f;
                                 for (const auto& ev : input.EnumValues)
-                                    comboW = std::max(comboW, ImGui::CalcTextSize(ev.c_str()).x + 28.0f);
+                                    comboW = std::max(comboW, ImGui::CalcTextSize(ev.label.c_str()).x + 28.0f);
                                 ImGui::SetNextItemWidth(comboW);
-                                const char* preview = input.EnumValues[curIdx].c_str();
+                                const char* preview = input.EnumValues[curIdx].label.c_str();
+                                // ── NodeEditor 内部的 Combo 需要 Suspend 才能弹出 ──
+                                ed::Suspend();
                                 if (ImGui::BeginCombo("##enumI", preview, ImGuiComboFlags_HeightRegular))
                                 {
                                     for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
                                     {
                                         bool sel = (ei == curIdx);
-                                        if (ImGui::Selectable(input.EnumValues[ei].c_str(), sel))
+                                        if (ImGui::Selectable(input.EnumValues[ei].label.c_str(), sel))
                                         {
                                             PushUndoState();
-                                            try { input.IntValue = std::stoll(input.EnumValues[ei]); }
+                                            try { input.IntValue = std::stoll(input.EnumValues[ei].value); }
                                             catch (...) { input.IntValue = (int64_t)ei; }
                                             ActiveDoc()->isDirty = true;
                                         }
@@ -469,6 +471,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                     }
                                     ImGui::EndCombo();
                                 }
+                                ed::Resume();
                             }
                             else
                             {
@@ -479,37 +482,38 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 input.IntValue = static_cast<int64_t>(v);
                                 ActiveDoc()->isDirty = true;
                             }
-                            if (ImGui::IsItemActivated()) PushUndoState();  // 拖拽开始帧保存
+                            if (ImGui::IsItemActivated()) PushUndoState();
                             }
                         }
                         else if (input.Type == PinType::Float)
                         {
                             if (!input.EnumValues.empty())
                             {
-                                // Float 枚举 Combo：选项字符串按 stof 转换
+                                // Float 枚举 Combo：显示 label，存 stof(value)
                                 int curIdx = 0;
                                 for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
                                 {
                                     try {
-                                        if (std::fabsf(std::stof(input.EnumValues[ei]) -
+                                        if (std::fabsf(std::stof(input.EnumValues[ei].value) -
                                                         static_cast<float>(input.FloatValue)) < 1e-5f)
                                             { curIdx = ei; break; }
                                     } catch (...) {}
                                 }
                                 float comboW = 60.0f;
                                 for (const auto& ev : input.EnumValues)
-                                    comboW = std::max(comboW, ImGui::CalcTextSize(ev.c_str()).x + 28.0f);
+                                    comboW = std::max(comboW, ImGui::CalcTextSize(ev.label.c_str()).x + 28.0f);
                                 ImGui::SetNextItemWidth(comboW);
-                                const char* preview = input.EnumValues[curIdx].c_str();
+                                const char* preview = input.EnumValues[curIdx].label.c_str();
+                                ed::Suspend();
                                 if (ImGui::BeginCombo("##enumF", preview, ImGuiComboFlags_HeightRegular))
                                 {
                                     for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
                                     {
                                         bool sel = (ei == curIdx);
-                                        if (ImGui::Selectable(input.EnumValues[ei].c_str(), sel))
+                                        if (ImGui::Selectable(input.EnumValues[ei].label.c_str(), sel))
                                         {
                                             PushUndoState();
-                                            try { input.FloatValue = static_cast<double>(std::stof(input.EnumValues[ei])); }
+                                            try { input.FloatValue = static_cast<double>(std::stof(input.EnumValues[ei].value)); }
                                             catch (...) { input.FloatValue = static_cast<double>(ei); }
                                             ActiveDoc()->isDirty = true;
                                         }
@@ -517,6 +521,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                     }
                                     ImGui::EndCombo();
                                 }
+                                ed::Resume();
                             }
                             else
                             {
@@ -527,39 +532,38 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 input.FloatValue = static_cast<double>(fval);
                                 ActiveDoc()->isDirty = true;
                             }
-                            if (ImGui::IsItemActivated()) PushUndoState();  // 拖拽开始帧保存
+                            if (ImGui::IsItemActivated()) PushUndoState();
                             }
                         }
                         else if (input.Type == PinType::String)
                         {
                             if (!input.EnumValues.empty())
                             {
-                                // ── 枚举 Combo ─────────────────────────────────────
-                                // 计算当前值的下标
+                                // ── 枚举 Combo：按 value 匹配当前值，显示 label ──────
                                 int curIdx = 0;
                                 for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
-                                    if (input.EnumValues[ei] == input.StringValue) { curIdx = ei; break; }
+                                    if (input.EnumValues[ei].value == input.StringValue) { curIdx = ei; break; }
 
-                                // 宽度：各选项文字最大宽 + Combo 箭头 + padding
+                                // 宽度：各选项 label 文字最大宽 + Combo 箭头 + padding
                                 float comboW = 60.0f;
                                 for (const auto& ev : input.EnumValues)
-                                    comboW = std::max(comboW, ImGui::CalcTextSize(ev.c_str()).x + 28.0f);
+                                    comboW = std::max(comboW, ImGui::CalcTextSize(ev.label.c_str()).x + 28.0f);
                                 ImGui::SetNextItemWidth(comboW);
 
-                                // Combo 下拉
                                 const char* preview = (curIdx >= 0 && curIdx < (int)input.EnumValues.size())
-                                    ? input.EnumValues[curIdx].c_str() : "...";
-                                bool comboSelected = false;  // 本帧是否通过 Combo 选了新值
-                                if (ImGui::BeginCombo("##enum", preview,
-                                        ImGuiComboFlags_HeightRegular))
+                                    ? input.EnumValues[curIdx].label.c_str() : "...";
+                                bool comboSelected = false;
+                                // ── NodeEditor 内部 Combo 必须 Suspend 才能正常弹出 ──
+                                ed::Suspend();
+                                if (ImGui::BeginCombo("##enum", preview, ImGuiComboFlags_HeightRegular))
                                 {
                                     for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
                                     {
                                         bool sel = (ei == curIdx);
-                                        if (ImGui::Selectable(input.EnumValues[ei].c_str(), sel))
+                                        if (ImGui::Selectable(input.EnumValues[ei].label.c_str(), sel))
                                         {
                                             PushUndoState();
-                                            input.StringValue = input.EnumValues[ei];
+                                            input.StringValue = input.EnumValues[ei].value;
                                             ActiveDoc()->isDirty = true;
                                             comboSelected = true;
                                         }
@@ -567,22 +571,18 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                     }
                                     ImGui::EndCombo();
                                 }
+                                ed::Resume();
 
                                 // 宽松模式：Combo 旁边加小 InputText 允许自定义输入
                                 if (!input.EnumStrict)
                                 {
                                     auto key = reinterpret_cast<uintptr_t>(input.ID.AsPointer());
                                     auto& buf = s_StringBuffers[key];
-                                    // Bug 修复：只有以下情况才把 StringValue 同步回 buf：
-                                    //   1) buf 还从未初始化（buf[0]=='\0' 且 StringValue 非空）
-                                    //   2) 本帧刚通过 Combo 选了新值（comboSelected）
-                                    // 其他情况保持 buf 不变，避免用户键入时被外部值覆盖。
                                     if (comboSelected ||
                                         (buf[0] == '\0' && !input.StringValue.empty()))
                                     {
                                         snprintf(buf.data(), buf.size(), "%s", input.StringValue.c_str());
                                     }
-
                                     ImGui::SameLine(0, 2);
                                     ImGui::SetNextItemWidth(60.0f);
                                     if (ImGui::InputText("##evalfree", buf.data(), buf.size()))

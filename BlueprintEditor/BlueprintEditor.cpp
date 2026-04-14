@@ -529,7 +529,7 @@ Node* BlueprintEditor::SpawnNodeByDef(const std::string& defId)
                               pd.customProperties.at("enumStrict") == "true");
             // 若 StringValue 为空，用第一个枚举值作为默认
             if (pin.StringValue.empty() && !pin.EnumValues.empty())
-                pin.StringValue = pin.EnumValues[0];
+                pin.StringValue = pin.EnumValues[0].value;
         }
     }
 

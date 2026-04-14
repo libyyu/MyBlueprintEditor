@@ -947,14 +947,14 @@ void BlueprintEditor::LoadEditorData(const RTBlueprintData& data)
                     {
                         edPin.EnumValues = enumVals;
                         edPin.EnumStrict  = strict;
-                        // 若当前值不在枚举列表里且列表非空，修正为第一个选项
+                        // 若当前值不在枚举 value 列表里且为空，修正为第一个选项的 value
                         if (!enumVals.empty())
                         {
                             bool inList = false;
                             for (const auto& ev : enumVals)
-                                if (ev == edPin.StringValue) { inList = true; break; }
+                                if (ev.value == edPin.StringValue) { inList = true; break; }
                             if (!inList && edPin.StringValue.empty())
-                                edPin.StringValue = enumVals[0];
+                                edPin.StringValue = enumVals[0].value;
                         }
                         break;
                     }
