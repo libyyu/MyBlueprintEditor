@@ -4,15 +4,16 @@
 #include <cinttypes>
 
 // 辅助：获取引脚的运行时值字符串
-// 优先从 persistentRunner 的实时 pinValues 取（断点暂停时有正确值），
-// 回退到 lastExecutionResult.outputValues（完整运行后的结果）
+// 优先从 persistentRunner 的实时 pinValues 取（断点暂停时有正确值，
+// 执行完成后 pinValues 仍保留直到下次 ResetState），
+// 回退到 lastExecutionResult.outputValues（兜底）
 static bool GetRuntimePinValueStr(BlueprintDocument* doc,
                                    ::NodeEditor::Runtime::PinId pid,
                                    std::string& outStr)
 {
     if (!doc) return false;
 
-    // 优先：persistentRunner 实时引脚值（断点/StepNext 时最准确）
+    // 1. persistentRunner 实时引脚值（断点/StepNext/执行完成后均有效）
     {
         auto val = doc->persistentRunner.GetPinValue(pid);
         if (val.type != ::NodeEditor::Runtime::PinDataType::Unknown)
@@ -21,7 +22,7 @@ static bool GetRuntimePinValueStr(BlueprintDocument* doc,
             return true;
         }
     }
-    // 回退：lastExecutionResult（完整运行后）
+    // 2. lastExecutionResult（完整运行后的快照兜底）
     {
         const auto& outVals = doc->lastExecutionResult.outputValues;
         auto valIt = outVals.find(pid);

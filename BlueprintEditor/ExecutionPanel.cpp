@@ -46,6 +46,9 @@ void BlueprintEditor::InitRunnerForDoc(BlueprintDocument* doc,
 
     doc->persistentRunner.ResetState();
     doc->persistentRunner.m_withEditor = true;
+    // 编辑器模式下启用引脚快照：每个节点执行后记录所有引脚值，
+    // 供 Watch 面板和引脚 tooltip 在执行完成后仍能展示上次的值
+    doc->persistentRunner.SetSnapshotEnabled(true);
 
     doc->persistentRunner.SetLogCallback([capturedDoc](::NodeEditor::Runtime::LogLevel /*level*/, const std::string& msg) {
         capturedDoc->executionLog.push_back(msg);
@@ -695,12 +698,17 @@ void BlueprintEditor::DrawWatchPanel(float paneWidth)
             ImGui::TextColored(ImVec4(0.70f, 0.85f, 1.0f, 1.0f), ICON_FA_CUBE " %s", node->Name.c_str());
 
             uint64_t nodeIdVal = reinterpret_cast<uintptr_t>(node->ID.AsPointer());
+            auto runtimeNodeId = static_cast<::NodeEditor::Runtime::NodeId>(nodeIdVal);
 
-            // 检查该节点是否在上次执行中被执行过
-            bool wasExecuted = false;
-            for (auto rid : res.executedNodeIds)
+            // 优先使用 PinSnapshot（执行完后保留，比 GetPinValue 更可靠）
+            auto pinSnapshot = runner.GetNodePinSnapshot(runtimeNodeId);
+
+            // 检查是否在上次执行中被执行过
+            bool wasExecuted = !pinSnapshot.empty();
+            if (!wasExecuted)
             {
-                if (rid == nodeIdVal) { wasExecuted = true; break; }
+                for (auto rid : res.executedNodeIds)
+                    if (rid == nodeIdVal) { wasExecuted = true; break; }
             }
 
             if (!wasExecuted && res.nodesExecuted > 0)
@@ -708,62 +716,59 @@ void BlueprintEditor::DrawWatchPanel(float paneWidth)
                 ImGui::TextDisabled("    (not executed in last run)");
                 continue;
             }
-
-            if (res.nodesExecuted == 0)
+            if (res.nodesExecuted == 0 && pinSnapshot.empty())
             {
                 ImGui::TextDisabled("    (no execution data)");
                 continue;
             }
 
-            // 输入引脚值
             bool hasAnyPinValue = false;
+
+            // 辅助：从 snapshot 或 runner 获取 pin 值字符串
+            auto getPinVal = [&](const Pin& pin) -> std::pair<bool, std::string> {
+                // 1. 优先从 snapshot（按名字查）
+                auto it = pinSnapshot.find(pin.Name);
+                if (it != pinSnapshot.end())
+                    return {true, it->second.value.asString()};
+                // 2. 回退到实时 pinValues
+                ::NodeEditor::Runtime::PinId pid = reinterpret_cast<uintptr_t>(pin.ID.AsPointer());
+                auto val = runner.GetPinValue(pid);
+                if (val.type != ::NodeEditor::Runtime::PinDataType::Unknown)
+                    return {true, val.asString()};
+                // 3. lastExecutionResult
+                auto it2 = res.outputValues.find(pid);
+                if (it2 != res.outputValues.end())
+                    return {true, it2->second.asString()};
+                return {false, {}};
+            };
+
+            // 输入引脚
             for (const auto& pin : node->Inputs)
             {
                 if (pin.Type == PinType::Flow) continue;
-                uint64_t pinId = reinterpret_cast<uintptr_t>(pin.ID.AsPointer());
-
-                // 从执行结果查找
-                auto it = res.outputValues.find(pinId);
-                RTVariant val;
-                if (it != res.outputValues.end())
-                    val = it->second;
-                else
-                    val = runner.GetPinValue(pinId);
-
-                if (val.type != RTPinDataType::Unknown)
+                auto [hasVal, valStr] = getPinVal(pin);
+                if (hasVal)
                 {
                     hasAnyPinValue = true;
-                    ImVec4 tCol = dataTypeColor(val.type);
-                    std::string valStr = val.asString();
                     if (valStr.size() > 60) valStr = valStr.substr(0, 57) + "...";
                     ImGui::TextColored(ImVec4(0.50f, 0.55f, 0.65f, 1.0f), "    " ICON_FA_ARROW_RIGHT " %s:", pin.Name.c_str());
                     ImGui::SameLine();
-                    ImGui::TextColored(tCol, "%s", valStr.c_str());
+                    ImGui::TextColored(ImVec4(0.85f, 0.88f, 0.95f, 1.0f), "%s", valStr.c_str());
                 }
             }
 
-            // 输出引脚值
+            // 输出引脚
             for (const auto& pin : node->Outputs)
             {
                 if (pin.Type == PinType::Flow) continue;
-                uint64_t pinId = reinterpret_cast<uintptr_t>(pin.ID.AsPointer());
-
-                auto it = res.outputValues.find(pinId);
-                RTVariant val;
-                if (it != res.outputValues.end())
-                    val = it->second;
-                else
-                    val = runner.GetPinValue(pinId);
-
-                if (val.type != RTPinDataType::Unknown)
+                auto [hasVal, valStr] = getPinVal(pin);
+                if (hasVal)
                 {
                     hasAnyPinValue = true;
-                    ImVec4 tCol = dataTypeColor(val.type);
-                    std::string valStr = val.asString();
                     if (valStr.size() > 60) valStr = valStr.substr(0, 57) + "...";
                     ImGui::TextColored(ImVec4(0.50f, 0.55f, 0.65f, 1.0f), "    " ICON_FA_ARROW_LEFT " %s:", pin.Name.c_str());
                     ImGui::SameLine();
-                    ImGui::TextColored(tCol, "%s", valStr.c_str());
+                    ImGui::TextColored(ImVec4(0.85f, 0.88f, 0.95f, 1.0f), "%s", valStr.c_str());
                 }
             }
 

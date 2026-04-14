@@ -121,6 +121,37 @@ jobs:
       - name: Run tests
         run: ctest --test-dir build --output-on-failure
 
+  # ── Linux / GCC ASAN + UBSAN ─────────────────────────────────────────────────
+  linux-asan:
+    name: Linux (GCC, ASAN+UBSAN)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtest-dev libgmock-dev liblua5.4-dev
+
+      - name: Configure (ASAN + UBSAN)
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_RUNTIME_ONLY=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_TESTS=ON \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run tests (ASAN)
+        env:
+          ASAN_OPTIONS: "halt_on_error=1:abort_on_error=1:detect_leaks=1"
+          UBSAN_OPTIONS: "halt_on_error=1:abort_on_error=1:print_stacktrace=1"
+        run: ctest --test-dir build --output-on-failure
+
   # ── macOS / Clang ───────────────────────────────────────────────────────────
   macos:
     name: macOS (Clang, runtime-only static)
