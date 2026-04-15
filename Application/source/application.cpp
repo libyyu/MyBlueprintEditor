@@ -269,7 +269,7 @@ void Application::RecreateFontAtlas()
     config.PixelSnapH = false;
 
     // 1. 加载默认字体（Play-Regular）
-    m_DefaultFont = io.Fonts->AddFontFromFileTTF("resource/Play-Regular.ttf", fontSize, &config);
+    m_DefaultFont = io.Fonts->AddFontFromFileTTF("resource/msyh.ttf", fontSize, &config, io.Fonts->GetGlyphRangesChineseFull());
 
     // 2. 合并 FontAwesome 6 图标字体到默认字体
     {
