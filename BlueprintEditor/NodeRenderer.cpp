@@ -134,6 +134,15 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                 bool        hasRuntime = false; std::string runtimeVal;
             } pendingPinTip;
 
+            // 枚举 Combo 弹出也必须延迟到 builder.End() 之后（ed::Suspend() 限制）
+            // 节点内部只渲染一个触发按钮，这里记录"哪个引脚的 Combo 需要弹出"
+            struct PendingEnumCombo {
+                bool   open    = false;   // 是否需要在 builder.End() 后调用 OpenPopup
+                Pin*   pin     = nullptr; // 目标引脚
+                float  popupX  = 0.f;    // 触发按钮的屏幕 X（用于定位）
+                float  popupY  = 0.f;    // 触发按钮的屏幕 Y
+            } pendingEnum;
+
             builder.Begin(node.ID);
                 if (!isSimple)
                 {
@@ -439,7 +448,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                         {
                             if (!input.EnumValues.empty())
                             {
-                                // Int 枚举 Combo：显示 label，存 stoll(value)
+                                // Int 枚举：显示触发按钮，点击后延迟到 builder.End() 外弹出
                                 int curIdx = 0;
                                 for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
                                 {
@@ -448,30 +457,21 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                             { curIdx = ei; break; }
                                     } catch (...) {}
                                 }
-                                float comboW = 60.0f;
+                                float btnW = 60.0f;
                                 for (const auto& ev : input.EnumValues)
-                                    comboW = std::max(comboW, ImGui::CalcTextSize(ev.label.c_str()).x + 28.0f);
-                                ImGui::SetNextItemWidth(comboW);
+                                    btnW = std::max(btnW, ImGui::CalcTextSize(ev.label.c_str()).x + 28.0f);
                                 const char* preview = input.EnumValues[curIdx].label.c_str();
-                                // ── NodeEditor 内部的 Combo 需要 Suspend 才能弹出 ──
-                                ed::Suspend();
-                                if (ImGui::BeginCombo("##enumI", preview, ImGuiComboFlags_HeightRegular))
+                                ImGui::SetNextItemWidth(btnW);
+                                // SmallButton 模拟 Combo 样式触发
+                                std::string btnLabel = std::string(preview) + " ##eI";
+                                if (ImGui::Button(btnLabel.c_str(), ImVec2(btnW, 0)))
                                 {
-                                    for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
-                                    {
-                                        bool sel = (ei == curIdx);
-                                        if (ImGui::Selectable(input.EnumValues[ei].label.c_str(), sel))
-                                        {
-                                            PushUndoState();
-                                            try { input.IntValue = std::stoll(input.EnumValues[ei].value); }
-                                            catch (...) { input.IntValue = (int64_t)ei; }
-                                            ActiveDoc()->isDirty = true;
-                                        }
-                                        if (sel) ImGui::SetItemDefaultFocus();
-                                    }
-                                    ImGui::EndCombo();
+                                    pendingEnum.open  = true;
+                                    pendingEnum.pin   = &input;
+                                    ImVec2 btnPos = ImGui::GetItemRectMin();
+                                    pendingEnum.popupX = btnPos.x;
+                                    pendingEnum.popupY = btnPos.y + ImGui::GetItemRectSize().y;
                                 }
-                                ed::Resume();
                             }
                             else
                             {
@@ -489,7 +489,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                         {
                             if (!input.EnumValues.empty())
                             {
-                                // Float 枚举 Combo：显示 label，存 stof(value)
+                                // Float 枚举：同上
                                 int curIdx = 0;
                                 for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
                                 {
@@ -499,29 +499,19 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                             { curIdx = ei; break; }
                                     } catch (...) {}
                                 }
-                                float comboW = 60.0f;
+                                float btnW = 60.0f;
                                 for (const auto& ev : input.EnumValues)
-                                    comboW = std::max(comboW, ImGui::CalcTextSize(ev.label.c_str()).x + 28.0f);
-                                ImGui::SetNextItemWidth(comboW);
+                                    btnW = std::max(btnW, ImGui::CalcTextSize(ev.label.c_str()).x + 28.0f);
                                 const char* preview = input.EnumValues[curIdx].label.c_str();
-                                ed::Suspend();
-                                if (ImGui::BeginCombo("##enumF", preview, ImGuiComboFlags_HeightRegular))
+                                std::string btnLabel = std::string(preview) + " ##eF";
+                                if (ImGui::Button(btnLabel.c_str(), ImVec2(btnW, 0)))
                                 {
-                                    for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
-                                    {
-                                        bool sel = (ei == curIdx);
-                                        if (ImGui::Selectable(input.EnumValues[ei].label.c_str(), sel))
-                                        {
-                                            PushUndoState();
-                                            try { input.FloatValue = static_cast<double>(std::stof(input.EnumValues[ei].value)); }
-                                            catch (...) { input.FloatValue = static_cast<double>(ei); }
-                                            ActiveDoc()->isDirty = true;
-                                        }
-                                        if (sel) ImGui::SetItemDefaultFocus();
-                                    }
-                                    ImGui::EndCombo();
+                                    pendingEnum.open  = true;
+                                    pendingEnum.pin   = &input;
+                                    ImVec2 btnPos = ImGui::GetItemRectMin();
+                                    pendingEnum.popupX = btnPos.x;
+                                    pendingEnum.popupY = btnPos.y + ImGui::GetItemRectSize().y;
                                 }
-                                ed::Resume();
                             }
                             else
                             {
@@ -539,50 +529,35 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                         {
                             if (!input.EnumValues.empty())
                             {
-                                // ── 枚举 Combo：按 value 匹配当前值，显示 label ──────
+                                // ── 枚举：节点内只渲染触发按钮，弹出在 builder.End() 后处理 ──
                                 int curIdx = 0;
                                 for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
                                     if (input.EnumValues[ei].value == input.StringValue) { curIdx = ei; break; }
 
-                                // 宽度：各选项 label 文字最大宽 + Combo 箭头 + padding
-                                float comboW = 60.0f;
+                                float btnW = 60.0f;
                                 for (const auto& ev : input.EnumValues)
-                                    comboW = std::max(comboW, ImGui::CalcTextSize(ev.label.c_str()).x + 28.0f);
-                                ImGui::SetNextItemWidth(comboW);
+                                    btnW = std::max(btnW, ImGui::CalcTextSize(ev.label.c_str()).x + 28.0f);
 
                                 const char* preview = (curIdx >= 0 && curIdx < (int)input.EnumValues.size())
                                     ? input.EnumValues[curIdx].label.c_str() : "...";
-                                bool comboSelected = false;
-                                // ── NodeEditor 内部 Combo 必须 Suspend 才能正常弹出 ──
-                                ed::Suspend();
-                                if (ImGui::BeginCombo("##enum", preview, ImGuiComboFlags_HeightRegular))
-                                {
-                                    for (int ei = 0; ei < (int)input.EnumValues.size(); ++ei)
-                                    {
-                                        bool sel = (ei == curIdx);
-                                        if (ImGui::Selectable(input.EnumValues[ei].label.c_str(), sel))
-                                        {
-                                            PushUndoState();
-                                            input.StringValue = input.EnumValues[ei].value;
-                                            ActiveDoc()->isDirty = true;
-                                            comboSelected = true;
-                                        }
-                                        if (sel) ImGui::SetItemDefaultFocus();
-                                    }
-                                    ImGui::EndCombo();
-                                }
-                                ed::Resume();
 
-                                // 宽松模式：Combo 旁边加小 InputText 允许自定义输入
+                                std::string btnLabel = std::string(preview) + " v##eS";
+                                if (ImGui::Button(btnLabel.c_str(), ImVec2(btnW, 0)))
+                                {
+                                    pendingEnum.open  = true;
+                                    pendingEnum.pin   = &input;
+                                    ImVec2 btnPos = ImGui::GetItemRectMin();
+                                    pendingEnum.popupX = btnPos.x;
+                                    pendingEnum.popupY = btnPos.y + ImGui::GetItemRectSize().y;
+                                }
+
+                                // 宽松模式：按钮旁边加 InputText 允许自定义输入
                                 if (!input.EnumStrict)
                                 {
                                     auto key = reinterpret_cast<uintptr_t>(input.ID.AsPointer());
                                     auto& buf = s_StringBuffers[key];
-                                    if (comboSelected ||
-                                        (buf[0] == '\0' && !input.StringValue.empty()))
-                                    {
+                                    if (buf[0] == '\0' && !input.StringValue.empty())
                                         snprintf(buf.data(), buf.size(), "%s", input.StringValue.c_str());
-                                    }
                                     ImGui::SameLine(0, 2);
                                     ImGui::SetNextItemWidth(60.0f);
                                     if (ImGui::InputText("##evalfree", buf.data(), buf.size()))
@@ -917,6 +892,63 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                 } // if (!node.isCollapsed) else
 
             builder.End();
+
+            // 枚举弹出：在 builder.End() 之后安全调用 ed::Suspend()
+            // 节点内只记录了"哪个引脚被点击"，这里渲染真正的下拉列表
+            if (pendingEnum.open && pendingEnum.pin)
+            {
+                // 用唯一 popup id（以引脚指针为 key）
+                char popupId[32];
+                snprintf(popupId, sizeof(popupId), "##EnumPopup%p", (void*)pendingEnum.pin);
+
+                ed::Suspend();
+                ImGui::SetNextWindowPos(ImVec2(pendingEnum.popupX, pendingEnum.popupY),
+                                        ImGuiCond_Always);
+                ImGui::OpenPopup(popupId);
+                if (ImGui::BeginPopup(popupId, ImGuiWindowFlags_NoMove))
+                {
+                    Pin* p = pendingEnum.pin;
+                    for (int ei = 0; ei < (int)p->EnumValues.size(); ++ei)
+                    {
+                        bool selected = false;
+                        if (p->Type == PinType::String)
+                            selected = (p->EnumValues[ei].value == p->StringValue);
+                        else if (p->Type == PinType::Int)
+                        {
+                            try { selected = (std::stoll(p->EnumValues[ei].value) == p->IntValue); }
+                            catch (...) { selected = (ei == 0); }
+                        }
+                        else if (p->Type == PinType::Float)
+                        {
+                            try { selected = std::fabsf(std::stof(p->EnumValues[ei].value) -
+                                                         static_cast<float>(p->FloatValue)) < 1e-5f; }
+                            catch (...) { selected = (ei == 0); }
+                        }
+
+                        if (ImGui::Selectable(p->EnumValues[ei].label.c_str(), selected))
+                        {
+                            PushUndoState();
+                            if (p->Type == PinType::String)
+                                p->StringValue = p->EnumValues[ei].value;
+                            else if (p->Type == PinType::Int)
+                            {
+                                try { p->IntValue = std::stoll(p->EnumValues[ei].value); }
+                                catch (...) { p->IntValue = (int64_t)ei; }
+                            }
+                            else if (p->Type == PinType::Float)
+                            {
+                                try { p->FloatValue = static_cast<double>(std::stof(p->EnumValues[ei].value)); }
+                                catch (...) { p->FloatValue = static_cast<double>(ei); }
+                            }
+                            ActiveDoc()->isDirty = true;
+                            ImGui::CloseCurrentPopup();
+                        }
+                        if (selected) ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndPopup();
+                }
+                ed::Resume();
+            }
 
             // 引脚 tooltip：在 builder.End() 之后安全调用 ed::Suspend()
             if (pendingPinTip.show)
