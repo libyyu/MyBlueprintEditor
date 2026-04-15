@@ -173,9 +173,9 @@
         "name": "LLM Call",
         "pins": [
           { "id": 17001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 17002, "kind": 0, "dataType": 4, "name": "BaseURL",      "defaultValue": "https://api.openai.com/v1" },
-          { "id": 17003, "kind": 0, "dataType": 4, "name": "ApiKey",       "defaultValue": "sk-your-api-key-here" },
-          { "id": 17004, "kind": 0, "dataType": 4, "name": "Model",        "defaultValue": "gpt-4o" },
+          { "id": 17002, "kind": 0, "dataType": 4, "name": "BaseURL",      "defaultValue": "https://open.bigmodel.cn/api/paas/v4" },
+          { "id": 17003, "kind": 0, "dataType": 4, "name": "ApiKey",       "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf" },
+          { "id": 17004, "kind": 0, "dataType": 4, "name": "Model",        "defaultValue": "glm-4-flash" },
           { "id": 17005, "kind": 0, "dataType": 4, "name": "Messages" },
           { "id": 17006, "kind": 0, "dataType": 4, "name": "SystemPrompt", "defaultValue": "You are a helpful assistant. Use tools when needed." },
           { "id": 17007, "kind": 0, "dataType": 2, "name": "MaxTokens",    "defaultValue": 1024 },
@@ -471,9 +471,9 @@
       { "name": "messages", "dataType": 4, "defaultValue": "[]" },
       { "name": "round",    "dataType": 2, "defaultValue": 0 },
       { "name": "done",     "dataType": 1, "defaultValue": false },
-      { "name": "ApiKey",   "dataType": 4, "defaultValue": "sk-your-api-key-here" },
-      { "name": "BaseURL",  "dataType": 4, "defaultValue": "https://api.openai.com/v1" },
-      { "name": "Model",    "dataType": 4, "defaultValue": "gpt-4o" }
+      { "name": "ApiKey",   "dataType": 4, "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf" },
+      { "name": "BaseURL",  "dataType": 4, "defaultValue": "https://open.bigmodel.cn/api/paas/v4" },
+      { "name": "Model",    "dataType": 4, "defaultValue": "glm-4-flash" }
     ]
   },
   "editor": {

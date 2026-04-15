@@ -366,9 +366,9 @@
       { "id": 43, "startPinId": 212, "endPinId": 711, "isEnabled": true }
     ],
     "variables": [
-      { "name": "ApiKey",         "dataType": 4, "defaultValue": "sk-your-api-key-here" },
-      { "name": "BaseURL",        "dataType": 4, "defaultValue": "https://api.openai.com/v1" },
-      { "name": "Model",          "dataType": 4, "defaultValue": "gpt-4o" },
+      { "name": "ApiKey",         "dataType": 4, "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf" },
+      { "name": "BaseURL",        "dataType": 4, "defaultValue": "https://open.bigmodel.cn/api/paas/v4" },
+      { "name": "Model",          "dataType": 4, "defaultValue": "glm-4-flash" },
       { "name": "Goal",           "dataType": 4, "defaultValue": "Search for latest AI news and summarize the top 3 findings" },
       { "name": "AvailableTools", "dataType": 4, "defaultValue": "[{\"name\":\"web_search\",\"description\":\"Search the web for information\"},{\"name\":\"summarize\",\"description\":\"Summarize a list of texts\"}]" },
       { "name": "plan",           "dataType": 4, "defaultValue": "[]" },

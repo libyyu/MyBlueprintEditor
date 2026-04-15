@@ -120,9 +120,9 @@
         "name": "LLM Summarize",
         "pins": [
           { "id": 600, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 601, "kind": 0, "dataType": 4, "name": "BaseURL",      "defaultValue": "https://api.openai.com/v1" },
-          { "id": 602, "kind": 0, "dataType": 4, "name": "ApiKey",       "defaultValue": "sk-your-api-key-here" },
-          { "id": 603, "kind": 0, "dataType": 4, "name": "Model",        "defaultValue": "gpt-4o" },
+          { "id": 601, "kind": 0, "dataType": 4, "name": "BaseURL",      "defaultValue": "https://open.bigmodel.cn/api/paas/v4" },
+          { "id": 602, "kind": 0, "dataType": 4, "name": "ApiKey",       "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf" },
+          { "id": 603, "kind": 0, "dataType": 4, "name": "Model",        "defaultValue": "glm-4-flash" },
           { "id": 604, "kind": 0, "dataType": 4, "name": "Messages" },
           { "id": 605, "kind": 0, "dataType": 4, "name": "SystemPrompt", "defaultValue": "You are a helpful research assistant. Summarize web search results concisely." },
           { "id": 606, "kind": 0, "dataType": 2, "name": "MaxTokens",    "defaultValue": 512 },
@@ -192,9 +192,9 @@
       { "id": 20, "startPinId": 617, "endPinId": 901, "isEnabled": true }
     ],
     "variables": [
-      { "name": "ApiKey",      "dataType": 4, "defaultValue": "sk-your-api-key-here" },
-      { "name": "BaseURL",     "dataType": 4, "defaultValue": "https://api.openai.com/v1" },
-      { "name": "Model",       "dataType": 4, "defaultValue": "gpt-4o" },
+      { "name": "ApiKey",      "dataType": 4, "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf" },
+      { "name": "BaseURL",     "dataType": 4, "defaultValue": "https://open.bigmodel.cn/api/paas/v4" },
+      { "name": "Model",       "dataType": 4, "defaultValue": "glm-4-flash" },
       { "name": "SearchQuery", "dataType": 4, "defaultValue": "latest AI news 2025" }
     ]
   },

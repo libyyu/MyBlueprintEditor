@@ -549,19 +549,19 @@
             "name": "ApiKey",
             "dataType": 4,
             "isExposed": true,
-            "defaultValue": "sk-your-api-key-here"
+            "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf"
         },
         {
             "name": "BaseURL",
             "dataType": 4,
             "isExposed": true,
-            "defaultValue": "https://api.openai.com/v1"
+            "defaultValue": "https://open.bigmodel.cn/api/paas/v4"
         },
         {
             "name": "Model",
             "dataType": 4,
             "isExposed": true,
-            "defaultValue": "gpt-4o"
+            "defaultValue": "glm-4-flash"
         },
         {
             "name": "Topic",
