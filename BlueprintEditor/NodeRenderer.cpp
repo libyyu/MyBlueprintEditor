@@ -48,6 +48,20 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
     _doc->newLinkPin     = _doc->newLinkPinId     ? FindPin(_doc->newLinkPinId)     : nullptr;
     _doc->newNodeLinkPin = _doc->newNodeLinkPinId ? FindPin(_doc->newNodeLinkPinId) : nullptr;
 
+    // 枚举下拉弹出状态（跨帧 static）
+    // 因为 ed::Suspend() 只能在所有节点循环之外调用，
+    // 所以触发时只记录状态，在函数末尾统一渲染 popup。
+    // pin 使用节点ID + 引脚名定位（不存裸指针，避免跨帧悬空）
+    struct EnumPopupState {
+        bool        needOpen  = false;  // 本帧按钮被按下，需要 OpenPopup
+        bool        isOpen    = false;  // popup 当前是否处于打开状态
+        ed::NodeId  nodeId;             // 目标节点 ID
+        std::string pinName;            // 目标引脚名
+        float       x = 0, y = 0;      // 弹出位置（屏幕坐标）
+    };
+    static EnumPopupState s_ep;
+    static const char* ENUM_POPUP_ID = "##EnumDropdown";
+
         auto cursorTopLeft = ImGui::GetCursorScreenPos();
 
 
@@ -133,15 +147,6 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                 bool        isObj      = false; std::string objVal;
                 bool        hasRuntime = false; std::string runtimeVal;
             } pendingPinTip;
-
-            // 枚举 Combo 弹出也必须延迟到 builder.End() 之后（ed::Suspend() 限制）
-            // 节点内部只渲染一个触发按钮，这里记录"哪个引脚的 Combo 需要弹出"
-            struct PendingEnumCombo {
-                bool   open    = false;   // 是否需要在 builder.End() 后调用 OpenPopup
-                Pin*   pin     = nullptr; // 目标引脚
-                float  popupX  = 0.f;    // 触发按钮的屏幕 X（用于定位）
-                float  popupY  = 0.f;    // 触发按钮的屏幕 Y
-            } pendingEnum;
 
             builder.Begin(node.ID);
                 if (!isSimple)
@@ -466,11 +471,12 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 std::string btnLabel = std::string(preview) + " ##eI";
                                 if (ImGui::Button(btnLabel.c_str(), ImVec2(btnW, 0)))
                                 {
-                                    pendingEnum.open  = true;
-                                    pendingEnum.pin   = &input;
+                                    s_ep.needOpen = true;
+                                    s_ep.nodeId   = node.ID;
+                                    s_ep.pinName  = input.Name;
                                     ImVec2 btnPos = ImGui::GetItemRectMin();
-                                    pendingEnum.popupX = btnPos.x;
-                                    pendingEnum.popupY = btnPos.y + ImGui::GetItemRectSize().y;
+                                    s_ep.x = btnPos.x;
+                                    s_ep.y = btnPos.y + ImGui::GetItemRectSize().y;
                                 }
                             }
                             else
@@ -506,11 +512,12 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 std::string btnLabel = std::string(preview) + " ##eF";
                                 if (ImGui::Button(btnLabel.c_str(), ImVec2(btnW, 0)))
                                 {
-                                    pendingEnum.open  = true;
-                                    pendingEnum.pin   = &input;
+                                    s_ep.needOpen = true;
+                                    s_ep.nodeId   = node.ID;
+                                    s_ep.pinName  = input.Name;
                                     ImVec2 btnPos = ImGui::GetItemRectMin();
-                                    pendingEnum.popupX = btnPos.x;
-                                    pendingEnum.popupY = btnPos.y + ImGui::GetItemRectSize().y;
+                                    s_ep.x = btnPos.x;
+                                    s_ep.y = btnPos.y + ImGui::GetItemRectSize().y;
                                 }
                             }
                             else
@@ -544,11 +551,12 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                                 std::string btnLabel = std::string(preview) + " v##eS";
                                 if (ImGui::Button(btnLabel.c_str(), ImVec2(btnW, 0)))
                                 {
-                                    pendingEnum.open  = true;
-                                    pendingEnum.pin   = &input;
+                                    s_ep.needOpen = true;
+                                    s_ep.nodeId   = node.ID;
+                                    s_ep.pinName  = input.Name;
                                     ImVec2 btnPos = ImGui::GetItemRectMin();
-                                    pendingEnum.popupX = btnPos.x;
-                                    pendingEnum.popupY = btnPos.y + ImGui::GetItemRectSize().y;
+                                    s_ep.x = btnPos.x;
+                                    s_ep.y = btnPos.y + ImGui::GetItemRectSize().y;
                                 }
 
                                 // 宽松模式：按钮旁边加 InputText 允许自定义输入
@@ -892,63 +900,6 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                 } // if (!node.isCollapsed) else
 
             builder.End();
-
-            // 枚举弹出：在 builder.End() 之后安全调用 ed::Suspend()
-            // 节点内只记录了"哪个引脚被点击"，这里渲染真正的下拉列表
-            if (pendingEnum.open && pendingEnum.pin)
-            {
-                // 用唯一 popup id（以引脚指针为 key）
-                char popupId[32];
-                snprintf(popupId, sizeof(popupId), "##EnumPopup%p", (void*)pendingEnum.pin);
-
-                ed::Suspend();
-                ImGui::SetNextWindowPos(ImVec2(pendingEnum.popupX, pendingEnum.popupY),
-                                        ImGuiCond_Always);
-                ImGui::OpenPopup(popupId);
-                if (ImGui::BeginPopup(popupId, ImGuiWindowFlags_NoMove))
-                {
-                    Pin* p = pendingEnum.pin;
-                    for (int ei = 0; ei < (int)p->EnumValues.size(); ++ei)
-                    {
-                        bool selected = false;
-                        if (p->Type == PinType::String)
-                            selected = (p->EnumValues[ei].value == p->StringValue);
-                        else if (p->Type == PinType::Int)
-                        {
-                            try { selected = (std::stoll(p->EnumValues[ei].value) == p->IntValue); }
-                            catch (...) { selected = (ei == 0); }
-                        }
-                        else if (p->Type == PinType::Float)
-                        {
-                            try { selected = std::fabsf(std::stof(p->EnumValues[ei].value) -
-                                                         static_cast<float>(p->FloatValue)) < 1e-5f; }
-                            catch (...) { selected = (ei == 0); }
-                        }
-
-                        if (ImGui::Selectable(p->EnumValues[ei].label.c_str(), selected))
-                        {
-                            PushUndoState();
-                            if (p->Type == PinType::String)
-                                p->StringValue = p->EnumValues[ei].value;
-                            else if (p->Type == PinType::Int)
-                            {
-                                try { p->IntValue = std::stoll(p->EnumValues[ei].value); }
-                                catch (...) { p->IntValue = (int64_t)ei; }
-                            }
-                            else if (p->Type == PinType::Float)
-                            {
-                                try { p->FloatValue = static_cast<double>(std::stof(p->EnumValues[ei].value)); }
-                                catch (...) { p->FloatValue = static_cast<double>(ei); }
-                            }
-                            ActiveDoc()->isDirty = true;
-                            ImGui::CloseCurrentPopup();
-                        }
-                        if (selected) ImGui::SetItemDefaultFocus();
-                    }
-                    ImGui::EndPopup();
-                }
-                ed::Resume();
-            }
 
             // 引脚 tooltip：在 builder.End() 之后安全调用 ed::Suspend()
             if (pendingPinTip.show)
@@ -1482,4 +1433,85 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
         }
 
         // ================================================================
+
+    // ── 枚举下拉弹出：在节点循环外渲染，ImGui popup 跨帧保持存活 ──────────────
+    // 如果本帧有按钮被按下，先 OpenPopup
+    if (s_ep.needOpen)
+    {
+        s_ep.needOpen = false;
+        s_ep.isOpen   = true;
+        ed::Suspend();
+        ImGui::SetNextWindowPos(ImVec2(s_ep.x, s_ep.y), ImGuiCond_Always);
+        ImGui::OpenPopup(ENUM_POPUP_ID);
+        ed::Resume();
+    }
+    // 每帧都检查并渲染（保持 popup 存活）
+    if (s_ep.isOpen)
+    {
+        ed::Suspend();
+        if (ImGui::BeginPopup(ENUM_POPUP_ID, ImGuiWindowFlags_NoMove))
+        {
+            Pin* p = nullptr;
+            for (auto& n : ActiveDoc()->nodes)
+            {
+                if (n.ID == s_ep.nodeId)
+                {
+                    for (auto& ip : n.Inputs)
+                        if (ip.Name == s_ep.pinName) { p = &ip; break; }
+                    break;
+                }
+            }
+            if (!p)
+            {
+                ImGui::CloseCurrentPopup();
+                s_ep.isOpen = false;
+            }
+            else
+            {
+                for (int ei = 0; ei < (int)p->EnumValues.size(); ++ei)
+                {
+                    bool selected = false;
+                    if (p->Type == PinType::String)
+                        selected = (p->EnumValues[ei].value == p->StringValue);
+                    else if (p->Type == PinType::Int)
+                    {
+                        try { selected = (std::stoll(p->EnumValues[ei].value) == p->IntValue); }
+                        catch (...) { selected = (ei == 0); }
+                    }
+                    else if (p->Type == PinType::Float)
+                    {
+                        try { selected = std::fabsf(std::stof(p->EnumValues[ei].value) -
+                                                     static_cast<float>(p->FloatValue)) < 1e-5f; }
+                        catch (...) { selected = (ei == 0); }
+                    }
+                    if (ImGui::Selectable(p->EnumValues[ei].label.c_str(), selected))
+                    {
+                        PushUndoState();
+                        if (p->Type == PinType::String)
+                            p->StringValue = p->EnumValues[ei].value;
+                        else if (p->Type == PinType::Int)
+                        {
+                            try { p->IntValue = std::stoll(p->EnumValues[ei].value); }
+                            catch (...) { p->IntValue = (int64_t)ei; }
+                        }
+                        else if (p->Type == PinType::Float)
+                        {
+                            try { p->FloatValue = static_cast<double>(std::stof(p->EnumValues[ei].value)); }
+                            catch (...) { p->FloatValue = static_cast<double>(ei); }
+                        }
+                        ActiveDoc()->isDirty = true;
+                        ImGui::CloseCurrentPopup();
+                    }
+                    if (selected) ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndPopup();
+        }
+        else
+        {
+            s_ep.isOpen = false;
+        }
+        ed::Resume();
+    }
 }
+
