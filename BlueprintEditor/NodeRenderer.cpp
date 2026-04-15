@@ -1434,83 +1434,98 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
 
         // ================================================================
 
-    // ── 枚举下拉弹出：在节点循环外渲染，ImGui popup 跨帧保持存活 ──────────────
-    // 如果本帧有按钮被按下，先 OpenPopup
-    if (s_ep.needOpen)
-    {
-        s_ep.needOpen = false;
-        s_ep.isOpen   = true;
-        ed::Suspend();
-        ImGui::SetNextWindowPos(ImVec2(s_ep.x, s_ep.y), ImGuiCond_Always);
-        ImGui::OpenPopup(ENUM_POPUP_ID);
-        ed::Resume();
-    }
-    // 每帧都检查并渲染（保持 popup 存活）
-    if (s_ep.isOpen)
+    // ── 枚举下拉：用浮动 ImGui 窗口实现，彻底绕开 Popup 被 NodeEditor 关闭的问题 ──
     {
         ed::Suspend();
-        if (ImGui::BeginPopup(ENUM_POPUP_ID, ImGuiWindowFlags_NoMove))
+
+        if (s_ep.needOpen)
         {
-            Pin* p = nullptr;
-            for (auto& n : ActiveDoc()->nodes)
+            s_ep.needOpen = false;
+            s_ep.isOpen   = true;
+        }
+
+        if (s_ep.isOpen)
+        {
+            // 浮动窗口：无标题、无 resize、无 scroll、自动调整大小
+            ImGui::SetNextWindowPos(ImVec2(s_ep.x, s_ep.y), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(ImVec2(0, 0));  // auto-size
+            ImGuiWindowFlags flags =
+                ImGuiWindowFlags_NoTitleBar      |
+                ImGuiWindowFlags_NoResize        |
+                ImGuiWindowFlags_NoScrollbar     |
+                ImGuiWindowFlags_NoScrollWithMouse|
+                ImGuiWindowFlags_NoSavedSettings |
+                ImGuiWindowFlags_NoMove          |
+                ImGuiWindowFlags_NoNav;
+            if (ImGui::Begin(ENUM_POPUP_ID, nullptr, flags))
             {
-                if (n.ID == s_ep.nodeId)
+                // 点击窗口外时关闭
+                if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
+                    ImGui::IsMouseClicked(ImGuiMouseButton_Left))
                 {
-                    for (auto& ip : n.Inputs)
-                        if (ip.Name == s_ep.pinName) { p = &ip; break; }
-                    break;
+                    s_ep.isOpen = false;
+                }
+                else
+                {
+                    Pin* p = nullptr;
+                    for (auto& n : ActiveDoc()->nodes)
+                    {
+                        if (n.ID == s_ep.nodeId)
+                        {
+                            for (auto& ip : n.Inputs)
+                                if (ip.Name == s_ep.pinName) { p = &ip; break; }
+                            break;
+                        }
+                    }
+                    if (!p)
+                    {
+                        s_ep.isOpen = false;
+                    }
+                    else
+                    {
+                        for (int ei = 0; ei < (int)p->EnumValues.size(); ++ei)
+                        {
+                            bool selected = false;
+                            if (p->Type == PinType::String)
+                                selected = (p->EnumValues[ei].value == p->StringValue);
+                            else if (p->Type == PinType::Int)
+                            {
+                                try { selected = (std::stoll(p->EnumValues[ei].value) == p->IntValue); }
+                                catch (...) { selected = (ei == 0); }
+                            }
+                            else if (p->Type == PinType::Float)
+                            {
+                                try { selected = std::fabsf(std::stof(p->EnumValues[ei].value) -
+                                                             static_cast<float>(p->FloatValue)) < 1e-5f; }
+                                catch (...) { selected = (ei == 0); }
+                            }
+                            if (ImGui::Selectable(p->EnumValues[ei].label.c_str(), selected,
+                                                  ImGuiSelectableFlags_None, ImVec2(120, 0)))
+                            {
+                                PushUndoState();
+                                if (p->Type == PinType::String)
+                                    p->StringValue = p->EnumValues[ei].value;
+                                else if (p->Type == PinType::Int)
+                                {
+                                    try { p->IntValue = std::stoll(p->EnumValues[ei].value); }
+                                    catch (...) { p->IntValue = (int64_t)ei; }
+                                }
+                                else if (p->Type == PinType::Float)
+                                {
+                                    try { p->FloatValue = static_cast<double>(std::stof(p->EnumValues[ei].value)); }
+                                    catch (...) { p->FloatValue = static_cast<double>(ei); }
+                                }
+                                ActiveDoc()->isDirty = true;
+                                s_ep.isOpen = false;
+                            }
+                            if (selected) ImGui::SetItemDefaultFocus();
+                        }
+                    }
                 }
             }
-            if (!p)
-            {
-                ImGui::CloseCurrentPopup();
-                s_ep.isOpen = false;
-            }
-            else
-            {
-                for (int ei = 0; ei < (int)p->EnumValues.size(); ++ei)
-                {
-                    bool selected = false;
-                    if (p->Type == PinType::String)
-                        selected = (p->EnumValues[ei].value == p->StringValue);
-                    else if (p->Type == PinType::Int)
-                    {
-                        try { selected = (std::stoll(p->EnumValues[ei].value) == p->IntValue); }
-                        catch (...) { selected = (ei == 0); }
-                    }
-                    else if (p->Type == PinType::Float)
-                    {
-                        try { selected = std::fabsf(std::stof(p->EnumValues[ei].value) -
-                                                     static_cast<float>(p->FloatValue)) < 1e-5f; }
-                        catch (...) { selected = (ei == 0); }
-                    }
-                    if (ImGui::Selectable(p->EnumValues[ei].label.c_str(), selected))
-                    {
-                        PushUndoState();
-                        if (p->Type == PinType::String)
-                            p->StringValue = p->EnumValues[ei].value;
-                        else if (p->Type == PinType::Int)
-                        {
-                            try { p->IntValue = std::stoll(p->EnumValues[ei].value); }
-                            catch (...) { p->IntValue = (int64_t)ei; }
-                        }
-                        else if (p->Type == PinType::Float)
-                        {
-                            try { p->FloatValue = static_cast<double>(std::stof(p->EnumValues[ei].value)); }
-                            catch (...) { p->FloatValue = static_cast<double>(ei); }
-                        }
-                        ActiveDoc()->isDirty = true;
-                        ImGui::CloseCurrentPopup();
-                    }
-                    if (selected) ImGui::SetItemDefaultFocus();
-                }
-            }
-            ImGui::EndPopup();
+            ImGui::End();
         }
-        else
-        {
-            s_ep.isOpen = false;
-        }
+
         ed::Resume();
     }
 }
