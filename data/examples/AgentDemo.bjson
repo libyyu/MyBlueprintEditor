@@ -25,7 +25,7 @@
         },
         {
             "id": 3,
-            "definitionId": "String.Template",
+            "definitionId": "FormatString",
             "definitionVersion": 1,
             "name": "Build User Prompt",
             "pins": [
@@ -33,20 +33,15 @@
                     "id": 4,
                     "kind": 0,
                     "dataType": 4,
-                    "name": "Template",
-                    "defaultValue": "请用简洁的语言解释：{{topic}}。回答限制在100字以内。"
+                    "name": "Format",
+                    "defaultValue": "请用简洁的语言解释：{0}。回答限制在100字以内。"
                 },
                 {
                     "id": 5,
                     "kind": 0,
-                    "dataType": 6,
-                    "name": "Keys"
-                },
-                {
-                    "id": 6,
-                    "kind": 0,
-                    "dataType": 6,
-                    "name": "Values"
+                    "dataType": 4,
+                    "name": "topic",
+                    "defaultValue": ""
                 },
                 {
                     "id": 7,
@@ -540,7 +535,7 @@
         {
             "id": 80,
             "startPinId": 65,
-            "endPinId": 6,
+            "endPinId": 5,
             "isEnabled": true
         }
     ],

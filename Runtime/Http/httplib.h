@@ -400,8 +400,12 @@ using socket_t = int;
 #error Please use OpenSSL or a current version of BoringSSL
 #endif
 #define SSL_get1_peer_certificate SSL_get_peer_certificate
+#elif OPENSSL_VERSION_NUMBER < 0x10100000L
+// OpenSSL < 1.1.0 is too old
+#error Sorry, OpenSSL versions prior to 1.1.0 are not supported
 #elif OPENSSL_VERSION_NUMBER < 0x30000000L
-#error Sorry, OpenSSL versions prior to 3.0.0 are not supported
+// OpenSSL 1.1.x: supported with minor API shims
+#define SSL_get1_peer_certificate SSL_get_peer_certificate
 #endif
 
 #endif // CPPHTTPLIB_OPENSSL_SUPPORT

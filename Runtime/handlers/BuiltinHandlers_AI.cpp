@@ -31,7 +31,19 @@ static crude_json::value variantToJson_AI(const Variant& v)
     case PinDataType::Boolean: return crude_json::value(v.asBool());
     case PinDataType::Integer: return crude_json::value(static_cast<double>(v.asInt()));
     case PinDataType::Float:   return crude_json::value(v.asFloat());
-    case PinDataType::String:  return crude_json::value(v.asString());
+    case PinDataType::String:
+    {
+        const std::string& s = v.asString();
+        // 如果字符串看起来是 JSON object 或 array，尝试解析；
+        // 这样 JSON.MakeMessage 输出的消息对象能正确被 JSON.ArrayPush 当对象处理
+        if (!s.empty() && (s.front() == '{' || s.front() == '['))
+        {
+            crude_json::value parsed = crude_json::value::parse(s);
+            if (!parsed.is_null())
+                return parsed;
+        }
+        return crude_json::value(s);
+    }
     case PinDataType::Array:
     {
         crude_json::array arr;
@@ -250,6 +262,7 @@ static HttpRequest BuildLLMRequest(ExecutionContext& ctx,
     req.method = "POST";
     req.body   = crude_json::value(std::move(body)).dump();
     req.headers["Content-Type"] = "application/json";
+    req.headers["User-Agent"]   = "Mozilla/5.0 BlueprintRuntime/1.0";
     if (!apiKey.empty())
         req.headers["Authorization"] = "Bearer " + apiKey;
     req.timeoutSeconds = 120;
@@ -390,20 +403,42 @@ void RegisterHandlers_AI(
     // ========================================================================
     handlers["String.Template"] = [](ExecutionContext& ctx) -> bool {
         std::string tmpl   = ctx.GetInputValue("Template").asString();
-        Variant     keys   = ctx.GetInputValue("Keys");
-        Variant     values = ctx.GetInputValue("Values");
+        Variant     keysV  = ctx.GetInputValue("Keys");
+        Variant     valsV  = ctx.GetInputValue("Values");
 
-        size_t n = std::min(keys.arraySize(), values.arraySize());
+        // 把 Keys/Values 统一拉成 vector<string>（支持 Array variant 或 JSON 字符串）
+        auto toStringVec = [](const Variant& v) -> std::vector<std::string> {
+            std::vector<std::string> out;
+            if (v.type == PinDataType::Array) {
+                for (size_t i = 0; i < v.arraySize(); ++i)
+                    out.push_back(v.arrayGet(i).asString());
+            } else if (v.type == PinDataType::String) {
+                const std::string& s = v.asString();
+                if (!s.empty() && s.front() == '[') {
+                    crude_json::value parsed = crude_json::value::parse(s);
+                    if (parsed.is_array()) {
+                        for (const auto& elem : parsed.get<crude_json::array>())
+                            out.push_back(elem.is_string() ? elem.get<std::string>() : elem.dump());
+                    }
+                } else if (!s.empty()) {
+                    out.push_back(s);  // 单值视为长度1的数组
+                }
+            }
+            return out;
+        };
+
+        auto keys   = toStringVec(keysV);
+        auto values = toStringVec(valsV);
+
+        size_t n = std::min(keys.size(), values.size());
         std::string result = tmpl;
         for (size_t i = 0; i < n; ++i) {
-            std::string k = keys.arrayGet(i).asString();
-            std::string v = values.arrayGet(i).asString();
-            if (k.empty()) continue;
-            std::string placeholder = "{{" + k + "}}";
+            if (keys[i].empty()) continue;
+            std::string placeholder = "{{" + keys[i] + "}}";
             size_t pos = 0;
             while ((pos = result.find(placeholder, pos)) != std::string::npos) {
-                result.replace(pos, placeholder.size(), v);
-                pos += v.size();
+                result.replace(pos, placeholder.size(), values[i]);
+                pos += values[i].size();
             }
         }
         ctx.SetOutputValue("Result", Variant(result));
