@@ -1,4 +1,4 @@
-// InspectorPanel.cpp -- 检视器面板（节点列表 / 变量 / 函数 / Details）
+﻿// InspectorPanel.cpp -- 检视器面板（节点列表 / 变量 / 函数 / Details）
 // 从 EditorUI.cpp 拆分而来
 #include "BlueprintEditor.h"
 #include "ThemeManager.h"
@@ -831,6 +831,7 @@ void BlueprintEditor::DrawVariablePanel()
     // 当前正在编辑的变量下标（-1 = 无）
     static int s_editingIdx = -1;
     static char s_editBuf[64] = "";
+    static int s_selectedVarIdx = -1;  // 当前选中的变量（显示默认值编辑）
 
     for (int i = 0; i < (int)doc->variables.size(); ++i)
     {
@@ -861,16 +862,21 @@ void BlueprintEditor::DrawVariablePanel()
         ImGui::SetCursorScreenPos(rowMin);
         // 用透明 Selectable 覆盖整行（不含删除按钮区域）
         float selectableW = paneWidth - deleteW - spacing;
-        bool rowClicked = ImGui::Selectable("##varrow", false,
+        bool isSelected = (s_selectedVarIdx == i);
+        bool rowClicked = ImGui::Selectable("##varrow", isSelected,
             ImGuiSelectableFlags_AllowOverlap | ImGuiSelectableFlags_AllowDoubleClick,
             ImVec2(selectableW, rowHeight));
 
-        // 双击进入编辑模式
-        if (rowClicked && ImGui::IsMouseDoubleClicked(0))
+        // 单击选中，双击编辑名称
+        if (rowClicked)
         {
-            s_editingIdx = i;
-            snprintf(s_editBuf, sizeof(s_editBuf), "%s", var.name.c_str());
-            ImGui::SetKeyboardFocusHere(1); // 下帧聚焦输入框
+            s_selectedVarIdx = i;
+            if (ImGui::IsMouseDoubleClicked(0))
+            {
+                s_editingIdx = i;
+                snprintf(s_editBuf, sizeof(s_editBuf), "%s", var.name.c_str());
+                ImGui::SetKeyboardFocusHere(1); // 下帧聚焦输入框
+            }
         }
 
         // 拖拽源：整行都可以拖
@@ -1046,9 +1052,117 @@ void BlueprintEditor::DrawVariablePanel()
     // 延迟删除
     if (deleteIdx >= 0)
     {
+        if (s_selectedVarIdx == deleteIdx) s_selectedVarIdx = -1;
+        else if (s_selectedVarIdx > deleteIdx) --s_selectedVarIdx;
         PushUndoState();  // 删除变量前保存快照
         doc->variables.erase(doc->variables.begin() + deleteIdx);
         doc->isDirty = true;
+    }
+
+    // ── 选中变量的详情（默认值编辑，UE4 风格）─────────────────────────────
+    if (s_selectedVarIdx >= 0 && s_selectedVarIdx < (int)doc->variables.size())
+    {
+        auto& selVar = doc->variables[s_selectedVarIdx];
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // 标题
+        ImGui::TextColored(typeColor(selVar.dataType), "● %s", selVar.name.c_str());
+        ImGui::SameLine();
+        ImGui::TextDisabled("[%s]", typeToStr(selVar).c_str());
+
+        ImGui::Spacing();
+
+        // 默认值编辑（根据类型不同渲染不同控件）
+        ImGui::TextUnformatted("Default Value:");
+        ImGui::PushID("##vardefault");
+
+        bool changed = false;
+        if (selVar.containerType != RTContainerType::Single)
+        {
+            // Array/Map/Set: 用 InputText 编辑 JSON 字符串
+            static char s_defaultBuf[512] = "";
+            std::string curVal = selVar.defaultValue.asString();
+            if (curVal != s_defaultBuf)
+                snprintf(s_defaultBuf, sizeof(s_defaultBuf), "%s", curVal.c_str());
+            ImGui::SetNextItemWidth(paneWidth - 8.0f);
+            if (ImGui::InputText("##defval", s_defaultBuf, sizeof(s_defaultBuf),
+                                  ImGuiInputTextFlags_EnterReturnsTrue))
+            {
+                PushUndoState();
+                selVar.defaultValue = RTVariant(std::string(s_defaultBuf));
+                doc->isDirty = true;
+            }
+        }
+        else switch (selVar.itemType)
+        {
+            case RTPinDataType::Boolean:
+            {
+                bool bval = selVar.defaultValue.asBool();
+                bool prev = bval;
+                if (ImGui::Checkbox("##defbool", &bval) && bval != prev)
+                {
+                    PushUndoState();
+                    selVar.defaultValue = RTVariant(bval);
+                    doc->isDirty = true;
+                }
+                break;
+            }
+            case RTPinDataType::Integer:
+            {
+                int64_t ival = selVar.defaultValue.asInt();
+                ImS64 v = static_cast<ImS64>(ival);
+                ImGui::SetNextItemWidth(paneWidth - 8.0f);
+                if (ImGui::DragScalar("##defint", ImGuiDataType_S64, &v, 1.0f))
+                {
+                    PushUndoState();
+                    selVar.defaultValue = RTVariant(static_cast<int64_t>(v));
+                    doc->isDirty = true;
+                }
+                break;
+            }
+            case RTPinDataType::Float:
+            {
+                float fval = static_cast<float>(selVar.defaultValue.asFloat());
+                ImGui::SetNextItemWidth(paneWidth - 8.0f);
+                if (ImGui::DragFloat("##deffloat", &fval, 0.01f))
+                {
+                    PushUndoState();
+                    selVar.defaultValue = RTVariant(static_cast<double>(fval));
+                    doc->isDirty = true;
+                }
+                break;
+            }
+            default:  // String / Object / Any
+            {
+                static char s_defaultStrBuf[512] = "";
+                std::string curStr = selVar.defaultValue.asString();
+                if (curStr != s_defaultStrBuf)
+                    snprintf(s_defaultStrBuf, sizeof(s_defaultStrBuf), "%s", curStr.c_str());
+                ImGui::SetNextItemWidth(paneWidth - 8.0f);
+                if (ImGui::InputText("##defstr", s_defaultStrBuf, sizeof(s_defaultStrBuf)))
+                {
+                    selVar.defaultValue = RTVariant(std::string(s_defaultStrBuf));
+                    doc->isDirty = true;
+                }
+                if (ImGui::IsItemActivated()) PushUndoState();
+                break;
+            }
+        }
+        ImGui::PopID();
+
+        // 是否暴露（Exposed）
+        ImGui::Spacing();
+        bool exposed = selVar.isExposed;
+        if (ImGui::Checkbox("Exposed (visible externally)", &exposed))
+        {
+            PushUndoState();
+            selVar.isExposed = exposed;
+            doc->isDirty = true;
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("When enabled, this variable can be set via\n-v flag in CLI or SetVariable() in code");
     }
 }
 

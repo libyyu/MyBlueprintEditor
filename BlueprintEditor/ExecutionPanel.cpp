@@ -170,6 +170,24 @@ void BlueprintEditor::ExecuteBlueprint()
     // 捕获文档指针快照（防止回调期间标签页切换写入错误文档）
     BlueprintDocument* capturedDoc = ActiveDoc();
 
+    // ── 自动加载蓝图同目录的 lua/BlueprintEntry.lua（Lua 注册节点入口）──────
+    // 必须在 InitRunnerForDoc 之前，确保 Lua handler 被注入到 runner
+#ifdef BLUEPRINT_HAS_LUA
+    if (!ActiveDoc()->filePath.empty())
+    {
+#ifndef __EMSCRIPTEN__
+        namespace fs = std::filesystem;
+        fs::path luaEntry = fs::path(ActiveDoc()->filePath).parent_path() / "lua" / "BlueprintEntry.lua";
+        if (fs::exists(luaEntry))
+        {
+            m_LuaNodeRegistrar.AddLuaPath(luaEntry.parent_path().string());
+            m_LuaNodeRegistrar.LoadEntrySilent(luaEntry.string(),
+                "doc:" + luaEntry.string());
+        }
+#endif
+    }
+#endif
+
     InitRunnerForDoc(ActiveDoc(), /*basePath=*/"", capturedDoc);
 
     // 注入工程库函数（FuncLib.* 节点需要，InitRunnerForDoc 不扫库）
@@ -390,6 +408,16 @@ void BlueprintEditor::ShowExecutionPanel(float paneWidth)
     // ── Tab: Log | Nodes ─────────────────────────────────────────────────
     if (ImGui::BeginTabBar("##ExecTabs"))
     {
+        // ── TabBar 右侧：隐藏底部面板按钮（与左侧面板显隐按钮对称）────────
+        // 用 ImGuiTabItemFlags_Trailing 把按钮对齐到 TabBar 最右侧
+        ImGui::SetNextItemWidth(0);
+        if (ImGui::TabItemButton(ICON_FA_XMARK "##CloseExecPanel",
+                                  ImGuiTabItemFlags_Trailing | ImGuiTabItemFlags_NoTooltip))
+        {
+            m_ShowExecutionWindow = false;
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Hide bottom panel\n(View menu to show again)");
         // ── Tab: Log ────────────────────────────────────────────────────
         if (ImGui::BeginTabItem(ICON_FA_TERMINAL " Log"))
         {

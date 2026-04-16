@@ -2157,15 +2157,21 @@ void BlueprintEditor::OnFrame(float deltaTime)
 
             ImGui::SameLine(0, 4);
 
-            // Stop
-            if (isIdle || isStopped) ImGui::BeginDisabled();
+            // Stop — 有异步任务时也需要可以停止
+            bool hasAsync = runner.HasPendingAsync();
+            bool canStop  = isRunning || isPaused || hasAsync;
+            if (!canStop) ImGui::BeginDisabled();
             ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(120, 30, 30, 255));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(160, 40, 40, 255));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(190, 50, 50, 255));
             if (ImGui::Button(ICON_FA_STOP "##stop", ImVec2(iconW, btnH)))
+            {
                 runner.Stop();
+                // 同时清除 isExecuting 标志，让编辑器立刻响应
+                if (ActiveDoc()) ActiveDoc()->isExecuting = false;
+            }
             ImGui::PopStyleColor(3);
-            if (isIdle || isStopped) ImGui::EndDisabled();
+            if (!canStop) ImGui::EndDisabled();
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Stop");
 
             // 状态指示
