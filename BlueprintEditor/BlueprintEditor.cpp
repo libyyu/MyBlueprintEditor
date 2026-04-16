@@ -1137,9 +1137,34 @@ void BlueprintEditor::OnStart()
         // exe 目录下的全局入口脚本（不存在则静默跳过，不 watch——全局不会动态出现）
         if(!bLoaded)
         {
-            std::string globalEntry = exeDir + "/BlueprintEntry.lua";
-            bLoaded = m_LuaNodeRegistrar.LoadEntrySilent(globalEntry, "global:BlueprintEntry");
-            BPLOG("Lua global path: " + exeDir);
+            // 候选路径列表：exe 目录、exe 的上级（bin/Release → 工程根）、工程根/data
+            // 这样 Release 模式下（ROOT_DIR 未定义）也能找到 data/BlueprintEntry.lua
+            std::vector<std::string> candidates;
+            candidates.push_back(exeDir + "/BlueprintEntry.lua");
+            // exe 在 build-windows/bin/Release/ 时：上溯三级到工程根
+            try {
+                fs::path p = fs::path(exeDir);
+                for (int up = 1; up <= 4 && !bLoaded; ++up)
+                {
+                    p = p.parent_path();
+                    candidates.push_back((p / "data" / "BlueprintEntry.lua").string());
+                    candidates.push_back((p / "BlueprintEntry.lua").string());
+                }
+            } catch (...) {}
+
+            for (const auto& cand : candidates)
+            {
+                if (fs::exists(cand))
+                {
+                    m_LuaNodeRegistrar.AddLuaPath(fs::path(cand).parent_path().string());
+                    bLoaded = m_LuaNodeRegistrar.LoadEntrySilent(cand, "global:BlueprintEntry");
+                    if (bLoaded)
+                    {
+                        BPLOG("Lua global path: " + fs::path(cand).parent_path().string());
+                        break;
+                    }
+                }
+            }
         }
 #endif
     }
