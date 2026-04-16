@@ -65,7 +65,32 @@ void BlueprintEditor::InitRunnerForDoc(BlueprintDocument* doc,
         bp = BpPath::ParentDir(doc->filePath);
         if (bp.empty()) bp = ".";
     }
+
+    // 快照 Lua 注册的 handler（m_HandlerRegistry 中来自 Lua 脚本的条目）
+    // 原因：RegisterBuiltinHandlers 末尾会 *outHandlers = move(allHandlers)
+    //       覆盖整个 m_HandlerRegistry，导致 Lua handler 丢失。
+    // 解决：先记录 Lua handler ID 集合，调用后把它们 merge 回 runner 和 registry。
+    std::unordered_map<std::string, ::NodeEditor::Runtime::NodeHandler> luaHandlerSnapshot;
+#ifdef BLUEPRINT_HAS_LUA
+    {
+        const auto& luaIds = m_LuaNodeRegistrar.GetRegisteredIds();
+        for (const auto& id : luaIds)
+        {
+            auto it = m_HandlerRegistry.find(id);
+            if (it != m_HandlerRegistry.end())
+                luaHandlerSnapshot[id] = it->second;
+        }
+    }
+#endif
+
     ::NodeEditor::Runtime::RegisterBuiltinHandlers(doc->persistentRunner, bp, &m_HandlerRegistry);
+
+    // 把 Lua handler merge 回 registry 和 runner
+    for (auto& kv : luaHandlerSnapshot)
+    {
+        m_HandlerRegistry[kv.first] = kv.second;
+        doc->persistentRunner.RegisterHandler(kv.first, kv.second);
+    }
 
     if (m_DefaultHandler)
         doc->persistentRunner.SetDefaultHandler(m_DefaultHandler);
