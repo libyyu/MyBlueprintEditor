@@ -435,7 +435,7 @@ if(NOT EMSCRIPTEN)
         target_compile_definitions(BlueprintRuntime PUBLIC CPPHTTPLIB_OPENSSL_SUPPORT)
         target_link_libraries(BlueprintRuntime PRIVATE OpenSSL::SSL OpenSSL::Crypto)
         message(STATUS "[BlueprintRuntime] OpenSSL ${OPENSSL_VERSION} → HTTPS enabled")
-    elseif(WIN32 AND EXISTS "${BLUEPRINT_ROOT_DIR}/external/openssl/include/ssl.h")
+    elseif(WIN32 AND EXISTS "${BLUEPRINT_ROOT_DIR}/external/openssl/include/openssl/ssl.h")
         # 回退到工程内预置的 external/openssl（Windows x64 静态库）
         set(_EXT_SSL_DIR "${BLUEPRINT_ROOT_DIR}/external/openssl")
         # OpenSSL 1.1.1 静态库可能带 zlib 压缩，先尝试找 zlib；找不到则禁用压缩
@@ -450,12 +450,12 @@ if(NOT EMSCRIPTEN)
             ws2_32 crypt32)   # Windows socket + cert store
         if(ZLIB_FOUND)
             target_link_libraries(BlueprintRuntime PRIVATE ZLIB::ZLIB)
-            message(STATUS "[BlueprintRuntime]   + zlib ${ZLIB_VERSION_STRING}")
+            message(STATUS "[BlueprintRuntime] + zlib ${ZLIB_VERSION_STRING}")
         else()
             # zlib 不存在：编译一个空 stub 满足链接，TLS 压缩（DEFLATE，已废弃）不可用
             target_sources(BlueprintRuntime PRIVATE
                 "${CMAKE_CURRENT_SOURCE_DIR}/Http/zlib_stub.c")
-            message(STATUS "[BlueprintRuntime]   zlib not found, using stub (TLS compression disabled)")
+            message(STATUS "[BlueprintRuntime] zlib not found, using stub (TLS compression disabled)")
         endif()
         message(STATUS "[BlueprintRuntime] OpenSSL (external/openssl) → HTTPS enabled")
     else()

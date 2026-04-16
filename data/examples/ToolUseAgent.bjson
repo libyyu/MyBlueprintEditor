@@ -1,342 +1,1365 @@
 {
-  "runtime": {
+    "runtime": {
     "fileType": "runtime",
     "metadata": {
-      "schemaVersion": 2,
-      "blueprintClass": 0,
-      "name": "ToolUseAgent",
-      "description": "Two-turn LLM agent with tool use (get_weather). Round 1: LLM decides to call get_weather. Round 2: LLM answers using tool result.",
-      "version": "1.0.0"
+        "schemaVersion": 2,
+        "blueprintClass": 0,
+        "name": "ToolUseAgent",
+        "description": "Blueprint Editor file",
+        "version": ""
     },
     "nodes": [
-      {
-        "id": 1,
-        "definitionId": "OnBeginPlay",
-        "name": "On Begin Play",
-        "pins": [
-          { "id": 1001, "kind": 1, "dataType": 0, "isExec": true }
-        ]
-      },
-      {
-        "id": 4,
-        "definitionId": "String.Template",
-        "name": "User Prompt",
-        "pins": [
-          { "id": 4001, "kind": 0, "dataType": 4, "name": "Template",
-            "defaultValue": "What is the weather in {{location}}?" },
-          { "id": 4002, "kind": 0, "dataType": 6, "name": "Keys",
-            "defaultValue": ["location"] },
-          { "id": 4003, "kind": 0, "dataType": 6, "name": "Values",
-            "defaultValue": ["Shanghai"] },
-          { "id": 4004, "kind": 1, "dataType": 4, "name": "Result" }
-        ]
-      },
-      {
-        "id": 5,
-        "definitionId": "JSON.MakeMessage",
-        "name": "User Message",
-        "pins": [
-          { "id": 5001, "kind": 0, "dataType": 4, "name": "Role",       "defaultValue": "user" },
-          { "id": 5002, "kind": 0, "dataType": 4, "name": "Content" },
-          { "id": 5003, "kind": 0, "dataType": 4, "name": "ToolCallId", "defaultValue": "" },
-          { "id": 5004, "kind": 1, "dataType": 4, "name": "Message" }
-        ]
-      },
-      {
-        "id": 6,
-        "definitionId": "JSON.ArrayPush",
-        "name": "Make Messages",
-        "pins": [
-          { "id": 6001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 6002, "kind": 0, "dataType": 4, "name": "JSON",    "defaultValue": "[]" },
-          { "id": 6003, "kind": 0, "dataType": 9, "name": "Element" },
-          { "id": 6010, "kind": 1, "dataType": 0, "isExec": true },
-          { "id": 6011, "kind": 1, "dataType": 4, "name": "JSON" },
-          { "id": 6012, "kind": 1, "dataType": 2, "name": "Length" }
-        ]
-      },
-      {
-        "id": 2,
-        "definitionId": "JSON.ArrayPush",
-        "name": "Make Tools Array",
-        "comment": "Wrap tool def JSON string into a tools array",
-        "pins": [
-          { "id": 2001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 2002, "kind": 0, "dataType": 4, "name": "JSON",    "defaultValue": "[]" },
-          { "id": 2003, "kind": 0, "dataType": 9, "name": "Element",
-            "defaultValue": "{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"description\":\"Get current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"location\"]}}}" },
-          { "id": 2010, "kind": 1, "dataType": 0, "isExec": true },
-          { "id": 2011, "kind": 1, "dataType": 4, "name": "JSON" },
-          { "id": 2012, "kind": 1, "dataType": 2, "name": "Length" }
-        ]
-      },
-      {
-        "id": 101,
-        "definitionId": "GetVariable",
-        "name": "Get ApiKey",
-        "pins": [
-          { "id": 1011, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "ApiKey" },
-          { "id": 1012, "kind": 1, "dataType": 4, "name": "Value" }
-        ]
-      },
-      {
-        "id": 102,
-        "definitionId": "GetVariable",
-        "name": "Get BaseURL",
-        "pins": [
-          { "id": 1021, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "BaseURL" },
-          { "id": 1022, "kind": 1, "dataType": 4, "name": "Value" }
-        ]
-      },
-      {
-        "id": 103,
-        "definitionId": "GetVariable",
-        "name": "Get Model",
-        "pins": [
-          { "id": 1031, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Model" },
-          { "id": 1032, "kind": 1, "dataType": 4, "name": "Value" }
-        ]
-      },
-      {
-        "id": 7,
-        "definitionId": "LLM.Chat",
-        "name": "LLM Call 1",
-        "pins": [
-          { "id": 7001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 7002, "kind": 0, "dataType": 4, "name": "BaseURL",      "defaultValue": "https://open.bigmodel.cn/api/paas/v4" },
-          { "id": 7003, "kind": 0, "dataType": 4, "name": "ApiKey",       "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf" },
-          { "id": 7004, "kind": 0, "dataType": 4, "name": "Model",        "defaultValue": "glm-4-flash" },
-          { "id": 7005, "kind": 0, "dataType": 4, "name": "Messages" },
-          { "id": 7006, "kind": 0, "dataType": 4, "name": "SystemPrompt", "defaultValue": "You are a helpful assistant." },
-          { "id": 7007, "kind": 0, "dataType": 2, "name": "MaxTokens",    "defaultValue": 512 },
-          { "id": 7008, "kind": 0, "dataType": 3, "name": "Temperature",  "defaultValue": 0.7 },
-          { "id": 7009, "kind": 0, "dataType": 4, "name": "Tools" },
-          { "id": 7010, "kind": 1, "dataType": 0, "name": "onReply",      "isExec": true },
-          { "id": 7011, "kind": 1, "dataType": 0, "name": "onToolCall",   "isExec": true },
-          { "id": 7012, "kind": 1, "dataType": 0, "name": "onError",      "isExec": true },
-          { "id": 7013, "kind": 1, "dataType": 4, "name": "Reply" },
-          { "id": 7014, "kind": 1, "dataType": 4, "name": "ToolCallsJSON" },
-          { "id": 7015, "kind": 1, "dataType": 4, "name": "FinishReason" },
-          { "id": 7016, "kind": 1, "dataType": 4, "name": "FullResponse" },
-          { "id": 7017, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
-        ]
-      },
-      {
-        "id": 8,
-        "definitionId": "JSON.GetPath",
-        "name": "Get Tool Call ID",
-        "pins": [
-          { "id": 8001, "kind": 0, "dataType": 4, "name": "JSON" },
-          { "id": 8002, "kind": 0, "dataType": 4, "name": "Path",
-            "defaultValue": "[0].id" },
-          { "id": 8003, "kind": 1, "dataType": 4, "name": "Value" },
-          { "id": 8004, "kind": 1, "dataType": 1, "name": "Found" }
-        ]
-      },
-      {
-        "id": 9,
-        "definitionId": "JSON.GetPath",
-        "name": "Get Location Arg",
-        "pins": [
-          { "id": 9001, "kind": 0, "dataType": 4, "name": "JSON" },
-          { "id": 9002, "kind": 0, "dataType": 4, "name": "Path",
-            "defaultValue": "[0].function.arguments.location" },
-          { "id": 9003, "kind": 1, "dataType": 4, "name": "Value" },
-          { "id": 9004, "kind": 1, "dataType": 1, "name": "Found" }
-        ]
-      },
-      {
-        "id": 10,
-        "definitionId": "Branch",
-        "name": "Has Tool Call?",
-        "pins": [
-          { "id": 10001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 10002, "kind": 0, "dataType": 1, "name": "Condition" },
-          { "id": 10003, "kind": 1, "dataType": 0, "name": "True",  "isExec": true },
-          { "id": 10004, "kind": 1, "dataType": 0, "name": "False", "isExec": true }
-        ]
-      },
-      {
-        "id": 11,
-        "definitionId": "FormatString",
-        "name": "Weather Result",
-        "pins": [
-          { "id": 11001, "kind": 0, "dataType": 4, "name": "Format",
-            "defaultValue": "Weather in {0}: Sunny, 25°C" },
-          { "id": 11002, "kind": 0, "dataType": 4, "name": "city" },
-          { "id": 11003, "kind": 1, "dataType": 4, "name": "Result" }
-        ]
-      },
-      {
-        "id": 12,
-        "definitionId": "JSON.MakeMessage",
-        "name": "Tool Message",
-        "pins": [
-          { "id": 12001, "kind": 0, "dataType": 4, "name": "Role",       "defaultValue": "tool" },
-          { "id": 12002, "kind": 0, "dataType": 4, "name": "Content" },
-          { "id": 12003, "kind": 0, "dataType": 4, "name": "ToolCallId" },
-          { "id": 12004, "kind": 1, "dataType": 4, "name": "Message" }
-        ]
-      },
-      {
-        "id": 13,
-        "definitionId": "JSON.ArrayPush",
-        "name": "Append Tool Msg",
-        "pins": [
-          { "id": 13001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 13002, "kind": 0, "dataType": 4, "name": "JSON" },
-          { "id": 13003, "kind": 0, "dataType": 9, "name": "Element" },
-          { "id": 13010, "kind": 1, "dataType": 0, "isExec": true },
-          { "id": 13011, "kind": 1, "dataType": 4, "name": "JSON" },
-          { "id": 13012, "kind": 1, "dataType": 2, "name": "Length" }
-        ]
-      },
-      {
-        "id": 104,
-        "definitionId": "GetVariable",
-        "name": "Get ApiKey 2",
-        "pins": [
-          { "id": 1041, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "ApiKey" },
-          { "id": 1042, "kind": 1, "dataType": 4, "name": "Value" }
-        ]
-      },
-      {
-        "id": 105,
-        "definitionId": "GetVariable",
-        "name": "Get BaseURL 2",
-        "pins": [
-          { "id": 1051, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "BaseURL" },
-          { "id": 1052, "kind": 1, "dataType": 4, "name": "Value" }
-        ]
-      },
-      {
-        "id": 106,
-        "definitionId": "GetVariable",
-        "name": "Get Model 2",
-        "pins": [
-          { "id": 1061, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Model" },
-          { "id": 1062, "kind": 1, "dataType": 4, "name": "Value" }
-        ]
-      },
-      {
-        "id": 14,
-        "definitionId": "LLM.Chat",
-        "name": "LLM Call 2",
-        "pins": [
-          { "id": 14001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 14002, "kind": 0, "dataType": 4, "name": "BaseURL",      "defaultValue": "https://open.bigmodel.cn/api/paas/v4" },
-          { "id": 14003, "kind": 0, "dataType": 4, "name": "ApiKey",       "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf" },
-          { "id": 14004, "kind": 0, "dataType": 4, "name": "Model",        "defaultValue": "glm-4-flash" },
-          { "id": 14005, "kind": 0, "dataType": 4, "name": "Messages" },
-          { "id": 14006, "kind": 0, "dataType": 4, "name": "SystemPrompt", "defaultValue": "You are a helpful assistant." },
-          { "id": 14007, "kind": 0, "dataType": 2, "name": "MaxTokens",    "defaultValue": 512 },
-          { "id": 14008, "kind": 0, "dataType": 3, "name": "Temperature",  "defaultValue": 0.7 },
-          { "id": 14009, "kind": 0, "dataType": 4, "name": "Tools",        "defaultValue": "" },
-          { "id": 14010, "kind": 1, "dataType": 0, "name": "onReply",      "isExec": true },
-          { "id": 14011, "kind": 1, "dataType": 0, "name": "onToolCall",   "isExec": true },
-          { "id": 14012, "kind": 1, "dataType": 0, "name": "onError",      "isExec": true },
-          { "id": 14013, "kind": 1, "dataType": 4, "name": "Reply" },
-          { "id": 14014, "kind": 1, "dataType": 4, "name": "ToolCallsJSON" },
-          { "id": 14015, "kind": 1, "dataType": 4, "name": "FinishReason" },
-          { "id": 14016, "kind": 1, "dataType": 4, "name": "FullResponse" },
-          { "id": 14017, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
-        ]
-      },
-      {
-        "id": 16,
-        "definitionId": "PrintString",
-        "name": "Print Answer",
-        "pins": [
-          { "id": 16001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 16002, "kind": 0, "dataType": 4, "name": "In String" },
-          { "id": 16003, "kind": 1, "dataType": 0, "isExec": true }
-        ]
-      },
-      {
-        "id": 17,
-        "definitionId": "PrintString",
-        "name": "Print Error",
-        "pins": [
-          { "id": 17001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 17002, "kind": 0, "dataType": 4, "name": "In String",
-            "defaultValue": "LLM call failed" },
-          { "id": 17003, "kind": 1, "dataType": 0, "isExec": true }
-        ]
-      },
-      {
-        "id": 18,
-        "definitionId": "PrintString",
-        "name": "No Tool Call",
-        "pins": [
-          { "id": 18001, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 18002, "kind": 0, "dataType": 4, "name": "In String",
-            "defaultValue": "No tool call in response" },
-          { "id": 18003, "kind": 1, "dataType": 0, "isExec": true }
-        ]
-      }
+        {
+            "id": 1,
+            "definitionId": "OnBeginPlay",
+            "definitionVersion": 1,
+            "name": "On Begin Play",
+            "pins": [
+                {
+                    "id": 2,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "definitionId": "String.Template",
+            "definitionVersion": 1,
+            "name": "User Prompt",
+            "pins": [
+                {
+                    "id": 4,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Template",
+                    "defaultValue": "What is the weather in {{location}}?"
+                },
+                {
+                    "id": 5,
+                    "kind": 0,
+                    "dataType": 6,
+                    "name": "Keys"
+                },
+                {
+                    "id": 6,
+                    "kind": 0,
+                    "dataType": 6,
+                    "name": "Values"
+                },
+                {
+                    "id": 7,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Result"
+                }
+            ]
+        },
+        {
+            "id": 8,
+            "definitionId": "JSON.MakeMessage",
+            "definitionVersion": 1,
+            "name": "User Message",
+            "pins": [
+                {
+                    "id": 9,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Role",
+                    "defaultValue": "user"
+                },
+                {
+                    "id": 10,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Content",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 11,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "ToolCallId",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 12,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Message"
+                }
+            ]
+        },
+        {
+            "id": 13,
+            "definitionId": "JSON.ArrayPush",
+            "definitionVersion": 1,
+            "name": "Make Messages",
+            "pins": [
+                {
+                    "id": 14,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 15,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "JSON",
+                    "defaultValue": "[]"
+                },
+                {
+                    "id": 16,
+                    "kind": 0,
+                    "dataType": 9,
+                    "name": "Element"
+                },
+                {
+                    "id": 17,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 18,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "JSON"
+                },
+                {
+                    "id": 19,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "Length"
+                }
+            ]
+        },
+        {
+            "id": 20,
+            "definitionId": "JSON.ArrayPush",
+            "definitionVersion": 1,
+            "name": "Make Tools Array",
+            "pins": [
+                {
+                    "id": 21,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 22,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "JSON",
+                    "defaultValue": "[]"
+                },
+                {
+                    "id": 23,
+                    "kind": 0,
+                    "dataType": 9,
+                    "name": "Element"
+                },
+                {
+                    "id": 24,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 25,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "JSON"
+                },
+                {
+                    "id": 26,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "Length"
+                }
+            ]
+        },
+        {
+            "id": 27,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get ApiKey",
+            "pins": [
+                {
+                    "id": 28,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "ApiKey"
+                },
+                {
+                    "id": 29,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 30,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get BaseURL",
+            "pins": [
+                {
+                    "id": 31,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "BaseURL"
+                },
+                {
+                    "id": 32,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 33,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get Model",
+            "pins": [
+                {
+                    "id": 34,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "Model"
+                },
+                {
+                    "id": 35,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 36,
+            "definitionId": "LLM.Chat",
+            "definitionVersion": 1,
+            "name": "LLM Call 1",
+            "pins": [
+                {
+                    "id": 37,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 38,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "BaseURL",
+                    "defaultValue": "https://open.bigmodel.cn/api/paas/v4"
+                },
+                {
+                    "id": 39,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "ApiKey",
+                    "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf"
+                },
+                {
+                    "id": 40,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Model",
+                    "defaultValue": "glm-4-flash"
+                },
+                {
+                    "id": 41,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Messages",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 42,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "SystemPrompt",
+                    "defaultValue": "You are a helpful assistant."
+                },
+                {
+                    "id": 43,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "MaxTokens",
+                    "defaultValue": 512
+                },
+                {
+                    "id": 44,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Temperature",
+                    "defaultValue": 0.69999999999999996
+                },
+                {
+                    "id": 45,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Tools",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 46,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onReply",
+                    "isExec": true
+                },
+                {
+                    "id": 47,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onToolCall",
+                    "isExec": true
+                },
+                {
+                    "id": 48,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onError",
+                    "isExec": true
+                },
+                {
+                    "id": 49,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Reply"
+                },
+                {
+                    "id": 50,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "ToolCallsJSON"
+                },
+                {
+                    "id": 51,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "FinishReason"
+                },
+                {
+                    "id": 52,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "FullResponse"
+                },
+                {
+                    "id": 53,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "ErrorMessage"
+                }
+            ]
+        },
+        {
+            "id": 54,
+            "definitionId": "JSON.GetPath",
+            "definitionVersion": 1,
+            "name": "Get Tool Call ID",
+            "pins": [
+                {
+                    "id": 55,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "JSON",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 56,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Path",
+                    "defaultValue": "[0].id"
+                },
+                {
+                    "id": 57,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                },
+                {
+                    "id": 58,
+                    "kind": 1,
+                    "dataType": 1,
+                    "name": "Found"
+                }
+            ]
+        },
+        {
+            "id": 59,
+            "definitionId": "JSON.GetPath",
+            "definitionVersion": 1,
+            "name": "Get Location Arg",
+            "pins": [
+                {
+                    "id": 60,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "JSON",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 61,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Path",
+                    "defaultValue": "[0].function.arguments.location"
+                },
+                {
+                    "id": 62,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                },
+                {
+                    "id": 63,
+                    "kind": 1,
+                    "dataType": 1,
+                    "name": "Found"
+                }
+            ]
+        },
+        {
+            "id": 64,
+            "definitionId": "Branch",
+            "definitionVersion": 1,
+            "name": "Has Tool Call?",
+            "pins": [
+                {
+                    "id": 65,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 66,
+                    "kind": 0,
+                    "dataType": 1,
+                    "name": "Condition",
+                    "defaultValue": false
+                },
+                {
+                    "id": 67,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "True",
+                    "isExec": true
+                },
+                {
+                    "id": 68,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "False",
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 69,
+            "definitionId": "FormatString",
+            "definitionVersion": 1,
+            "name": "Weather Result",
+            "pins": [
+                {
+                    "id": 70,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Format",
+                    "defaultValue": "Weather in {0}: Sunny, 25°C"
+                },
+                {
+                    "id": 71,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "city",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 72,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Result"
+                }
+            ]
+        },
+        {
+            "id": 73,
+            "definitionId": "JSON.MakeMessage",
+            "definitionVersion": 1,
+            "name": "Tool Message",
+            "pins": [
+                {
+                    "id": 74,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Role",
+                    "defaultValue": "tool"
+                },
+                {
+                    "id": 75,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Content",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 76,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "ToolCallId",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 77,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Message"
+                }
+            ]
+        },
+        {
+            "id": 78,
+            "definitionId": "JSON.ArrayPush",
+            "definitionVersion": 1,
+            "name": "Append Tool Msg",
+            "pins": [
+                {
+                    "id": 79,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 80,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "JSON",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 81,
+                    "kind": 0,
+                    "dataType": 9,
+                    "name": "Element"
+                },
+                {
+                    "id": 82,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 83,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "JSON"
+                },
+                {
+                    "id": 84,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "Length"
+                }
+            ]
+        },
+        {
+            "id": 85,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get ApiKey 2",
+            "pins": [
+                {
+                    "id": 86,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "ApiKey"
+                },
+                {
+                    "id": 87,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 88,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get BaseURL 2",
+            "pins": [
+                {
+                    "id": 89,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "BaseURL"
+                },
+                {
+                    "id": 90,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 91,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get Model 2",
+            "pins": [
+                {
+                    "id": 92,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "Model"
+                },
+                {
+                    "id": 93,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 94,
+            "definitionId": "LLM.Chat",
+            "definitionVersion": 1,
+            "name": "LLM Call 2",
+            "pins": [
+                {
+                    "id": 95,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 96,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "BaseURL",
+                    "defaultValue": "https://open.bigmodel.cn/api/paas/v4"
+                },
+                {
+                    "id": 97,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "ApiKey",
+                    "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf"
+                },
+                {
+                    "id": 98,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Model",
+                    "defaultValue": "glm-4-flash"
+                },
+                {
+                    "id": 99,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Messages",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 100,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "SystemPrompt",
+                    "defaultValue": "You are a helpful assistant."
+                },
+                {
+                    "id": 101,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "MaxTokens",
+                    "defaultValue": 512
+                },
+                {
+                    "id": 102,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Temperature",
+                    "defaultValue": 0.69999999999999996
+                },
+                {
+                    "id": 103,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Tools",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 104,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onReply",
+                    "isExec": true
+                },
+                {
+                    "id": 105,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onToolCall",
+                    "isExec": true
+                },
+                {
+                    "id": 106,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onError",
+                    "isExec": true
+                },
+                {
+                    "id": 107,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Reply"
+                },
+                {
+                    "id": 108,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "ToolCallsJSON"
+                },
+                {
+                    "id": 109,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "FinishReason"
+                },
+                {
+                    "id": 110,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "FullResponse"
+                },
+                {
+                    "id": 111,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "ErrorMessage"
+                }
+            ]
+        },
+        {
+            "id": 112,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print Answer",
+            "pins": [
+                {
+                    "id": 113,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 114,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 115,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 116,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print Error",
+            "pins": [
+                {
+                    "id": 117,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 118,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": "LLM call failed 2"
+                },
+                {
+                    "id": 119,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 120,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "No Tool Call",
+            "pins": [
+                {
+                    "id": 121,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 122,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": "No tool call in response"
+                },
+                {
+                    "id": 123,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 154,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print Error",
+            "pins": [
+                {
+                    "id": 155,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 156,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": "LLM call failed"
+                },
+                {
+                    "id": 157,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        }
     ],
     "links": [
-      { "id": 100, "startPinId": 1001,  "endPinId": 2001,  "isEnabled": true },
-      { "id": 101, "startPinId": 2010,  "endPinId": 6001,  "isEnabled": true },
-      { "id": 200, "startPinId": 4004,  "endPinId": 5002,  "isEnabled": true },
-      { "id": 201, "startPinId": 5004,  "endPinId": 6003,  "isEnabled": true },
-      { "id": 202, "startPinId": 6010,  "endPinId": 7001,  "isEnabled": true },
-      { "id": 203, "startPinId": 6011,  "endPinId": 7005,  "isEnabled": true },
-      { "id": 204, "startPinId": 2011,  "endPinId": 7009,  "isEnabled": true },
-      { "id": 205, "startPinId": 1012,  "endPinId": 7003,  "isEnabled": true },
-      { "id": 206, "startPinId": 1022,  "endPinId": 7002,  "isEnabled": true },
-      { "id": 207, "startPinId": 1032,  "endPinId": 7004,  "isEnabled": true },
-      { "id": 400, "startPinId": 7010,  "endPinId": 10001, "isEnabled": true },
-      { "id": 401, "startPinId": 7012,  "endPinId": 17001, "isEnabled": true },
-      { "id": 402, "startPinId": 7014,  "endPinId": 8001,  "isEnabled": true },
-      { "id": 403, "startPinId": 7014,  "endPinId": 9001,  "isEnabled": true },
-      { "id": 410, "startPinId": 8004,  "endPinId": 10002, "isEnabled": true },
-      { "id": 420, "startPinId": 10003, "endPinId": 13001, "isEnabled": true },
-      { "id": 421, "startPinId": 10004, "endPinId": 18001, "isEnabled": true },
-      { "id": 430, "startPinId": 9003,  "endPinId": 11002, "isEnabled": true },
-      { "id": 431, "startPinId": 11003, "endPinId": 12002, "isEnabled": true },
-      { "id": 432, "startPinId": 8003,  "endPinId": 12003, "isEnabled": true },
-      { "id": 433, "startPinId": 12004, "endPinId": 13003, "isEnabled": true },
-      { "id": 434, "startPinId": 6011,  "endPinId": 13002, "isEnabled": true },
-      { "id": 435, "startPinId": 13010, "endPinId": 14001, "isEnabled": true },
-      { "id": 436, "startPinId": 13011, "endPinId": 14005, "isEnabled": true },
-      { "id": 437, "startPinId": 1042,  "endPinId": 14003, "isEnabled": true },
-      { "id": 438, "startPinId": 1052,  "endPinId": 14002, "isEnabled": true },
-      { "id": 439, "startPinId": 1062,  "endPinId": 14004, "isEnabled": true },
-      { "id": 440, "startPinId": 14010, "endPinId": 16001, "isEnabled": true },
-      { "id": 441, "startPinId": 14012, "endPinId": 17001, "isEnabled": true },
-      { "id": 442, "startPinId": 14013, "endPinId": 16002, "isEnabled": true }
+        {
+            "id": 124,
+            "startPinId": 2,
+            "endPinId": 21,
+            "isEnabled": true
+        },
+        {
+            "id": 125,
+            "startPinId": 24,
+            "endPinId": 14,
+            "isEnabled": true
+        },
+        {
+            "id": 126,
+            "startPinId": 7,
+            "endPinId": 10,
+            "isEnabled": true
+        },
+        {
+            "id": 127,
+            "startPinId": 12,
+            "endPinId": 16,
+            "isEnabled": true
+        },
+        {
+            "id": 128,
+            "startPinId": 17,
+            "endPinId": 37,
+            "isEnabled": true
+        },
+        {
+            "id": 129,
+            "startPinId": 18,
+            "endPinId": 41,
+            "isEnabled": true
+        },
+        {
+            "id": 130,
+            "startPinId": 25,
+            "endPinId": 45,
+            "isEnabled": true
+        },
+        {
+            "id": 131,
+            "startPinId": 29,
+            "endPinId": 39,
+            "isEnabled": true
+        },
+        {
+            "id": 132,
+            "startPinId": 32,
+            "endPinId": 38,
+            "isEnabled": true
+        },
+        {
+            "id": 133,
+            "startPinId": 35,
+            "endPinId": 40,
+            "isEnabled": true
+        },
+        {
+            "id": 134,
+            "startPinId": 46,
+            "endPinId": 65,
+            "isEnabled": true
+        },
+        {
+            "id": 136,
+            "startPinId": 50,
+            "endPinId": 55,
+            "isEnabled": true
+        },
+        {
+            "id": 137,
+            "startPinId": 50,
+            "endPinId": 60,
+            "isEnabled": true
+        },
+        {
+            "id": 138,
+            "startPinId": 58,
+            "endPinId": 66,
+            "isEnabled": true
+        },
+        {
+            "id": 139,
+            "startPinId": 67,
+            "endPinId": 79,
+            "isEnabled": true
+        },
+        {
+            "id": 140,
+            "startPinId": 68,
+            "endPinId": 121,
+            "isEnabled": true
+        },
+        {
+            "id": 141,
+            "startPinId": 62,
+            "endPinId": 71,
+            "isEnabled": true
+        },
+        {
+            "id": 142,
+            "startPinId": 72,
+            "endPinId": 75,
+            "isEnabled": true
+        },
+        {
+            "id": 143,
+            "startPinId": 57,
+            "endPinId": 76,
+            "isEnabled": true
+        },
+        {
+            "id": 144,
+            "startPinId": 77,
+            "endPinId": 81,
+            "isEnabled": true
+        },
+        {
+            "id": 145,
+            "startPinId": 18,
+            "endPinId": 80,
+            "isEnabled": true
+        },
+        {
+            "id": 146,
+            "startPinId": 82,
+            "endPinId": 95,
+            "isEnabled": true
+        },
+        {
+            "id": 147,
+            "startPinId": 83,
+            "endPinId": 99,
+            "isEnabled": true
+        },
+        {
+            "id": 148,
+            "startPinId": 87,
+            "endPinId": 97,
+            "isEnabled": true
+        },
+        {
+            "id": 149,
+            "startPinId": 90,
+            "endPinId": 96,
+            "isEnabled": true
+        },
+        {
+            "id": 150,
+            "startPinId": 93,
+            "endPinId": 98,
+            "isEnabled": true
+        },
+        {
+            "id": 151,
+            "startPinId": 104,
+            "endPinId": 113,
+            "isEnabled": true
+        },
+        {
+            "id": 152,
+            "startPinId": 106,
+            "endPinId": 117,
+            "isEnabled": true
+        },
+        {
+            "id": 153,
+            "startPinId": 107,
+            "endPinId": 114,
+            "isEnabled": true
+        },
+        {
+            "id": 158,
+            "startPinId": 48,
+            "endPinId": 155,
+            "isEnabled": true
+        }
     ],
     "variables": [
-      { "name": "ApiKey",  "dataType": 4, "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf" },
-      { "name": "BaseURL", "dataType": 4, "defaultValue": "https://open.bigmodel.cn/api/paas/v4" },
-      { "name": "Model",   "dataType": 4, "defaultValue": "glm-4-flash" }
+        {
+            "name": "ApiKey",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf"
+        },
+        {
+            "name": "BaseURL",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": "https://open.bigmodel.cn/api/paas/v4"
+        },
+        {
+            "name": "Model",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": "glm-4-flash"
+        }
     ]
-  },
-  "editor": {
+},
+    "editor": {
     "fileType": "editor",
-    "metadata": { "author": "", "createdAt": "", "updatedAt": "" },
+    "metadata": {
+        "author": "",
+        "createdAt": "",
+        "updatedAt": ""
+    },
     "nodes": [
-      { "id": 1,  "position": { "x": -600, "y": 0    }, "size": { "width": 161, "height": 72  } },
-      { "id": 2,  "position": { "x": -360, "y": 0    }, "size": { "width": 440, "height": 128 } },
-      { "id": 4,  "position": { "x": -600, "y": 200  }, "size": { "width": 340, "height": 105 } },
-      { "id": 5,  "position": { "x": -200, "y": 200  }, "size": { "width": 340, "height": 105 } },
-      { "id": 6,  "position": { "x": 200,  "y": 100  }, "size": { "width": 260, "height": 128 } },
-      { "id": 7,  "position": { "x": 520,  "y": 0    }, "size": { "width": 400, "height": 317 } },
-      { "id": 10, "position": { "x": 980,  "y": 0    }, "size": { "width": 200, "height": 115 } },
-      { "id": 8,  "position": { "x": 980,  "y": 200  }, "size": { "width": 340, "height": 103 } },
-      { "id": 9,  "position": { "x": 980,  "y": 340  }, "size": { "width": 340, "height": 103 } },
-      { "id": 11, "position": { "x": 1380, "y": 340  }, "size": { "width": 380, "height": 71  } },
-      { "id": 12, "position": { "x": 1820, "y": 260  }, "size": { "width": 340, "height": 105 } },
-      { "id": 13, "position": { "x": 2220, "y": 200  }, "size": { "width": 260, "height": 128 } },
-      { "id": 14, "position": { "x": 2560, "y": 0    }, "size": { "width": 400, "height": 317 } },
-      { "id": 16, "position": { "x": 3020, "y": 0    }, "size": { "width": 193, "height": 100 } },
-      { "id": 17, "position": { "x": 980,  "y": -120 }, "size": { "width": 193, "height": 100 } },
-      { "id": 18, "position": { "x": 1380, "y": -80  }, "size": { "width": 220, "height": 100 } }
+        {
+            "id": 1,
+            "position": {
+                "x": -600,
+                "y": 0
+            },
+            "size": {
+                "width": 158,
+                "height": 72
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 3,
+            "position": {
+                "x": -734,
+                "y": 351
+            },
+            "size": {
+                "width": 406,
+                "height": 99
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 8,
+            "position": {
+                "x": -312,
+                "y": 349
+            },
+            "size": {
+                "width": 436,
+                "height": 102
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 13,
+            "position": {
+                "x": 40,
+                "y": 4
+            },
+            "size": {
+                "width": 294,
+                "height": 131
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 20,
+            "position": {
+                "x": -360,
+                "y": 0
+            },
+            "size": {
+                "width": 294,
+                "height": 131
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 27,
+            "position": {
+                "x": 130,
+                "y": 220
+            },
+            "size": {
+                "width": 182,
+                "height": 40
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 30,
+            "position": {
+                "x": 119,
+                "y": 172
+            },
+            "size": {
+                "width": 193,
+                "height": 40
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 33,
+            "position": {
+                "x": 101,
+                "y": 268
+            },
+            "size": {
+                "width": 179,
+                "height": 40
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 36,
+            "position": {
+                "x": 520,
+                "y": 0
+            },
+            "size": {
+                "width": 403,
+                "height": 305
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 54,
+            "position": {
+                "x": 1140,
+                "y": 220
+            },
+            "size": {
+                "width": 284,
+                "height": 103
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 59,
+            "position": {
+                "x": 1140,
+                "y": 360
+            },
+            "size": {
+                "width": 284,
+                "height": 103
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 64,
+            "position": {
+                "x": 1352,
+                "y": 0
+            },
+            "size": {
+                "width": 202,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 69,
+            "position": {
+                "x": 1540,
+                "y": 360
+            },
+            "size": {
+                "width": 408,
+                "height": 71
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 73,
+            "position": {
+                "x": 1820,
+                "y": 260
+            },
+            "size": {
+                "width": 398,
+                "height": 99
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 78,
+            "position": {
+                "x": 2237,
+                "y": 68
+            },
+            "size": {
+                "width": 203,
+                "height": 128
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 85,
+            "position": {
+                "x": 2438,
+                "y": 380
+            },
+            "size": {
+                "width": 194,
+                "height": 40
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 88,
+            "position": {
+                "x": 2331,
+                "y": 492
+            },
+            "size": {
+                "width": 205,
+                "height": 40
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 91,
+            "position": {
+                "x": 2441,
+                "y": 444
+            },
+            "size": {
+                "width": 191,
+                "height": 40
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 94,
+            "position": {
+                "x": 2709,
+                "y": 196
+            },
+            "size": {
+                "width": 403,
+                "height": 308
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 112,
+            "position": {
+                "x": 3020,
+                "y": 0
+            },
+            "size": {
+                "width": 152,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 116,
+            "position": {
+                "x": 3428,
+                "y": 286
+            },
+            "size": {
+                "width": 260,
+                "height": 103
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 120,
+            "position": {
+                "x": 1560,
+                "y": -146
+            },
+            "size": {
+                "width": 260,
+                "height": 103
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 154,
+            "position": {
+                "x": 1112,
+                "y": 526
+            },
+            "size": {
+                "width": 260,
+                "height": 103
+            },
+            "isCollapsed": false
+        }
     ],
     "viewInfo": {
-      "viewPosition": { "x": -300, "y": -100 },
-      "viewScale": 0.75
+        "viewPosition": { "x": 0, "y": 0 },
+        "viewScale": 1
     }
-  }
+}
 }

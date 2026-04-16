@@ -133,7 +133,7 @@
           { "id": 400, "kind": 0, "dataType": 0, "isExec": true },
           { "id": 401, "kind": 0, "dataType": 2, "name": "First Index", "defaultValue": 0 },
           { "id": 402, "kind": 0, "dataType": 2, "name": "Last Index" },
-          { "id": 403, "kind": 1, "dataType": 0, "name": "LoopBody",  "isExec": true },
+          { "id": 403, "kind": 1, "dataType": 0, "name": "Loop Body",  "isExec": true },
           { "id": 404, "kind": 1, "dataType": 0, "name": "Completed", "isExec": true },
           { "id": 405, "kind": 1, "dataType": 2, "name": "Index" }
         ]
