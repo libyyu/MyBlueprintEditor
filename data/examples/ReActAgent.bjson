@@ -414,6 +414,50 @@
           { "id": 971, "kind": 0, "dataType": 4, "name": "In String" },
           { "id": 972, "kind": 1, "dataType": 0, "isExec": true }
         ]
+      },
+      {
+        "id": 200,
+        "definitionId": "JSON.GetPath",
+        "name": "Get Assistant Msg",
+        "pins": [
+          { "id": 2000, "kind": 0, "dataType": 4, "name": "JSON" },
+          { "id": 2001, "kind": 0, "dataType": 4, "name": "Path", "defaultValue": "choices[0].message" },
+          { "id": 2002, "kind": 1, "dataType": 4, "name": "Value" },
+          { "id": 2003, "kind": 1, "dataType": 1, "name": "Found" }
+        ]
+      },
+      {
+        "id": 201,
+        "definitionId": "GetVariable",
+        "name": "Get messages before tool",
+        "pins": [
+          { "id": 2010, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "messages" },
+          { "id": 2011, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 202,
+        "definitionId": "JSON.ArrayPush",
+        "name": "Push Assistant Msg",
+        "pins": [
+          { "id": 2020, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 2021, "kind": 0, "dataType": 4, "name": "JSON" },
+          { "id": 2022, "kind": 0, "dataType": 9, "name": "Element" },
+          { "id": 2023, "kind": 1, "dataType": 0, "isExec": true },
+          { "id": 2024, "kind": 1, "dataType": 4, "name": "JSON" },
+          { "id": 2025, "kind": 1, "dataType": 2, "name": "Length" }
+        ]
+      },
+      {
+        "id": 203,
+        "definitionId": "SetVariable",
+        "name": "Save messages with assistant",
+        "pins": [
+          { "id": 2030, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 2031, "kind": 0, "dataType": 4, "name": "Name",  "defaultValue": "messages" },
+          { "id": 2032, "kind": 0, "dataType": 4, "name": "Value" },
+          { "id": 2033, "kind": 1, "dataType": 0, "isExec": true }
+        ]
       }
     ],
     "links": [
@@ -432,8 +476,14 @@
       { "id": 13,  "startPinId": 44,  "endPinId": 502, "isEnabled": true },
       { "id": 14,  "startPinId": 503, "endPinId": 540, "isEnabled": true },
       { "id": 15,  "startPinId": 44,  "endPinId": 541, "isEnabled": true },
-      { "id": 16,  "startPinId": 42,  "endPinId": 580, "isEnabled": true },
+      { "id": 16,  "startPinId": 42,  "endPinId": 2020, "isEnabled": true },
       { "id": 17,  "startPinId": 45,  "endPinId": 581, "isEnabled": true },
+      { "id": 52,  "startPinId": 47,  "endPinId": 2000, "isEnabled": true },
+      { "id": 53,  "startPinId": 2002,"endPinId": 2022, "isEnabled": true },
+      { "id": 54,  "startPinId": 2011,"endPinId": 2021, "isEnabled": true },
+      { "id": 55,  "startPinId": 2023,"endPinId": 2030, "isEnabled": true },
+      { "id": 56,  "startPinId": 2024,"endPinId": 2032, "isEnabled": true },
+      { "id": 57,  "startPinId": 2033,"endPinId": 580,  "isEnabled": true },
       { "id": 18,  "startPinId": 582, "endPinId": 600, "isEnabled": true },
       { "id": 19,  "startPinId": 584, "endPinId": 601, "isEnabled": true },
       { "id": 20,  "startPinId": 585, "endPinId": 700, "isEnabled": true },

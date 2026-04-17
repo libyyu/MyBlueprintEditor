@@ -739,6 +739,12 @@ int runNewFeatureTests();
 
 int main(int argc, char* argv[])
 {
+#if defined(_WIN32) || defined(_WIN64)
+    // 设置控制台输出为 UTF-8，避免中文乱码
+    SetConsoleOutputCP(65001);
+    SetConsoleCP(65001);
+#endif
+
     // --help / -h
     for (int i = 1; i < argc; ++i)
         if (std::string(argv[i]) == "--help" || std::string(argv[i]) == "-h")
