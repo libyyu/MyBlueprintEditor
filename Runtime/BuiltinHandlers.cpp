@@ -39,6 +39,9 @@
 #include "handlers/BuiltinHandlers_Crypto.h"
 #include "handlers/BuiltinHandlers_Proto.h"
 #include "handlers/BuiltinHandlers_Agent.h"
+#include "handlers/BuiltinHandlers_Game.h"
+#include "handlers/BuiltinHandlers_Save.h"
+#include "handlers/BuiltinHandlers_GameMath.h"
 
 namespace NodeEditor {
 namespace Runtime {
@@ -70,6 +73,9 @@ void RegisterBuiltinHandlers(
     RegisterHandlers_Crypto(allHandlers);
     RegisterHandlers_Proto(allHandlers);
     RegisterHandlers_Agent(allHandlers, runner);
+    RegisterHandlers_Game(allHandlers, runner);
+    RegisterHandlers_Save(allHandlers);
+    RegisterHandlers_GameMath(allHandlers, runner);
 
     // 设置默认处理器
     runner.SetDefaultHandler([](ExecutionContext& ctx) {
