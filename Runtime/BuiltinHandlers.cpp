@@ -15,6 +15,7 @@
 //   BuiltinHandlers_Time.cpp    — 时间   (GetTime/DeltaTime/TimeSince/TimerInfo …)
 //   BuiltinHandlers_Data.cpp    — 数据   (ToJSON/FromJSON/HasKey/GetField/ArrayToString …)
 //   BuiltinHandlers_Misc.cpp    — 杂项   (GetVariable/SetVariable/IsValid/MakeLiteral* …)
+//   BuiltinHandlers_Agent.cpp   — Agent扩展 (Memory.*/Tool.Register/Trigger.*)
 
 #include "BuiltinHandlers.h"
 
@@ -37,6 +38,7 @@
 #include "handlers/BuiltinHandlers_Server.h"
 #include "handlers/BuiltinHandlers_Crypto.h"
 #include "handlers/BuiltinHandlers_Proto.h"
+#include "handlers/BuiltinHandlers_Agent.h"
 
 namespace NodeEditor {
 namespace Runtime {
@@ -67,6 +69,7 @@ void RegisterBuiltinHandlers(
     RegisterHandlers_Server(allHandlers, runner);
     RegisterHandlers_Crypto(allHandlers);
     RegisterHandlers_Proto(allHandlers);
+    RegisterHandlers_Agent(allHandlers, runner);
 
     // 设置默认处理器
     runner.SetDefaultHandler([](ExecutionContext& ctx) {

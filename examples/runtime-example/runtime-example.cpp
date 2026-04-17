@@ -12,6 +12,8 @@
 //   -e EVENT                Dispatch a named event (default: OnBeginPlay)
 //                           Use -e "" to skip OnBeginPlay
 //   --lua <script.lua>      Load and execute a Lua script before running
+//                           (overrides auto BlueprintEntry.lua search)
+//   --no-entry-lua          Skip automatic BlueprintEntry.lua loading
 //   --max-time <secs>       Max wall-clock time to wait for async work (default: 30)
 //   --tick-rate <ms>        Frame loop interval in ms (default: 16)
 //   --no-deps               Skip automatic dependency loading
@@ -27,6 +29,11 @@
 //   BP_BASEURL              Injected as BaseURL variable
 //   BP_MODEL                Injected as Model variable
 //   BP_VAR_<NAME>           Injected as variable <NAME>  (e.g. BP_VAR_Timeout=10)
+//
+// AUTO LUA LOADING
+//   When no --lua is given, the runtime automatically searches for
+//   BlueprintEntry.lua in:  1) blueprint file directory  2) exe directory
+//   Use --no-entry-lua to disable this behaviour.
 //
 // EXAMPLES
 //   runtime-example data/examples/ReActAgent.bjson -v ApiKey=sk-xxx -v UserQuery="hello"
@@ -50,6 +57,17 @@
 #include <functional>
 #include <csignal>
 #include <atomic>
+
+#if defined(_WIN32) || defined(_WIN64)
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h>
+#elif defined(__linux__)
+#  include <unistd.h>
+#elif defined(__APPLE__)
+#  include <mach-o/dyld.h>
+#endif
 
 #include "BlueprintRunner.h"
 #include "BlueprintExporter.h"
@@ -239,11 +257,12 @@ struct RunOptions {
     std::string filePath;
     std::vector<std::pair<std::string,std::string>> vars;  // KEY=VALUE pairs
     std::vector<std::string> events;   // events to dispatch; empty = ["OnBeginPlay"]
-    std::string luaScript;             // "" = none
+    std::string luaScript;             // "" = none (auto-search BlueprintEntry.lua)
     float maxTimeSec  = 30.0f;
     int   tickRateMs  = 16;
     bool  quiet       = false;
     bool  noDeps      = false;
+    bool  noEntryLua  = false;         // --no-entry-lua: skip auto BlueprintEntry.lua
     std::string outputFmt; // "" | "json" | "vars"
 };
 
@@ -314,15 +333,61 @@ static int executeSingle(const RunOptions& opt)
         runner.SetVariable(kv.first, variantFromString(kv.second));
 
 #ifdef BLUEPRINT_HAS_LUA
-    // Lua script injection
-    if (!opt.luaScript.empty())
+    // Lua script injection：--lua 显式指定，或自动搜索 BlueprintEntry.lua
+    if (!opt.noEntryLua)
     {
-        if (!runner.LoadLuaScript(opt.luaScript))
+        std::string luaToLoad = opt.luaScript;
+
+        if (luaToLoad.empty())
         {
-            std::cerr << "ERROR loading Lua: " << opt.luaScript << "\n";
-            return 1;
+            // 自动搜索顺序：
+            //   1. 蓝图文件所在目录/BlueprintEntry.lua
+            //   2. exe 所在目录/BlueprintEntry.lua
+            std::vector<std::string> candidates;
+            candidates.push_back(basePath + "/BlueprintEntry.lua");
+
+#if defined(_WIN32) || defined(_WIN64)
+            char exePath[1024] = {};
+            if (GetModuleFileNameA(nullptr, exePath, sizeof(exePath)))
+            {
+                fs::path exeDir = fs::path(exePath).parent_path();
+                candidates.push_back((exeDir / "BlueprintEntry.lua").string());
+            }
+#else
+            // Linux / macOS：通过 /proc/self/exe 或 _NSGetExecutablePath 获取 exe 路径
+#  if defined(__linux__)
+            char exePath[1024] = {};
+            ssize_t len = readlink("/proc/self/exe", exePath, sizeof(exePath)-1);
+            if (len > 0) {
+                exePath[len] = '\0';
+                fs::path exeDir = fs::path(exePath).parent_path();
+                candidates.push_back((exeDir / "BlueprintEntry.lua").string());
+            }
+#  elif defined(__APPLE__)
+            char exePath[1024] = {};
+            uint32_t sz = sizeof(exePath);
+            if (_NSGetExecutablePath(exePath, &sz) == 0) {
+                fs::path exeDir = fs::path(exePath).parent_path();
+                candidates.push_back((exeDir / "BlueprintEntry.lua").string());
+            }
+#  endif
+#endif
+            for (const auto& c : candidates)
+            {
+                if (fs::exists(c)) { luaToLoad = c; break; }
+            }
         }
-        if (!opt.quiet) std::cout << "Lua loaded: " << opt.luaScript << "\n";
+
+        if (!luaToLoad.empty())
+        {
+            if (!runner.LoadLuaScript(luaToLoad))
+            {
+                std::cerr << "ERROR loading Lua: " << luaToLoad << "\n";
+                if (!opt.luaScript.empty()) return 1;  // 显式指定时才致命
+            }
+            else if (!opt.quiet)
+                std::cout << "Lua loaded: " << luaToLoad << "\n";
+        }
     }
 #endif
 
@@ -645,6 +710,8 @@ static void printUsage(const char* prog)
         "  -v KEY=VALUE         Inject a variable (can repeat, e.g. -v ApiKey=sk-xxx)\n"
         "  -e EVENT             Dispatch event (default: OnBeginPlay; '' = none)\n"
         "  --lua <script.lua>   Load Lua script before execution\n"
+        "                       (overrides auto BlueprintEntry.lua search)\n"
+        "  --no-entry-lua       Skip automatic BlueprintEntry.lua loading\n"
         "  --max-time <secs>    Async wait timeout (default: 30)\n"
         "  --tick-rate <ms>     Frame interval in ms (default: 16)\n"
         "  --no-deps            Skip automatic dependency loading\n\n"
@@ -776,6 +843,7 @@ int main(int argc, char* argv[])
             if (!ev.empty()) opt.events.push_back(ev);
         }
         else if (a == "--lua" && i+1 < argc) opt.luaScript = argv[++i];
+        else if (a == "--no-entry-lua") opt.noEntryLua = true;
         else if (a == "--max-time" && i+1 < argc) opt.maxTimeSec = std::stof(argv[++i]);
         else if (a == "--tick-rate" && i+1 < argc) opt.tickRateMs = std::stoi(argv[++i]);
         else if (a == "--no-deps") opt.noDeps = true;
