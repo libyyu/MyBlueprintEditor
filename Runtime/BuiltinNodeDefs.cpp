@@ -2543,18 +2543,696 @@ static void RegisterNodeDefs_AI(INodeRegistry& registry)
             MakePin("BaseURL",    PinDataType::String),
             MakePin("ApiKey",     PinDataType::String),
             MakePin("Model",      PinDataType::String),
-            MakePin("Messages",   PinDataType::String),   // JSON 数组字符串
-            MakePin("KeepRecent", PinDataType::Integer),  // 保留最近 N 条，default 6
+            MakePin("Messages",   PinDataType::String),
+            MakePin("KeepRecent", PinDataType::Integer),
             MakePin("MaxTokens",  PinDataType::Integer),
         },
         {
             MakeFlowPin("onDone"),
             MakeFlowPin("onError"),
-            MakePin("Compressed",    PinDataType::String), // 压缩后的 JSON 数组
+            MakePin("Compressed",   PinDataType::String),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "50A080");
+
+    // LLM.StructuredOutput — 强制 JSON Schema 输出
+    reg("LLM.StructuredOutput", "LLM Structured Output", "AI/LLM",
+        {
+            MakeFlowPin(""),
+            MakePin("BaseURL",     PinDataType::String),
+            MakePin("ApiKey",      PinDataType::String),
+            MakePin("Model",       PinDataType::String),
+            MakePin("Messages",    PinDataType::String),
+            MakePin("SystemPrompt",PinDataType::String),
+            MakePin("SchemaName",  PinDataType::String),
+            MakePin("Schema",      PinDataType::String),
+            MakePin("MaxTokens",   PinDataType::Integer),
+            MakePin("Temperature", PinDataType::Float),
+        },
+        {
+            MakeFlowPin("onSuccess"),
+            MakeFlowPin("onError"),
+            MakePin("Output",       PinDataType::String),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "6A0572");
+
+    // Schema.Validate — 验证 JSON 是否符合 Schema
+    reg("Schema.Validate", "Schema Validate", "AI/JSON",
+        {
+            MakePin("JSON",   PinDataType::String),
+            MakePin("Schema", PinDataType::String),
+        },
+        {
+            MakeFlowPin("onPass"),
+            MakeFlowPin("onFail"),
+            MakePin("IsValid",      PinDataType::Boolean),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "6A0572", "Simple");
+
+    // LLM.Route — LLM 驱动的路由分发
+    reg("LLM.Route", "LLM Route", "AI/LLM",
+        {
+            MakeFlowPin(""),
+            MakePin("BaseURL", PinDataType::String),
+            MakePin("ApiKey",  PinDataType::String),
+            MakePin("Model",   PinDataType::String),
+            MakePin("Input",   PinDataType::String),
+            MakePin("Routes",  PinDataType::String),   // JSON array of {label,description}
+        },
+        {
+            MakeFlowPin("onRoute0"),
+            MakeFlowPin("onRoute1"),
+            MakeFlowPin("onRoute2"),
+            MakeFlowPin("onRoute3"),
+            MakeFlowPin("onRoute4"),
+            MakeFlowPin("onRoute5"),
+            MakeFlowPin("onRoute6"),
+            MakeFlowPin("onRoute7"),
+            MakeFlowPin("onError"),
+            MakePin("SelectedRoute", PinDataType::Integer),
+            MakePin("SelectedLabel", PinDataType::String),
             MakePin("ErrorMessage",  PinDataType::String),
         },
-        "50A080"); // 绿色
+        "6A0572");
 
+    // Intent.Classify — 意图识别
+    reg("Intent.Classify", "Intent Classify", "AI/Agent",
+        {
+            MakeFlowPin(""),
+            MakePin("BaseURL", PinDataType::String),
+            MakePin("ApiKey",  PinDataType::String),
+            MakePin("Model",   PinDataType::String),
+            MakePin("Text",    PinDataType::String),
+            MakePin("Intents", PinDataType::String),   // JSON array of string or {label,description}
+        },
+        {
+            MakeFlowPin("onMatched"),
+            MakeFlowPin("onUnknown"),
+            MakeFlowPin("onError"),
+            MakePin("Intent",       PinDataType::String),
+            MakePin("Confidence",   PinDataType::String),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "50A080");
+
+    // Agent.Spawn — 并行异步子蓝图
+    reg("Agent.Spawn", "Agent Spawn", "AI/Agent",
+        {
+            MakeFlowPin(""),
+            MakePin("FilePath",  PinDataType::String),
+            MakePin("Params",    PinDataType::String),  // JSON object
+            MakePin("EventName", PinDataType::String),  // default: OnBeginPlay
+        },
+        {
+            MakeFlowPin("onDone"),
+            MakeFlowPin("onError"),
+            MakePin("SpawnId",      PinDataType::String),
+            MakePin("Output",       PinDataType::String),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "50A080");
+
+    // Agent.Join — 等待多个 Spawn 全部完成
+    reg("Agent.Join", "Agent Join", "AI/Agent",
+        {
+            MakeFlowPin(""),
+            MakePin("Count",   PinDataType::Integer),
+            MakePin("Timeout", PinDataType::Float),
+        },
+        {
+            MakeFlowPin("onDone"),
+            MakeFlowPin("onTimeout"),
+            MakePin("CompletedCount", PinDataType::Integer),
+        },
+        "50A080");
+
+    // Memory.Store — 进程级 KV 存储
+    reg("Memory.Store", "Memory Store", "AI/Memory",
+        {
+            MakeFlowPin(""),
+            MakePin("Key",   PinDataType::String),
+            MakePin("Value", PinDataType::String),
+            MakePin("TTL",   PinDataType::Float),   // 0=永久
+        },
+        { MakeFlowPin("exec") },
+        "4A90D9");
+
+    // Memory.Recall — 读取记忆
+    reg("Memory.Recall", "Memory Recall", "AI/Memory",
+        {
+            MakePin("Key",    PinDataType::String),
+            MakePin("Prefix", PinDataType::String),
+        },
+        {
+            MakePin("Value",      PinDataType::String),
+            MakePin("Found",      PinDataType::Boolean),
+            MakePin("AllMatches", PinDataType::String),
+        },
+        "4A90D9", "Simple");
+
+    // Memory.Clear — 清空记忆
+    reg("Memory.Clear", "Memory Clear", "AI/Memory",
+        {
+            MakeFlowPin(""),
+            MakePin("Prefix", PinDataType::String),
+        },
+        {
+            MakeFlowPin("exec"),
+            MakePin("RemovedCount", PinDataType::Integer),
+        },
+        "4A90D9");
+
+    // Tool.Register — 动态注册工具
+    reg("Tool.Register", "Tool Register", "AI/Tool",
+        {
+            MakeFlowPin(""),
+            MakePin("Name",        PinDataType::String),
+            MakePin("FilePath",    PinDataType::String),
+            MakePin("Description", PinDataType::String),
+        },
+        {
+            MakeFlowPin("exec"),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        "F5A623");
+
+    // Trigger.Cron — 定时触发
+    reg("Trigger.Cron", "Trigger Cron", "AI/Agent",
+        {
+            MakeFlowPin(""),
+            MakePin("IntervalSec", PinDataType::Float),
+            MakePin("MaxCount",    PinDataType::Integer),
+            MakePin("EventName",   PinDataType::String),
+        },
+        {
+            MakeFlowPin("onTick"),
+            MakeFlowPin("onDone"),
+            MakePin("TickCount", PinDataType::Integer),
+        },
+        "E07B39");
+
+    // Trigger.FileWatch — 文件变化触发
+    reg("Trigger.FileWatch", "Trigger File Watch", "AI/Agent",
+        {
+            MakeFlowPin(""),
+            MakePin("FilePath",        PinDataType::String),
+            MakePin("PollIntervalSec", PinDataType::Float),
+        },
+        {
+            MakeFlowPin("onChanged"),
+            MakeFlowPin("onError"),
+            MakePin("FilePath", PinDataType::String),
+        },
+        "E07B39");
+
+}
+
+// ============================================================================
+// Game — 行为树 BT.* 和状态机 FSM.*
+// ============================================================================
+static void RegisterNodeDefs_Game(INodeRegistry& registry)
+{
+    auto reg = [&registry](const char* id, const char* name, const char* category,
+                  std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
+                  const char* color = "", const char* edType = "")
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
+
+    const char* BT_COLOR  = "3A7F4B"; // 森林绿
+    const char* FSM_COLOR = "2E6DA4"; // 钢蓝
+
+    // ── 行为树 ──────────────────────────────────────────────────────────────
+    reg("BT.Sequence", "BT Sequence", "Game/BehaviorTree",
+        { MakeFlowPin(""),
+          MakePin("onChild0",PinDataType::Unknown,false), // 仅作占位，实际引脚动态
+        },
+        { MakeFlowPin("onChild0"), MakeFlowPin("onChild1"), MakeFlowPin("onChild2"),
+          MakeFlowPin("onChild3"), MakeFlowPin("onChild4"),
+          MakeFlowPin("onSuccess"), MakeFlowPin("onFailure"),
+          MakePin("FailedIndex", PinDataType::Integer) },
+        BT_COLOR);
+
+    reg("BT.Selector", "BT Selector", "Game/BehaviorTree",
+        { MakeFlowPin("") },
+        { MakeFlowPin("onChild0"), MakeFlowPin("onChild1"), MakeFlowPin("onChild2"),
+          MakeFlowPin("onChild3"), MakeFlowPin("onChild4"),
+          MakeFlowPin("onSuccess"), MakeFlowPin("onFailure"),
+          MakePin("SucceededIndex", PinDataType::Integer) },
+        BT_COLOR);
+
+    reg("BT.Parallel", "BT Parallel", "Game/BehaviorTree",
+        { MakeFlowPin(""),
+          MakePinEnum("Policy", "All,Any") },
+        { MakeFlowPin("onChild0"), MakeFlowPin("onChild1"), MakeFlowPin("onChild2"),
+          MakeFlowPin("onChild3"), MakeFlowPin("onChild4"),
+          MakeFlowPin("onSuccess"), MakeFlowPin("onFailure"),
+          MakePin("SuccessCount", PinDataType::Integer),
+          MakePin("FailureCount", PinDataType::Integer) },
+        BT_COLOR);
+
+    reg("BT.Inverter", "BT Inverter", "Game/BehaviorTree",
+        { MakeFlowPin("") },
+        { MakeFlowPin("onChild"), MakeFlowPin("onSuccess"), MakeFlowPin("onFailure") },
+        BT_COLOR);
+
+    reg("BT.Repeat", "BT Repeat", "Game/BehaviorTree",
+        { MakeFlowPin(""),
+          MakePin("Count",        PinDataType::Integer),
+          MakePin("StopOnFailure",PinDataType::Boolean) },
+        { MakeFlowPin("onChild"), MakeFlowPin("onDone"), MakeFlowPin("onFailure"),
+          MakePin("Iterations", PinDataType::Integer) },
+        BT_COLOR);
+
+    reg("BT.Cooldown", "BT Cooldown", "Game/BehaviorTree",
+        { MakeFlowPin(""),
+          MakePin("Duration", PinDataType::Float),
+          MakePin("Key",      PinDataType::String) },
+        { MakeFlowPin("onChild"), MakeFlowPin("onSuccess"),
+          MakeFlowPin("onFailure"), MakeFlowPin("onCooldown") },
+        BT_COLOR);
+
+    reg("BT.Wait", "BT Wait", "Game/BehaviorTree",
+        { MakeFlowPin(""), MakePin("Duration", PinDataType::Float) },
+        { MakeFlowPin("onDone") },
+        BT_COLOR);
+
+    reg("BT.Condition", "BT Condition", "Game/BehaviorTree",
+        { MakePin("Condition", PinDataType::Boolean),
+          MakePin("Key",       PinDataType::String) },
+        { MakeFlowPin("onSuccess"), MakeFlowPin("onFailure"),
+          MakePin("Result", PinDataType::Boolean) },
+        BT_COLOR, "Simple");
+
+    reg("BT.SetBlackboard", "BT Set Blackboard", "Game/BehaviorTree",
+        { MakeFlowPin(""), MakePin("Key", PinDataType::String), MakePin("Value", PinDataType::Any) },
+        { MakeFlowPin("exec") },
+        BT_COLOR);
+
+    reg("BT.GetBlackboard", "BT Get Blackboard", "Game/BehaviorTree",
+        { MakePin("Key", PinDataType::String) },
+        { MakePin("Value", PinDataType::Any), MakePin("Found", PinDataType::Boolean) },
+        BT_COLOR, "Simple");
+
+    reg("BT.Log", "BT Log", "Game/BehaviorTree",
+        { MakeFlowPin(""),
+          MakePin("Message", PinDataType::String),
+          MakePinEnum("Level", "info,warn,error") },
+        { MakeFlowPin("exec") },
+        BT_COLOR);
+
+    reg("BT.AlwaysSuccess", "BT Always Success", "Game/BehaviorTree",
+        { MakeFlowPin("") },
+        { MakeFlowPin("onChild"), MakeFlowPin("onDone") },
+        BT_COLOR);
+
+    reg("BT.AlwaysFailure", "BT Always Failure", "Game/BehaviorTree",
+        { MakeFlowPin("") },
+        { MakeFlowPin("onChild"), MakeFlowPin("onDone") },
+        BT_COLOR);
+
+    // ── 状态机 ──────────────────────────────────────────────────────────────
+    reg("FSM.State", "FSM State", "Game/StateMachine",
+        { MakeFlowPin(""),
+          MakePin("StateName",  PinDataType::String),
+          MakePin("MachineId",  PinDataType::String) },
+        { MakeFlowPin("onEnter"), MakeFlowPin("onUpdate"), MakeFlowPin("onExit"),
+          MakePin("IsActive", PinDataType::Boolean) },
+        FSM_COLOR);
+
+    reg("FSM.Transition", "FSM Transition", "Game/StateMachine",
+        { MakeFlowPin(""),
+          MakePin("Condition", PinDataType::Boolean),
+          MakePin("From",      PinDataType::String),
+          MakePin("To",        PinDataType::String),
+          MakePin("MachineId", PinDataType::String) },
+        { MakeFlowPin("onTransitioned"), MakeFlowPin("onSkipped"),
+          MakePin("Changed", PinDataType::Boolean) },
+        FSM_COLOR);
+
+    reg("FSM.GetState", "FSM Get State", "Game/StateMachine",
+        { MakePin("MachineId", PinDataType::String) },
+        { MakePin("State", PinDataType::String) },
+        FSM_COLOR, "Simple");
+
+    reg("FSM.SetState", "FSM Set State", "Game/StateMachine",
+        { MakeFlowPin(""),
+          MakePin("State",     PinDataType::String),
+          MakePin("MachineId", PinDataType::String) },
+        { MakeFlowPin("exec"), MakePin("PrevState", PinDataType::String) },
+        FSM_COLOR);
+
+    reg("FSM.IsInState", "FSM Is In State", "Game/StateMachine",
+        { MakePin("State",     PinDataType::String),
+          MakePin("MachineId", PinDataType::String) },
+        { MakePin("Result", PinDataType::Boolean) },
+        FSM_COLOR, "Simple");
+}
+
+// ============================================================================
+// Save — 存档系统 Save.*
+// ============================================================================
+static void RegisterNodeDefs_Save(INodeRegistry& registry)
+{
+    auto reg = [&registry](const char* id, const char* name, const char* category,
+                  std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
+                  const char* color = "", const char* edType = "")
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
+
+    const char* SAVE_COLOR = "C47A2B"; // 琥珀色
+
+    reg("Save.Write", "Save Write", "Game/Save",
+        { MakeFlowPin(""),
+          MakePin("Slot",  PinDataType::String),
+          MakePin("Key",   PinDataType::String),
+          MakePin("Value", PinDataType::Any) },
+        { MakeFlowPin("exec"),
+          MakePin("Success",      PinDataType::Boolean),
+          MakePin("ErrorMessage", PinDataType::String) },
+        SAVE_COLOR);
+
+    reg("Save.Read", "Save Read", "Game/Save",
+        { MakePin("Slot",    PinDataType::String),
+          MakePin("Key",     PinDataType::String),
+          MakePin("Default", PinDataType::Any) },
+        { MakePin("Value", PinDataType::Any),
+          MakePin("Found", PinDataType::Boolean) },
+        SAVE_COLOR, "Simple");
+
+    reg("Save.Exists", "Save Exists", "Game/Save",
+        { MakePin("Slot", PinDataType::String) },
+        { MakePin("Exists", PinDataType::Boolean) },
+        SAVE_COLOR, "Simple");
+
+    reg("Save.Delete", "Save Delete", "Game/Save",
+        { MakeFlowPin(""), MakePin("Slot", PinDataType::String) },
+        { MakeFlowPin("exec"), MakePin("Success", PinDataType::Boolean) },
+        SAVE_COLOR);
+
+    reg("Save.ListSlots", "Save List Slots", "Game/Save",
+        {},
+        { MakePin("Slots", PinDataType::Array),
+          MakePin("Count", PinDataType::Integer) },
+        SAVE_COLOR, "Simple");
+
+    reg("Save.ExportJSON", "Save Export JSON", "Game/Save",
+        { MakePin("Slot", PinDataType::String) },
+        { MakePin("JSON",  PinDataType::String),
+          MakePin("Found", PinDataType::Boolean) },
+        SAVE_COLOR, "Simple");
+
+    reg("Save.ImportJSON", "Save Import JSON", "Game/Save",
+        { MakeFlowPin(""),
+          MakePin("Slot", PinDataType::String),
+          MakePin("JSON", PinDataType::String) },
+        { MakeFlowPin("exec"),
+          MakePin("Success",      PinDataType::Boolean),
+          MakePin("ErrorMessage", PinDataType::String) },
+        SAVE_COLOR);
+
+    reg("Save.Clear", "Save Clear", "Game/Save",
+        { MakeFlowPin(""), MakePin("Slot", PinDataType::String) },
+        { MakeFlowPin("exec"), MakePin("Success", PinDataType::Boolean) },
+        SAVE_COLOR);
+
+    reg("Save.GetKeys", "Save Get Keys", "Game/Save",
+        { MakePin("Slot", PinDataType::String) },
+        { MakePin("Keys",  PinDataType::Array),
+          MakePin("Count", PinDataType::Integer) },
+        SAVE_COLOR, "Simple");
+
+    reg("Save.WriteMultiple", "Save Write Multiple", "Game/Save",
+        { MakeFlowPin(""),
+          MakePin("Slot", PinDataType::String),
+          MakePin("Data", PinDataType::String) },
+        { MakeFlowPin("exec"), MakePin("Success", PinDataType::Boolean) },
+        SAVE_COLOR);
+}
+
+// ============================================================================
+// GameMath — Vec2/Vec3、物理碰撞辅助、Stat 数值系统、Cooldown
+// ============================================================================
+static void RegisterNodeDefs_GameMath(INodeRegistry& registry)
+{
+    auto reg = [&registry](const char* id, const char* name, const char* category,
+                  std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
+                  const char* color = "", const char* edType = "")
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
+
+    const char* VEC_COLOR  = "1A7A8A"; // 青色
+    const char* PHY_COLOR  = "7A3A8A"; // 紫
+    const char* STAT_COLOR = "8A3A1A"; // 深橙
+    const char* CD_COLOR   = "3A6A8A"; // 钢蓝
+
+    // ── Vec2 ────────────────────────────────────────────────────────────────
+    reg("Vec2.Make", "Vec2 Make", "Game/Math",
+        { MakePin("X", PinDataType::Float), MakePin("Y", PinDataType::Float) },
+        { MakePin("Vec2", PinDataType::String),
+          MakePin("X", PinDataType::Float), MakePin("Y", PinDataType::Float) },
+        VEC_COLOR, "Simple");
+
+    reg("Vec2.Get", "Vec2 Get", "Game/Math",
+        { MakePin("Vec2", PinDataType::String) },
+        { MakePin("X", PinDataType::Float), MakePin("Y", PinDataType::Float) },
+        VEC_COLOR, "Simple");
+
+    reg("Vec2.Add", "Vec2 Add", "Game/Math",
+        { MakePin("A", PinDataType::String), MakePin("B", PinDataType::String) },
+        { MakePin("Result", PinDataType::String) },
+        VEC_COLOR, "Simple");
+
+    reg("Vec2.Sub", "Vec2 Sub", "Game/Math",
+        { MakePin("A", PinDataType::String), MakePin("B", PinDataType::String) },
+        { MakePin("Result", PinDataType::String) },
+        VEC_COLOR, "Simple");
+
+    reg("Vec2.Scale", "Vec2 Scale", "Game/Math",
+        { MakePin("Vec2", PinDataType::String), MakePin("Scale", PinDataType::Float) },
+        { MakePin("Result", PinDataType::String) },
+        VEC_COLOR, "Simple");
+
+    reg("Vec2.Length", "Vec2 Length", "Game/Math",
+        { MakePin("Vec2", PinDataType::String) },
+        { MakePin("Length", PinDataType::Float) },
+        VEC_COLOR, "Simple");
+
+    reg("Vec2.Normalize", "Vec2 Normalize", "Game/Math",
+        { MakePin("Vec2", PinDataType::String) },
+        { MakePin("Result", PinDataType::String), MakePin("Length", PinDataType::Float) },
+        VEC_COLOR, "Simple");
+
+    reg("Vec2.Dot", "Vec2 Dot", "Game/Math",
+        { MakePin("A", PinDataType::String), MakePin("B", PinDataType::String) },
+        { MakePin("Result", PinDataType::Float) },
+        VEC_COLOR, "Simple");
+
+    reg("Vec2.Distance", "Vec2 Distance", "Game/Math",
+        { MakePin("A", PinDataType::String), MakePin("B", PinDataType::String) },
+        { MakePin("Distance", PinDataType::Float) },
+        VEC_COLOR, "Simple");
+
+    reg("Vec2.Lerp", "Vec2 Lerp", "Game/Math",
+        { MakePin("A", PinDataType::String), MakePin("B", PinDataType::String),
+          MakePin("T", PinDataType::Float) },
+        { MakePin("Result", PinDataType::String) },
+        VEC_COLOR, "Simple");
+
+    reg("Vec2.Angle", "Vec2 Angle", "Game/Math",
+        { MakePin("Vec2", PinDataType::String) },
+        { MakePin("Degrees", PinDataType::Float) },
+        VEC_COLOR, "Simple");
+
+    reg("Vec2.Rotate", "Vec2 Rotate", "Game/Math",
+        { MakePin("Vec2", PinDataType::String), MakePin("Degrees", PinDataType::Float) },
+        { MakePin("Result", PinDataType::String) },
+        VEC_COLOR, "Simple");
+
+    reg("Vec2.Zero", "Vec2 Zero", "Game/Math", {},
+        { MakePin("Result", PinDataType::String) }, VEC_COLOR, "Simple");
+
+    reg("Vec2.One", "Vec2 One", "Game/Math", {},
+        { MakePin("Result", PinDataType::String) }, VEC_COLOR, "Simple");
+
+    // ── Vec3 ────────────────────────────────────────────────────────────────
+    reg("Vec3.Make", "Vec3 Make", "Game/Math",
+        { MakePin("X", PinDataType::Float), MakePin("Y", PinDataType::Float),
+          MakePin("Z", PinDataType::Float) },
+        { MakePin("Vec3", PinDataType::String),
+          MakePin("X", PinDataType::Float), MakePin("Y", PinDataType::Float),
+          MakePin("Z", PinDataType::Float) },
+        VEC_COLOR, "Simple");
+
+    reg("Vec3.Get", "Vec3 Get", "Game/Math",
+        { MakePin("Vec3", PinDataType::String) },
+        { MakePin("X", PinDataType::Float), MakePin("Y", PinDataType::Float),
+          MakePin("Z", PinDataType::Float) },
+        VEC_COLOR, "Simple");
+
+    reg("Vec3.Add", "Vec3 Add", "Game/Math",
+        { MakePin("A", PinDataType::String), MakePin("B", PinDataType::String) },
+        { MakePin("Result", PinDataType::String) }, VEC_COLOR, "Simple");
+
+    reg("Vec3.Sub", "Vec3 Sub", "Game/Math",
+        { MakePin("A", PinDataType::String), MakePin("B", PinDataType::String) },
+        { MakePin("Result", PinDataType::String) }, VEC_COLOR, "Simple");
+
+    reg("Vec3.Scale", "Vec3 Scale", "Game/Math",
+        { MakePin("Vec3", PinDataType::String), MakePin("Scale", PinDataType::Float) },
+        { MakePin("Result", PinDataType::String) }, VEC_COLOR, "Simple");
+
+    reg("Vec3.Length", "Vec3 Length", "Game/Math",
+        { MakePin("Vec3", PinDataType::String) },
+        { MakePin("Length", PinDataType::Float) }, VEC_COLOR, "Simple");
+
+    reg("Vec3.Normalize", "Vec3 Normalize", "Game/Math",
+        { MakePin("Vec3", PinDataType::String) },
+        { MakePin("Result", PinDataType::String), MakePin("Length", PinDataType::Float) },
+        VEC_COLOR, "Simple");
+
+    reg("Vec3.Dot", "Vec3 Dot", "Game/Math",
+        { MakePin("A", PinDataType::String), MakePin("B", PinDataType::String) },
+        { MakePin("Result", PinDataType::Float) }, VEC_COLOR, "Simple");
+
+    reg("Vec3.Cross", "Vec3 Cross", "Game/Math",
+        { MakePin("A", PinDataType::String), MakePin("B", PinDataType::String) },
+        { MakePin("Result", PinDataType::String) }, VEC_COLOR, "Simple");
+
+    reg("Vec3.Distance", "Vec3 Distance", "Game/Math",
+        { MakePin("A", PinDataType::String), MakePin("B", PinDataType::String) },
+        { MakePin("Distance", PinDataType::Float) }, VEC_COLOR, "Simple");
+
+    reg("Vec3.Lerp", "Vec3 Lerp", "Game/Math",
+        { MakePin("A", PinDataType::String), MakePin("B", PinDataType::String),
+          MakePin("T", PinDataType::Float) },
+        { MakePin("Result", PinDataType::String) }, VEC_COLOR, "Simple");
+
+    reg("Vec3.Reflect", "Vec3 Reflect", "Game/Math",
+        { MakePin("Vec3", PinDataType::String), MakePin("Normal", PinDataType::String) },
+        { MakePin("Result", PinDataType::String) }, VEC_COLOR, "Simple");
+
+    reg("Vec3.Zero", "Vec3 Zero", "Game/Math", {},
+        { MakePin("Result", PinDataType::String) }, VEC_COLOR, "Simple");
+
+    reg("Vec3.One", "Vec3 One", "Game/Math", {},
+        { MakePin("Result", PinDataType::String) }, VEC_COLOR, "Simple");
+
+    // ── 物理碰撞辅助 ─────────────────────────────────────────────────────────
+    reg("Physics.PointInRect", "Point In Rect", "Game/Physics",
+        { MakePin("PointX", PinDataType::Float), MakePin("PointY", PinDataType::Float),
+          MakePin("RectX",  PinDataType::Float), MakePin("RectY",  PinDataType::Float),
+          MakePin("RectW",  PinDataType::Float), MakePin("RectH",  PinDataType::Float) },
+        { MakePin("Inside", PinDataType::Boolean) },
+        PHY_COLOR, "Simple");
+
+    reg("Physics.RectOverlap", "Rect Overlap", "Game/Physics",
+        { MakePin("AX", PinDataType::Float), MakePin("AY", PinDataType::Float),
+          MakePin("AW", PinDataType::Float), MakePin("AH", PinDataType::Float),
+          MakePin("BX", PinDataType::Float), MakePin("BY", PinDataType::Float),
+          MakePin("BW", PinDataType::Float), MakePin("BH", PinDataType::Float) },
+        { MakePin("Overlap",  PinDataType::Boolean),
+          MakePin("OverlapX", PinDataType::Float), MakePin("OverlapY", PinDataType::Float),
+          MakePin("OverlapW", PinDataType::Float), MakePin("OverlapH", PinDataType::Float) },
+        PHY_COLOR, "Simple");
+
+    reg("Physics.CircleOverlap", "Circle Overlap", "Game/Physics",
+        { MakePin("C1X", PinDataType::Float), MakePin("C1Y", PinDataType::Float),
+          MakePin("R1",  PinDataType::Float),
+          MakePin("C2X", PinDataType::Float), MakePin("C2Y", PinDataType::Float),
+          MakePin("R2",  PinDataType::Float) },
+        { MakePin("Overlap",          PinDataType::Boolean),
+          MakePin("Distance",         PinDataType::Float),
+          MakePin("PenetrationDepth", PinDataType::Float) },
+        PHY_COLOR, "Simple");
+
+    reg("Physics.PointInCircle", "Point In Circle", "Game/Physics",
+        { MakePin("PointX", PinDataType::Float), MakePin("PointY", PinDataType::Float),
+          MakePin("CX",     PinDataType::Float), MakePin("CY",     PinDataType::Float),
+          MakePin("Radius", PinDataType::Float) },
+        { MakePin("Inside",   PinDataType::Boolean),
+          MakePin("Distance", PinDataType::Float) },
+        PHY_COLOR, "Simple");
+
+    reg("Physics.Raycast2D", "Raycast 2D", "Game/Physics",
+        { MakePin("OriginX", PinDataType::Float), MakePin("OriginY", PinDataType::Float),
+          MakePin("DirX",    PinDataType::Float), MakePin("DirY",    PinDataType::Float),
+          MakePin("MaxDist", PinDataType::Float),
+          MakePin("RectX",   PinDataType::Float), MakePin("RectY",   PinDataType::Float),
+          MakePin("RectW",   PinDataType::Float), MakePin("RectH",   PinDataType::Float) },
+        { MakePin("Hit",     PinDataType::Boolean),
+          MakePin("HitX",    PinDataType::Float), MakePin("HitY",    PinDataType::Float),
+          MakePin("HitDist", PinDataType::Float),
+          MakePin("NormalX", PinDataType::Float), MakePin("NormalY", PinDataType::Float) },
+        PHY_COLOR, "Simple");
+
+    // ── Stat 数值系统 ────────────────────────────────────────────────────────
+    reg("Stat.Set", "Stat Set", "Game/Stat",
+        { MakeFlowPin(""),
+          MakePin("Name",   PinDataType::String),
+          MakePin("Base",   PinDataType::Float),
+          MakePin("Min",    PinDataType::Float),
+          MakePin("Max",    PinDataType::Float),
+          MakePin("Entity", PinDataType::String) },
+        { MakeFlowPin("exec") },
+        STAT_COLOR);
+
+    reg("Stat.Get", "Stat Get", "Game/Stat",
+        { MakePin("Name",   PinDataType::String),
+          MakePin("Entity", PinDataType::String) },
+        { MakePin("Value",         PinDataType::Float),
+          MakePin("Base",          PinDataType::Float),
+          MakePin("ModifierCount", PinDataType::Integer) },
+        STAT_COLOR, "Simple");
+
+    reg("Stat.AddModifier", "Stat Add Modifier", "Game/Stat",
+        { MakeFlowPin(""),
+          MakePin("Name",   PinDataType::String),
+          MakePin("Entity", PinDataType::String),
+          MakePin("ModId",  PinDataType::String),
+          MakePinEnum("Type", "add,mul,override"),
+          MakePin("Value",  PinDataType::Float) },
+        { MakeFlowPin("exec"), MakePin("NewValue", PinDataType::Float) },
+        STAT_COLOR);
+
+    reg("Stat.RemoveModifier", "Stat Remove Modifier", "Game/Stat",
+        { MakeFlowPin(""),
+          MakePin("Name",   PinDataType::String),
+          MakePin("Entity", PinDataType::String),
+          MakePin("ModId",  PinDataType::String) },
+        { MakeFlowPin("exec"), MakePin("NewValue", PinDataType::Float) },
+        STAT_COLOR);
+
+    reg("Stat.Reset", "Stat Reset", "Game/Stat",
+        { MakeFlowPin(""),
+          MakePin("Name",   PinDataType::String),
+          MakePin("Entity", PinDataType::String) },
+        { MakeFlowPin("exec") },
+        STAT_COLOR);
+
+    // ── Cooldown 冷却系统 ────────────────────────────────────────────────────
+    reg("Cooldown.Start", "Cooldown Start", "Game/Cooldown",
+        { MakeFlowPin(""),
+          MakePin("Key",      PinDataType::String),
+          MakePin("Duration", PinDataType::Float) },
+        { MakeFlowPin("exec") },
+        CD_COLOR);
+
+    reg("Cooldown.IsReady", "Cooldown Is Ready", "Game/Cooldown",
+        { MakePin("Key", PinDataType::String) },
+        { MakePin("Ready",     PinDataType::Boolean),
+          MakePin("Remaining", PinDataType::Float) },
+        CD_COLOR, "Simple");
+
+    reg("Cooldown.GetRemaining", "Cooldown Get Remaining", "Game/Cooldown",
+        { MakePin("Key",      PinDataType::String),
+          MakePin("Duration", PinDataType::Float) },
+        { MakePin("Remaining", PinDataType::Float),
+          MakePin("Progress",  PinDataType::Float) },
+        CD_COLOR, "Simple");
+
+    reg("Cooldown.Reset", "Cooldown Reset", "Game/Cooldown",
+        { MakeFlowPin(""), MakePin("Key", PinDataType::String) },
+        { MakeFlowPin("exec") },
+        CD_COLOR);
 }
 
 void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
@@ -2587,7 +3265,14 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     addCat("AI/Tool",    "AI / Tool");
     addCat("AI/Agent",   "AI / Agent");
     addCat("AI/MCP",     "AI / MCP");
-    addCat("File",       "File I/O");
+    addCat("File",             "File I/O");
+    addCat("Game/BehaviorTree","Behavior Tree");
+    addCat("Game/StateMachine","State Machine");
+    addCat("Game/Save",        "Save System");
+    addCat("Game/Math",        "Game Math");
+    addCat("Game/Physics",     "Physics Helpers");
+    addCat("Game/Stat",        "Stat System");
+    addCat("Game/Cooldown",    "Cooldown");
 
     // --- 注册各分类的节点定义 ---
     RegisterNodeDefs_Flow(registry);
@@ -2610,6 +3295,9 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     RegisterNodeDefs_AI(registry);
     RegisterNodeDefs_File(registry);
     RegisterNodeDefs_Retry(registry);
+    RegisterNodeDefs_Game(registry);
+    RegisterNodeDefs_Save(registry);
+    RegisterNodeDefs_GameMath(registry);
 }
 
 } // namespace Runtime
