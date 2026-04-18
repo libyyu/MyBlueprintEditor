@@ -60,8 +60,8 @@ public:
     // ── 注销所有 Lua 节点 ────────────────────────────────────────────────
     void UnregisterAll();
 
-    // ── 文件 Watch 轮询（每帧调用） ──────────────────────────────────────
-    void PollFileChanges();
+    // ── 文件 Watch 轮询（每帧调用，传入 deltaTime 实现节流） ─────────────
+    void PollFileChanges(float deltaTime = 0.0f);
 
     // ── 心跳 Tick（驱动 Lua OnGlobalTick） ──────────────────────────────
     void Tick(float deltaTime);

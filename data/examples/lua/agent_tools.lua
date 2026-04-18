@@ -205,8 +205,15 @@ function run_react_agent(user_query, api_key, base_url, model, on_done)
             table.insert(msgs, json.parse(asst_msg))
             messages = json.stringify(msgs)
 
-            -- finish_reason == "stop" 或无 tool_calls → 最终回答
-            if finish_reason == "stop" or not tool_calls_raw then
+            -- 无 tool_calls → 最终回答（finish_reason 可能是 "stop"/"length"/其他）
+            if not tool_calls_raw then
+                local answer = (content ~= "") and content or "[Agent] Empty response from LLM"
+                print("[Agent] Final answer:\n" .. answer)
+                on_done(answer)
+                return
+            end
+            -- 有 tool_calls 但 finish_reason == "stop"（异常情况，仍优先处理 tool_calls）
+            if finish_reason == "stop" then
                 print("[Agent] Final answer:\n" .. content)
                 on_done(content)
                 return

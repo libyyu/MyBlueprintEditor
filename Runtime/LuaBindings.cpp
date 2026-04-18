@@ -458,6 +458,8 @@ static int l_registerHandler(lua_State* L)
 
     // 包装并注册（传入 defId 用于错误信息上下文）
     runner->RegisterHandler(defId, wrapLuaHandler(L, funcRef, defId));
+    // 标记为 Lua 注册的 handler，确保编辑器执行时能同步到 persistentRunner
+    runner->MarkLuaRegisteredNode(defId);
     return 0;
 }
 
@@ -676,13 +678,10 @@ void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner)
     lua_setfield(L, -2, "ReleaseAsync");
 
     lua_setglobal(L, "Blueprint");
-
-
 }
-
-
 
 } // namespace Runtime
 } // namespace NodeEditor
+
 
 #endif // BLUEPRINT_HAS_LUA

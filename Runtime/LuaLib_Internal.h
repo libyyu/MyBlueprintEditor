@@ -66,7 +66,8 @@ inline crude_json::value luaToJson(lua_State* L, int idx)
             if (!lua_isinteger(L, -2)) { isArr = false; lua_pop(L, 2); break; }
             ++n; lua_pop(L, 1);
         }
-        if (isArr && n > 0) {
+        if (isArr) {
+            // 空表 {} 也序列化为 JSON array []，而非 object {}
             crude_json::array arr; arr.reserve(n);
             for (int i = 1; i <= n; ++i) {
                 lua_rawgeti(L, abs, i);
@@ -128,6 +129,21 @@ inline const crude_json::value* getJsonPath(const crude_json::value& root,
 // 把 Lua table（栈上 idx）转为 JSON headers 字符串 {"K":"V",...}
 inline std::string luaTableToHeadersJson(lua_State* L, int idx)
 {
+    // JSON 字符串最小转义（" 和 \）
+    auto jsonEscape = [](const std::string& s) -> std::string {
+        std::string out;
+        out.reserve(s.size());
+        for (char c : s) {
+            if      (c == '"')  out += "\\\"";
+            else if (c == '\\') out += "\\\\";
+            else if (c == '\n') out += "\\n";
+            else if (c == '\r') out += "\\r";
+            else if (c == '\t') out += "\\t";
+            else                out += c;
+        }
+        return out;
+    };
+
     int abs = (idx > 0 || idx <= LUA_REGISTRYINDEX) ? idx : lua_gettop(L) + idx + 1;
     std::string h = "{"; bool first = true;
     lua_pushnil(L);
@@ -136,12 +152,10 @@ inline std::string luaTableToHeadersJson(lua_State* L, int idx)
         first = false;
         h += "\"";
         if (lua_type(L, -2) == LUA_TSTRING)
-            for (char c : std::string(lua_tostring(L, -2)))
-                h += (c == '"' ? "\\\"" : std::string(1, c));
+            h += jsonEscape(lua_tostring(L, -2));
         h += "\":\"";
         if (lua_type(L, -1) == LUA_TSTRING)
-            for (char c : std::string(lua_tostring(L, -1)))
-                h += (c == '"' ? "\\\"" : std::string(1, c));
+            h += jsonEscape(lua_tostring(L, -1));
         h += "\"";
         lua_pop(L, 1);
     }

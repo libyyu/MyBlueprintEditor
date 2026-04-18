@@ -119,9 +119,9 @@ void LuaNodeRegistrar::WatchEntryScript(const std::string& filePath, const std::
     // 立即尝试加载（文件已存在）
     if (fs::exists(filePath))
     {
-        LoadEntrySilent(filePath, chunkName);
+        bool ok = LoadEntrySilent(filePath, chunkName);
         for (auto& w : m_entryWatches)
-            if (w.filePath == filePath) { w.loaded = true; break; }
+            if (w.filePath == filePath) { w.loaded = ok; break; }
     }
 }
 
@@ -199,8 +199,7 @@ bool LuaNodeRegistrar::ReloadAll()
 
 bool LuaNodeRegistrar::ReloadFile(const std::string& filePath)
 {
-    // 单文件热重载：目前实现为全量重载（Runner 侧也是全量）
-    // 未来可优化为精确单文件重载
+    (void)filePath;  // TODO: 优化为精确单文件重载（当前实现为全量重载）
     return ReloadAll();
 }
 
@@ -221,11 +220,11 @@ void LuaNodeRegistrar::UnregisterAll()
 // PollFileChanges
 // ============================================================================
 
-void LuaNodeRegistrar::PollFileChanges()
+void LuaNodeRegistrar::PollFileChanges(float deltaTime)
 {
-    m_pollAccum += m_pollIntervalSec;  // 由调用方传 dt，此处用简单累加策略
-    // 注：PollFileChanges 每帧被调用，但内部节流
-    // 直接在每次调用时检查（调用方已按 pollIntervalSec 节流）
+    m_pollAccum += deltaTime;
+    if (m_pollAccum < m_pollIntervalSec) return;
+    m_pollAccum = 0.0f;
 
 #ifdef BLUEPRINT_HAS_LUA
     // ── 热重载：检测已加载脚本变更 ────────────────────────────────────────

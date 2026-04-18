@@ -32,13 +32,12 @@
 #include <memory>
 #include <queue>
 #include <atomic>
+#include <algorithm>
+#include <thread>
+#include <chrono>
 
 // 前置声明（编辑器类在全局命名空间）
 struct BlueprintEditor;
-#include <algorithm>
-#include <unordered_set>
-#include <thread>
-#include <chrono>
 
 namespace NodeEditor {
 namespace Runtime {
