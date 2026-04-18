@@ -677,6 +677,50 @@ void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner)
     });
     lua_setfield(L, -2, "ReleaseAsync");
 
+    // Blueprint.GetVariable(name) → string | number | boolean | nil
+    // 允许 Lua 脚本读取蓝图变量（例如 SearchProvider、TavilyKey 等配置变量）
+    lua_pushcfunction(L, [](lua_State* Lx) -> int {
+        const char* name = luaL_checkstring(Lx, 1);
+        lua_getfield(Lx, LUA_REGISTRYINDEX, "__blueprint_runner");
+        auto* r = static_cast<BlueprintRunner*>(lua_touserdata(Lx, -1));
+        lua_pop(Lx, 1);
+        if (!r) { lua_pushnil(Lx); return 1; }
+        auto v = r->GetVariable(name);
+        switch (v.type) {
+        case PinDataType::Boolean: lua_pushboolean(Lx, v.asBool() ? 1 : 0); break;
+        case PinDataType::Integer: lua_pushinteger(Lx, static_cast<lua_Integer>(v.asInt())); break;
+        case PinDataType::Float:   lua_pushnumber(Lx, v.asFloat()); break;
+        case PinDataType::Unknown: lua_pushnil(Lx); break;
+        default:
+        {
+            auto s = v.asString();
+            lua_pushstring(Lx, s.c_str());
+            break;
+        }
+        }
+        return 1;
+    });
+    lua_setfield(L, -2, "GetVariable");
+
+    // Blueprint.SetVariable(name, value) — Lua 脚本写回蓝图变量
+    lua_pushcfunction(L, [](lua_State* Lx) -> int {
+        const char* name = luaL_checkstring(Lx, 1);
+        lua_getfield(Lx, LUA_REGISTRYINDEX, "__blueprint_runner");
+        auto* r = static_cast<BlueprintRunner*>(lua_touserdata(Lx, -1));
+        lua_pop(Lx, 1);
+        if (!r) return 0;
+        int t = lua_type(Lx, 2);
+        if      (t == LUA_TBOOLEAN) r->SetVariable(name, Variant((bool)lua_toboolean(Lx, 2)));
+        else if (t == LUA_TNUMBER && lua_isinteger(Lx, 2))
+            r->SetVariable(name, Variant(static_cast<int64_t>(lua_tointeger(Lx, 2))));
+        else if (t == LUA_TNUMBER)
+            r->SetVariable(name, Variant(lua_tonumber(Lx, 2)));
+        else if (t == LUA_TSTRING)
+            r->SetVariable(name, Variant(std::string(lua_tostring(Lx, 2))));
+        return 0;
+    });
+    lua_setfield(L, -2, "SetVariable");
+
     lua_setglobal(L, "Blueprint");
 }
 
