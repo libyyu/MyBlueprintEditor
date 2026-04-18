@@ -56,9 +56,8 @@ static void pushVariantRaw(lua_State* L, const Variant& v)
     case PinDataType::Map: {
         lua_createtable(L, 0, static_cast<int>(v.mapSize()));
         for (const auto& kv : v.asMap()) {
-            // kv.first は Variant — Lua テーブルキーは文字列に変換
-            std::string keyStr = kv.first.asString();
-            lua_pushstring(L, keyStr.c_str());
+            // 按键的原始类型推送，保持 Lua 端可以用正确类型索引
+            pushVariantRaw(L, kv.first);
             pushVariantRaw(L, kv.second);
             lua_rawset(L, -3);
         }
@@ -677,8 +676,10 @@ void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner)
     });
     lua_setfield(L, -2, "ReleaseAsync");
 
-    // Blueprint.GetVariable(name) → string | number | boolean | nil
-    // 允许 Lua 脚本读取蓝图变量（例如 SearchProvider、TavilyKey 等配置变量）
+    // Blueprint.GetVariable(name) → boolean | integer | number | string | table | nil
+    // 完整支持所有 Variant 类型：
+    //   Boolean → boolean, Integer → integer, Float → number, String/Object → string
+    //   Array → table (array), Map → table (hash), Set → table (array), nil/Unknown → nil
     lua_pushcfunction(L, [](lua_State* Lx) -> int {
         const char* name = luaL_checkstring(Lx, 1);
         lua_getfield(Lx, LUA_REGISTRYINDEX, "__blueprint_runner");
@@ -686,37 +687,29 @@ void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner)
         lua_pop(Lx, 1);
         if (!r) { lua_pushnil(Lx); return 1; }
         auto v = r->GetVariable(name);
-        switch (v.type) {
-        case PinDataType::Boolean: lua_pushboolean(Lx, v.asBool() ? 1 : 0); break;
-        case PinDataType::Integer: lua_pushinteger(Lx, static_cast<lua_Integer>(v.asInt())); break;
-        case PinDataType::Float:   lua_pushnumber(Lx, v.asFloat()); break;
-        case PinDataType::Unknown: lua_pushnil(Lx); break;
-        default:
-        {
-            auto s = v.asString();
-            lua_pushstring(Lx, s.c_str());
-            break;
-        }
-        }
+        if (v.type == PinDataType::Unknown) { lua_pushnil(Lx); return 1; }
+        pushVariantRaw(Lx, v);
         return 1;
     });
     lua_setfield(L, -2, "GetVariable");
 
-    // Blueprint.SetVariable(name, value) — Lua 脚本写回蓝图变量
+    // Blueprint.SetVariable(name, value)
+    // 完整支持所有类型：
+    //   boolean → Boolean, integer → Integer, number → Float, string → String
+    //   table (array) → Array, table (hash) → Map
+    //   nil → 清除变量（设为 Unknown）
     lua_pushcfunction(L, [](lua_State* Lx) -> int {
         const char* name = luaL_checkstring(Lx, 1);
         lua_getfield(Lx, LUA_REGISTRYINDEX, "__blueprint_runner");
         auto* r = static_cast<BlueprintRunner*>(lua_touserdata(Lx, -1));
         lua_pop(Lx, 1);
         if (!r) return 0;
-        int t = lua_type(Lx, 2);
-        if      (t == LUA_TBOOLEAN) r->SetVariable(name, Variant((bool)lua_toboolean(Lx, 2)));
-        else if (t == LUA_TNUMBER && lua_isinteger(Lx, 2))
-            r->SetVariable(name, Variant(static_cast<int64_t>(lua_tointeger(Lx, 2))));
-        else if (t == LUA_TNUMBER)
-            r->SetVariable(name, Variant(lua_tonumber(Lx, 2)));
-        else if (t == LUA_TSTRING)
-            r->SetVariable(name, Variant(std::string(lua_tostring(Lx, 2))));
+        if (lua_type(Lx, 2) == LUA_TNIL) {
+            // nil → 清除（设为空 Unknown）
+            r->SetVariable(name, Variant());
+        } else {
+            r->SetVariable(name, toVariant(Lx, 2));
+        }
         return 0;
     });
     lua_setfield(L, -2, "SetVariable");
