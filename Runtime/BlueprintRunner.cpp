@@ -2475,12 +2475,14 @@ bool BlueprintRunner::LoadLuaScript(const std::string& filePath)
     if (std::find(m_luaLoadedFiles.begin(), m_luaLoadedFiles.end(), filePath) == m_luaLoadedFiles.end())
         m_luaLoadedFiles.push_back(filePath);
 
-    // 记录修改时间
+    // 记录修改时间（热重载用；WebGL 无文件系统，跳过）
+#if !defined(__EMSCRIPTEN__) && !defined(BLUEPRINT_NO_FILESYSTEM)
     try {
         namespace fs = std::filesystem;
         auto t = fs::last_write_time(filePath);
         m_luaFileMtimes[filePath] = t.time_since_epoch().count();
     } catch (...) {}
+#endif
 
     Log("[Lua] Script loaded OK: " + filePath, LogLevel::Verbose);
     return true;
