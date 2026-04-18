@@ -13,7 +13,9 @@
 
 #include "LuaLib_Internal.h"
 #include "LuaBindings.h"
+#include "BlueprintRunner.h"
 #include "Http/IHttpClient.h"
+#include "MainThreadDispatcher.h"
 
 #include <cstdio>
 
@@ -21,6 +23,7 @@ namespace NodeEditor {
 namespace Runtime {
 
 // 通用异步请求分发：构造 HttpRequest，调用 SendAsync；
+// 通过 AcquireAsync/ReleaseAsync 通知 runner 有 pending 工作（使 HasPendingWork() 返回 true），
 // 回调由 MainThreadDispatcher::Post 派回主线程后调用 Lua callback（cbRef）。
 static void asyncRequest(lua_State* L,
                          const std::string& method,
@@ -31,6 +34,7 @@ static void asyncRequest(lua_State* L,
 {
     auto* client = BP_GetHttpClient();
     if (!client) {
+        // 无 HTTP 客户端：同步调用 callback 报错
         lua_rawgeti(L, LUA_REGISTRYINDEX, cbRef);
         luaL_unref(L, LUA_REGISTRYINDEX, cbRef);
         lua_pushnil(L);
@@ -39,6 +43,14 @@ static void asyncRequest(lua_State* L,
         lua_pcall(L, 3, 0, 0);
         return;
     }
+
+    // 获取绑定的 runner（由 RegisterLuaBindings 存入 registry["__blueprint_runner"]）
+    lua_getfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
+    auto* runner = static_cast<BlueprintRunner*>(lua_touserdata(L, -1));
+    lua_pop(L, 1);
+
+    // 通知 runner 有一个异步操作开始（使 HasPendingWork() 返回 true，启动 Tick 循环）
+    if (runner) runner->AcquireAsync();
 
     HttpRequest req;
     req.method = method; req.url = url; req.body = body;
@@ -50,17 +62,34 @@ static void asyncRequest(lua_State* L,
                     req.headers[kv.first] = kv.second.get<std::string>();
     }
 
-    client->SendAsync(req, [L, cbRef](HttpResponse resp) {
-        lua_rawgeti(L, LUA_REGISTRYINDEX, cbRef);
-        luaL_unref(L, LUA_REGISTRYINDEX, cbRef);
-        lua_pushstring(L, resp.body.c_str());
-        lua_pushinteger(L, resp.statusCode);
-        lua_pushstring(L, resp.error.c_str());
-        if (lua_pcall(L, 3, 0, 0) != LUA_OK) {
-            const char* err = lua_tostring(L, -1);
-            fprintf(stderr, "[http callback] Lua error: %s\n", err ? err : "(unknown)");
-            lua_pop(L, 1);
-        }
+    // 保留 runner 存活标志（避免 runner 析构后野指针）
+    auto alive = runner ? runner->GetAliveFlag() : nullptr;
+
+    client->SendAsync(req, [L, cbRef, runner, alive](HttpResponse resp) {
+        // 在后台线程：将 Lua 回调 Post 到主线程执行
+        std::string respBody  = resp.body;
+        int         respCode  = resp.statusCode;
+        std::string respError = resp.error;
+
+        MainThreadDispatcher::Get().Post([L, cbRef, runner, alive,
+                                          respBody  = std::move(respBody),
+                                          respCode,
+                                          respError = std::move(respError)]() {
+            // 在主线程：先释放 async 计数，再执行 Lua 回调
+            if (runner && alive && *alive)
+                runner->ReleaseAsync();
+
+            lua_rawgeti(L, LUA_REGISTRYINDEX, cbRef);
+            luaL_unref(L, LUA_REGISTRYINDEX, cbRef);
+            lua_pushstring(L, respBody.c_str());
+            lua_pushinteger(L, respCode);
+            lua_pushstring(L, respError.c_str());
+            if (lua_pcall(L, 3, 0, 0) != LUA_OK) {
+                const char* err = lua_tostring(L, -1);
+                fprintf(stderr, "[http callback] Lua error: %s\n", err ? err : "(unknown)");
+                lua_pop(L, 1);
+            }
+        });
     });
 }
 
