@@ -66,31 +66,28 @@ void BlueprintEditor::InitRunnerForDoc(BlueprintDocument* doc,
         if (bp.empty()) bp = ".";
     }
 
-    // 快照 Lua 注册的 handler（m_HandlerRegistry 中来自 Lua 脚本的条目）
-    // 原因：RegisterBuiltinHandlers 末尾会 *outHandlers = move(allHandlers)
-    //       覆盖整个 m_HandlerRegistry，导致 Lua handler 丢失。
-    // 解决：先记录 Lua handler ID 集合，调用后把它们 merge 回 runner 和 registry。
-    std::unordered_map<std::string, ::NodeEditor::Runtime::NodeHandler> luaHandlerSnapshot;
+    ::NodeEditor::Runtime::RegisterBuiltinHandlers(doc->persistentRunner, bp, &m_HandlerRegistry);
+
+    // 从编辑器级 Lua Runner 同步 Lua 注册的节点定义和 handler 到文档 runner
+    // 架构说明：m_luaRunner 是编辑器专属 Lua VM 宿主，不加载蓝图数据；
+    //           文档执行时将其 Lua 注册结果同步到 persistentRunner，保证 handler 不丢失。
 #ifdef BLUEPRINT_HAS_LUA
     {
-        const auto& luaIds = m_LuaNodeRegistrar.GetRegisteredIds();
+        const auto& luaIds = m_luaRunner.GetLuaRegisteredNodeIds();
+        const auto& allHandlers = m_luaRunner.GetHandlers();
         for (const auto& id : luaIds)
         {
-            auto it = m_HandlerRegistry.find(id);
-            if (it != m_HandlerRegistry.end())
-                luaHandlerSnapshot[id] = it->second;
+            // 同步节点定义（编辑器节点库可见）
+            const auto* def = m_luaRunner.GetNodeDef(id);
+            if (def) doc->persistentRunner.RegisterNodeDef(*def);
+
+            // 同步 handler
+            auto hit = allHandlers.find(id);
+            if (hit != allHandlers.end())
+                doc->persistentRunner.RegisterHandler(id, hit->second);
         }
     }
 #endif
-
-    ::NodeEditor::Runtime::RegisterBuiltinHandlers(doc->persistentRunner, bp, &m_HandlerRegistry);
-
-    // 把 Lua handler merge 回 registry 和 runner
-    for (auto& kv : luaHandlerSnapshot)
-    {
-        m_HandlerRegistry[kv.first] = kv.second;
-        doc->persistentRunner.RegisterHandler(kv.first, kv.second);
-    }
 
     if (m_DefaultHandler)
         doc->persistentRunner.SetDefaultHandler(m_DefaultHandler);

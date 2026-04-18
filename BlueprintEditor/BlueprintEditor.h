@@ -732,7 +732,11 @@ struct BlueprintEditor : public Application
     RTNodeRegistry                                          m_NodeRegistry;
     std::unordered_map<std::string, RTNodeHandler>          m_HandlerRegistry;
 
-    // Lua 节点注册器（Phase 3：编辑器侧 Lua 扩展）
+    // 编辑器级专用 Lua Runner：管理 Lua VM 生命周期（不加载蓝图，仅用于 Lua 脚本注册）
+    // Lua 脚本注册的节点定义/handler 存在此 runner，执行文档时自动同步到 persistentRunner
+    RTBlueprintRunner                                       m_luaRunner;
+
+    // Lua 节点注册器（薄包装，委托给 m_luaRunner）
     LuaNodeRegistrar                                        m_LuaNodeRegistrar;
 
     // Default handler

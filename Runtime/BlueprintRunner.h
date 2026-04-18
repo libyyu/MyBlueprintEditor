@@ -27,6 +27,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <functional>
 #include <memory>
 #include <queue>
@@ -557,10 +558,28 @@ public:
 
     // 加载 Lua 脚本文件并执行
     // 脚本中调用 Blueprint.RegisterHandler() 会自动注册 handler 到本 runner
+    // 同时将脚本注册的节点 ID 记入 m_luaRegisteredNodeIds（可通过 GetLuaRegisteredNodeIds 查询）
     bool LoadLuaScript(const std::string& filePath);
 
     // 加载 Lua 代码字符串并执行
     bool LoadLuaString(const std::string& code, const std::string& name = "=string");
+
+    // 热重载指定 Lua 文件：先注销该文件注册的节点定义和 handler，再重新加载
+    // 返回 true=成功，false=加载出错（GetLastError() 可查详情）
+    bool ReloadLuaScript(const std::string& filePath);
+
+    // 注销所有由 Lua 脚本注册的节点定义和 handler（热重载全量重置时使用）
+    void UnregisterAllLuaNodes();
+
+    // 向 Lua VM 的 package.path 追加搜索目录（dir/?.lua; dir/?/init.lua）
+    void AddLuaPath(const std::string& dir);
+
+    // 获取所有由 Lua 脚本注册的节点 ID 集合（编辑器用于同步节点库）
+    const std::unordered_set<std::string>& GetLuaRegisteredNodeIds() const { return m_luaRegisteredNodeIds; }
+
+    // 内部：由 LuaBindings 回调，记录某节点 ID 是 Lua 注册的（勿手动调用）
+    void MarkLuaRegisteredNode(const std::string& id) { m_luaRegisteredNodeIds.insert(id); }
+    void UnmarkLuaRegisteredNode(const std::string& id) { m_luaRegisteredNodeIds.erase(id); }
 
     // 获取 Lua 引擎实例（高级用途：注册自定义 C 函数等）
     LuaScriptEngine* GetLuaEngine();
@@ -820,6 +839,15 @@ private:
 
     // 脚本动态节点定义注册表（Lua / C# 通过 RegisterNodeDef 注册）
     DefaultNodeRegistry                                 m_scriptRegistry;
+
+#ifdef BLUEPRINT_HAS_LUA
+    // Lua 注册的节点 ID 集合（用于热重载时精确清理）
+    std::unordered_set<std::string>                     m_luaRegisteredNodeIds;
+    // Lua 加载的文件列表（按加载顺序，用于 ReloadLuaScript）
+    std::vector<std::string>                            m_luaLoadedFiles;
+    // 文件上次修改时间（ReloadLuaScript 用于判断是否有变化）
+    std::unordered_map<std::string, int64_t>            m_luaFileMtimes;
+#endif
 
     // 数据层：节点执行状态（引脚值、变量、当前节点等纯数据）
     NodeExecutionState                                  m_state;

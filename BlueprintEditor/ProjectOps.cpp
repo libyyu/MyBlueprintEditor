@@ -381,23 +381,23 @@ void BlueprintEditor::SyncProjectLibrariesToRegistry()
         m_NodeRegistry.registerCategory(cat);
     }
 
-    // Phase 3：加载 Lua 扩展脚本（先清除旧定义再重新加载）
+    // 加载 Lua 扩展脚本（先清除旧定义再重新加载）
 #ifdef BLUEPRINT_HAS_LUA
     m_LuaNodeRegistrar.UnregisterAll();
-    m_LuaNodeRegistrar.Initialize(&m_NodeRegistry, &m_HandlerRegistry);
+    m_LuaNodeRegistrar.BindRunner(&m_luaRunner);
     int luaTotal = 0;
     for (const auto& relPath : m_Project.luaExtensions)
     {
         std::string absPath = m_Project.AbsPath(relPath);
         if (absPath.empty() || !fs::exists(absPath)) continue;
-        int n = m_LuaNodeRegistrar.LoadScript(absPath);
-        if (n >= 0)
-            luaTotal += n;
+        bool ok = m_LuaNodeRegistrar.LoadScript(absPath);
+        if (ok)
+            ++luaTotal;
         else
             BPLOG("[Lua] Error loading " + relPath + ": " + m_LuaNodeRegistrar.GetLastError());
     }
     if (luaTotal > 0)
-        BPLOG("SyncProjectLibraries: registered " + std::to_string(luaTotal) + " Lua nodes");
+        BPLOG("SyncProjectLibraries: registered Lua scripts: " + std::to_string(luaTotal));
 #endif
 
     // 节点定义变更，强制重建缓存
@@ -1090,10 +1090,10 @@ void BlueprintEditor::DrawProjectPanel()
             ImGui::SameLine();
             if (ImGui::SmallButton(ICON_FA_ARROWS_ROTATE " Reload All##lua"))
             {
-                int n = m_LuaNodeRegistrar.ReloadAll();
+                bool ok = m_LuaNodeRegistrar.ReloadAll();
                 m_CachedDefCount = 0;
-                if (n >= 0)
-                    BPLOG("[Lua] Reloaded " + std::to_string(n) + " node definitions");
+                if (ok)
+                    BPLOG("[Lua] Reloaded all scripts");
                 else
                     BPLOG("[Lua] Reload failed: " + m_LuaNodeRegistrar.GetLastError());
             }
@@ -1142,9 +1142,8 @@ void BlueprintEditor::DrawProjectPanel()
                     if (ImGui::MenuItem(ICON_FA_ARROWS_ROTATE " Reload this script"))
                     {
                         std::string absPath = m_Project.AbsPath(relPath);
-                        int n = m_LuaNodeRegistrar.ReloadFile(absPath);
+                        m_LuaNodeRegistrar.ReloadFile(absPath);
                         m_CachedDefCount = 0;
-                        (void)n;
                     }
                     ImGui::EndPopup();
                 }

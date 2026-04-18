@@ -604,6 +604,7 @@ static int l_registerNodeDef(lua_State* L)
         runner->LogWarning(std::string("[Lua] Overriding existing node def '") + def.id + "'");
 
     runner->RegisterNodeDef(def);
+    runner->MarkLuaRegisteredNode(def.id);  // 标记为 Lua 注册节点，用于热重载清理
     return 0;
 }
 

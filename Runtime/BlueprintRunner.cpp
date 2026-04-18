@@ -2471,9 +2471,71 @@ bool BlueprintRunner::LoadLuaScript(const std::string& filePath)
         return false;
     }
 
+    // 记录文件（去重）
+    if (std::find(m_luaLoadedFiles.begin(), m_luaLoadedFiles.end(), filePath) == m_luaLoadedFiles.end())
+        m_luaLoadedFiles.push_back(filePath);
+
+    // 记录修改时间
+    try {
+        namespace fs = std::filesystem;
+        auto t = fs::last_write_time(filePath);
+        m_luaFileMtimes[filePath] = t.time_since_epoch().count();
+    } catch (...) {}
+
     Log("[Lua] Script loaded OK: " + filePath, LogLevel::Verbose);
     return true;
 }
+
+bool BlueprintRunner::ReloadLuaScript(const std::string& filePath)
+{
+    if (!m_luaEngine) return LoadLuaScript(filePath);
+
+    // 注销该文件之前注册的所有节点（无法精确区分文件，全量重载时调 UnregisterAllLuaNodes）
+    // 这里做全量注销再重新加载全部文件（简单可靠）
+    UnregisterAllLuaNodes();
+
+    // 重置 Lua VM（清除函数引用，避免旧 handler 残留）
+    m_luaEngine.reset();
+
+    // 重新加载所有文件
+    auto files = m_luaLoadedFiles;
+    m_luaLoadedFiles.clear();
+    m_luaFileMtimes.clear();
+
+    for (const auto& f : files)
+    {
+        if (!LoadLuaScript(f))
+            return false;  // 报错止步
+    }
+    return true;
+}
+
+void BlueprintRunner::UnregisterAllLuaNodes()
+{
+    for (const auto& id : m_luaRegisteredNodeIds)
+    {
+        m_scriptRegistry.unregisterNode(id);
+        m_handlers.erase(id);
+    }
+    m_luaRegisteredNodeIds.clear();
+}
+
+void BlueprintRunner::AddLuaPath(const std::string& dir)
+{
+    if (!m_luaEngine)
+    {
+        // 延迟创建 VM
+        m_luaEngine = std::make_unique<LuaScriptEngine>();
+        if (!m_luaEngine->Initialize(this))
+        {
+            m_luaEngine.reset();
+            return;
+        }
+    }
+    m_luaEngine->AddLuaPath(dir);
+}
+
+
 
 bool BlueprintRunner::LoadLuaString(const std::string& code, const std::string& name)
 {
