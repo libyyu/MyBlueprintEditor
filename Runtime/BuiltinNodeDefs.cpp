@@ -3257,10 +3257,11 @@ static void RegisterNodeDefs_Socket(INodeRegistry& registry)
             MakePin("BufferSize", PinDataType::Integer),
         },
         {
-            MakeFlowPin("exec"),
+            MakeFlowPin(""),
             MakeFlowPin("onAccept"),
             MakeFlowPin("onData"),
             MakeFlowPin("onDisconnect"),
+            MakePin("Success",  PinDataType::Boolean),
             MakePin("ConnId",   PinDataType::String),
             MakePin("PeerAddr", PinDataType::String),
             MakePin("PeerPort", PinDataType::Integer),
@@ -3276,13 +3277,13 @@ static void RegisterNodeDefs_Socket(INodeRegistry& registry)
             MakePin("BufferSize", PinDataType::Integer),
         },
         {
+            MakeFlowPin(""),
             MakeFlowPin("onConnected"),
             MakeFlowPin("onData"),
             MakeFlowPin("onDisconnect"),
             MakeFlowPin("onError"),
             MakePin("ConnId",       PinDataType::String),
             MakePin("Data",         PinDataType::String),
-            MakePin("ErrorMessage", PinDataType::String),
         },
         TCP_COLOR);
 
@@ -3293,7 +3294,7 @@ static void RegisterNodeDefs_Socket(INodeRegistry& registry)
             MakePin("Data",   PinDataType::String),
         },
         {
-            MakeFlowPin("exec"),
+            MakeFlowPin(""),
             MakePin("Success",      PinDataType::Boolean),
             MakePin("ErrorMessage", PinDataType::String),
         },
@@ -3304,7 +3305,7 @@ static void RegisterNodeDefs_Socket(INodeRegistry& registry)
             MakeFlowPin(""),
             MakePin("ConnId", PinDataType::String),
         },
-        { MakeFlowPin("exec") },
+        { MakeFlowPin("") },
         TCP_COLOR);
 
     reg("TCP.Stop", "TCP Stop", "Network/TCP",
@@ -3312,7 +3313,7 @@ static void RegisterNodeDefs_Socket(INodeRegistry& registry)
             MakeFlowPin(""),
             MakePin("ServerKey", PinDataType::String),
         },
-        { MakeFlowPin("exec") },
+        { MakeFlowPin("") },
         TCP_COLOR);
 
     // ── UDP ──────────────────────────────────────────────────────────────────
@@ -3324,8 +3325,9 @@ static void RegisterNodeDefs_Socket(INodeRegistry& registry)
             MakePin("BufferSize", PinDataType::Integer),
         },
         {
-            MakeFlowPin("exec"),
+            MakeFlowPin(""),
             MakeFlowPin("onData"),
+            MakePin("Success",  PinDataType::Boolean),
             MakePin("FromAddr", PinDataType::String),
             MakePin("FromPort", PinDataType::Integer),
             MakePin("Data",     PinDataType::String),
@@ -3340,7 +3342,7 @@ static void RegisterNodeDefs_Socket(INodeRegistry& registry)
             MakePin("Data", PinDataType::String),
         },
         {
-            MakeFlowPin("exec"),
+            MakeFlowPin(""),
             MakePin("Success",      PinDataType::Boolean),
             MakePin("ErrorMessage", PinDataType::String),
         },
@@ -3351,7 +3353,7 @@ static void RegisterNodeDefs_Socket(INodeRegistry& registry)
             MakeFlowPin(""),
             MakePin("Port", PinDataType::Integer),
         },
-        { MakeFlowPin("exec") },
+        { MakeFlowPin("") },
         UDP_COLOR);
 }
 

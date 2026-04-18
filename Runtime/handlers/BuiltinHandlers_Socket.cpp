@@ -40,6 +40,9 @@
 #  ifndef WIN32_LEAN_AND_MEAN
 #    define WIN32_LEAN_AND_MEAN
 #  endif
+#  ifndef _WINSOCK_DEPRECATED_NO_WARNINGS
+#   define _WINSOCK_DEPRECATED_NO_WARNINGS
+#  endif 
 #  ifndef NOMINMAX
 #    define NOMINMAX
 #  endif
@@ -200,12 +203,14 @@ void RegisterHandlers_Socket(
         int bufSize       = static_cast<int>(ctx.GetInputValue("BufferSize").asInt());
         if (host.empty()) host = "0.0.0.0";
         if (bufSize <= 0) bufSize = 4096;
-
+                
         initWSA();
         SockFd listenFd = socket(AF_INET, SOCK_STREAM, 0);
         if (listenFd == INVALID_SOCK) {
             ctx.LogError("[TCP.Listen] socket() failed");
-            ctx.ActivateOutputFlow("exec");
+            ctx.SetOutputValue("Data", Variant("[TCP.Listen] socket() failed"));
+            ctx.SetOutputValue("Success", Variant(false));
+            ctx.ActivateOutputFlow("");
             return true;
         }
         int opt = 1;
@@ -220,7 +225,9 @@ void RegisterHandlers_Socket(
         {
             SOCK_CLOSE(listenFd);
             ctx.LogError("[TCP.Listen] bind/listen failed on port " + std::to_string(port));
-            ctx.ActivateOutputFlow("exec");
+			ctx.SetOutputValue("Data", Variant("[TCP.Listen] bind/listen failed on port " + std::to_string(port)));
+			ctx.SetOutputValue("Success", Variant(false));
+			ctx.ActivateOutputFlow("");
             return true;
         }
 
@@ -332,7 +339,9 @@ void RegisterHandlers_Socket(
             return true;
         });
 
-        ctx.ActivateOutputFlow("exec");
+		ctx.SetOutputValue("Success", Variant(true));
+		ctx.ActivateOutputFlow("");
+
         return true;
     };
 
@@ -428,7 +437,6 @@ void RegisterHandlers_Socket(
                 const auto& msg = batch.front();
                 pCtx->SetOutputValue("ConnId",       Variant(msg.connId));
                 pCtx->SetOutputValue("Data",         Variant(msg.data));
-                pCtx->SetOutputValue("ErrorMessage", Variant(std::string("")));
                 switch (msg.type) {
                 case TcpMessage::Type::Accept:
                     pCtx->ActivateOutputFlow(connectedPin);
@@ -438,7 +446,6 @@ void RegisterHandlers_Socket(
                     break;
                 case TcpMessage::Type::Disconnect:
                     if (!msg.data.empty()) {
-                        pCtx->SetOutputValue("ErrorMessage", Variant(msg.data));
                         pCtx->ActivateOutputFlow(errorPin);
                     } else {
                         pCtx->ActivateOutputFlow(discPin);
@@ -450,6 +457,7 @@ void RegisterHandlers_Socket(
             return !st->closed;
         });
 
+		ctx.ActivateOutputFlow("");
         return true;
     };
 
@@ -496,7 +504,7 @@ void RegisterHandlers_Socket(
 
         ctx.SetOutputValue("Success",      Variant(sent));
         ctx.SetOutputValue("ErrorMessage", Variant(errMsg));
-        ctx.ActivateOutputFlow("exec");
+        ctx.ActivateOutputFlow("");
         return true;
     };
 
@@ -534,7 +542,7 @@ void RegisterHandlers_Socket(
         }
 
         ctx.Log("[TCP.Disconnect] connId=" + connId);
-        ctx.ActivateOutputFlow("exec");
+        ctx.ActivateOutputFlow("");
         return true;
     };
 
@@ -562,7 +570,7 @@ void RegisterHandlers_Socket(
             s_tcpServers.erase(it);
         }
         ctx.Log("[TCP.Stop] key=" + serverKey);
-        ctx.ActivateOutputFlow("exec");
+        ctx.ActivateOutputFlow("");
         return true;
     };
 
@@ -580,12 +588,14 @@ void RegisterHandlers_Socket(
         int bufSize      = static_cast<int>(ctx.GetInputValue("BufferSize").asInt());
         if (host.empty())  host    = "0.0.0.0";
         if (bufSize <= 0)  bufSize = 65507;
-
+ 
         initWSA();
         SockFd fd = socket(AF_INET, SOCK_DGRAM, 0);
         if (fd == INVALID_SOCK) {
             ctx.LogError("[UDP.Bind] socket() failed");
-            ctx.ActivateOutputFlow("exec");
+			ctx.SetOutputValue("Data", Variant("[UDP.Bind] socket() failed"));
+			ctx.SetOutputValue("Success", Variant(false));
+			ctx.ActivateOutputFlow("");
             return true;
         }
         sockaddr_in addr{};
@@ -595,7 +605,9 @@ void RegisterHandlers_Socket(
         if (bind(fd, (sockaddr*)&addr, sizeof(addr)) != 0) {
             SOCK_CLOSE(fd);
             ctx.LogError("[UDP.Bind] bind failed on port " + std::to_string(port));
-            ctx.ActivateOutputFlow("exec");
+			ctx.SetOutputValue("Data", Variant("[UDP.Bind] bind failed on port " + std::to_string(port)));
+			ctx.SetOutputValue("Success", Variant(false));
+			ctx.ActivateOutputFlow("");
             return true;
         }
 
@@ -662,7 +674,9 @@ void RegisterHandlers_Socket(
             return true;
         });
 
-        ctx.ActivateOutputFlow("exec");
+		ctx.SetOutputValue("Success", Variant(true));
+		ctx.ActivateOutputFlow("");
+
         return true;
     };
 
@@ -676,7 +690,7 @@ void RegisterHandlers_Socket(
         std::string host = ctx.GetInputValue("Host").asString();
         int port         = static_cast<int>(ctx.GetInputValue("Port").asInt());
         std::string data = ctx.GetInputValue("Data").asString();
-
+        
         initWSA();
         SockFd fd = socket(AF_INET, SOCK_DGRAM, 0);
         bool sent = false;
@@ -699,7 +713,7 @@ void RegisterHandlers_Socket(
 
         ctx.SetOutputValue("Success",      Variant(sent));
         ctx.SetOutputValue("ErrorMessage", Variant(errMsg));
-        ctx.ActivateOutputFlow("exec");
+        ctx.ActivateOutputFlow("");
         return true;
     };
 
@@ -712,7 +726,7 @@ void RegisterHandlers_Socket(
     handlers["UDP.Close"] = [](ExecutionContext& ctx) -> bool {
         int port = static_cast<int>(ctx.GetInputValue("Port").asInt());
         std::string bindKey = ctx.GetVariable("__udp_key_" + std::to_string(port)).asString();
-
+        
         if (!bindKey.empty()) {
             std::lock_guard<std::mutex> lk(s_udpMutex);
             auto it = s_udpSockets.find(bindKey);
@@ -724,7 +738,7 @@ void RegisterHandlers_Socket(
             }
         }
         ctx.Log("[UDP.Close] port=" + std::to_string(port));
-        ctx.ActivateOutputFlow("exec");
+        ctx.ActivateOutputFlow("");
         return true;
     };
 }
@@ -745,19 +759,35 @@ void RegisterHandlers_Socket(
         return [name](ExecutionContext& ctx) -> bool {
             ctx.LogError("[" + name + "] not supported on WebGL");
             ctx.SetOutputValue("Success",      Variant(false));
+            ctx.SetOutputValue("Data", Variant(std::string("Not supported on WebGL")));
+            ctx.ActivateOutputFlow("");
+            return true;
+        };
+    };
+    auto webglStub2 = [](const std::string& name) {
+        return [name](ExecutionContext& ctx) -> bool {
+            ctx.LogError("[" + name + "] not supported on WebGL");
+            ctx.SetOutputValue("Success",      Variant(false));
             ctx.SetOutputValue("ErrorMessage", Variant(std::string("Not supported on WebGL")));
-            ctx.ActivateOutputFlow("exec");
+            ctx.ActivateOutputFlow("");
+            return true;
+        };
+    };
+    auto webglStub3 = [](const std::string& name) {
+        return [name](ExecutionContext& ctx) -> bool {
+            ctx.LogError("[" + name + "] not supported on WebGL");
+            ctx.ActivateOutputFlow("");
             return true;
         };
     };
     handlers["TCP.Listen"]     = webglStub("TCP.Listen");
     handlers["TCP.Connect"]    = webglStub("TCP.Connect");
-    handlers["TCP.Send"]       = webglStub("TCP.Send");
-    handlers["TCP.Disconnect"] = webglStub("TCP.Disconnect");
-    handlers["TCP.Stop"]       = webglStub("TCP.Stop");
+    handlers["TCP.Send"]       = webglStub2("TCP.Send");
+    handlers["TCP.Disconnect"] = webglStub3("TCP.Disconnect");
+    handlers["TCP.Stop"]       = webglStub3("TCP.Stop");
     handlers["UDP.Bind"]       = webglStub("UDP.Bind");
-    handlers["UDP.Send"]       = webglStub("UDP.Send");
-    handlers["UDP.Close"]      = webglStub("UDP.Close");
+    handlers["UDP.Send"]       = webglStub2("UDP.Send");
+    handlers["UDP.Close"]      = webglStub3("UDP.Close");
 }
 
 } // namespace Runtime
