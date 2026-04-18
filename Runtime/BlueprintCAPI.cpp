@@ -13,6 +13,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <mutex>
 #if !defined(__EMSCRIPTEN__)
 #  include <filesystem>
 #endif
@@ -24,10 +25,23 @@
 #    define NOMINMAX
 #  endif
 #  include <windows.h>
-#  undef IsLoggingEnabled   // 防止 Windows 宏污染 BlueprintRunner 方法名
+#  undef IsLoggingEnabled
+#elif defined(__linux__)
+#  include <unistd.h>
+#elif defined(__APPLE__)
+#  include <mach-o/dyld.h>
 #endif
 
 using namespace NodeEditor::Runtime;
+
+// ---------------------------------------------------------------------------
+// 全局 Lua 入口路径（进程级，所有 runner 共享）
+// 通过 BP_SetGlobalLuaEntry() 设置，tryLoadBlueprintEntry() 优先使用
+// ---------------------------------------------------------------------------
+namespace {
+    std::mutex  s_globalEntryMutex;
+    std::string s_globalLuaEntry;
+} // anonymous namespace
 
 // ---------------------------------------------------------------------------
 // Internal wrapper: wraps BlueprintRunner + last-error string
@@ -47,25 +61,42 @@ struct RunnerWrapper
         RegisterBuiltinHandlers(runner, basePath);
     }
 
-    // 静默加载 BlueprintEntry.lua：
-    //   先找 basePath/BlueprintEntry.lua，再找 DLL 所在目录/BlueprintEntry.lua
-    //   任一存在则加载（不报错，不存在直接跳过）
+    // 静默加载 BlueprintEntry.lua
+    // 搜索顺序（找到第一个存在的文件立即加载，不重复）：
+    //   1. 用户通过 BP_SetGlobalLuaEntry 指定的路径（最高优先）
+    //   2. 蓝图文件所在目录/BlueprintEntry.lua
+    //   3. 当前工作目录/BlueprintEntry.lua
+    //   4. DLL/exe 所在目录/BlueprintEntry.lua（Windows）
     void tryLoadBlueprintEntry()
     {
 #if defined(BLUEPRINT_HAS_LUA) && !defined(__EMSCRIPTEN__)
         namespace fs = std::filesystem;
         std::vector<std::string> candidates;
 
-        // 1. 蓝图文件所在目录
+        // 1. 用户显式指定的全局入口
+        {
+            std::lock_guard<std::mutex> lk(s_globalEntryMutex);
+            if (!s_globalLuaEntry.empty())
+                candidates.push_back(s_globalLuaEntry);
+        }
+
+        // 2. 蓝图文件所在目录
         if (!basePath.empty())
             candidates.push_back(basePath + "/BlueprintEntry.lua");
 
-        // 2. DLL 所在目录（Windows: GetModuleFileNameA，其他平台跳过）
+        // 3. 当前工作目录
+        {
+            std::error_code ec;
+            auto cwd = fs::current_path(ec);
+            if (!ec)
+                candidates.push_back((cwd / "BlueprintEntry.lua").string());
+        }
+
+        // 4. DLL/exe 所在目录
 #if defined(_WIN32) || defined(_WIN64)
         {
             char dllPath[MAX_PATH] = {};
             HMODULE hm = nullptr;
-            // 用模块内静态局部地址定位所在 DLL
             static const int kAnchor = 0;
             if (::GetModuleHandleExA(
                     GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
@@ -78,6 +109,25 @@ struct RunnerWrapper
                 candidates.push_back((dllDir / "BlueprintEntry.lua").string());
             }
         }
+#elif defined(__linux__)
+        {
+            char exePath[1024] = {};
+            ssize_t len = readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
+            if (len > 0) {
+                exePath[len] = '\0';
+                fs::path exeDir = fs::path(exePath).parent_path();
+                candidates.push_back((exeDir / "BlueprintEntry.lua").string());
+            }
+        }
+#elif defined(__APPLE__)
+        {
+            char exePath[1024] = {};
+            uint32_t sz = sizeof(exePath);
+            if (_NSGetExecutablePath(exePath, &sz) == 0) {
+                fs::path exeDir = fs::path(exePath).parent_path();
+                candidates.push_back((exeDir / "BlueprintEntry.lua").string());
+            }
+        }
 #endif
 
         for (const auto& path : candidates)
@@ -85,7 +135,7 @@ struct RunnerWrapper
             if (fs::exists(path))
             {
                 runner.LoadLuaScript(path);
-                break;  // 找到第一个存在的就加载，不重复加载
+                break;
             }
         }
 #endif
@@ -225,6 +275,33 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadLuaScript(BP_Runner runner,
         return 1;
     }
     w->lastError.clear();
+#endif
+    return 0;
+}
+
+/// Set the global Lua entry path used by all runners when loading blueprints.
+/// Pass NULL or "" to clear (disable global entry).
+/// When set, this path takes highest priority in tryLoadBlueprintEntry().
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetGlobalLuaEntry(const char* filePath)
+{
+    std::lock_guard<std::mutex> lk(s_globalEntryMutex);
+    s_globalLuaEntry = (filePath && *filePath) ? std::string(filePath) : std::string();
+}
+
+/// Get the current global Lua entry path (copies into buf, returns length).
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetGlobalLuaEntry(char* buf, int bufLen)
+{
+    std::lock_guard<std::mutex> lk(s_globalEntryMutex);
+    return copyString(s_globalLuaEntry, buf, bufLen);
+}
+
+/// Immediately load the global Lua entry (or auto-search) into the given runner.
+/// Useful for forcing a reload after BP_SetGlobalLuaEntry.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadGlobalLuaEntry(BP_Runner runner)
+{
+    if (!runner) return 1;
+#if defined(BLUEPRINT_HAS_LUA) && !defined(__EMSCRIPTEN__)
+    asWrapper(runner)->tryLoadBlueprintEntry();
 #endif
     return 0;
 }

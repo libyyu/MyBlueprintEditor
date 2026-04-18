@@ -147,6 +147,23 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetBasePath(BP_Runner runner, 
 /// BlueprintEntry.lua from the blueprint directory (then the DLL directory).
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadLuaScript(BP_Runner runner, const char* filePath);
 
+/// Set the global Lua entry file path used by all runners when loading blueprints.
+/// Search order in tryLoadBlueprintEntry:
+///   1. This path (highest priority)
+///   2. Blueprint file directory/BlueprintEntry.lua
+///   3. Current working directory/BlueprintEntry.lua
+///   4. DLL/exe directory/BlueprintEntry.lua
+/// Pass NULL or "" to clear (disable).
+/// Thread-safe. No-op when BLUEPRINT_HAS_LUA is not defined.
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetGlobalLuaEntry(const char* filePath);
+
+/// Get the current global Lua entry path. Returns number of bytes written.
+BLUEPRINT_CAPI_EXPORT int  BLUEPRINT_CAPI_CALL BP_GetGlobalLuaEntry(char* buf, int bufLen);
+
+/// Immediately load the global Lua entry (or auto-search) into the runner.
+/// Useful after calling BP_SetGlobalLuaEntry to force an immediate reload.
+BLUEPRINT_CAPI_EXPORT int  BLUEPRINT_CAPI_CALL BP_LoadGlobalLuaEntry(BP_Runner runner);
+
 /// Returns 1 if a blueprint has been loaded successfully, 0 otherwise.
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_IsLoaded(BP_Runner runner);
 

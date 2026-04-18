@@ -2,6 +2,7 @@
 // 从 EditorUI.cpp 拆分而来
 #include "BlueprintEditor.h"
 #include "ThemeManager.h"
+#include "../Utils/Json/crude_json.h"
 
 // ============================================================================
 // DrawNodeListPanel — 右侧面板主入口（Tab Bar：Nodes / Variables / Functions / Events / Details）
@@ -1081,18 +1082,249 @@ void BlueprintEditor::DrawVariablePanel()
         bool changed = false;
         if (selVar.containerType != RTContainerType::Single)
         {
-            // Array/Map/Set: 用 InputText 编辑 JSON 字符串
-            static char s_defaultBuf[512] = "";
-            std::string curVal = selVar.defaultValue.asString();
-            if (curVal != s_defaultBuf)
-                snprintf(s_defaultBuf, sizeof(s_defaultBuf), "%s", curVal.c_str());
-            ImGui::SetNextItemWidth(paneWidth - 8.0f);
-            if (ImGui::InputText("##defval", s_defaultBuf, sizeof(s_defaultBuf),
-                                  ImGuiInputTextFlags_EnterReturnsTrue))
+            // ── 容器类型结构化编辑（UE4 风格）────────────────────────────────
+            // 内部状态：缓存解析后的元素列表，避免每帧重新解析 JSON
+            // key = (varName + dataType) 作为缓存 invalidate 标记
+            struct ContainerEditState {
+                std::string         cacheKey;
+                // Array/Set: elements[i] = string 表示的值
+                // Map: elements[i] = "key\nvalue" 分两行
+                std::vector<std::string> keys;    // Map: key；Array/Set: 空
+                std::vector<std::string> values;  // 所有类型: 元素值
+                bool                dirty = false; // values 被修改，需回写 JSON
+            };
+            static ContainerEditState s_ces;
+
+            // 构造缓存 key
+            std::string ck = selVar.name + "|" +
+                             std::to_string(static_cast<int>(selVar.containerType)) + "|" +
+                             std::to_string(static_cast<int>(selVar.itemType));
+
+            // 解析 JSON → state（缓存 miss 时）
+            if (s_ces.cacheKey != ck)
+            {
+                s_ces.cacheKey = ck;
+                s_ces.keys.clear();
+                s_ces.values.clear();
+                s_ces.dirty = false;
+
+                std::string jsonStr = selVar.defaultValue.asString();
+                if (!jsonStr.empty())
+                {
+                    using namespace crude_json;
+                    value parsed = value::parse(jsonStr);
+                    if (selVar.containerType == RTContainerType::Map && parsed.is_object())
+                    {
+                        for (const auto& kv : parsed.get<object>())
+                        {
+                            s_ces.keys.push_back(kv.first);
+                            s_ces.values.push_back(
+                                kv.second.is_string() ? kv.second.get<std::string>()
+                                                      : kv.second.dump());
+                        }
+                    }
+                    else if (parsed.is_array())
+                    {
+                        for (const auto& el : parsed.get<array>())
+                            s_ces.values.push_back(
+                                el.is_string() ? el.get<std::string>() : el.dump());
+                    }
+                }
+            }
+
+            // 辅助：将 state 回写成 JSON 并存入 defaultValue
+            auto flushToVar = [&]() {
+                using namespace crude_json;
+                if (selVar.containerType == RTContainerType::Map)
+                {
+                    object obj;
+                    for (size_t i = 0; i < s_ces.values.size(); ++i)
+                    {
+                        std::string key = i < s_ces.keys.size() ? s_ces.keys[i] : "";
+                        if (!key.empty())
+                        {
+                            // 尝试解析为 JSON，失败则视为字符串
+                            value v = value::parse(s_ces.values[i]);
+                            obj[key] = v.is_null() && !s_ces.values[i].empty()
+                                ? value(s_ces.values[i]) : v;
+                        }
+                    }
+                    selVar.defaultValue = RTVariant(value(std::move(obj)).dump());
+                }
+                else
+                {
+                    array arr;
+                    for (const auto& sv : s_ces.values)
+                    {
+                        value v = value::parse(sv);
+                        arr.push_back(v.is_null() && !sv.empty() ? value(sv) : v);
+                    }
+                    selVar.defaultValue = RTVariant(value(std::move(arr)).dump());
+                }
+                doc->isDirty = true;
+                s_ces.dirty  = false;
+            };
+
+            // 辅助：根据 itemType 渲染单个元素编辑控件，返回 true 表示值改变
+            auto renderItemEdit = [&](int idx, std::string& valStr, float itemW) -> bool {
+                bool itemChanged = false;
+                ImGui::PushID(idx);
+                switch (selVar.itemType)
+                {
+                case RTPinDataType::Boolean: {
+                    bool bv = (valStr == "true" || valStr == "1");
+                    if (ImGui::Checkbox("##bv", &bv)) {
+                        valStr = bv ? "true" : "false";
+                        itemChanged = true;
+                    }
+                    break;
+                }
+                case RTPinDataType::Integer: {
+                    int64_t iv = 0;
+                    try { iv = std::stoll(valStr); } catch (...) {}
+                    ImS64 imv = static_cast<ImS64>(iv);
+                    ImGui::SetNextItemWidth(itemW);
+                    if (ImGui::DragScalar("##iv", ImGuiDataType_S64, &imv, 1.0f)) {
+                        valStr = std::to_string(static_cast<int64_t>(imv));
+                        itemChanged = true;
+                    }
+                    break;
+                }
+                case RTPinDataType::Float: {
+                    float fv = 0.0f;
+                    try { fv = std::stof(valStr); } catch (...) {}
+                    ImGui::SetNextItemWidth(itemW);
+                    if (ImGui::DragFloat("##fv", &fv, 0.01f)) {
+                        valStr = std::to_string(fv);
+                        itemChanged = true;
+                    }
+                    break;
+                }
+                default: { // String / Object / Any
+                    static char s_itembuf[512];
+                    snprintf(s_itembuf, sizeof(s_itembuf), "%s", valStr.c_str());
+                    ImGui::SetNextItemWidth(itemW);
+                    if (ImGui::InputText("##sv", s_itembuf, sizeof(s_itembuf))) {
+                        valStr = s_itembuf;
+                        itemChanged = true;
+                    }
+                    if (ImGui::IsItemActivated()) PushUndoState();
+                    break;
+                }
+                }
+                ImGui::PopID();
+                return itemChanged;
+            };
+
+            // ── 渲染元素列表 ──────────────────────────────────────────────────
+            int  removeIdx  = -1;
+            bool anyChanged = false;
+            int  count = static_cast<int>(s_ces.values.size());
+
+            // 表头：元素数 + 添加按钮
+            ImGui::TextDisabled("%d element(s)", count);
+            ImGui::SameLine(paneWidth - 70.0f);
+            if (ImGui::SmallButton(ICON_FA_PLUS " Add"))
             {
                 PushUndoState();
-                selVar.defaultValue = RTVariant(std::string(s_defaultBuf));
-                doc->isDirty = true;
+                if (selVar.containerType == RTContainerType::Map)
+                    s_ces.keys.push_back("key" + std::to_string(count));
+                s_ces.values.push_back(
+                    selVar.itemType == RTPinDataType::Boolean ? "false" :
+                    selVar.itemType == RTPinDataType::Integer ? "0" :
+                    selVar.itemType == RTPinDataType::Float   ? "0.0" : "");
+                anyChanged = true;
+            }
+
+            ImGui::Spacing();
+
+            // 元素列表（最多显示 20 条，超出时滚动）
+            float listH = std::min(count, 12) * (ImGui::GetFrameHeightWithSpacing()) + 4.0f;
+            if (count > 0)
+                ImGui::BeginChild("##cedit", ImVec2(0, listH), false);
+
+            for (int i = 0; i < count; ++i)
+            {
+                ImGui::PushID(i);
+
+                // ── 序号标签 ──────────────────────────────────────────────
+                ImGui::TextDisabled("[%d]", i);
+                ImGui::SameLine();
+
+                float delW    = ImGui::CalcTextSize(ICON_FA_TRASH_CAN).x + 8.0f;
+                float spacing = ImGui::GetStyle().ItemSpacing.x;
+
+                if (selVar.containerType == RTContainerType::Map)
+                {
+                    // Map: key 输入 + value 输入
+                    float half = (paneWidth - delW - spacing * 3 - 30.0f) * 0.45f;
+                    static char s_keybuf[256];
+                    std::string& keyStr = s_ces.keys.size() > (size_t)i
+                        ? s_ces.keys[i] : *(s_ces.keys.emplace_back(), &s_ces.keys.back());
+                    snprintf(s_keybuf, sizeof(s_keybuf), "%s", keyStr.c_str());
+                    ImGui::SetNextItemWidth(half);
+                    if (ImGui::InputText("##mkey", s_keybuf, sizeof(s_keybuf))) {
+                        keyStr = s_keybuf;
+                        anyChanged = true;
+                    }
+                    if (ImGui::IsItemActivated()) PushUndoState();
+                    ImGui::SameLine();
+                    ImGui::TextDisabled(":");
+                    ImGui::SameLine();
+                    if (renderItemEdit(i + 1000, s_ces.values[i], half))
+                        anyChanged = true;
+                }
+                else
+                {
+                    // Array/Set: 只有 value
+                    float valW = paneWidth - delW - spacing * 2 - 30.0f;
+                    if (renderItemEdit(i, s_ces.values[i], valW))
+                        anyChanged = true;
+                }
+
+                // 删除按钮
+                ImGui::SameLine();
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0,0,0,0));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f,0.2f,0.2f,0.5f));
+                if (ImGui::SmallButton(ICON_FA_TRASH_CAN)) removeIdx = i;
+                ImGui::PopStyleColor(2);
+
+                ImGui::PopID();
+            }
+            if (count > 0)
+                ImGui::EndChild();
+
+            // 延迟删除
+            if (removeIdx >= 0)
+            {
+                PushUndoState();
+                s_ces.values.erase(s_ces.values.begin() + removeIdx);
+                if (selVar.containerType == RTContainerType::Map &&
+                    (int)s_ces.keys.size() > removeIdx)
+                    s_ces.keys.erase(s_ces.keys.begin() + removeIdx);
+                anyChanged = true;
+            }
+
+            if (anyChanged)
+                flushToVar();
+
+            // JSON 原文折叠查看（高级）
+            if (ImGui::TreeNode("Raw JSON"))
+            {
+                static char s_rawbuf[2048] = "";
+                std::string curRaw = selVar.defaultValue.asString();
+                if (curRaw.size() < sizeof(s_rawbuf) - 1)
+                    snprintf(s_rawbuf, sizeof(s_rawbuf), "%s", curRaw.c_str());
+                ImGui::SetNextItemWidth(paneWidth - 8.0f);
+                if (ImGui::InputTextMultiline("##rawjson", s_rawbuf, sizeof(s_rawbuf),
+                    ImVec2(0, 60), ImGuiInputTextFlags_EnterReturnsTrue))
+                {
+                    PushUndoState();
+                    selVar.defaultValue = RTVariant(std::string(s_rawbuf));
+                    s_ces.cacheKey = "";  // 强制重新解析
+                    doc->isDirty = true;
+                }
+                ImGui::TreePop();
             }
         }
         else switch (selVar.itemType)
