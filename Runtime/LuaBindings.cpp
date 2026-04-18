@@ -654,6 +654,26 @@ void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner)
     lua_pushcfunction(L, l_hasNodeDef);
     lua_setfield(L, -2, "HasNodeDef");
 
+    // Blueprint.AcquireAsync() — 通知 runner 有一个异步操作正在进行
+    // Blueprint.ReleaseAsync() — 通知 runner 一个异步操作已完成
+    // 配对使用，使 runner.HasPendingWork() 在 Lua 异步期间返回 true，驱动 Tick 循环。
+    lua_pushcfunction(L, [](lua_State* Lx) -> int {
+        lua_getfield(Lx, LUA_REGISTRYINDEX, "__blueprint_runner");
+        auto* r = static_cast<BlueprintRunner*>(lua_touserdata(Lx, -1));
+        lua_pop(Lx, 1);
+        if (r) r->AcquireAsync();
+        return 0;
+    });
+    lua_setfield(L, -2, "AcquireAsync");
+
+    lua_pushcfunction(L, [](lua_State* Lx) -> int {
+        lua_getfield(Lx, LUA_REGISTRYINDEX, "__blueprint_runner");
+        auto* r = static_cast<BlueprintRunner*>(lua_touserdata(Lx, -1));
+        lua_pop(Lx, 1);
+        if (r) r->ReleaseAsync();
+        return 0;
+    });
+    lua_setfield(L, -2, "ReleaseAsync");
 
     lua_setglobal(L, "Blueprint");
 

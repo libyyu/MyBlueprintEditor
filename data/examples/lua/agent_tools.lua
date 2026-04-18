@@ -11,11 +11,42 @@
 --   3. 该蓝图通过 Lua 脚本节点调用本文件中的函数
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- get_weather(location) → 天气字符串（同步 http.get）
+-- async_http_get / async_http_post
+-- 封装 http.get/post，在发起请求前调用 Blueprint.AcquireAsync()，
+-- 在回调执行后调用 Blueprint.ReleaseAsync()，
+-- 使 runner.HasPendingWork() 在请求期间返回 true，驱动 Tick 循环。
+-- ─────────────────────────────────────────────────────────────────────────────
+local function async_http_get(url, headers, callback)
+    Blueprint.AcquireAsync()
+    if type(headers) == "function" then
+        -- 无 headers 版本：async_http_get(url, callback)
+        local cb = headers
+        http.get(url, function(body, status, err)
+            Blueprint.ReleaseAsync()
+            cb(body, status, err)
+        end)
+    else
+        http.get(url, headers, function(body, status, err)
+            Blueprint.ReleaseAsync()
+            callback(body, status, err)
+        end)
+    end
+end
+
+local function async_http_post(url, body, headers, callback)
+    Blueprint.AcquireAsync()
+    http.post(url, body, headers, function(resp_body, status, err)
+        Blueprint.ReleaseAsync()
+        callback(resp_body, status, err)
+    end)
+end
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- get_weather(location, callback) → 天气字符串
 -- ─────────────────────────────────────────────────────────────────────────────
 function get_weather(location, callback)
     local url = "https://wttr.in/" .. location .. "?format=3"
-    http.get(url, function(body, status, err)
+    async_http_get(url, function(body, status, err)
         if err ~= "" or status < 200 or status >= 300 then
             callback("Weather fetch failed for " .. location .. ": " .. (err ~= "" and err or tostring(status)))
         else
@@ -26,29 +57,25 @@ function get_weather(location, callback)
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- web_search(query) → 搜索结果文本（同步 http.get + HTML 解析）
+-- web_search(query, callback) → 搜索结果文本
 -- ─────────────────────────────────────────────────────────────────────────────
 function web_search(query, callback)
-    -- URL 编码
     local encoded = query:gsub("([^%w%-%.%_%~])", function(c)
         return string.format("%%%02X", string.byte(c))
     end)
     local url = "https://lite.duckduckgo.com/lite/?q=" .. encoded
     local headers = { ["User-Agent"] = "Mozilla/5.0 (compatible; BlueprintLua/1.0)" }
 
-    http.get(url, headers, function(body, status, err)
+    async_http_get(url, headers, function(body, status, err)
         if err ~= "" or status < 200 or status >= 300 then
             callback("Search failed: " .. (err ~= "" and err or tostring(status)))
             return
         end
 
-        -- 简单 HTML 解析：提取 result-link href + result-snippet
         local results = {}
         local max = 5
-
         for href, title in body:gmatch('class="result%-link"[^>]*href="([^"]+)"[^>]*>([^<]+)') do
             if #results >= max then break end
-            -- 找对应 snippet
             local snippet = body:match('class="result%-snippet">([^<]+)', body:find(href, 1, true) or 1)
             snippet = snippet and snippet:match("^%s*(.-)%s*$") or ""
             table.insert(results, {
@@ -74,13 +101,13 @@ function web_search(query, callback)
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- run_react_agent(query, api_key, base_url, model)
+-- run_react_agent(query, api_key, base_url, model, on_done)
 --
 -- ReAct 循环：
 --   1. 构建初始 messages = [user: query]
 --   2. 调用 LLM，传入 tools 定义
---   3. onReply → 保存结果，结束
---   4. onToolCall → 解析 tool_calls，执行工具，追加 tool 消息，继续循环
+--   3. finish_reason == "stop" → 最终回答，调用 on_done
+--   4. tool_calls → 并发执行工具，追加结果，继续循环
 -- ─────────────────────────────────────────────────────────────────────────────
 local TOOLS_DEF = json.stringify({
     {
@@ -117,7 +144,6 @@ function run_react_agent(user_query, api_key, base_url, model, on_done)
     base_url = base_url or "https://api.openai.com/v1"
     model    = model    or "gpt-4o"
 
-    -- 初始化 messages
     local messages = json.stringify({
         { role = "user", content = user_query }
     })
@@ -134,7 +160,6 @@ function run_react_agent(user_query, api_key, base_url, model, on_done)
 
         print("[Agent] Round " .. round .. " / calling LLM...")
 
-        -- 构造请求 body
         local req_body = json.stringify({
             model       = model,
             messages    = json.parse(messages),
@@ -149,7 +174,7 @@ function run_react_agent(user_query, api_key, base_url, model, on_done)
         }
         local llm_url = (base_url:gsub("/$", "")) .. "/chat/completions"
 
-        http.post(llm_url, req_body, req_headers, function(body, status, err)
+        async_http_post(llm_url, req_body, req_headers, function(body, status, err)
             if err ~= "" or status < 200 or status >= 300 then
                 on_done("[Agent] LLM error: " .. (err ~= "" and err or ("HTTP " .. status)))
                 return
@@ -161,11 +186,11 @@ function run_react_agent(user_query, api_key, base_url, model, on_done)
                 return
             end
 
-            local finish_reason = json.get(body, "choices[0].finish_reason") or ""
-            local content       = json.get(body, "choices[0].message.content") or ""
-            local tool_calls_raw= json.get(body, "choices[0].message.tool_calls")
+            local finish_reason  = json.get(body, "choices[0].finish_reason") or ""
+            local content        = json.get(body, "choices[0].message.content") or ""
+            local tool_calls_raw = json.get(body, "choices[0].message.tool_calls")
 
-            -- 把 assistant 消息追加到 messages
+            -- 追加 assistant 消息到 messages
             local asst_msg
             if tool_calls_raw then
                 asst_msg = json.stringify({
@@ -180,7 +205,7 @@ function run_react_agent(user_query, api_key, base_url, model, on_done)
             table.insert(msgs, json.parse(asst_msg))
             messages = json.stringify(msgs)
 
-            -- finish_reason == "stop" 或没有 tool_calls → 最终回答
+            -- finish_reason == "stop" 或无 tool_calls → 最终回答
             if finish_reason == "stop" or not tool_calls_raw then
                 print("[Agent] Final answer:\n" .. content)
                 on_done(content)
@@ -202,7 +227,7 @@ function run_react_agent(user_query, api_key, base_url, model, on_done)
                 pending = pending - 1
                 if pending > 0 then return end
 
-                -- 所有工具执行完毕，追加 tool 消息
+                -- 所有工具完成，追加 tool 消息，进入下一轮
                 local msgs2 = json.parse(messages)
                 for i = 1, #tool_calls do
                     local tc_id = json.get(json.stringify(tool_calls[i]), "id") or ""
