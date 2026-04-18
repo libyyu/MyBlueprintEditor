@@ -87,6 +87,7 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Game.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Save.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_GameMath.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Socket.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Http/IHttpClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Http/HttpClient_Default.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Http/HttpClient_Emscripten.cpp

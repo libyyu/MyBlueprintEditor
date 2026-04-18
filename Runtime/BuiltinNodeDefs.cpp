@@ -3235,6 +3235,126 @@ static void RegisterNodeDefs_GameMath(INodeRegistry& registry)
         CD_COLOR);
 }
 
+// ============================================================================
+// Socket — TCP/UDP 节点定义
+// ============================================================================
+static void RegisterNodeDefs_Socket(INodeRegistry& registry)
+{
+    auto reg = [&registry](const char* id, const char* name, const char* category,
+                  std::vector<PinDefinition> inputs, std::vector<PinDefinition> outputs,
+                  const char* color = "", const char* edType = "")
+    { RegisterNodeDef(registry, id, name, category, std::move(inputs), std::move(outputs), color, edType); };
+
+    const char* TCP_COLOR = "1565C0"; // 深蓝
+    const char* UDP_COLOR = "00838F"; // 青绿
+
+    // ── TCP ──────────────────────────────────────────────────────────────────
+    reg("TCP.Listen", "TCP Listen", "Network/TCP",
+        {
+            MakeFlowPin(""),
+            MakePin("Host",       PinDataType::String),
+            MakePin("Port",       PinDataType::Integer),
+            MakePin("BufferSize", PinDataType::Integer),
+        },
+        {
+            MakeFlowPin("exec"),
+            MakeFlowPin("onAccept"),
+            MakeFlowPin("onData"),
+            MakeFlowPin("onDisconnect"),
+            MakePin("ConnId",   PinDataType::String),
+            MakePin("PeerAddr", PinDataType::String),
+            MakePin("PeerPort", PinDataType::Integer),
+            MakePin("Data",     PinDataType::String),
+        },
+        TCP_COLOR);
+
+    reg("TCP.Connect", "TCP Connect", "Network/TCP",
+        {
+            MakeFlowPin(""),
+            MakePin("Host",       PinDataType::String),
+            MakePin("Port",       PinDataType::Integer),
+            MakePin("BufferSize", PinDataType::Integer),
+        },
+        {
+            MakeFlowPin("onConnected"),
+            MakeFlowPin("onData"),
+            MakeFlowPin("onDisconnect"),
+            MakeFlowPin("onError"),
+            MakePin("ConnId",       PinDataType::String),
+            MakePin("Data",         PinDataType::String),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        TCP_COLOR);
+
+    reg("TCP.Send", "TCP Send", "Network/TCP",
+        {
+            MakeFlowPin(""),
+            MakePin("ConnId", PinDataType::String),
+            MakePin("Data",   PinDataType::String),
+        },
+        {
+            MakeFlowPin("exec"),
+            MakePin("Success",      PinDataType::Boolean),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        TCP_COLOR);
+
+    reg("TCP.Disconnect", "TCP Disconnect", "Network/TCP",
+        {
+            MakeFlowPin(""),
+            MakePin("ConnId", PinDataType::String),
+        },
+        { MakeFlowPin("exec") },
+        TCP_COLOR);
+
+    reg("TCP.Stop", "TCP Stop", "Network/TCP",
+        {
+            MakeFlowPin(""),
+            MakePin("ServerKey", PinDataType::String),
+        },
+        { MakeFlowPin("exec") },
+        TCP_COLOR);
+
+    // ── UDP ──────────────────────────────────────────────────────────────────
+    reg("UDP.Bind", "UDP Bind", "Network/UDP",
+        {
+            MakeFlowPin(""),
+            MakePin("Host",       PinDataType::String),
+            MakePin("Port",       PinDataType::Integer),
+            MakePin("BufferSize", PinDataType::Integer),
+        },
+        {
+            MakeFlowPin("exec"),
+            MakeFlowPin("onData"),
+            MakePin("FromAddr", PinDataType::String),
+            MakePin("FromPort", PinDataType::Integer),
+            MakePin("Data",     PinDataType::String),
+        },
+        UDP_COLOR);
+
+    reg("UDP.Send", "UDP Send", "Network/UDP",
+        {
+            MakeFlowPin(""),
+            MakePin("Host", PinDataType::String),
+            MakePin("Port", PinDataType::Integer),
+            MakePin("Data", PinDataType::String),
+        },
+        {
+            MakeFlowPin("exec"),
+            MakePin("Success",      PinDataType::Boolean),
+            MakePin("ErrorMessage", PinDataType::String),
+        },
+        UDP_COLOR);
+
+    reg("UDP.Close", "UDP Close", "Network/UDP",
+        {
+            MakeFlowPin(""),
+            MakePin("Port", PinDataType::Integer),
+        },
+        { MakeFlowPin("exec") },
+        UDP_COLOR);
+}
+
 void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
 {
     // --- 注册分类 ---
@@ -3273,6 +3393,8 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     addCat("Game/Physics",     "Physics Helpers");
     addCat("Game/Stat",        "Stat System");
     addCat("Game/Cooldown",    "Cooldown");
+    addCat("Network/TCP",      "TCP");
+    addCat("Network/UDP",      "UDP");
 
     // --- 注册各分类的节点定义 ---
     RegisterNodeDefs_Flow(registry);
@@ -3298,6 +3420,7 @@ void RegisterBuiltinNodeDefinitions(INodeRegistry& registry)
     RegisterNodeDefs_Game(registry);
     RegisterNodeDefs_Save(registry);
     RegisterNodeDefs_GameMath(registry);
+    RegisterNodeDefs_Socket(registry);
 }
 
 } // namespace Runtime
