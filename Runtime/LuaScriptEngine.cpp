@@ -44,6 +44,25 @@ LuaScriptEngine& LuaScriptEngine::operator=(LuaScriptEngine&& other) noexcept
     }
     return *this;
 }
+static std::string _luaArgsToString(lua_State* L)
+{
+    static std::string msg;
+    msg.clear();
+	int n = lua_gettop(L);
+	lua_getglobal(L, "tostring");
+	for (int i = 1; i <= n; ++i)
+	{
+		lua_pushvalue(L, -1);   // tostring 函数
+		lua_pushvalue(L, i);    // 参数
+		lua_pcall(L, 1, 1, 0);
+		const char* s = lua_tostring(L, -1);
+		if (s) msg += s;
+		if (i < n) msg += "\t";
+		lua_pop(L, 1);
+	}
+	lua_pop(L, 1); // pop tostring
+	return msg;
+}
 
 bool LuaScriptEngine::Initialize(BlueprintRunner* runner)
 {
@@ -79,34 +98,47 @@ bool LuaScriptEngine::Initialize(BlueprintRunner* runner)
     {
         // 把 runner 指针存入 Lua registry，供 print 覆盖函数访问
         // （__blueprint_runner 已由 RegisterLuaBindings 设置，此处直接复用）
-        lua_pushcfunction(m_L, [](lua_State* L) -> int {
-            // 拼接所有参数（与 Lua 标准 print 行为一致，tab 分隔）
-            int n = lua_gettop(L);
-            lua_getglobal(L, "tostring");
-            std::string msg;
-            for (int i = 1; i <= n; ++i)
-            {
-                lua_pushvalue(L, -1);   // tostring 函数
-                lua_pushvalue(L, i);    // 参数
-                lua_pcall(L, 1, 1, 0);
-                const char* s = lua_tostring(L, -1);
-                if (s) msg += s;
-                if (i < n) msg += "\t";
-                lua_pop(L, 1);
-            }
-            lua_pop(L, 1); // pop tostring
-
-            // 通过 runner PrintCallback 输出
-            lua_getfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
-            auto* r = static_cast<BlueprintRunner*>(lua_touserdata(L, -1));
-            lua_pop(L, 1);
-            if (r)
-                r->Print(msg);
-            else
-                fprintf(stdout, "%s\n", msg.c_str());
-            return 0;
+        lua_pushcfunction(m_L, [](lua_State* L)->int {
+			std::string msg = _luaArgsToString(L);
+			// 通过 runner PrintCallback 输出
+			lua_getfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
+			auto* r = static_cast<BlueprintRunner*>(lua_touserdata(L, -1));
+			lua_pop(L, 1);
+			if (r)
+				r->Print(msg);
+			else
+				fprintf(stdout, "%s\n", msg.c_str());
+			return 0;
         });
         lua_setglobal(m_L, "print");
+		
+        lua_pushcfunction(m_L, [](lua_State* L)->int {
+			std::string msg = _luaArgsToString(L);
+			// 通过 runner PrintCallback 输出
+			lua_getfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
+			auto* r = static_cast<BlueprintRunner*>(lua_touserdata(L, -1));
+			lua_pop(L, 1);
+			if (r)
+				r->Print(msg, LogLevel::Warning);
+			else
+				fprintf(stdout, "%s\n", msg.c_str());
+			return 0;
+        });
+		lua_setglobal(m_L, "warn");
+
+        lua_pushcfunction(m_L, [](lua_State* L)->int {
+			std::string msg = _luaArgsToString(L);
+			// 通过 runner PrintCallback 输出
+			lua_getfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
+			auto* r = static_cast<BlueprintRunner*>(lua_touserdata(L, -1));
+			lua_pop(L, 1);
+			if (r)
+				r->Print(msg, LogLevel::Error);
+			else
+				fprintf(stderr, "%s\n", msg.c_str());
+			return 0;
+        });
+		lua_setglobal(m_L, "printerror");
     }
 
     m_lastError.clear();
