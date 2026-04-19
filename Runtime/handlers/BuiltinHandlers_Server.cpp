@@ -411,6 +411,7 @@ void RegisterHandlers_Server(
                 pCtx->SetOutputValue("ErrorMessage", Variant(st->errorMsg));
                 pCtx->ActivateOutputFlow("onError");
                 // 清理
+                if (st->thread.joinable()) st->thread.detach();
                 std::lock_guard<std::mutex> lk(s_wsMutex);
                 s_wsClients.erase(connId);
                 delete st;
