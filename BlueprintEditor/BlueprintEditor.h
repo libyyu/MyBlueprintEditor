@@ -621,6 +621,10 @@ struct BlueprintEditor : public Application
     void RegisterBuiltinNodeDefinitions();
     void RegisterBuiltinHandlers();
 
+    // 将 m_luaRunner 中 Lua 注册的节点定义同步到 m_NodeRegistry（供编辑器节点库可见）
+    // 每次 Lua 脚本加载/重载后调用
+    void SyncLuaDefsToRegistry();
+
     // ------------------------------------------------------------------
     // 右键菜单
     // ------------------------------------------------------------------

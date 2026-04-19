@@ -11,3 +11,18 @@ void BlueprintEditor::RegisterBuiltinNodeDefinitions()
     // 委托给 Runtime 层的独立注册函数
     ::NodeEditor::Runtime::RegisterBuiltinNodeDefinitions(m_NodeRegistry);
 }
+
+void BlueprintEditor::SyncLuaDefsToRegistry()
+{
+#ifdef BLUEPRINT_HAS_LUA
+    const auto& luaIds = m_luaRunner.GetLuaRegisteredNodeIds();
+    for (const auto& id : luaIds)
+    {
+        const auto* def = m_luaRunner.GetNodeDef(id);
+        if (def)
+            m_NodeRegistry.registerNode(*def);
+    }
+    // 触发节点菜单缓存重建
+    m_CachedDefCount = 0;
+#endif
+}

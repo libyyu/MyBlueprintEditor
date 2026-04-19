@@ -1164,6 +1164,10 @@ void BlueprintEditor::OnStart()
                 }
             }
         }
+
+        // 将 Lua 注册的节点定义同步到编辑器节点库（全局入口脚本加载后）
+        if (bLoaded)
+            SyncLuaDefsToRegistry();
 #endif
     }
 
