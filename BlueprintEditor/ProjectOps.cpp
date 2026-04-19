@@ -60,6 +60,7 @@ void BlueprintEditor::NewProject()
         m_Project.projectDir + "/BlueprintEntry.lua",
         m_Project.name + ":BlueprintEntry"
     );
+    SyncLuaDefsToRegistry();
 }
 
 // ============================================================================
@@ -98,6 +99,7 @@ void BlueprintEditor::OpenProject()
         m_Project.projectDir + "/BlueprintEntry.lua",
         m_Project.name + ":BlueprintEntry"
     );
+    SyncLuaDefsToRegistry();
 }
 
 // ============================================================================
@@ -398,6 +400,8 @@ void BlueprintEditor::SyncProjectLibrariesToRegistry()
     }
     if (luaTotal > 0)
         BPLOG("SyncProjectLibraries: registered Lua scripts: " + std::to_string(luaTotal));
+    // 同步 Lua 注册的节点定义到编辑器节点库
+    SyncLuaDefsToRegistry();
 #endif
 
     // 节点定义变更，强制重建缓存

@@ -345,7 +345,12 @@ void BlueprintEditor::OnFrame(float deltaTime)
 #ifdef BLUEPRINT_HAS_LUA
     if (m_LuaNodeRegistrar.IsInitialized() && m_LuaNodeRegistrar.GetAutoReload())
     {
+        size_t countBefore = m_luaRunner.GetLuaRegisteredNodeIds().size();
         m_LuaNodeRegistrar.PollFileChanges(deltaTime);
+        // 热重载后同步 Lua 节点定义到编辑器节点库
+        size_t countAfter = m_luaRunner.GetLuaRegisteredNodeIds().size();
+        if (countAfter != countBefore)
+            SyncLuaDefsToRegistry();
         // 若 registry 大小变化则强制重建节点菜单缓存
         size_t newCount = m_NodeRegistry.getAllNodeDefinitions().size();
         if (newCount != m_CachedDefCount)
