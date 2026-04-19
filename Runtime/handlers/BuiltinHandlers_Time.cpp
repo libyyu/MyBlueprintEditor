@@ -1,6 +1,7 @@
 // Runtime/BuiltinHandlers_Time.cpp -- Time 节点处理器
 #include "BuiltinHandlers_Time.h"
 #include <cmath>
+#include <ctime>
 
 namespace NodeEditor {
 namespace Runtime {
@@ -30,20 +31,40 @@ void RegisterHandlers_Time(
         return true;
     };
 
-    handlers["FormatTime"] = [](ExecutionContext& ctx) {
+    handlers["BreakTime"] = [](ExecutionContext& ctx) {
         double seconds = ctx.GetInputValue("Seconds").asFloat();
         int totalSec = static_cast<int>(seconds);
-        int hours = totalSec / 3600;
-        int mins = (totalSec % 3600) / 60;
-        int secs = totalSec % 60;
+        std::time_t ts = static_cast<std::time_t>(totalSec);
+		// 转换为本地时间（或使用 gmtime 得 UTC）
+		std::tm* tm = std::localtime(&ts);
+		int year = tm->tm_year + 1900;
+		int month = tm->tm_mon + 1;
+		int day = tm->tm_mday;
+		int wday = tm->tm_wday;   // 星期几
+		int hour = tm->tm_hour;
+		int minute = tm->tm_min;
+		int second = tm->tm_sec;
         int ms = static_cast<int>((seconds - totalSec) * 1000);
+		ctx.SetOutputValue("Year", Variant(year));
+		ctx.SetOutputValue("Mon", Variant(month));
+		ctx.SetOutputValue("Day", Variant(day));
+		ctx.SetOutputValue("WDay", Variant(wday));
+		ctx.SetOutputValue("Hour", Variant(hour));
+		ctx.SetOutputValue("Min", Variant(minute));
+		ctx.SetOutputValue("Sec", Variant(second));
+		ctx.SetOutputValue("MSec", Variant(ms));
+        return true;
+    };
 
-        char buf[64];
-        if (hours > 0)
-            snprintf(buf, sizeof(buf), "%02d:%02d:%02d.%03d", hours, mins, secs, ms);
-        else
-            snprintf(buf, sizeof(buf), "%02d:%02d.%03d", mins, secs, ms);
-        ctx.SetOutputValue("Formatted", Variant(std::string(buf)));
+    handlers["FormatTime"] = [](ExecutionContext& ctx) {
+        double seconds = ctx.GetInputValue("Seconds").asFloat();
+		std::string format = ctx.GetInputValue("Format").asString();
+        // 转换为本地时间（或使用 gmtime 得 UTC）
+		std::time_t ts = static_cast<std::time_t>(seconds);
+		std::tm* tm = std::localtime(&ts);
+        char buffer[80] = { 0x0 };
+        strftime(buffer, sizeof(buffer), format.c_str(), tm);
+        ctx.SetOutputValue("Formatted", Variant(std::string(buffer)));
         return true;
     };
 

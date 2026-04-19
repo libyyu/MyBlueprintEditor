@@ -1180,9 +1180,23 @@ static void RegisterNodeDefs_Time(INodeRegistry& registry)
         { MakePin("Elapsed", PinDataType::Float) },
         "40C0C0", "Simple");
 
+	// BreakTime — 将秒数分解为时分秒
+	reg("BreakTime", "Break Time", "Time",
+		{ MakePin("Seconds", PinDataType::Float) },
+		{ MakePin("Year", PinDataType::Integer),
+          MakePin("Mon", PinDataType::Integer),
+          MakePin("Day", PinDataType::Integer),
+          MakePin("WDay", PinDataType::Integer),
+          MakePin("Hour", PinDataType::Integer),
+          MakePin("Min", PinDataType::Integer),
+          MakePin("Sec", PinDataType::Integer),
+          MakePin("MSec", PinDataType::Integer)
+        },
+		"40C0C0", "Simple");
+
     // FormatTime — 格式化时间为可读字符串
     reg("FormatTime", "Format Time", "Time",
-        { MakePin("Seconds", PinDataType::Float) },
+        { MakePin("Seconds", PinDataType::Float), MakePin("Format", PinDataType::String) },
         { MakePin("Formatted", PinDataType::String) },
         "40C0C0", "Simple");
 
