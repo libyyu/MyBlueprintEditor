@@ -576,6 +576,9 @@ public:
     // 获取所有由 Lua 脚本注册的节点 ID 集合（编辑器用于同步节点库）
     const std::unordered_set<std::string>& GetLuaRegisteredNodeIds() const { return m_luaRegisteredNodeIds; }
 
+    // 获取已加载的 Lua 文件列表（按加载顺序，编辑器用于在 persistentRunner 重新加载）
+    const std::vector<std::string>& GetLuaLoadedFiles() const { return m_luaLoadedFiles; }
+
     // 内部：由 LuaBindings 回调，记录某节点 ID 是 Lua 注册的（勿手动调用）
     void MarkLuaRegisteredNode(const std::string& id) { m_luaRegisteredNodeIds.insert(id); }
     void UnmarkLuaRegisteredNode(const std::string& id) { m_luaRegisteredNodeIds.erase(id); }

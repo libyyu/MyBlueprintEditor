@@ -68,23 +68,52 @@ void BlueprintEditor::InitRunnerForDoc(BlueprintDocument* doc,
 
     ::NodeEditor::Runtime::RegisterBuiltinHandlers(doc->persistentRunner, bp, &m_HandlerRegistry);
 
-    // 从编辑器级 Lua Runner 同步 Lua 注册的节点定义和 handler 到文档 runner
-    // 架构说明：m_luaRunner 是编辑器专属 Lua VM 宿主，不加载蓝图数据；
-    //           文档执行时将其 Lua 注册结果同步到 persistentRunner，保证 handler 不丢失。
 #ifdef BLUEPRINT_HAS_LUA
+    // Lua 集成：让 persistentRunner 拥有独立 Lua VM，重新加载 m_luaRunner 已加载的全部脚本。
+    // 这样 Lua handler 内的 Blueprint.AcquireAsync/ReleaseAsync 调用打到 persistentRunner，
+    // HasPendingWork() 才能感知到 Lua 层的异步活动，编辑器 Tick 循环才会持续驱动。
+    //
+    // 注意：不能直接复用 m_luaRunner 的 lua_State（它绑定的是 m_luaRunner 指针），
+    //       必须为 persistentRunner 创建独立 VM，让 __blueprint_runner 指向 persistentRunner。
     {
+        // 同步搜索路径
+        auto* srcEngine = m_luaRunner.GetLuaEngine();
+        if (srcEngine)
+        {
+            // 把 m_luaRunner 已添加的搜索路径也加到 persistentRunner
+            for (const auto& dir : srcEngine->GetLoadedFiles())
+            {
+                // GetLoadedFiles 返回已加载的文件，父目录即为搜索路径
+#ifndef __EMSCRIPTEN__
+                namespace fs = std::filesystem;
+                auto parent = fs::path(dir).parent_path().string();
+                if (!parent.empty())
+                    doc->persistentRunner.AddLuaPath(parent);
+#endif
+            }
+        }
+
+        // 重新加载所有 Lua 脚本到 persistentRunner（__blueprint_runner 将指向 persistentRunner）
+        const auto& files = m_luaRunner.GetLuaLoadedFiles();
+        for (const auto& f : files)
+        {
+            if (!doc->persistentRunner.LoadLuaScript(f))
+            {
+                // 加载失败记录到执行日志，但不中止执行
+                capturedDoc->executionLog.push_back(
+                    "[WARN] Lua script failed to load in exec runner: " + f +
+                    " — " + doc->persistentRunner.GetLastError());
+                capturedDoc->executionLogDirty = true;
+            }
+        }
+
+        // 同步节点定义（编辑器节点库显示用）
+        // handler 已由重新加载脚本时 RegisterHandler 写入 persistentRunner，无需重复
         const auto& luaIds = m_luaRunner.GetLuaRegisteredNodeIds();
-        const auto& allHandlers = m_luaRunner.GetHandlers();
         for (const auto& id : luaIds)
         {
-            // 同步节点定义（编辑器节点库可见）
             const auto* def = m_luaRunner.GetNodeDef(id);
             if (def) doc->persistentRunner.RegisterNodeDef(*def);
-
-            // 同步 handler
-            auto hit = allHandlers.find(id);
-            if (hit != allHandlers.end())
-                doc->persistentRunner.RegisterHandler(id, hit->second);
         }
     }
 #endif
