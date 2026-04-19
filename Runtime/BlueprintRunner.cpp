@@ -1488,6 +1488,16 @@ void BlueprintRunner::Log(const std::string& message, LogLevel level) const
         m_logCallback(level, message);
 }
 
+void BlueprintRunner::Print(const std::string& message, LogLevel level) const
+{
+    if (m_printCallback)
+        m_printCallback(level, message);
+    else if (m_logCallback && m_context.loggingEnabled)
+        m_logCallback(level, message);
+    else
+        fprintf(stdout, "%s\n", message.c_str());
+}
+
 void BlueprintRunner::SetLogCallback(std::function<void(LogLevel, const std::string&)> callback)
 {
     m_logCallback = std::move(callback);

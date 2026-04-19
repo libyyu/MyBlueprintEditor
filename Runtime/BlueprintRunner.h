@@ -603,6 +603,11 @@ public:
     void LogWarning(const std::string& message) const { Log(message, LogLevel::Warning); }
     void LogError  (const std::string& message) const { Log(message, LogLevel::Error);   }
 
+    /// Print a message through the runner's print callback (application-level output).
+    /// Falls back to log callback if print callback is not set.
+    /// Used by Lua print() redirection.
+    void Print(const std::string& message, LogLevel level = LogLevel::Info) const;
+
     /// Set callback for internal debug/diagnostic messages (LogLevel, message).
     /// Has no effect when logging is disabled (see EnableLogging).
     void SetLogCallback(std::function<void(LogLevel, const std::string&)> callback);

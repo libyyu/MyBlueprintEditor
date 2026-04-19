@@ -99,10 +99,8 @@ void BlueprintEditor::InitRunnerForDoc(BlueprintDocument* doc,
         {
             if (!doc->persistentRunner.LoadLuaScript(f))
             {
-                // 加载失败记录到执行日志，但不中止执行
                 capturedDoc->executionLog.push_back(
-                    "[WARN] Lua script failed to load in exec runner: " + f +
-                    " — " + doc->persistentRunner.GetLastError());
+                    "[WARN] Lua: " + f + " — " + doc->persistentRunner.GetLastError());
                 capturedDoc->executionLogDirty = true;
             }
         }

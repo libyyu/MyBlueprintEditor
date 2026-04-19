@@ -73,6 +73,42 @@ bool LuaScriptEngine::Initialize(BlueprintRunner* runner)
     // 注册 json.* 和 http.* 全局库
     RegisterLuaJsonHttpLibs(m_L);
 
+    // 重定向 Lua print() → runner 的 PrintCallback（若无 runner 则保持 stdout）
+    // 这样 Lua 脚本里的 print() 输出能在编辑器控制台和 runtime-example 都能看到
+    if (m_runner)
+    {
+        // 把 runner 指针存入 Lua registry，供 print 覆盖函数访问
+        // （__blueprint_runner 已由 RegisterLuaBindings 设置，此处直接复用）
+        lua_pushcfunction(m_L, [](lua_State* L) -> int {
+            // 拼接所有参数（与 Lua 标准 print 行为一致，tab 分隔）
+            int n = lua_gettop(L);
+            lua_getglobal(L, "tostring");
+            std::string msg;
+            for (int i = 1; i <= n; ++i)
+            {
+                lua_pushvalue(L, -1);   // tostring 函数
+                lua_pushvalue(L, i);    // 参数
+                lua_pcall(L, 1, 1, 0);
+                const char* s = lua_tostring(L, -1);
+                if (s) msg += s;
+                if (i < n) msg += "\t";
+                lua_pop(L, 1);
+            }
+            lua_pop(L, 1); // pop tostring
+
+            // 通过 runner PrintCallback 输出
+            lua_getfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
+            auto* r = static_cast<BlueprintRunner*>(lua_touserdata(L, -1));
+            lua_pop(L, 1);
+            if (r)
+                r->Print(msg);
+            else
+                fprintf(stdout, "%s\n", msg.c_str());
+            return 0;
+        });
+        lua_setglobal(m_L, "print");
+    }
+
     m_lastError.clear();
     return true;
 }
