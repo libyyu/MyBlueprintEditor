@@ -40,6 +40,7 @@ add_executable(blueprint_tests
     test_handlers.cpp
     test_agent_demo.cpp
     test_agent_nodes.cpp
+    test_game_extra.cpp
 )
 
 target_link_libraries(blueprint_tests

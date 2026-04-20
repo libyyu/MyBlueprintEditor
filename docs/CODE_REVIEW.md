@@ -2,16 +2,26 @@
 
 > 审查范围：`Runtime/` 目录全部源文件  
 > 日期：2026-03-25  
+> 更新：2026-04-20（标注已修复项）
 
 ---
 
-## 总览
+## 修复状态总览
 
-| 优先级 | 问题数 |
-|--------|--------|
-| 🔴 高（影响正确性/稳定性） | 3 |
-| 🟡 中（架构/可维护性） | 4 |
-| 🟢 低（体验/性能） | 5 |
+| # | 问题 | 优先级 | 状态 |
+|---|------|--------|------|
+| 1 | Variant union UB | 🔴 | ⚠️ 待处理（trivial 类型暂无实际风险） |
+| 2 | DefaultNodeRegistry rehash 野指针 | 🔴 | ✅ 已修复（`rebuildAllDefsCache()` 统一调用） |
+| 3 | `stoll/stod` no-exceptions 兼容 | 🔴 | ✅ 已修复（改用 `strtoll/strtod`） |
+| 4 | ExecutionContext 职责过重 | 🟡 | ⏸ 暂缓（架构重构，风险高） |
+| 5 | `m_parentTimerManager` 裸指针 | 🟡 | ✅ 已修复（改用 `weak_ptr<FrameTimerManager>`） |
+| 6 | `m_keepAliveRunners` 内存泄漏 | 🟡 | ✅ 已修复（`Tick()` 中 `HasPendingAsync()==false` 时清理） |
+| 7 | BuiltinHandlers 双重定义 | 🟡 | ✅ 已解决（Editor 版直接调用 Runtime 版，无重复逻辑） |
+| 8 | `getOutputNodes` 重复节点 | 🟢 | ✅ 已修复（集合去重） |
+| 9 | `crude_json` 未独立 CMake target | 🟢 | ✅ 已修复（`Utils/Json/CMakeLists.txt` 独立 target） |
+| 10 | `BlueprintMetadata` 缺 schemaVersion | 🟢 | ✅ 已有（`schemaVersion` 字段存在于序列化） |
+| 11 | `BlueprintData` 索引无线程安全 | 🟢 | ⏸ 暂缓（运行时为单线程模型，暂不影响） |
+| 12 | `BuiltinHandlers_Houdini/Tree` 空存根 | 🔴 | ✅ 已加 `[Legacy]` 警告，明确提示未实现 |
 
 ---
 
