@@ -43,6 +43,7 @@
 #include "handlers/BuiltinHandlers_Save.h"
 #include "handlers/BuiltinHandlers_GameMath.h"
 #include "handlers/BuiltinHandlers_Socket.h"
+#include "handlers/BuiltinHandlers_GameExtra.h"
 
 namespace NodeEditor {
 namespace Runtime {
@@ -78,6 +79,7 @@ void RegisterBuiltinHandlers(
     RegisterHandlers_Save(allHandlers);
     RegisterHandlers_GameMath(allHandlers, runner);
     RegisterHandlers_Socket(allHandlers, runner);
+    RegisterHandlers_GameExtra(allHandlers, runner);
 
     // 设置默认处理器
     runner.SetDefaultHandler([](ExecutionContext& ctx) {
