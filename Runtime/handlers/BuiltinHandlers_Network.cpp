@@ -10,6 +10,7 @@
 #include <sstream>
 #include <cstdio>
 #include <cctype>
+#include <algorithm>
 #ifndef __EMSCRIPTEN__
 #  include <thread>
 #  include <future>
@@ -573,8 +574,7 @@ void RegisterHandlers_Network(
 #ifdef _WIN32
                     // ── Windows：CreateProcess + WaitForSingleObject + TerminateProcess ──
 
-                    // 用 GetSystemDirectory 获取 cmd.exe 绝对路径，
-                    // 避免在 PATH 不含 System32 的宿主进程（如 Python MCP server）中找不到 cmd
+                    // cmd.exe 绝对路径（避免依赖宿主进程 PATH）
                     char sysDir[MAX_PATH] = {};
                     GetSystemDirectoryA(sysDir, MAX_PATH);
                     std::string cmdExe = std::string(sysDir) + "\\cmd.exe";
@@ -584,6 +584,86 @@ void RegisterHandlers_Network(
                         fullCmd = "cmd /c \"cd /d \"" + workDir + "\" && " + command + "\" 2>&1";
                     else
                         fullCmd = "cmd /c \"" + command + "\" 2>&1";
+
+                    // ── 构造完整环境块：合并系统 PATH + 用户 PATH + System32 保底 ──────
+                    // 宿主进程（Python MCP server 等）可能继承了残缺的 PATH，
+                    // 从注册表读取系统和用户 PATH，确保 p4/git 等工具命令可被 cmd.exe 找到。
+                    auto regQuerySz = [](HKEY root, const char* subKey, const char* val) -> std::string {
+                        HKEY hk = nullptr;
+                        if (RegOpenKeyExA(root, subKey, 0, KEY_READ, &hk) != ERROR_SUCCESS)
+                            return {};
+                        char buf[32768] = {};
+                        DWORD len = sizeof(buf), type = 0;
+                        LONG r = RegQueryValueExA(hk, val, nullptr, &type,
+                                                  reinterpret_cast<LPBYTE>(buf), &len);
+                        RegCloseKey(hk);
+                        if (r != ERROR_SUCCESS) return {};
+                        // REG_EXPAND_SZ: 展开 %SystemRoot% 等变量
+                        if (type == REG_EXPAND_SZ) {
+                            char exp[32768] = {};
+                            ExpandEnvironmentStringsA(buf, exp, sizeof(exp));
+                            return exp;
+                        }
+                        return buf;
+                    };
+
+                    std::string sysPATH = regQuerySz(
+                        HKEY_LOCAL_MACHINE,
+                        "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
+                        "Path");
+                    std::string userPATH = regQuerySz(
+                        HKEY_CURRENT_USER, "Environment", "Path");
+
+                    // 保底：确保 System32 一定在里面
+                    std::string sys32 = std::string(sysDir);
+                    auto containsCI = [](const std::string& haystack, const std::string& needle) {
+                        if (needle.empty()) return true;
+                        auto it = std::search(haystack.begin(), haystack.end(),
+                                              needle.begin(),  needle.end(),
+                                              [](char a, char b){ return ::tolower(a)==::tolower(b); });
+                        return it != haystack.end();
+                    };
+
+                    std::string mergedPATH;
+                    if (!sysPATH.empty())  mergedPATH += sysPATH;
+                    if (!userPATH.empty()) mergedPATH += (mergedPATH.empty() ? "" : ";") + userPATH;
+                    if (!containsCI(mergedPATH, sys32))
+                        mergedPATH = sys32 + (mergedPATH.empty() ? "" : ";") + mergedPATH;
+
+                    // 继承父进程其余环境变量，仅替换 PATH
+                    // 用 GetEnvironmentStrings 取当前环境，把 PATH 条目替换为 mergedPATH
+                    std::vector<char> envBlock;
+                    {
+                        LPCH envStr = GetEnvironmentStringsA();
+                        if (envStr) {
+                            bool pathReplaced = false;
+                            const char* p = envStr;
+                            while (*p) {
+                                std::string entry(p);
+                                // 找 PATH= 条目（大小写不敏感）
+                                bool isPath = (entry.size() >= 5 &&
+                                              ::tolower(entry[0])=='p' && ::tolower(entry[1])=='a' &&
+                                              ::tolower(entry[2])=='t' && ::tolower(entry[3])=='h' &&
+                                              entry[4]=='=');
+                                if (isPath) {
+                                    std::string newEntry = "PATH=" + mergedPATH;
+                                    envBlock.insert(envBlock.end(), newEntry.begin(), newEntry.end());
+                                    pathReplaced = true;
+                                } else {
+                                    envBlock.insert(envBlock.end(), entry.begin(), entry.end());
+                                }
+                                envBlock.push_back('\0');
+                                p += entry.size() + 1;
+                            }
+                            if (!pathReplaced) {
+                                std::string newEntry = "PATH=" + mergedPATH;
+                                envBlock.insert(envBlock.end(), newEntry.begin(), newEntry.end());
+                                envBlock.push_back('\0');
+                            }
+                            FreeEnvironmentStringsA(envStr);
+                        }
+                        envBlock.push_back('\0');  // 双 NUL 结尾
+                    }
 
                     // 创建匿名管道捕获 stdout
                     HANDLE hReadPipe = nullptr, hWritePipe = nullptr;
@@ -604,9 +684,9 @@ void RegisterHandlers_Network(
                     std::vector<char> cmdBuf(fullCmd.begin(), fullCmd.end());
                     cmdBuf.push_back('\0');
 
-                    // lpApplicationName 指定绝对路径，lpCommandLine 保持原 "cmd /c ..." 形式
                     if (!CreateProcessA(cmdExe.c_str(), cmdBuf.data(), nullptr, nullptr,
-                                        TRUE, CREATE_NO_WINDOW, nullptr,
+                                        TRUE, CREATE_NO_WINDOW,
+                                        envBlock.empty() ? nullptr : envBlock.data(),
                                         workDir.empty() ? nullptr : workDir.c_str(),
                                         &si, &pi)) {
                         CloseHandle(hWritePipe); CloseHandle(hReadPipe);

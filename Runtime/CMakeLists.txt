@@ -453,7 +453,7 @@ if(NOT EMSCRIPTEN)
             "$<$<CONFIG:Debug>:${_EXT_SSL_DIR}/lib/Debug/libcrypto.lib>"
             "$<$<NOT:$<CONFIG:Debug>>:${_EXT_SSL_DIR}/lib/Release/libssl.lib>"
             "$<$<NOT:$<CONFIG:Debug>>:${_EXT_SSL_DIR}/lib/Release/libcrypto.lib>"
-            ws2_32 crypt32)   # Windows socket + cert store
+            ws2_32 crypt32 advapi32)   # Windows socket + cert store + registry
         if(ZLIB_FOUND)
             target_link_libraries(BlueprintRuntime PRIVATE ZLIB::ZLIB)
             message(STATUS "[BlueprintRuntime] + zlib ${ZLIB_VERSION_STRING}")
