@@ -572,6 +572,13 @@ void RegisterHandlers_Network(
 
 #ifdef _WIN32
                     // ── Windows：CreateProcess + WaitForSingleObject + TerminateProcess ──
+
+                    // 用 GetSystemDirectory 获取 cmd.exe 绝对路径，
+                    // 避免在 PATH 不含 System32 的宿主进程（如 Python MCP server）中找不到 cmd
+                    char sysDir[MAX_PATH] = {};
+                    GetSystemDirectoryA(sysDir, MAX_PATH);
+                    std::string cmdExe = std::string(sysDir) + "\\cmd.exe";
+
                     std::string fullCmd;
                     if (!workDir.empty())
                         fullCmd = "cmd /c \"cd /d \"" + workDir + "\" && " + command + "\" 2>&1";
@@ -597,7 +604,8 @@ void RegisterHandlers_Network(
                     std::vector<char> cmdBuf(fullCmd.begin(), fullCmd.end());
                     cmdBuf.push_back('\0');
 
-                    if (!CreateProcessA(nullptr, cmdBuf.data(), nullptr, nullptr,
+                    // lpApplicationName 指定绝对路径，lpCommandLine 保持原 "cmd /c ..." 形式
+                    if (!CreateProcessA(cmdExe.c_str(), cmdBuf.data(), nullptr, nullptr,
                                         TRUE, CREATE_NO_WINDOW, nullptr,
                                         workDir.empty() ? nullptr : workDir.c_str(),
                                         &si, &pi)) {
