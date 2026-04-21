@@ -14,15 +14,13 @@ void BlueprintEditor::RegisterBuiltinNodeDefinitions()
 
 void BlueprintEditor::SyncLuaDefsToRegistry()
 {
-#ifdef BLUEPRINT_HAS_LUA
-    const auto& luaIds = m_luaRunner.GetLuaRegisteredNodeIds();
-    for (const auto& id : luaIds)
+    // 将 m_luaRunner 中 Lua 注册的节点定义同步到编辑器节点库
+    // 无 Lua 时 GetLuaRegisteredNodeIds() 返回空集合，无副作用
+    for (const auto& id : m_luaRunner.GetLuaRegisteredNodeIds())
     {
         const auto* def = m_luaRunner.GetNodeDef(id);
         if (def)
             m_NodeRegistry.registerNode(*def);
     }
-    // 触发节点菜单缓存重建
-    m_CachedDefCount = 0;
-#endif
+    m_CachedDefCount = 0;  // 触发节点菜单缓存重建
 }

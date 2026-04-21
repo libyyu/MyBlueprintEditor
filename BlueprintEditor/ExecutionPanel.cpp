@@ -68,34 +68,26 @@ void BlueprintEditor::InitRunnerForDoc(BlueprintDocument* doc,
 
     ::NodeEditor::Runtime::RegisterBuiltinHandlers(doc->persistentRunner, bp, &m_HandlerRegistry);
 
-#ifdef BLUEPRINT_HAS_LUA
     // Lua 集成：让 persistentRunner 拥有独立 Lua VM，重新加载 m_luaRunner 已加载的全部脚本。
-    // 这样 Lua handler 内的 Blueprint.AcquireAsync/ReleaseAsync 调用打到 persistentRunner，
-    // HasPendingWork() 才能感知到 Lua 层的异步活动，编辑器 Tick 循环才会持续驱动。
-    //
-    // 注意：不能直接复用 m_luaRunner 的 lua_State（它绑定的是 m_luaRunner 指针），
-    //       必须为 persistentRunner 创建独立 VM，让 __blueprint_runner 指向 persistentRunner。
+    // 这样 Lua handler 内的 Blueprint.AcquireAsync/ReleaseAsync 打到 persistentRunner，
+    // HasPendingWork() 才能感知 Lua 层的异步活动，编辑器 Tick 循环持续驱动。
+    // 无 Lua 时 GetLuaLoadedFiles() 返回空集合，下面的循环为空操作。
     {
-        // 同步搜索路径
-        auto* srcEngine = m_luaRunner.GetLuaEngine();
-        if (srcEngine)
-        {
-            // 把 m_luaRunner 已添加的搜索路径也加到 persistentRunner
-            for (const auto& dir : srcEngine->GetLoadedFiles())
-            {
-                // GetLoadedFiles 返回已加载的文件，父目录即为搜索路径
+        // 同步搜索路径（把 m_luaRunner 的脚本父目录加到 persistentRunner）
 #ifndef __EMSCRIPTEN__
-                namespace fs = std::filesystem;
-                auto parent = fs::path(dir).parent_path().string();
+        {
+            namespace fs = std::filesystem;
+            for (const auto& f : m_luaRunner.GetLuaLoadedFiles())
+            {
+                auto parent = fs::path(f).parent_path().string();
                 if (!parent.empty())
                     doc->persistentRunner.AddLuaPath(parent);
-#endif
             }
         }
+#endif
 
         // 重新加载所有 Lua 脚本到 persistentRunner（__blueprint_runner 将指向 persistentRunner）
-        const auto& files = m_luaRunner.GetLuaLoadedFiles();
-        for (const auto& f : files)
+        for (const auto& f : m_luaRunner.GetLuaLoadedFiles())
         {
             if (!doc->persistentRunner.LoadLuaScript(f))
             {
@@ -105,16 +97,13 @@ void BlueprintEditor::InitRunnerForDoc(BlueprintDocument* doc,
             }
         }
 
-        // 同步节点定义（编辑器节点库显示用）
-        // handler 已由重新加载脚本时 RegisterHandler 写入 persistentRunner，无需重复
-        const auto& luaIds = m_luaRunner.GetLuaRegisteredNodeIds();
-        for (const auto& id : luaIds)
+        // 同步节点定义（handler 已由重加载脚本时 RegisterHandler 写入，无需重复）
+        for (const auto& id : m_luaRunner.GetLuaRegisteredNodeIds())
         {
             const auto* def = m_luaRunner.GetNodeDef(id);
             if (def) doc->persistentRunner.RegisterNodeDef(*def);
         }
     }
-#endif
 
     if (m_DefaultHandler)
         doc->persistentRunner.SetDefaultHandler(m_DefaultHandler);

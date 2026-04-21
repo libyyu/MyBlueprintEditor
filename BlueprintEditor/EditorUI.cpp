@@ -341,25 +341,21 @@ void BlueprintEditor::ShowLeftPane(float /*paneWidth*/)
 
 void BlueprintEditor::OnFrame(float deltaTime)
 {
-    // Phase 3：Lua 热重载轮询（每帧调用，内部按 m_pollIntervalSec 节流）
-#ifdef BLUEPRINT_HAS_LUA
+    // Lua 热重载轮询（内部按 m_pollIntervalSec 节流；无 Lua 时为空操作）
     if (m_LuaNodeRegistrar.IsInitialized() && m_LuaNodeRegistrar.GetAutoReload())
     {
         size_t countBefore = m_luaRunner.GetLuaRegisteredNodeIds().size();
         m_LuaNodeRegistrar.PollFileChanges(deltaTime);
-        // 热重载后同步 Lua 节点定义到编辑器节点库
         size_t countAfter = m_luaRunner.GetLuaRegisteredNodeIds().size();
         if (countAfter != countBefore)
             SyncLuaDefsToRegistry();
-        // 若 registry 大小变化则强制重建节点菜单缓存
         size_t newCount = m_NodeRegistry.getAllNodeDefinitions().size();
         if (newCount != m_CachedDefCount)
-            m_CachedDefCount = 0;  // 触发下一帧重建
+            m_CachedDefCount = 0;
     }
-    // 驱动 Lua 全局 OnGlobalTick(dt)
+    // 驱动 Lua 全局 OnGlobalTick(dt)（无 Lua 时 Tick 为空操作）
     if (m_LuaNodeRegistrar.IsInitialized())
         m_LuaNodeRegistrar.Tick(deltaTime);
-#endif
 
     // 驱动所有文档的计时器
     for (auto& doc : m_Documents)

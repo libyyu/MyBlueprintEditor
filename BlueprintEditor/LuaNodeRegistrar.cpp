@@ -1,6 +1,8 @@
 // BlueprintEditor/LuaNodeRegistrar.cpp
 // 编辑器侧 Lua 扩展管理器实现
 // 所有 Lua 操作委托给绑定的 BlueprintRunner（Runtime 层统一管理 Lua VM）
+// 编辑器本身对 Lua 无感知：此文件不使用 BLUEPRINT_HAS_LUA，
+// 无 Lua 时 Runtime 接口均为空操作，行为退化为无事发生。
 
 #include "LuaNodeRegistrar.h"
 #include "../Runtime/BlueprintRunner.h"
@@ -20,7 +22,6 @@ void LuaNodeRegistrar::BindRunner(NodeEditor::Runtime::BlueprintRunner* runner)
 
     if (!runner) return;
 
-#ifdef BLUEPRINT_HAS_LUA
     // 将编辑器的日志回调注入 runner：Lua print/warn 输出到编辑器控制台
     if (m_logCallback)
     {
@@ -30,7 +31,6 @@ void LuaNodeRegistrar::BindRunner(NodeEditor::Runtime::BlueprintRunner* runner)
             m_logCallback(lv, msg);
         });
     }
-#endif
 }
 
 // ============================================================================
@@ -44,14 +44,12 @@ void LuaNodeRegistrar::SetLogCallback(LogCallback cb)
     // 如果已绑定 runner，立即更新其日志回调
     if (m_runner && m_logCallback)
     {
-#ifdef BLUEPRINT_HAS_LUA
         auto& logCb = m_logCallback;
         m_runner->SetLogCallback([logCb](NodeEditor::Runtime::LogLevel level, const std::string& msg) {
             int lv = (level == NodeEditor::Runtime::LogLevel::Error)   ? 2
                    : (level == NodeEditor::Runtime::LogLevel::Warning) ? 1 : 0;
             logCb(lv, msg);
         });
-#endif
     }
 }
 
@@ -61,11 +59,7 @@ void LuaNodeRegistrar::SetLogCallback(LogCallback cb)
 
 void LuaNodeRegistrar::AddLuaPath(const std::string& dir)
 {
-#ifdef BLUEPRINT_HAS_LUA
     if (m_runner) m_runner->AddLuaPath(dir);
-#else
-    (void)dir;
-#endif
 }
 
 // ============================================================================
@@ -77,7 +71,6 @@ bool LuaNodeRegistrar::LoadEntrySilent(const std::string& filePath, const std::s
     if (!m_runner || filePath.empty()) return false;
     if (!fs::exists(filePath)) return false;
 
-#ifdef BLUEPRINT_HAS_LUA
     if (!m_runner->LoadLuaScript(filePath))
     {
         m_lastError = m_runner->GetLastError();
@@ -86,9 +79,6 @@ bool LuaNodeRegistrar::LoadEntrySilent(const std::string& filePath, const std::s
         return false;
     }
     return true;
-#else
-    return false;
-#endif
 }
 
 // ============================================================================
@@ -137,7 +127,6 @@ bool LuaNodeRegistrar::LoadScript(const std::string& filePath)
         return false;
     }
 
-#ifdef BLUEPRINT_HAS_LUA
     if (!m_runner->LoadLuaScript(filePath))
     {
         m_lastError = m_runner->GetLastError();
@@ -156,9 +145,6 @@ bool LuaNodeRegistrar::LoadScript(const std::string& filePath)
 
     m_lastError.clear();
     return true;
-#else
-    return false;
-#endif
 }
 
 // ============================================================================
@@ -169,7 +155,6 @@ bool LuaNodeRegistrar::ReloadAll()
 {
     if (!m_runner || m_loadedFiles.empty()) return true;
 
-#ifdef BLUEPRINT_HAS_LUA
     if (!m_runner->ReloadLuaScript(m_loadedFiles[0]))
     {
         m_lastError = m_runner->GetLastError();
@@ -188,9 +173,6 @@ bool LuaNodeRegistrar::ReloadAll()
 
     m_lastError.clear();
     return true;
-#else
-    return false;
-#endif
 }
 
 // ============================================================================
@@ -209,9 +191,7 @@ bool LuaNodeRegistrar::ReloadFile(const std::string& filePath)
 
 void LuaNodeRegistrar::UnregisterAll()
 {
-#ifdef BLUEPRINT_HAS_LUA
     if (m_runner) m_runner->UnregisterAllLuaNodes();
-#endif
     m_loadedFiles.clear();
     m_fileModTimes.clear();
 }
@@ -226,7 +206,6 @@ void LuaNodeRegistrar::PollFileChanges(float deltaTime)
     if (m_pollAccum < m_pollIntervalSec) return;
     m_pollAccum = 0.0f;
 
-#ifdef BLUEPRINT_HAS_LUA
     // ── 热重载：检测已加载脚本变更 ────────────────────────────────────────
     if (m_autoReload && !m_loadedFiles.empty())
     {
@@ -259,7 +238,6 @@ void LuaNodeRegistrar::PollFileChanges(float deltaTime)
             }
         } catch (...) {}
     }
-#endif
 }
 
 // ============================================================================
@@ -268,9 +246,5 @@ void LuaNodeRegistrar::PollFileChanges(float deltaTime)
 
 void LuaNodeRegistrar::Tick(float deltaTime)
 {
-#ifdef BLUEPRINT_HAS_LUA
     if (m_runner) m_runner->TickLua(static_cast<double>(deltaTime));
-#else
-    (void)deltaTime;
-#endif
 }

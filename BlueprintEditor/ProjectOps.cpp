@@ -145,10 +145,8 @@ void BlueprintEditor::CloseProject()
     if (!m_Project.IsOpen()) return;
     BPLOG("Closing project: " + m_Project.name);
 
-    // 清除 Lua 注册的节点定义
-#ifdef BLUEPRINT_HAS_LUA
+    // 清除 Lua 注册的节点定义（无 Lua 时 UnregisterAll 为空操作）
     m_LuaNodeRegistrar.UnregisterAll();
-#endif
 
     m_Project = BpProject{};
     SetTitle("Blueprint Editor - [No Project]");
@@ -383,8 +381,7 @@ void BlueprintEditor::SyncProjectLibrariesToRegistry()
         m_NodeRegistry.registerCategory(cat);
     }
 
-    // 加载 Lua 扩展脚本（先清除旧定义再重新加载）
-#ifdef BLUEPRINT_HAS_LUA
+    // 加载 Lua 扩展脚本（无 Lua 时各接口为空操作）
     m_LuaNodeRegistrar.UnregisterAll();
     m_LuaNodeRegistrar.BindRunner(&m_luaRunner);
     int luaTotal = 0;
@@ -402,7 +399,6 @@ void BlueprintEditor::SyncProjectLibrariesToRegistry()
         BPLOG("SyncProjectLibraries: registered Lua scripts: " + std::to_string(luaTotal));
     // 同步 Lua 注册的节点定义到编辑器节点库
     SyncLuaDefsToRegistry();
-#endif
 
     // 节点定义变更，强制重建缓存
     m_CachedDefCount = 0;
@@ -1001,7 +997,7 @@ void BlueprintEditor::DrawProjectPanel()
     drawSection(m_Project.libraries,  "##sec_lib", "LIBRARIES",  ICON_FA_CUBE, RTBlueprintClass::FunctionLibrary);
 
 #ifdef BLUEPRINT_HAS_LUA
-    // ── Lua 脚本 Section ────────────────────────────────────────────────
+    // ── Lua 脚本 Section（仅在支持 Lua 的构建中显示）────────────────────
     {
         ImGui::PushID("##sec_lua");
         ImGuiID stateId = ImGui::GetID("##sec_lua");
