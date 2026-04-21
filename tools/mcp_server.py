@@ -42,6 +42,13 @@ import pathlib
 import traceback
 from typing import Optional
 
+# Windows: 确保 System32 在 PATH 中，否则 Code.Run 节点无法找到 cmd.exe 等系统命令
+if sys.platform == "win32":
+    _sys32 = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32")
+    _path  = os.environ.get("PATH", "")
+    if _sys32.lower() not in _path.lower():
+        os.environ["PATH"] = _sys32 + os.pathsep + _path
+
 import mcp.server.stdio
 import mcp.types as types
 from mcp.server import Server
