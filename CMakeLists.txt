@@ -54,11 +54,19 @@ option(BUILD_RUNTIME_ONLY      "Build only BlueprintRuntime (no Editor / Applica
 option(BUILD_EXAMPLES          "Build example applications" ON)
 option(BLUEPRINT_NO_FILESYSTEM "Exclude DefaultFileSystem from BlueprintRuntime" OFF)
 
-# Emscripten: force runtime-only + static
+
+# Emscripten: 静态库 + 无共享
+# 默认仍为 Runtime-only（Unity 插件用途），BUILD_EDITOR_WASM=ON 时构建完整编辑器 HTML
+option(BUILD_EDITOR_WASM "Build full editor as WebAssembly HTML (requires Emscripten)" OFF)
 if(EMSCRIPTEN)
-    set(BUILD_RUNTIME_ONLY TRUE)
-    set(BUILD_SHARED_LIBS  FALSE CACHE BOOL "Always OFF for Emscripten" FORCE)
-    message(STATUS "[MyBlueprintEditor] Emscripten build → BUILD_RUNTIME_ONLY=ON, BUILD_SHARED_LIBS=OFF")
+    set(BUILD_SHARED_LIBS FALSE CACHE BOOL "Always OFF for Emscripten" FORCE)
+    if(NOT BUILD_EDITOR_WASM)
+        set(BUILD_RUNTIME_ONLY TRUE)
+        message(STATUS "[MyBlueprintEditor] Emscripten build → Runtime-only (Unity plugin). Use -DBUILD_EDITOR_WASM=ON for full editor.")
+    else()
+        set(BUILD_RUNTIME_ONLY FALSE)
+        message(STATUS "[MyBlueprintEditor] Emscripten build → Full Editor WASM mode")
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------
@@ -303,6 +311,11 @@ if(NOT BUILD_RUNTIME_ONLY)
 
     if(WIN32)
         # Windows always uses Win32 + DX11; no GLFW/OpenGL needed
+    elseif(EMSCRIPTEN)
+        # Emscripten 内置 GLFW3 桩（-sUSE_GLFW=3）和 WebGL2，无需 find_package
+        set(HAVE_GLFW3  1)
+        set(HAVE_OPENGL 1)
+        message(STATUS "[Application] Emscripten → built-in GLFW3 + WebGL2")
     else()
         find_package(glfw3 QUIET)
         find_package(OpenGL QUIET)
@@ -392,6 +405,33 @@ if(NOT BUILD_RUNTIME_ONLY)
     target_link_libraries(Application PUBLIC ImGuiNodeEditor)
     if(WIN32)
         target_link_libraries(Application PRIVATE d3d11.lib d3dcompiler.lib d3dx11 dxerr)
+    elseif(EMSCRIPTEN)
+        # Emscripten：内置 GLFW 桩 + WebGL2 + Asyncify（文件对话框等待）
+        target_compile_options(Application PRIVATE
+            -sUSE_GLFW=3
+            -sUSE_WEBGL2=1
+            -sFULL_ES3=1
+            -DIMGUI_IMPL_OPENGL_ES3
+        )
+        target_link_options(Application PUBLIC
+            -sUSE_GLFW=3
+            -sUSE_WEBGL2=1
+            -sFULL_ES3=1
+            -sASYNCIFY                    # 支持 emscripten_sleep（文件对话框同步等待）
+            -sASYNCIFY_IMPORTS=[emscripten_sleep]
+            -sALLOW_MEMORY_GROWTH=1
+            -sEXPORTED_RUNTIME_METHODS=[ccall,cwrap,FS,stringToUTF8,UTF8ToString]
+            -sEXPORTED_FUNCTIONS=[_main,_malloc,_free]
+            --preload-file ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintEditor/resource@/resource
+            --preload-file ${CMAKE_CURRENT_SOURCE_DIR}/data@/data
+            -sINITIAL_MEMORY=256MB
+            -O2
+        )
+        target_compile_definitions(Application PRIVATE
+            IMGUI_IMPL_OPENGL_ES3
+            HAVE_GLFW3=1
+            HAVE_OPENGL=1
+        )
     else()
         target_link_libraries(Application PRIVATE glfw OpenGL::GL ${CMAKE_DL_LIBS})
     endif()
@@ -424,6 +464,9 @@ if(NOT BUILD_RUNTIME_ONLY)
         endif()
 
         add_executable(BlueprintEditor WIN32 ${BLUEPRINT_EDITOR_SOURCES})
+    elseif(EMSCRIPTEN)
+        add_executable(BlueprintEditor ${BLUEPRINT_EDITOR_SOURCES})
+        set_target_properties(BlueprintEditor PROPERTIES SUFFIX ".html")
     else()
         add_executable(BlueprintEditor ${BLUEPRINT_EDITOR_SOURCES})
     endif()

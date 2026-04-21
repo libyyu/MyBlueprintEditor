@@ -247,6 +247,7 @@ jobs:
           find build-android -name "*.so" | head -5
           echo "Android shared lib build succeeded"
 
+
   # ── WebGL / Emscripten ──────────────────────────────────────────────────────
   wasm:
     name: WebGL (Emscripten)
@@ -274,3 +275,33 @@ jobs:
         run: |
           find build-wasm -name "libBlueprintRuntime.a" | xargs ls -lh
           echo "WASM build succeeded"
+
+  # ── WebGL Editor / Emscripten ───────────────────────────────────────────────
+  wasm-editor:
+    name: WebGL Editor (Emscripten)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.50
+
+      - name: Configure
+        run: |
+          emcmake cmake -B build-wasm-editor \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_EDITOR_WASM=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_EXAMPLES=OFF
+
+      - name: Build
+        run: cmake --build build-wasm-editor --target BlueprintEditor --parallel
+
+      - name: Check output
+        run: |
+          find build-wasm-editor -name "BlueprintEditor.html" | xargs ls -lh
+          find build-wasm-editor -name "BlueprintEditor.wasm" | xargs ls -lh
+          echo "WASM Editor build succeeded"

@@ -8,11 +8,13 @@
 
 
 // Define PLATFORM(x) which evaluate to 0 or 1 when
-// 'x' is: WINDOWS, MACOS or LINUX
+// 'x' is: WINDOWS, MACOS, LINUX, or WASM
 # if defined(_WIN32)
 #     define PLATFORM_PRIV_WINDOWS()     1
 # elif defined(__APPLE__)
 #     define PLATFORM_PRIV_MACOS()       1
+# elif defined(__EMSCRIPTEN__)
+#     define PLATFORM_PRIV_WASM()        1
 # elif defined(__linux__)
 #     define PLATFORM_PRIV_LINUX()       1
 # else
@@ -27,6 +29,9 @@
 # endif
 # ifndef PLATFORM_PRIV_LINUX
 #     define PLATFORM_PRIV_LINUX()       0
+# endif
+# ifndef PLATFORM_PRIV_WASM
+#     define PLATFORM_PRIV_WASM()        0
 # endif
 
 # define PLATFORM(x) (PLATFORM_PRIV_##x())
