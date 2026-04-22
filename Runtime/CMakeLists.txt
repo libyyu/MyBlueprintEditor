@@ -554,19 +554,19 @@ endif()
 
 if(EMSCRIPTEN)
     # Unity WebGL compile flags
-    # BUILD_EDITOR_WASM：编辑器层有 try/catch，-fno-exceptions 只能作用于 Runtime 本身（PRIVATE）
-    # Runtime-only（Unity 插件）：PUBLIC 传递给使用者也是期望行为
-    if(BUILD_EDITOR_WASM)
-        set(_bp_em_propagation PRIVATE)
-    else()
-        set(_bp_em_propagation PUBLIC)
-    endif()
-    target_compile_options(BlueprintRuntime ${_bp_em_propagation}
+    target_compile_options(BlueprintRuntime PUBLIC
         -fno-exceptions          # Unity WebGL does not support C++ exceptions
         -fno-rtti                # Unity WebGL strips RTTI
         -O2
     )
-    message(STATUS "[BlueprintRuntime] Emscripten flags applied (-fno-exceptions, -fno-rtti, -O2) [${_bp_em_propagation}]")
+    # NOTE: Emscripten link flags (-sWASM=1, -sALLOW_MEMORY_GROWTH=1, etc.)
+    # are NOT set here because BlueprintRuntime is always a STATIC library
+    # under Emscripten.  INTERFACE link options on a static library only
+    # propagate when the consumer links via target_link_libraries(); Unity
+    # performs its own linking step, so these flags would never take effect.
+    # If you build a standalone Emscripten app (non-Unity), add the flags
+    # in your final executable's CMakeLists.txt instead.
+    message(STATUS "[BlueprintRuntime] Emscripten flags applied (-fno-exceptions, -fno-rtti, -O2)")
 
 elseif(MSVC)
     target_compile_options(BlueprintRuntime PRIVATE

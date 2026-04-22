@@ -54,19 +54,11 @@ option(BUILD_RUNTIME_ONLY      "Build only BlueprintRuntime (no Editor / Applica
 option(BUILD_EXAMPLES          "Build example applications" ON)
 option(BLUEPRINT_NO_FILESYSTEM "Exclude DefaultFileSystem from BlueprintRuntime" OFF)
 
-
-# Emscripten: 静态库 + 无共享
-# 默认仍为 Runtime-only（Unity 插件用途），BUILD_EDITOR_WASM=ON 时构建完整编辑器 HTML
-option(BUILD_EDITOR_WASM "Build full editor as WebAssembly HTML (requires Emscripten)" OFF)
+# Emscripten: force runtime-only + static
 if(EMSCRIPTEN)
-    set(BUILD_SHARED_LIBS FALSE CACHE BOOL "Always OFF for Emscripten" FORCE)
-    if(NOT BUILD_EDITOR_WASM)
-        set(BUILD_RUNTIME_ONLY TRUE)
-        message(STATUS "[MyBlueprintEditor] Emscripten build → Runtime-only (Unity plugin). Use -DBUILD_EDITOR_WASM=ON for full editor.")
-    else()
-        set(BUILD_RUNTIME_ONLY FALSE)
-        message(STATUS "[MyBlueprintEditor] Emscripten build → Full Editor WASM mode")
-    endif()
+    set(BUILD_RUNTIME_ONLY TRUE)
+    set(BUILD_SHARED_LIBS  FALSE CACHE BOOL "Always OFF for Emscripten" FORCE)
+    message(STATUS "[MyBlueprintEditor] Emscripten build → BUILD_RUNTIME_ONLY=ON, BUILD_SHARED_LIBS=OFF")
 endif()
 
 # ---------------------------------------------------------------------------
@@ -183,9 +175,12 @@ if(NOT BUILD_RUNTIME_ONLY)
     # ------------------------------------------------------------------
     # ImGui (static, always)
     # ------------------------------------------------------------------
-    # 直接设置路径（find_path 在 cross-compile 下 NO_DEFAULT_PATH 可能跳过搜索）
-    set(IMGUI_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/imgui")
-    if(NOT EXISTS "${IMGUI_INCLUDE_DIR}/imgui.h")
+    find_path(IMGUI_INCLUDE_DIR imgui.h
+        PATHS ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui
+        NO_DEFAULT_PATH
+    )
+
+    if(NOT IMGUI_INCLUDE_DIR)
         message(FATAL_ERROR "ImGui headers not found at external/imgui/")
     endif()
 
@@ -308,11 +303,6 @@ if(NOT BUILD_RUNTIME_ONLY)
 
     if(WIN32)
         # Windows always uses Win32 + DX11; no GLFW/OpenGL needed
-    elseif(EMSCRIPTEN)
-        # Emscripten 内置 GLFW3 桩（-sUSE_GLFW=3）和 WebGL2，无需 find_package
-        set(HAVE_GLFW3  1)
-        set(HAVE_OPENGL 1)
-        message(STATUS "[Application] Emscripten → built-in GLFW3 + WebGL2")
     else()
         find_package(glfw3 QUIET)
         find_package(OpenGL QUIET)
@@ -402,38 +392,6 @@ if(NOT BUILD_RUNTIME_ONLY)
     target_link_libraries(Application PUBLIC ImGuiNodeEditor)
     if(WIN32)
         target_link_libraries(Application PRIVATE d3d11.lib d3dcompiler.lib d3dx11 dxerr)
-    elseif(EMSCRIPTEN)
-        # Emscripten：内置 GLFW 桩 + WebGL2 + Asyncify（文件对话框等待）
-        target_compile_options(Application PRIVATE
-            -sUSE_GLFW=3
-            -sUSE_WEBGL2=1
-            -sFULL_ES3=1
-            -DIMGUI_IMPL_OPENGL_ES3
-        )
-        # PUBLIC：将 IMGUI_IMPL_OPENGL_ES3 传播给 BlueprintEditor 等依赖方
-        # 这样 renderer_ogl3.cpp 编译时禁用 imgl3w loader，改用 WebGL2/GLES3 原生 API
-        target_compile_definitions(Application PUBLIC
-            IMGUI_IMPL_OPENGL_ES3
-            HAVE_GLFW3=1
-            HAVE_OPENGL=1
-        )
-        target_link_options(Application INTERFACE
-            -sUSE_GLFW=3
-            -sUSE_WEBGL2=1
-            -sFULL_ES3=1
-            -sASYNCIFY
-            -sASYNCIFY_IMPORTS=[emscripten_sleep]
-            -sALLOW_MEMORY_GROWTH=1
-            -sEXPORTED_RUNTIME_METHODS=[ccall,cwrap,FS,stringToUTF8,UTF8ToString]
-            -sEXPORTED_FUNCTIONS=[_main,_malloc,_free]
-            -sINITIAL_MEMORY=256MB
-            -O2
-        )
-        target_compile_definitions(Application PRIVATE
-            IMGUI_IMPL_OPENGL_ES3
-            HAVE_GLFW3=1
-            HAVE_OPENGL=1
-        )
     else()
         target_link_libraries(Application PRIVATE glfw OpenGL::GL ${CMAKE_DL_LIBS})
     endif()
@@ -466,9 +424,6 @@ if(NOT BUILD_RUNTIME_ONLY)
         endif()
 
         add_executable(BlueprintEditor WIN32 ${BLUEPRINT_EDITOR_SOURCES})
-    elseif(EMSCRIPTEN)
-        add_executable(BlueprintEditor ${BLUEPRINT_EDITOR_SOURCES})
-        set_target_properties(BlueprintEditor PROPERTIES SUFFIX ".html")
     else()
         add_executable(BlueprintEditor ${BLUEPRINT_EDITOR_SOURCES})
     endif()
@@ -508,28 +463,6 @@ if(NOT BUILD_RUNTIME_ONLY)
         RUNTIME_OUTPUT_DIRECTORY_RELEASE   "${OUTPUT_DIR}/Release"
         VS_DEBUGGER_WORKING_DIRECTORY      "${CMAKE_CURRENT_SOURCE_DIR}"
     )
-
-    # Emscripten：编辑器层有 try/catch，需要开启异常（覆盖 Runtime 传递的 -fno-exceptions）
-    if(EMSCRIPTEN)
-        target_compile_options(BlueprintEditor PRIVATE
-            -fexceptions
-            -frtti
-        )
-        # preload-file 格式: 绝对路径@虚拟路径（Emscripten 打包资源到 .data 文件）
-        set(_RES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/BlueprintEditor/resource")
-        set(_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/data")
-        set(_EM_PRELOAD "")
-        if(EXISTS "${_RES_DIR}")
-            list(APPEND _EM_PRELOAD "--preload-file=${_RES_DIR}@/resource")
-        endif()
-        if(EXISTS "${_DATA_DIR}")
-            list(APPEND _EM_PRELOAD "--preload-file=${_DATA_DIR}@/data")
-        endif()
-        target_link_options(BlueprintEditor PRIVATE
-            -fexceptions
-            ${_EM_PRELOAD}
-        )
-    endif()
 
     # ------------------------------------------------------------------
     # Resource copy

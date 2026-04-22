@@ -100,8 +100,6 @@ bool RendererOpenGL3::Create(Platform& platform)
 
 # if PLATFORM(MACOS)
     const char* glslVersion = "#version 150";
-# elif PLATFORM(WASM)
-    const char* glslVersion = "#version 300 es";
 # else
     const char* glslVersion = "#version 130";
 # endif

@@ -12,11 +12,6 @@
 #pragma comment(lib, "shlwapi.lib")
 #endif
 
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#include <emscripten/html5.h>
-#endif
-
 extern "C" {
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
@@ -229,22 +224,6 @@ int Application::Run()
 {
     m_Platform->ShowMainWindow();
 
-#ifdef __EMSCRIPTEN__
-    // 浏览器不允许阻塞主线程，必须用回调驱动每帧
-    // 用静态指针传递 this（生命周期与浏览器页面一致，安全）
-    static Application* s_app = this;
-    emscripten_set_main_loop([]() {
-        if (!s_app->m_Platform->ProcessMainWindowEvents())
-        {
-            s_app->OnStop();
-            emscripten_cancel_main_loop();
-            return;
-        }
-        if (s_app->m_Platform->IsMainWindowVisible())
-            s_app->Frame();
-    }, 0, true);   // fps=0 → 跟随浏览器 requestAnimationFrame，simulate_infinite_loop=true
-    return 0;
-#else
     while (m_Platform->ProcessMainWindowEvents())
     {
         if (!m_Platform->IsMainWindowVisible())
@@ -256,7 +235,6 @@ int Application::Run()
     OnStop();
 
     return 0;
-#endif
 }
 
 void Application::RecreateFontAtlas()
