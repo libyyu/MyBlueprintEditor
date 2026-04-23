@@ -12,6 +12,12 @@ Unity/Samples/AINpc/
 ├── AINpcStreamingController.cs     ← NPC 控制器（流式版）
 ├── StreamingDialogUI.cs            ← UI（token 实时追加 + 光标闪烁）
 ├── EmotionalNpcController.cs       ← NPC 控制器（情绪化，LLM 返回 JSON）
+├── OpenWorld/                      ← 开放世界风（3D 气泡 + 距离触发 + 深度 Panel）
+│   ├── WorldSpeechBubble.cs
+│   ├── NpcProximityTrigger.cs
+│   ├── InteractionPrompt.cs
+│   ├── OpenWorldDialogPanel.cs
+│   └── README.md                   ← 开放世界专用教程
 ├── WebGLNotes.md                   ← WebGL 编译 + CORS 指南
 └── README.md                       ← 本文件
 ```
@@ -145,8 +151,14 @@ YourUnityProject/Assets/
 ### 5. 情绪反馈（本目录 `EmotionalNpcController`）
 LLM 同时输出情绪和动作，NPC Animator 联动，让角色真的"活"起来。
 
-### 6. 3D 世界空间气泡（自行实现）
+### 6. 3D 世界空间气泡（`OpenWorld/` 子目录 — 完整实现）
 Canvas = World Space，挂在 NPC 头顶跟随移动，远离时淡出。适合开放世界、模拟经营。
+
+**详见** [`OpenWorld/README.md`](./OpenWorld/README.md)，里面实现了：
+- `WorldSpeechBubble` — 3D 头顶气泡（Billboard + 距离淡出 + 打字机 + 自动收起）
+- `NpcProximityTrigger` — 双层半径触发（Greet 10m 打招呼 / Interact 3m 按 E 对话）+ 视野检测
+- `InteractionPrompt` — 屏幕 "按 E" 提示（自动追踪最近 NPC）
+- `OpenWorldDialogPanel` — 深度对话 Panel（历史记录、多 NPC 切换）
 
 ---
 
