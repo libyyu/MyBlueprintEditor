@@ -53,6 +53,7 @@ option(BUILD_SHARED_LIBS       "Build BlueprintRuntime as shared library (.dll/.
 option(BUILD_RUNTIME_ONLY      "Build only BlueprintRuntime (no Editor / Application)" OFF)
 option(BUILD_EXAMPLES          "Build example applications" ON)
 option(BLUEPRINT_NO_FILESYSTEM "Exclude DefaultFileSystem from BlueprintRuntime" OFF)
+option(BLUEPRINT_WXGAME        "Emscripten: export extra symbols for 微信/抖音小游戏 (adds .js+.wasm with addFunction support)" OFF)
 
 # Emscripten: force runtime-only + static
 if(EMSCRIPTEN)
@@ -165,6 +166,31 @@ if((BUILD_EXAMPLES OR BUILD_RUNTIME_ONLY) AND NOT _IS_MOBILE_PLATFORM)
         RUNTIME_OUTPUT_DIRECTORY_RELEASE   "${CMAKE_BINARY_DIR}/bin/Release"
     )
     message(STATUS "[runtime-example] target added (BUILD_RUNTIME_ONLY=${BUILD_RUNTIME_ONLY})")
+
+    # ------------------------------------------------------------------
+    # BLUEPRINT_WXGAME：Emscripten 下让 runtime-example 产出
+    #   runtime-example.js + runtime-example.wasm
+    # 并导出微信/抖音小游戏接入所需的全部 C API 符号。
+    #
+    # Runtime 本身是 STATIC 库，必须通过一个 executable（runtime-example）
+    # 才能触发 Emscripten 链接，生成可在 JS 侧 ccall/cwrap 的胶水。
+    # 我们复用 runtime-example 这个既有 target，不再新增 executable，
+    # 避免重复编译全部源文件。
+    # ------------------------------------------------------------------
+    if(EMSCRIPTEN AND BLUEPRINT_WXGAME)
+        target_link_options(runtime-example PRIVATE
+            -sMODULARIZE=1
+            -sEXPORT_NAME=BlueprintRuntime
+            -sALLOW_MEMORY_GROWTH=1
+            -sALLOW_TABLE_GROWTH=1
+            -sFETCH=1
+            -sWASM=1
+            -sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','UTF8ToString','stringToUTF8','lengthBytesUTF8','addFunction','removeFunction','getValue','setValue']
+            -sEXPORTED_FUNCTIONS=['_main','_malloc','_free','_BP_CreateRunner','_BP_DestroyRunner','_BP_LoadFromJson','_BP_LoadFromFile','_BP_IsLoaded','_BP_Execute','_BP_ExecuteNode','_BP_Tick','_BP_SetVariableInt','_BP_SetVariableFloat','_BP_SetVariableString','_BP_SetVariableBool','_BP_GetVariableInt','_BP_GetVariableFloat','_BP_GetVariableBool','_BP_GetVariableString','_BP_SetLogCallback','_BP_SetPrintCallback','_BP_EnableLogging','_BP_IsLoggingEnabled','_BP_GetLastError','_BP_InitDefaultHttpClient','_BP_InstallJSBridgeHttpClient','_BP_Http_SetRequestDispatcher','_BP_Http_GetReqUrl','_BP_Http_GetReqMethod','_BP_Http_GetReqBody','_BP_Http_GetReqHeaders','_BP_Http_OnResponse']
+            -O2
+        )
+        message(STATUS "[runtime-example] WXGAME mode enabled: will produce BlueprintRuntime.js + .wasm")
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------

@@ -274,3 +274,45 @@ jobs:
         run: |
           find build-wasm -name "libBlueprintRuntime.a" | xargs ls -lh
           echo "WASM build succeeded"
+
+  # ── 微信/抖音小游戏（Emscripten + JS Bridge） ──────────────────────────────
+  wxgame:
+    name: WeChat/TikTok MiniGame (Emscripten)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.50
+
+      - name: Configure (wxgame)
+        run: |
+          emcmake cmake -B build-wxgame \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_RUNTIME_ONLY=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_TESTS=OFF \
+            -DBLUEPRINT_WXGAME=ON
+
+      - name: Build (runtime-example → BlueprintRuntime.js + .wasm)
+        run: cmake --build build-wxgame --target runtime-example --parallel
+
+      - name: Check output
+        run: |
+          echo "=== 产物列表 ==="
+          find build-wxgame -name "runtime-example.js"   -exec ls -lh {} \;
+          find build-wxgame -name "runtime-example.wasm" -exec ls -lh {} \;
+          echo "=== WASM 包体大小 ==="
+          find build-wxgame -name "*.wasm" -exec du -h {} \;
+          echo "WXGame build succeeded"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlueprintRuntime-wxgame
+          path: |
+            build-wxgame/**/runtime-example.js
+            build-wxgame/**/runtime-example.wasm
+          if-no-files-found: error

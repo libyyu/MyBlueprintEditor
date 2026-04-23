@@ -92,6 +92,7 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Http/IHttpClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Http/HttpClient_Default.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Http/HttpClient_Emscripten.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Http/HttpClient_JSBridge.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FileSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintCAPI.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ScriptNodeLoader.cpp
