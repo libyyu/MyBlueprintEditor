@@ -266,27 +266,68 @@ namespace BlueprintRuntime
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
         public static extern void BP_DestroyRunner(IntPtr runner);
 
+        // --- Global HTTP client (shared across runners, needed by LLM.* nodes) ---
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void BP_InitDefaultHttpClient();
+
         // --- Loading ---
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
         public static extern int BP_LoadFromJson(IntPtr runner,
             [MarshalAs(UnmanagedType.LPStr)] string json);
 
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BP_LoadFromJsonWithBaseDir(IntPtr runner,
+            [MarshalAs(UnmanagedType.LPStr)] string json,
+            [MarshalAs(UnmanagedType.LPStr)] string baseDir);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
         public static extern int BP_LoadFromFile(IntPtr runner,
             [MarshalAs(UnmanagedType.LPStr)] string filePath);
 
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void BP_SetBasePath(IntPtr runner,
+            [MarshalAs(UnmanagedType.LPStr)] string basePath);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
         public static extern int BP_IsLoaded(IntPtr runner);
+
+        // --- Lua extension (optional; calls are no-ops if built without Lua) ---
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BP_LoadLuaScript(IntPtr runner,
+            [MarshalAs(UnmanagedType.LPStr)] string filePath);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void BP_SetGlobalLuaEntry(
+            [MarshalAs(UnmanagedType.LPStr)] string filePath);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BP_GetGlobalLuaEntry(IntPtr buf, int bufLen);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BP_LoadGlobalLuaEntry(IntPtr runner);
 
         // --- Execution ---
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
         public static extern int BP_Execute(IntPtr runner);
 
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BP_DispatchEvent(IntPtr runner,
+            [MarshalAs(UnmanagedType.LPStr)] string eventDefinitionId);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
         public static extern int BP_ExecuteNode(IntPtr runner, ulong nodeId);
 
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
         public static extern void BP_Tick(IntPtr runner, float deltaTime);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BP_GetActiveTimerCount(IntPtr runner);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BP_HasPendingWork(IntPtr runner);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void BP_DrainQueue();
 
         // --- Variables: Set ---
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
@@ -570,6 +611,15 @@ namespace BlueprintRuntime
                 throw new BPException("LoadFromJson failed: " + GetLastError());
         }
 
+        /// <summary>Load blueprint JSON with explicit base directory for resolving
+        /// relative file paths (e.g. embedded Lua scripts).</summary>
+        public void LoadFromJson(string json, string baseDir)
+        {
+            ThrowIfDisposed();
+            if (Native.BP_LoadFromJsonWithBaseDir(_handle, json, baseDir ?? "") != 0)
+                throw new BPException("LoadFromJsonWithBaseDir failed: " + GetLastError());
+        }
+
         public void LoadFromFile(string filePath)
         {
             ThrowIfDisposed();
@@ -577,9 +627,38 @@ namespace BlueprintRuntime
                 throw new BPException("LoadFromFile failed: " + GetLastError());
         }
 
+        /// <summary>Set base directory for resolving relative file paths.
+        /// Useful when loading a blueprint from memory (e.g. TextAsset) that
+        /// references other files by relative path.</summary>
+        public void SetBasePath(string basePath)
+        {
+            ThrowIfDisposed();
+            Native.BP_SetBasePath(_handle, basePath ?? "");
+        }
+
         public bool IsLoaded
         {
             get { ThrowIfDisposed(); return Native.BP_IsLoaded(_handle) != 0; }
+        }
+
+        // ---------------------------------------------------------------------
+        // Lua extension (optional — these are no-ops if Runtime built without Lua)
+        // ---------------------------------------------------------------------
+
+        /// <summary>Load a Lua extension script (registers node defs / handlers at runtime).
+        /// No-op if Runtime was built without BLUEPRINT_HAS_LUA.</summary>
+        /// <returns>true on success</returns>
+        public bool LoadLuaScript(string filePath)
+        {
+            ThrowIfDisposed();
+            return Native.BP_LoadLuaScript(_handle, filePath) == 0;
+        }
+
+        /// <summary>Load the globally-configured Lua entry script into this runner.</summary>
+        public bool LoadGlobalLuaEntry()
+        {
+            ThrowIfDisposed();
+            return Native.BP_LoadGlobalLuaEntry(_handle) == 0;
         }
 
         // ---------------------------------------------------------------------
@@ -593,6 +672,14 @@ namespace BlueprintRuntime
                 throw new BPException("Execute failed: " + GetLastError());
         }
 
+        /// <summary>Dispatch a named event (triggers all OnEvent nodes matching the id).
+        /// Return value: number of handlers fired (≥0) or negative on error.</summary>
+        public int DispatchEvent(string eventDefinitionId)
+        {
+            ThrowIfDisposed();
+            return Native.BP_DispatchEvent(_handle, eventDefinitionId ?? "");
+        }
+
         public void ExecuteNode(ulong nodeId)
         {
             ThrowIfDisposed();
@@ -604,6 +691,19 @@ namespace BlueprintRuntime
         {
             ThrowIfDisposed();
             Native.BP_Tick(_handle, deltaTime);
+        }
+
+        /// <summary>Number of currently-active timers (SetTimer / DelayedCall).</summary>
+        public int ActiveTimerCount
+        {
+            get { ThrowIfDisposed(); return Native.BP_GetActiveTimerCount(_handle); }
+        }
+
+        /// <summary>True if there are pending async tasks (HTTP / timers / stream chunks).
+        /// Cheap to query — use it to skip Tick() when idle, saving CPU.</summary>
+        public bool HasPendingWork
+        {
+            get { ThrowIfDisposed(); return Native.BP_HasPendingWork(_handle) != 0; }
         }
 
         // ---------------------------------------------------------------------
@@ -818,6 +918,38 @@ namespace BlueprintRuntime
             var h = GCHandle.Alloc(bytes, GCHandleType.Pinned);
             handles.Add(h);
             return h.AddrOfPinnedObject();
+        }
+
+        // =====================================================================
+        // Global (static) API — shared across all runners
+        // =====================================================================
+
+        /// <summary>Initialize the default HTTP client (cpp-httplib on native,
+        /// emscripten_fetch on WebGL). Required before any LLM.* / HTTP.* node
+        /// executes. Idempotent: safe to call multiple times.</summary>
+        public static void InitDefaultHttpClient() => Native.BP_InitDefaultHttpClient();
+
+        /// <summary>Drain the main-thread dispatch queue (async HTTP callbacks etc.).
+        /// Normally called automatically by BP_Tick, but can be invoked manually
+        /// when you have no active runners but still need to process pending work.</summary>
+        public static void DrainQueue() => Native.BP_DrainQueue();
+
+        /// <summary>Set the global Lua entry-point script path. All runners created
+        /// afterwards will load this script on first Lua call. No-op without BLUEPRINT_HAS_LUA.</summary>
+        public static void SetGlobalLuaEntry(string filePath) =>
+            Native.BP_SetGlobalLuaEntry(filePath ?? "");
+
+        /// <summary>Get the currently-configured global Lua entry path ("" if unset).</summary>
+        public static string GetGlobalLuaEntry()
+        {
+            const int bufLen = 512;
+            IntPtr buf = Marshal.AllocHGlobal(bufLen);
+            try
+            {
+                int n = Native.BP_GetGlobalLuaEntry(buf, bufLen);
+                return n > 0 ? Marshal.PtrToStringUTF8(buf, n) : "";
+            }
+            finally { Marshal.FreeHGlobal(buf); }
         }
     }
 

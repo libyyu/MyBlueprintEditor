@@ -66,7 +66,8 @@ namespace BlueprintRuntime.Samples.AINpc
             // 注意：LLM 域名必须在 Unity Player Settings → WebGL → Publishing Settings 的 CORS 允许列表里
             // 或由 LLM 供应商返回正确的 CORS 响应头
 #endif
-            Native.BP_InitDefaultHttpClient();
+            // 初始化默认 HTTP 客户端（Runtime 内部幂等，重复调用无副作用）
+            BPRunner.InitDefaultHttpClient();
             IsReady = true;
             OnReady?.Invoke();
 
@@ -104,7 +105,12 @@ namespace BlueprintRuntime.Samples.AINpc
             {
                 var r = _runners[i];
                 if (r == null) { _runners.RemoveAt(i); continue; }
-                try { r.Tick(dt); }
+                try
+                {
+                    // 优化：空闲 runner 跳过 Tick（无 HTTP 异步/无定时器）
+                    if (!r.HasPendingWork) continue;
+                    r.Tick(dt);
+                }
                 catch (Exception e) { Debug.LogError($"[BlueprintService] Tick failed: {e}"); }
             }
         }
