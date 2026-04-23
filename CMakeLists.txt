@@ -137,17 +137,25 @@ if(BLUEPRINT_LUA AND TARGET lua54)
 endif()
 
 # ---------------------------------------------------------------------------
-# runtime-example — built only on desktop platforms (not iOS/Android/Emscripten)
+# runtime-example — built only on desktop platforms (not iOS/Android)
 #   Use:  runtime-example --test [flow_test.json]
+#
+# Emscripten: 默认跳过；BLUEPRINT_WXGAME=ON 时构建，产出
+#   runtime-example.js + runtime-example.wasm（小游戏接入用）
 # ---------------------------------------------------------------------------
 set(_IS_MOBILE_PLATFORM FALSE)
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR
-   CMAKE_SYSTEM_NAME STREQUAL "Android" OR
-   EMSCRIPTEN)
+   CMAKE_SYSTEM_NAME STREQUAL "Android")
     set(_IS_MOBILE_PLATFORM TRUE)
 endif()
 
-if((BUILD_EXAMPLES OR BUILD_RUNTIME_ONLY) AND NOT _IS_MOBILE_PLATFORM)
+# Emscripten：仅在 BLUEPRINT_WXGAME=ON 时产出 .js + .wasm，否则视为 mobile 跳过
+set(_SKIP_RUNTIME_EXAMPLE FALSE)
+if(EMSCRIPTEN AND NOT BLUEPRINT_WXGAME)
+    set(_SKIP_RUNTIME_EXAMPLE TRUE)
+endif()
+
+if((BUILD_EXAMPLES OR BUILD_RUNTIME_ONLY) AND NOT _IS_MOBILE_PLATFORM AND NOT _SKIP_RUNTIME_EXAMPLE)
     set(_RE_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/runtime-example/runtime-example.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/runtime-example/test_new_features.cpp
