@@ -11,8 +11,8 @@
     "nodes": [
       {
         "id": 1,
-        "definitionId": "OnExecute",
-        "name": "On Execute",
+        "definitionId": "OnBeginPlay",
+        "name": "On Begin Play",
         "pins": [
           {
             "id": 2,
@@ -77,21 +77,27 @@
       },
       {
         "id": 30,
-        "definitionId": "JSON.MakeMessageArray",
-        "name": "Messages",
+        "definitionId": "FormatString",
+        "name": "Wrap Messages Array",
         "pins": [
           {
             "id": 301,
             "kind": 0,
             "dataType": 4,
-            "name": "Messages",
-            "isArray": true
+            "name": "Format",
+            "defaultValue": "[{0}]"
+          },
+          {
+            "id": 302,
+            "kind": 0,
+            "dataType": 4,
+            "name": "0"
           },
           {
             "id": 302,
             "kind": 1,
             "dataType": 4,
-            "name": "Array"
+            "name": "Result"
           }
         ]
       },
@@ -540,7 +546,7 @@
       {
         "id": 3,
         "startPinId": 204,
-        "endPinId": 301,
+        "endPinId": 302,
         "isEnabled": true
       },
       {

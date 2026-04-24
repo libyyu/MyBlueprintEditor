@@ -86,8 +86,8 @@
     "nodes": [
       {
         "id": 1,
-        "definitionId": "OnExecute",
-        "name": "Start"
+        "definitionId": "OnBeginPlay",
+        "name": "On Begin Play"
       },
       {
         "id": 10,
@@ -211,8 +211,11 @@
       },
       {
         "id": 30,
-        "definitionId": "JSON.MakeMessageArray",
-        "name": "Messages"
+        "definitionId": "FormatString",
+        "name": "Wrap Messages Array",
+        "pinValues": {
+          "Format": "[{0}]"
+        }
       },
       {
         "id": 40,
@@ -261,13 +264,13 @@
         },
         "to": {
           "nodeId": 30,
-          "pin": "Message 0"
+          "pin": "0"
         }
       },
       {
         "from": {
           "nodeId": 30,
-          "pin": "Messages"
+          "pin": "Result"
         },
         "to": {
           "nodeId": 40,
