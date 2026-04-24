@@ -41,27 +41,36 @@
 
 ```
 Samples/MiniGame/
-├── MiniGameBootstrap.cs                      ← 场景启动脚本（推荐放 Bootstrap 场景）
+├── MiniGameBootstrap.cs                      ← 场景启动脚本
 │
 ├── Storage/
 │   ├── BlueprintStorage.cs                   ← 跨平台存储 API
-│   ├── NpcMemory.cs                          ← NPC 跨会话记忆组件
-│   └── Plugins/WebGL/BlueprintStorage.jslib  ← WebGL/小游戏 storage 桥
+│   ├── NpcMemory.cs                          ← NPC 跨会话记忆（好感度/历史）
+│   └── Plugins/WebGL/BlueprintStorage.jslib
+│
+├── World/                                     ← ★ 多 NPC 世界编排
+│   ├── WorldState.cs                         ← 时间/天气/全局事件
+│   ├── NpcRegistry.cs                        ← NPC 注册 + 附近感知 + 话题广播
+│   ├── NpcBehaviorGate.cs                    ← 好感度段位切换 Personality
+│   └── AffinityHeart.cs                      ← 头顶 ❤❤♡♡♡ UI
 │
 ├── Loader/
-│   ├── BlueprintLoader.cs                    ← CDN 动态下载 + 缓存 + ETag 校验
-│   └── LlmProxyConfig.cs                     ← LLM 代理配置（Direct/Proxy 切换）
+│   ├── BlueprintLoader.cs                    ← CDN 动态蓝图 + ETag 热更新
+│   └── LlmProxyConfig.cs                     ← LLM 代理配置
 │
 ├── WeChat/
-│   ├── WeChatSDK.cs                          ← Share/Login/Toast/RewardedAd C# API
+│   ├── WeChatSDK.cs                          ← Share/Login/Toast/RewardedAd
 │   ├── BlueprintWeChatNodes.cs               ← 把 wx.* 注册为蓝图节点
-│   └── Plugins/WebGL/WeChatSDK.jslib         ← WebGL → wx.* jslib
+│   ├── ShareViralSystem.cs                   ← ★ 分享裂变统计 + 冷却
+│   ├── ShareRewardPanel.cs                   ← ★ 分享奖励 UI（3 种模式）
+│   └── Plugins/WebGL/WeChatSDK.jslib
 │
 ├── ServerProxy/
-│   └── llm-proxy.worker.js                   ← Cloudflare Worker 代理（生产必用）
+│   ├── llm-proxy.worker.js                   ← Cloudflare Worker 代理
+│   └── DEPLOY.md                             ← ★ 10 分钟部署教程（含截图）
 │
 ├── Editor/
-│   └── MiniGameBuildMenu.cs                  ← Unity 菜单"Blueprint/构建 WebGL..."
+│   └── MiniGameBuildMenu.cs                  ← "Blueprint/构建 WebGL..."
 │
 └── README.md
 ```
@@ -69,10 +78,11 @@ Samples/MiniGame/
 对应蓝图：
 ```
 data/examples/wxgame/
-├── AI_NPC_Dialog.bjson      ← 基础对话
-├── AI_NPC_Streaming.bjson   ← 流式对话
-├── AI_NPC_Emotional.bjson   ← 情绪+动作 JSON 输出
-└── AI_NPC_Memory.bjson      ← 记忆增强（好感度/见面次数/事实库）
+├── AI_NPC_Dialog.bjson         ← 基础对话
+├── AI_NPC_Streaming.bjson      ← 流式对话
+├── AI_NPC_Emotional.bjson      ← 情绪 + 动作 JSON
+├── AI_NPC_Memory.bjson         ← 好感度/见面次数/事实库
+└── AI_NPC_WorldAware.bjson     ← ★ 世界感知（时间/天气/附近 NPC）
 ```
 
 ---
@@ -246,3 +256,115 @@ LLM 偶尔会输出不合规内容（涉政、黄赌毒）。必须：
 5. **完整的 Cloudflare Worker 部署教程**（截图）
 
 告诉我继续做哪个。
+
+---
+
+## ★ "活着的村庄" 完整方案（多 NPC + 世界状态 + 好感度 + 裂变）
+
+以上 5 个方向已全部实现！下面是把它们串起来的**完整场景搭建指南**。
+
+### 场景蓝图
+
+```
+Hierarchy
+├── Main Camera + Player(tag=Player)
+│
+├── Bootstrap                              ← 总管
+│   ├── MiniGameBootstrap.cs               (LlmConfig / CDN / 广告)
+│   ├── BlueprintService (自动创建)
+│   ├── BlueprintLoader  (自动创建)
+│   ├── WorldState                         ← 世界时间/天气/事件
+│   │   - secondsPerPhase = 600           (每 10 分钟推进一个时段)
+│   ├── NpcRegistry                        ← NPC 发现中心
+│   │   - awarenessRadius = 50
+│   │   - refreshInterval = 10
+│   └── ShareViralSystem                   ← 分享统计
+│       - shareTitle = "我在 AI 酒馆聊天..."
+│
+├── NPC_MeowMeow                           ← 喵喵店长
+│   ├── AINpcStreamingController.cs
+│   │   - StreamingBlueprint = AI_NPC_WorldAware.bjson
+│   ├── NpcProximityTrigger.cs            (Greet 10m / Interact 3m)
+│   ├── NpcMemory.cs                      (NpcId = "NPC_MeowMeow")
+│   ├── NpcRegistrant.cs                  (injectBeforeEveryChat = true)
+│   ├── NpcBehaviorGate.cs                ← 好感度段位切换
+│   │   ├── Stranger  (0-20)
+│   │   ├── Friend   (41-60) unlockEvent="玩家和喵喵成了朋友"
+│   │   └── Lover    (81+)   unlockEvent="喵喵爱上了玩家"
+│   ├── BlueprintWeChatNodes.cs           (让蓝图可调 WeChat.Share)
+│   │
+│   └── SpeechBubble (World Space Canvas)
+│       ├── WorldSpeechBubble.cs
+│       └── AffinityHeart (子物体 Canvas)
+│           - 显示 ❤❤♡♡♡，好感变化飘字
+│
+├── NPC_Blacksmith                         ← 铁匠老王（同样配置，不同 Personality）
+│   └── ... (复制 NPC_MeowMeow 改名 + 改性格 + 改位置)
+│
+├── NPC_Bard                               ← 游吟诗人莉莉
+│   └── ...
+│
+└── UI Canvas (Screen Space)
+    ├── InteractPromptPanel                (按 E 对话)
+    ├── OpenWorldDialogPanel              (深度对话面板)
+    └── ShareRewardPanel                   ← ★ 裂变奖励 UI
+        - mode = Cumulative
+        - targetShares = 3
+        - rewardDesc = "解锁神秘 NPC：神秘人"
+        - onRewardClaimed → 激活 NPC_Mysterious.SetActive(true)
+```
+
+### 为什么这样有"活"感？
+
+| 行为 | 实现机制 |
+|---|---|
+| 喵喵和铁匠会互相提起对方 | `NpcRegistry` 每次对话前注入 `NearbyNpcs = "铁匠老王(25米)；诗人莉莉(38米)"` |
+| NPC 清晨精神，深夜犯困 | `WorldState.GetTimeText()` 注入 `WorldTime = "清晨"`，LLM 自动调整语气 |
+| 玩家送礼后 NPC 叫你"老朋友" | `NpcBehaviorGate` 切换 Personality 到 Friend 段位 |
+| NPC 头顶 ❤ 数量增加 | `AffinityHeart` 订阅 `NpcMemory.OnChanged` |
+| 村里发生大事所有 NPC 都知道 | `WorldState.AddEvent` → 下次所有 NPC 都会读到 `RecentEvents` |
+| 分享给 3 个好友解锁新 NPC | `ShareRewardPanel` + `ShareViralSystem` 自动记录 |
+
+### 代码示例：好感度驱动 + 事件联动
+
+```csharp
+// 在 OpenWorldDialogPanel 或其他地方，监听玩家行为
+void OnPlayerGaveGift(NpcMemory targetNpc, string giftName)
+{
+    targetNpc.AddAffinity(+10);
+    targetNpc.RememberFact($"玩家送了我{giftName}");
+    WorldState.Instance.AddEvent($"玩家给{targetNpc.NpcId}送了{giftName}");
+
+    // 下次对话，此 NPC 会说"上次那个{giftName}我很喜欢喵~"
+    //        别的 NPC 会说"听说你送喵喵礼物了，真大方啊"
+}
+
+// 好感度跨段位时自动触发（已由 NpcBehaviorGate 处理）
+npcMeow.GetComponent<NpcBehaviorGate>().OnStageChanged += stage => {
+    WeChatSDK.ShowToast($"你们的关系升级了：{stage.name}", WeChatSDK.ToastIcon.Success);
+};
+```
+
+### 蓝图只要一个 `AI_NPC_WorldAware.bjson`
+
+所有 NPC 共用同一个蓝图。**差异全在 Inspector 的 Personality 字段**——这就是 AI NPC 相对传统对话系统的核心优势：**一个蓝图 + N 个人设 = N 个活 NPC**。
+
+### 上线 checklist（照着做一定能过审）
+
+- [ ] 所有 NPC 的 `NpcId` 唯一（避免 NpcMemory 串档）
+- [ ] `LlmConfig.Mode = Proxy`，走 Cloudflare Worker（见 `ServerProxy/DEPLOY.md`）
+- [ ] 代理层加内容安全过滤（微信过审关键）
+- [ ] `request 合法域名` 白名单加上 Worker 域名 + 你的 CDN 域名
+- [ ] `Personality` 中不含政治/色情/暴力引导词
+- [ ] `WorldState.AddEvent` 加的事件也过内容安全
+- [ ] 冷却设置合理（`cooldown >= 1.5s` 防止连点烧 token）
+
+---
+
+## 下一步可以做的事情
+
+1. **剧情任务系统**（Quest 蓝图 + 完成触发奖励）
+2. **玩家属性/经验**（金币、等级、装备，和 NPC 对话动态反映）
+3. **NPC 互相对话 Demo**（A 看到玩家走进 B 的店 → 评论）
+4. **语音版 NPC**（TTS 朗读回复，用 `HTTP.Post` 节点 + 云端 TTS）
+5. **纯 2D UI 版本**（不用世界空间 Canvas，做一个聊天 app 风的小游戏）
