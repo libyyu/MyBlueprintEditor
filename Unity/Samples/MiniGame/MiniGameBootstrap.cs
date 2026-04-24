@@ -88,6 +88,8 @@ namespace BlueprintRuntime.Samples.MiniGame
                     WeChat.BlueprintWeChatNodes.RegisterAll(runner);
                     Quest.BlueprintQuestNodes.RegisterAll(runner);
                     BlueprintItemNodes.RegisterAll(runner);
+                    BlueprintShopNodes.RegisterAll(runner);
+                    BlueprintMemoryNodes.RegisterAll(runner);
                     BlueprintTutorialNodes.RegisterAll(runner);
                 };
             }

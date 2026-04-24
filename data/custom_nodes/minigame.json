@@ -246,6 +246,134 @@
         {"name": "IsDone", "type": "Boolean"},
         {"name": "AllDone", "type": "Boolean"}
       ]
+    },
+    {
+      "id": "Shop.Buy",
+      "name": "Shop Buy",
+      "category": "Game/Shop",
+      "color": "F39C12",
+      "description": "从 NPC 商店购买物品",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "NpcId", "type": "String"},
+        {"name": "ItemId", "type": "String"},
+        {"name": "Count", "type": "Integer"}
+      ],
+      "outputs": [
+        {"name": "onSuccess", "type": "Flow", "isExec": true},
+        {"name": "onPoor", "type": "Flow", "isExec": true},
+        {"name": "onNotFound", "type": "Flow", "isExec": true},
+        {"name": "onError", "type": "Flow", "isExec": true},
+        {"name": "Cost", "type": "Integer"}
+      ]
+    },
+    {
+      "id": "Shop.Sell",
+      "name": "Shop Sell",
+      "category": "Game/Shop",
+      "color": "F39C12",
+      "description": "向 NPC 商店卖出物品",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "NpcId", "type": "String"},
+        {"name": "ItemId", "type": "String"},
+        {"name": "Count", "type": "Integer"}
+      ],
+      "outputs": [
+        {"name": "onSuccess", "type": "Flow", "isExec": true},
+        {"name": "onInsufficient", "type": "Flow", "isExec": true},
+        {"name": "onError", "type": "Flow", "isExec": true},
+        {"name": "Revenue", "type": "Integer"}
+      ]
+    },
+    {
+      "id": "Shop.GetPrice",
+      "name": "Shop Get Price",
+      "category": "Game/Shop",
+      "color": "F39C12",
+      "description": "查询商品买卖价格（纯数据节点）",
+      "inputs": [
+        {"name": "NpcId", "type": "String"},
+        {"name": "ItemId", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "BuyPrice", "type": "Integer"},
+        {"name": "SellPrice", "type": "Integer"}
+      ]
+    },
+    {
+      "id": "Shop.ListItems",
+      "name": "Shop List Items",
+      "category": "Game/Shop",
+      "color": "F39C12",
+      "description": "列出商店所有商品（纯数据节点）",
+      "inputs": [
+        {"name": "NpcId", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "ItemList", "type": "String"},
+        {"name": "Count", "type": "Integer"}
+      ]
+    },
+    {
+      "id": "Memory.AddAffinity",
+      "name": "Memory Add Affinity",
+      "category": "Game/Memory",
+      "color": "E74C3C",
+      "description": "修改 NPC 好感度（正值增加，负值减少）",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "NpcId", "type": "String"},
+        {"name": "Delta", "type": "Integer"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true},
+        {"name": "NewAffinity", "type": "Integer"}
+      ]
+    },
+    {
+      "id": "Memory.RememberFact",
+      "name": "Memory Remember Fact",
+      "category": "Game/Memory",
+      "color": "E74C3C",
+      "description": "让 NPC 记住一个事实（永久保存）",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "NpcId", "type": "String"},
+        {"name": "Fact", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true}
+      ]
+    },
+    {
+      "id": "Memory.GetAffinity",
+      "name": "Memory Get Affinity",
+      "category": "Game/Memory",
+      "color": "E74C3C",
+      "description": "获取 NPC 好感度和见面次数（纯数据节点）",
+      "inputs": [
+        {"name": "NpcId", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "Affinity", "type": "Integer"},
+        {"name": "MeetCount", "type": "Integer"},
+        {"name": "IsFirstMeet", "type": "Boolean"}
+      ]
+    },
+    {
+      "id": "Memory.ClearHistory",
+      "name": "Memory Clear History",
+      "category": "Game/Memory",
+      "color": "E74C3C",
+      "description": "清除 NPC 的对话历史记录",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "NpcId", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true}
+      ]
     }
   ]
 }
