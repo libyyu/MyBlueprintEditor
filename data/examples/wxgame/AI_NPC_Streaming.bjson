@@ -313,8 +313,8 @@
           {
             "id": 902,
             "kind": 0,
-            "dataType": 9,
-            "name": "arg0"
+            "dataType": 4,
+            "name": "0"
           },
           {
             "id": 903,
@@ -364,8 +364,8 @@
           {
             "id": 1002,
             "kind": 0,
-            "dataType": 9,
-            "name": "arg0"
+            "dataType": 4,
+            "name": "0"
           },
           {
             "id": 1003,
@@ -415,8 +415,8 @@
           {
             "id": 1102,
             "kind": 0,
-            "dataType": 9,
-            "name": "arg0"
+            "dataType": 4,
+            "name": "0"
           },
           {
             "id": 1103,

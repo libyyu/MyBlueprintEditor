@@ -196,26 +196,26 @@
           {
             "id": 442,
             "kind": 0,
-            "dataType": 9,
-            "name": "arg0"
+            "dataType": 4,
+            "name": "0"
           },
           {
             "id": 443,
             "kind": 0,
-            "dataType": 9,
-            "name": "arg1"
+            "dataType": 4,
+            "name": "1"
           },
           {
             "id": 444,
             "kind": 0,
-            "dataType": 9,
-            "name": "arg2"
+            "dataType": 4,
+            "name": "2"
           },
           {
             "id": 445,
             "kind": 0,
-            "dataType": 9,
-            "name": "arg3"
+            "dataType": 4,
+            "name": "3"
           },
           {
             "id": 446,
