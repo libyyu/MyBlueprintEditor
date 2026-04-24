@@ -85,6 +85,13 @@ namespace BlueprintRuntime.Samples.MiniGame
             Changed();
         }
 
+        public void SetGold(int value)
+        {
+            Data.gold = Mathf.Max(0, value);
+            OnGoldChanged?.Invoke(Data.gold);
+            Changed();
+        }
+
         public bool TrySpendGold(int cost)
         {
             if (cost < 0) return false;
@@ -94,6 +101,21 @@ namespace BlueprintRuntime.Samples.MiniGame
         }
 
         // ── 经验 / 升级 ───────────────────────────────────────────
+        public void SetLevel(int value)
+        {
+            Data.level = Mathf.Max(1, value);
+            Changed();
+        }
+
+        public void SetName(string name)
+        {
+            if (!string.IsNullOrEmpty(name))
+            {
+                Data.playerName = name;
+                Changed();
+            }
+        }
+
         public void AddExp(int amount)
         {
             if (amount <= 0) return;

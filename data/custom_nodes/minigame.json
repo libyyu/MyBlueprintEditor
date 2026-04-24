@@ -374,6 +374,67 @@
       "outputs": [
         {"name": "Out", "type": "Flow", "isExec": true}
       ]
+    },
+    {
+      "id": "Player.AddGold",
+      "name": "Player Add Gold",
+      "category": "Game/Player",
+      "color": "F1C40F",
+      "description": "增减玩家金币",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "Amount", "type": "Integer"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true},
+        {"name": "NewGold", "type": "Integer"}
+      ]
+    },
+    {
+      "id": "Player.AddExp",
+      "name": "Player Add Exp",
+      "category": "Game/Player",
+      "color": "F1C40F",
+      "description": "增加玩家经验（可能触发升级）",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "Amount", "type": "Integer"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true},
+        {"name": "onLevelUp", "type": "Flow", "isExec": true},
+        {"name": "NewExp", "type": "Integer"},
+        {"name": "NewLevel", "type": "Integer"},
+        {"name": "LeveledUp", "type": "Boolean"}
+      ]
+    },
+    {
+      "id": "Player.GetStats",
+      "name": "Player Get Stats",
+      "category": "Game/Player",
+      "color": "F1C40F",
+      "description": "获取玩家属性（纯数据节点）",
+      "inputs": [],
+      "outputs": [
+        {"name": "Gold", "type": "Integer"},
+        {"name": "Level", "type": "Integer"},
+        {"name": "Exp", "type": "Integer"},
+        {"name": "Name", "type": "String"}
+      ]
+    },
+    {
+      "id": "Player.SetName",
+      "name": "Player Set Name",
+      "category": "Game/Player",
+      "color": "F1C40F",
+      "description": "设置玩家名字",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "Name", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true}
+      ]
     }
   ]
 }

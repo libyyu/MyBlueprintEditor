@@ -1,0 +1,85 @@
+// ─────────────────────────────────────────────────────────────────────
+// BlueprintPlayerNodes.cs — 玩家属性蓝图节点
+//
+// 节点：Player.AddGold / Player.AddExp / Player.GetStats / Player.SetName
+// ─────────────────────────────────────────────────────────────────────
+
+using UnityEngine;
+using BlueprintRuntime;
+
+namespace BlueprintMiniGame
+{
+    public static class BlueprintPlayerNodes
+    {
+        public static void RegisterAll(BPRunner runner)
+        {
+            // ── Player.AddGold ──────────────────────────────────────
+            runner.RegisterHandler("Player.AddGold", (ctx) =>
+            {
+                if (PlayerStats.Instance == null) { ctx.LogError("PlayerStats not found"); return; }
+                int amount = ctx.GetInputInt("Amount");
+                PlayerStats.Instance.AddGold(amount);
+                ctx.SetOutputInt("NewGold", PlayerStats.Instance.Gold);
+                if (amount > 0)
+                    ctx.Print($"获得 {amount} 金币（余额: {PlayerStats.Instance.Gold}）");
+                else if (amount < 0)
+                    ctx.Print($"花费 {-amount} 金币（余额: {PlayerStats.Instance.Gold}）");
+                ctx.ActivateOutputFlow("Out");
+            });
+
+            // ── Player.AddExp ───────────────────────────────────────
+            runner.RegisterHandler("Player.AddExp", (ctx) =>
+            {
+                if (PlayerStats.Instance == null) { ctx.LogError("PlayerStats not found"); return; }
+                int amount = ctx.GetInputInt("Amount");
+                int oldLevel = PlayerStats.Instance.Level;
+                PlayerStats.Instance.AddExp(amount);
+                int newLevel = PlayerStats.Instance.Level;
+
+                ctx.SetOutputInt("NewExp", PlayerStats.Instance.Exp);
+                ctx.SetOutputInt("NewLevel", newLevel);
+                ctx.SetOutputBool("LeveledUp", newLevel > oldLevel);
+
+                if (newLevel > oldLevel)
+                {
+                    ctx.Print($"获得 {amount} 经验，升级到 Lv.{newLevel}！");
+                    ctx.ActivateOutputFlow("onLevelUp");
+                }
+                else
+                {
+                    ctx.Print($"获得 {amount} 经验");
+                    ctx.ActivateOutputFlow("Out");
+                }
+            });
+
+            // ── Player.GetStats ─────────────────────────────────────
+            runner.RegisterHandler("Player.GetStats", (ctx) =>
+            {
+                if (PlayerStats.Instance == null)
+                {
+                    ctx.SetOutputInt("Gold", 0);
+                    ctx.SetOutputInt("Level", 1);
+                    ctx.SetOutputInt("Exp", 0);
+                    ctx.SetOutputString("Name", "");
+                    return;
+                }
+                ctx.SetOutputInt("Gold", PlayerStats.Instance.Gold);
+                ctx.SetOutputInt("Level", PlayerStats.Instance.Level);
+                ctx.SetOutputInt("Exp", PlayerStats.Instance.Exp);
+                ctx.SetOutputString("Name", PlayerStats.Instance.PlayerName);
+            });
+
+            // ── Player.SetName ──────────────────────────────────────
+            runner.RegisterHandler("Player.SetName", (ctx) =>
+            {
+                if (PlayerStats.Instance == null) { ctx.LogError("PlayerStats not found"); return; }
+                string name = ctx.GetInputString("Name");
+                if (!string.IsNullOrEmpty(name))
+                    PlayerStats.Instance.SetName(name);
+                ctx.ActivateOutputFlow("Out");
+            });
+
+            Debug.Log("[BlueprintPlayerNodes] Registered 4 nodes: Player.AddGold/AddExp/GetStats/SetName");
+        }
+    }
+}
