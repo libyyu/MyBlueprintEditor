@@ -70,6 +70,21 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
             if (node.Type != NodeType::Blueprint && node.Type != NodeType::Simple)
                 continue;
 
+            // ── 自动恢复：如果之前因 NodeDef 缺失标红，但现在注册表里有了 ──
+            // （支持依赖库延迟加载、热重载 Lua 脚本等场景）
+            if (node.HasError && node.ErrorMessage.find("not found") != std::string::npos)
+            {
+                auto* def = m_NodeRegistry.getNodeDefinition(node.DefinitionId);
+                if (def)
+                {
+                    node.HasError = false;
+                    node.ErrorMessage.clear();
+                    node.Color = GetNodeColor(def);
+                    // 注：引脚可能需要从 NodeDef 补全，但暂不做（已有引脚不变，
+                    // 只是颜色和错误状态恢复。如需完整同步可以加 SyncPinsFromDef）
+                }
+            }
+
             // ---- 通用引脚可见性：根据 HiddenWhen 声明式规则动态隐藏/显示引脚 ----
             // 格式: "引脚名==值" — 当同节点指定输入引脚的值等于给定值时隐藏此引脚
             // 被引用的引脚若被连线，则条件不满足（保守显示）
