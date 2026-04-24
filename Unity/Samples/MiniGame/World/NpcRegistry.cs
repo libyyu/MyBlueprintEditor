@@ -176,10 +176,12 @@ namespace BlueprintRuntime.Samples.MiniGame
         [SerializeField] private string displayName = "";
 
         [Header("对话前自动注入世界/附近信息")]
-        [Tooltip("开启后：每次 NPC 开始思考（OnThinking）时自动注入 WorldTime/WorldWeather/RecentEvents/NearbyNpcs")]
+        [Tooltip("开启后：每次 NPC 开始思考（OnThinking）时自动注入全部世界/玩家/任务变量")]
         [SerializeField] private bool injectBeforeEveryChat = true;
         [SerializeField] private bool injectWorldState      = true;
         [SerializeField] private bool injectNearbyNpcs      = true;
+        [SerializeField] private bool injectPlayerStats     = true;
+        [SerializeField] private bool injectQuests          = true;
 
         private NpcIdentity _identity;
         private AINpcController          _basic;
@@ -234,7 +236,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 NpcRegistry.Instance.Unregister(_identity.id);
         }
 
-        /// <summary>把世界状态 + 附近 NPC 注入到本 NPC 的 runner</summary>
+        /// <summary>把世界状态 + 附近 NPC + 玩家属性 + 任务状态注入到本 NPC 的 runner</summary>
         public void InjectNow()
         {
             var runner = NpcRegistry.RunnerAccessor.Get(_identity?.controller);
@@ -243,6 +245,10 @@ namespace BlueprintRuntime.Samples.MiniGame
                 WorldState.Instance.InjectInto(runner);
             if (injectNearbyNpcs && NpcRegistry.Instance != null)
                 NpcRegistry.Instance.InjectNearbyInto(_identity, runner);
+            if (injectPlayerStats && PlayerStats.Instance != null)
+                PlayerStats.Instance.InjectInto(runner);
+            if (injectQuests && Quest.QuestSystem.Instance != null)
+                Quest.QuestSystem.Instance.InjectInto(runner);
         }
 
         private string GetControllerName()
