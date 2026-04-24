@@ -361,6 +361,41 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
 
     CreateNewDocument();
     ed::SetCurrentEditor(ActiveDoc()->editorContext);
+
+    // ── 在 LoadEditorData 之前先加载依赖库 ──────────────────────────────────
+    // 必须在 LoadEditorData 前完成，否则 FuncLib.* 节点渲染时找不到 NodeDef
+    if (!m_Project.IsOpen())
+    {
+        std::string dir = BpPath::ParentDir(path);
+        if (dir.empty()) dir = ".";
+
+        // 1. 按 metadata.dependencies 精确加载依赖（相对于蓝图所在目录）
+        for (const auto& dep : result.data.metadata.dependencies)
+        {
+            std::string depPath = dir + "/" + dep;
+            ::NodeEditor::Runtime::JsonBlueprintExporter depExporter;
+            auto depResult = depExporter.importRuntimeFromFile(depPath);
+            if (depResult.success)
+            {
+                int n = ::NodeEditor::Runtime::RegisterLibraryFunctions(
+                    m_NodeRegistry, depResult.data, depPath);
+                if (n > 0)
+                    m_CachedDefCount = 0;  // 强制重建菜单缓存
+            }
+        }
+
+        // 2. 再扫描同目录下所有 Library（补充未在 dependencies 中声明的）
+        int libCount = ::NodeEditor::Runtime::LoadFunctionLibrary(m_NodeRegistry, dir);
+        if (libCount > 0)
+        {
+            ::NodeEditor::Runtime::NodeCategory cat;
+            cat.id   = "FunctionLibrary";
+            cat.name = "FunctionLibrary";
+            m_NodeRegistry.registerCategory(cat);
+            m_CachedDefCount = 0;
+        }
+    }
+
     LoadEditorData(result.data);
     ActiveDoc()->filePath = path;
     
@@ -379,58 +414,6 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
             ActiveDoc()->executionLog.push_back("[WARN] " + w);
     }
     ActiveDoc()->executionLogDirty = true;
-
-    // 如果没有打开工程，自动扫描蓝图同目录下的 FunctionLibrary 文件并注册节点
-    // （有工程时由 SyncProjectLibrariesToRegistry 负责）
-    if (!m_Project.IsOpen())
-    {
-        std::string dir = BpPath::ParentDir(ActiveDoc()->filePath);
-        if (dir.empty()) dir = ".";
-
-        // 1. 按 metadata.dependencies 精确加载依赖（相对于蓝图所在目录）
-        for (const auto& dep : result.data.metadata.dependencies)
-        {
-            std::string depPath = dir + "/" + dep;
-            ::NodeEditor::Runtime::JsonBlueprintExporter depExporter;
-            auto depResult = depExporter.importRuntimeFromFile(depPath);
-            if (depResult.success)
-            {
-                int n = ::NodeEditor::Runtime::RegisterLibraryFunctions(
-                    m_NodeRegistry, depResult.data, depPath);
-                if (n > 0)
-                {
-                    ActiveDoc()->executionLog.push_back(
-                        "[INFO] Loaded dependency '" + dep + "': " + std::to_string(n) + " function(s)");
-                    m_CachedDefCount = 0;  // 强制重建菜单缓存
-                }
-                else
-                {
-                    ActiveDoc()->executionLog.push_back(
-                        "[WARN] Dependency '" + dep + "' loaded but registered 0 functions (not a Library?)");
-                }
-            }
-            else
-            {
-                ActiveDoc()->executionLog.push_back(
-                    "[WARN] Failed to load dependency '" + dep + "': " + depResult.errorMessage);
-            }
-        }
-
-        // 2. 再扫描同目录下所有 Library（补充未在 dependencies 中声明的）
-        int libCount = ::NodeEditor::Runtime::LoadFunctionLibrary(m_NodeRegistry, dir);
-        if (libCount > 0)
-        {
-            ActiveDoc()->executionLog.push_back(
-                "[INFO] Auto-registered " + std::to_string(libCount) +
-                " library function(s) from: " + dir);
-            // 确保 FunctionLibrary 根分类存在于菜单树
-            ::NodeEditor::Runtime::NodeCategory cat;
-            cat.id   = "FunctionLibrary";
-            cat.name = "FunctionLibrary";
-            m_NodeRegistry.registerCategory(cat);
-            m_CachedDefCount = 0;  // 强制重建菜单缓存
-        }
-    }
 }
 
 // ============================================================================
