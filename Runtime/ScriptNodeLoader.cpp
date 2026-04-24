@@ -3,6 +3,10 @@
 #include <fstream>
 #include <sstream>
 
+#if !defined(BLUEPRINT_NO_FILESYSTEM) && !defined(__EMSCRIPTEN__)
+#include <filesystem>
+#endif
+
 // crude_json
 #include "../Utils/Json/crude_json.h"
 
@@ -156,6 +160,44 @@ int LoadCustomNodesFromFile(INodeRegistry& registry, const std::string& filePath
 
     return count;
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// 自动扫描目录下所有 .json 文件并加载节点定义
+// ─────────────────────────────────────────────────────────────────────
+
+#if !defined(BLUEPRINT_NO_FILESYSTEM) && !defined(__EMSCRIPTEN__)
+
+int LoadCustomNodesFromDirectory(INodeRegistry& registry, const std::string& dirPath)
+{
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (!fs::is_directory(dirPath, ec))
+        return 0;
+
+    int total = 0;
+    for (const auto& entry : fs::recursive_directory_iterator(dirPath, ec))
+    {
+        if (ec) break;
+        if (!entry.is_regular_file()) continue;
+
+        auto ext = entry.path().extension().string();
+        // 支持 .json 和 .bjson
+        if (ext == ".json" || ext == ".bjson")
+        {
+            int n = LoadCustomNodesFromFile(registry, entry.path().string());
+            total += n;
+        }
+    }
+    return total;
+}
+
+#else
+// Emscripten / BLUEPRINT_NO_FILESYSTEM: 无法扫描目录
+int LoadCustomNodesFromDirectory(INodeRegistry& /*registry*/, const std::string& /*dirPath*/)
+{
+    return 0;
+}
+#endif
 
 } // namespace Runtime
 } // namespace NodeEditor

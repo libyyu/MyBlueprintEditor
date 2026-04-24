@@ -1182,9 +1182,11 @@ void BlueprintEditor::OnStart()
     LoadRecentFiles();
     LoadRecentProjects();
 
-    // 加载外部自定义节点定义（文件不存在时静默跳过）
+    // 加载外部自定义节点定义
+    // 方式1：单文件（向后兼容）
     ::NodeEditor::Runtime::LoadCustomNodesFromFile(m_NodeRegistry, "data/custom_nodes.json");
-    ::NodeEditor::Runtime::LoadCustomNodesFromFile(m_NodeRegistry, "data/custom_nodes_minigame.json");
+    // 方式2：自动扫描目录下所有 .json/.bjson（推荐：新增节点只需放文件，不用改 C++）
+    ::NodeEditor::Runtime::LoadCustomNodesFromDirectory(m_NodeRegistry, "data/custom_nodes");
 
     // 加载公共函数库（目录不存在时静默返回 0）
     // 若工程系统启用后，此处可改为 SyncProjectLibrariesToRegistry()
