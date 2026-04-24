@@ -1,1 +1,966 @@
-{"runtime":{"fileType":"runtime","metadata":{"schemaVersion":2,"blueprintClass":0,"name":"AI_NPC_Emotional","description":"情绪化 NPC：LLM 返回 {reply,emotion,action} JSON，JSON.GetPath 拆字段后通过 PrintString 前缀 REPLY:/EMOTION:/ACTION: 回传 Unity","version":"1.0"},"nodes":[{"id":1,"definitionId":"OnExecute","name":"On Execute","pins":[{"id":2,"kind":1,"dataType":0,"isExec":true}]},{"id":10,"definitionId":"GetVariable","name":"Get PlayerInput","pins":[{"id":101,"kind":0,"dataType":4,"name":"Name","defaultValue":"PlayerInput"},{"id":102,"kind":1,"dataType":4,"name":"Value"}]},{"id":20,"definitionId":"JSON.MakeMessage","name":"Make User Msg","pins":[{"id":201,"kind":0,"dataType":4,"name":"Role","defaultValue":"user"},{"id":202,"kind":0,"dataType":4,"name":"Content"},{"id":203,"kind":0,"dataType":4,"name":"ToolCallId","defaultValue":""},{"id":204,"kind":1,"dataType":4,"name":"Message"}]},{"id":30,"definitionId":"JSON.MakeMessageArray","name":"Messages","pins":[{"id":301,"kind":0,"dataType":4,"name":"Messages","isArray":true},{"id":302,"kind":1,"dataType":4,"name":"Array"}]},{"id":40,"definitionId":"GetVariable","name":"Get Personality","pins":[{"id":401,"kind":0,"dataType":4,"name":"Name","defaultValue":"Personality"},{"id":402,"kind":1,"dataType":4,"name":"Value"}]},{"id":50,"definitionId":"GetVariable","name":"Get BaseURL","pins":[{"id":501,"kind":0,"dataType":4,"name":"Name","defaultValue":"BaseURL"},{"id":502,"kind":1,"dataType":4,"name":"Value"}]},{"id":60,"definitionId":"GetVariable","name":"Get ApiKey","pins":[{"id":601,"kind":0,"dataType":4,"name":"Name","defaultValue":"ApiKey"},{"id":602,"kind":1,"dataType":4,"name":"Value"}]},{"id":70,"definitionId":"GetVariable","name":"Get Model","pins":[{"id":701,"kind":0,"dataType":4,"name":"Name","defaultValue":"Model"},{"id":702,"kind":1,"dataType":4,"name":"Value"}]},{"id":80,"definitionId":"LLM.Chat","name":"Chat (JSON out)","pins":[{"id":801,"kind":0,"dataType":0,"isExec":true},{"id":802,"kind":0,"dataType":4,"name":"BaseURL"},{"id":803,"kind":0,"dataType":4,"name":"ApiKey"},{"id":804,"kind":0,"dataType":4,"name":"Model","defaultValue":"glm-4-flash"},{"id":805,"kind":0,"dataType":4,"name":"Messages"},{"id":806,"kind":0,"dataType":4,"name":"SystemPrompt"},{"id":807,"kind":0,"dataType":2,"name":"MaxTokens","defaultValue":300},{"id":808,"kind":0,"dataType":3,"name":"Temperature","defaultValue":0.7},{"id":809,"kind":0,"dataType":4,"name":"Tools","defaultValue":""},{"id":810,"kind":1,"dataType":0,"name":"onReply","isExec":true},{"id":811,"kind":1,"dataType":0,"name":"onToolCall","isExec":true},{"id":812,"kind":1,"dataType":0,"name":"onError","isExec":true},{"id":813,"kind":1,"dataType":4,"name":"Reply"},{"id":814,"kind":1,"dataType":4,"name":"ToolCallsJSON"},{"id":815,"kind":1,"dataType":4,"name":"FinishReason"},{"id":816,"kind":1,"dataType":4,"name":"FullResponse"},{"id":817,"kind":1,"dataType":4,"name":"ErrorMessage"}]},{"id":90,"definitionId":"JSON.GetPath","name":"Parse reply","pins":[{"id":901,"kind":0,"dataType":4,"name":"JSON"},{"id":902,"kind":0,"dataType":4,"name":"Path","defaultValue":"reply"},{"id":903,"kind":1,"dataType":4,"name":"Value"},{"id":904,"kind":1,"dataType":1,"name":"Found"}]},{"id":91,"definitionId":"JSON.GetPath","name":"Parse emotion","pins":[{"id":911,"kind":0,"dataType":4,"name":"JSON"},{"id":912,"kind":0,"dataType":4,"name":"Path","defaultValue":"emotion"},{"id":913,"kind":1,"dataType":4,"name":"Value"},{"id":914,"kind":1,"dataType":1,"name":"Found"}]},{"id":92,"definitionId":"JSON.GetPath","name":"Parse action","pins":[{"id":921,"kind":0,"dataType":4,"name":"JSON"},{"id":922,"kind":0,"dataType":4,"name":"Path","defaultValue":"action"},{"id":923,"kind":1,"dataType":4,"name":"Value"},{"id":924,"kind":1,"dataType":1,"name":"Found"}]},{"id":110,"definitionId":"FormatString","name":"Wrap REPLY","pins":[{"id":1101,"kind":0,"dataType":4,"name":"Format","defaultValue":"REPLY:{0}"},{"id":1102,"kind":0,"dataType":9,"name":"arg0"},{"id":1103,"kind":1,"dataType":4,"name":"Result"}]},{"id":111,"definitionId":"PrintString","name":"Emit REPLY","pins":[{"id":1111,"kind":0,"dataType":0,"isExec":true},{"id":1112,"kind":0,"dataType":4,"name":"In String"},{"id":1113,"kind":1,"dataType":0,"isExec":true}]},{"id":120,"definitionId":"FormatString","name":"Wrap EMOTION","pins":[{"id":1201,"kind":0,"dataType":4,"name":"Format","defaultValue":"EMOTION:{0}"},{"id":1202,"kind":0,"dataType":9,"name":"arg0"},{"id":1203,"kind":1,"dataType":4,"name":"Result"}]},{"id":121,"definitionId":"PrintString","name":"Emit EMOTION","pins":[{"id":1211,"kind":0,"dataType":0,"isExec":true},{"id":1212,"kind":0,"dataType":4,"name":"In String"},{"id":1213,"kind":1,"dataType":0,"isExec":true}]},{"id":130,"definitionId":"FormatString","name":"Wrap ACTION","pins":[{"id":1301,"kind":0,"dataType":4,"name":"Format","defaultValue":"ACTION:{0}"},{"id":1302,"kind":0,"dataType":9,"name":"arg0"},{"id":1303,"kind":1,"dataType":4,"name":"Result"}]},{"id":131,"definitionId":"PrintString","name":"Emit ACTION","pins":[{"id":1311,"kind":0,"dataType":0,"isExec":true},{"id":1312,"kind":0,"dataType":4,"name":"In String"},{"id":1313,"kind":1,"dataType":0,"isExec":true}]},{"id":140,"definitionId":"FormatString","name":"Wrap ERROR","pins":[{"id":1401,"kind":0,"dataType":4,"name":"Format","defaultValue":"ERROR:{0}"},{"id":1402,"kind":0,"dataType":9,"name":"arg0"},{"id":1403,"kind":1,"dataType":4,"name":"Result"}]},{"id":141,"definitionId":"PrintString","name":"Emit ERROR","pins":[{"id":1411,"kind":0,"dataType":0,"isExec":true},{"id":1412,"kind":0,"dataType":4,"name":"In String"},{"id":1413,"kind":1,"dataType":0,"isExec":true}]}],"links":[{"id":1,"startPinId":2,"endPinId":801,"isEnabled":true},{"id":2,"startPinId":102,"endPinId":202,"isEnabled":true},{"id":3,"startPinId":204,"endPinId":301,"isEnabled":true},{"id":4,"startPinId":302,"endPinId":805,"isEnabled":true},{"id":5,"startPinId":402,"endPinId":806,"isEnabled":true},{"id":6,"startPinId":502,"endPinId":802,"isEnabled":true},{"id":7,"startPinId":602,"endPinId":803,"isEnabled":true},{"id":8,"startPinId":702,"endPinId":804,"isEnabled":true},{"id":9,"startPinId":813,"endPinId":901,"isEnabled":true},{"id":10,"startPinId":813,"endPinId":911,"isEnabled":true},{"id":11,"startPinId":813,"endPinId":921,"isEnabled":true},{"id":12,"startPinId":810,"endPinId":1111,"isEnabled":true},{"id":13,"startPinId":903,"endPinId":1102,"isEnabled":true},{"id":14,"startPinId":1103,"endPinId":1112,"isEnabled":true},{"id":15,"startPinId":1113,"endPinId":1211,"isEnabled":true},{"id":16,"startPinId":913,"endPinId":1202,"isEnabled":true},{"id":17,"startPinId":1203,"endPinId":1212,"isEnabled":true},{"id":18,"startPinId":1213,"endPinId":1311,"isEnabled":true},{"id":19,"startPinId":923,"endPinId":1302,"isEnabled":true},{"id":20,"startPinId":1303,"endPinId":1312,"isEnabled":true},{"id":21,"startPinId":812,"endPinId":1411,"isEnabled":true},{"id":22,"startPinId":817,"endPinId":1402,"isEnabled":true},{"id":23,"startPinId":1403,"endPinId":1412,"isEnabled":true}]}}
+{
+  "runtime": {
+    "fileType": "runtime",
+    "metadata": {
+      "schemaVersion": 2,
+      "blueprintClass": 0,
+      "name": "AI_NPC_Emotional",
+      "description": "情绪化 NPC：LLM 返回 {reply,emotion,action} JSON，JSON.GetPath 拆字段后通过 PrintString 前缀 REPLY:/EMOTION:/ACTION: 回传 Unity",
+      "version": "1.0"
+    },
+    "nodes": [
+      {
+        "id": 1,
+        "definitionId": "OnExecute",
+        "name": "On Execute",
+        "pins": [
+          {
+            "id": 2,
+            "kind": 1,
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "definitionId": "GetVariable",
+        "name": "Get PlayerInput",
+        "pins": [
+          {
+            "id": 101,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Name",
+            "defaultValue": "PlayerInput"
+          },
+          {
+            "id": 102,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Value"
+          }
+        ]
+      },
+      {
+        "id": 20,
+        "definitionId": "JSON.MakeMessage",
+        "name": "Make User Msg",
+        "pins": [
+          {
+            "id": 201,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Role",
+            "defaultValue": "user"
+          },
+          {
+            "id": 202,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Content"
+          },
+          {
+            "id": 203,
+            "kind": 0,
+            "dataType": 4,
+            "name": "ToolCallId",
+            "defaultValue": ""
+          },
+          {
+            "id": 204,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Message"
+          }
+        ]
+      },
+      {
+        "id": 30,
+        "definitionId": "JSON.MakeMessageArray",
+        "name": "Messages",
+        "pins": [
+          {
+            "id": 301,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Messages",
+            "isArray": true
+          },
+          {
+            "id": 302,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Array"
+          }
+        ]
+      },
+      {
+        "id": 40,
+        "definitionId": "GetVariable",
+        "name": "Get Personality",
+        "pins": [
+          {
+            "id": 401,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Name",
+            "defaultValue": "Personality"
+          },
+          {
+            "id": 402,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Value"
+          }
+        ]
+      },
+      {
+        "id": 50,
+        "definitionId": "GetVariable",
+        "name": "Get BaseURL",
+        "pins": [
+          {
+            "id": 501,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Name",
+            "defaultValue": "BaseURL"
+          },
+          {
+            "id": 502,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Value"
+          }
+        ]
+      },
+      {
+        "id": 60,
+        "definitionId": "GetVariable",
+        "name": "Get ApiKey",
+        "pins": [
+          {
+            "id": 601,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Name",
+            "defaultValue": "ApiKey"
+          },
+          {
+            "id": 602,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Value"
+          }
+        ]
+      },
+      {
+        "id": 70,
+        "definitionId": "GetVariable",
+        "name": "Get Model",
+        "pins": [
+          {
+            "id": 701,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Name",
+            "defaultValue": "Model"
+          },
+          {
+            "id": 702,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Value"
+          }
+        ]
+      },
+      {
+        "id": 80,
+        "definitionId": "LLM.Chat",
+        "name": "Chat (JSON out)",
+        "pins": [
+          {
+            "id": 801,
+            "kind": 0,
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 802,
+            "kind": 0,
+            "dataType": 4,
+            "name": "BaseURL"
+          },
+          {
+            "id": 803,
+            "kind": 0,
+            "dataType": 4,
+            "name": "ApiKey"
+          },
+          {
+            "id": 804,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Model",
+            "defaultValue": "glm-4-flash"
+          },
+          {
+            "id": 805,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Messages"
+          },
+          {
+            "id": 806,
+            "kind": 0,
+            "dataType": 4,
+            "name": "SystemPrompt"
+          },
+          {
+            "id": 807,
+            "kind": 0,
+            "dataType": 2,
+            "name": "MaxTokens",
+            "defaultValue": 300
+          },
+          {
+            "id": 808,
+            "kind": 0,
+            "dataType": 3,
+            "name": "Temperature",
+            "defaultValue": 0.7
+          },
+          {
+            "id": 809,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Tools",
+            "defaultValue": ""
+          },
+          {
+            "id": 810,
+            "kind": 1,
+            "dataType": 0,
+            "name": "onReply",
+            "isExec": true
+          },
+          {
+            "id": 811,
+            "kind": 1,
+            "dataType": 0,
+            "name": "onToolCall",
+            "isExec": true
+          },
+          {
+            "id": 812,
+            "kind": 1,
+            "dataType": 0,
+            "name": "onError",
+            "isExec": true
+          },
+          {
+            "id": 813,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Reply"
+          },
+          {
+            "id": 814,
+            "kind": 1,
+            "dataType": 4,
+            "name": "ToolCallsJSON"
+          },
+          {
+            "id": 815,
+            "kind": 1,
+            "dataType": 4,
+            "name": "FinishReason"
+          },
+          {
+            "id": 816,
+            "kind": 1,
+            "dataType": 4,
+            "name": "FullResponse"
+          },
+          {
+            "id": 817,
+            "kind": 1,
+            "dataType": 4,
+            "name": "ErrorMessage"
+          }
+        ]
+      },
+      {
+        "id": 90,
+        "definitionId": "JSON.GetPath",
+        "name": "Parse reply",
+        "pins": [
+          {
+            "id": 901,
+            "kind": 0,
+            "dataType": 4,
+            "name": "JSON"
+          },
+          {
+            "id": 902,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Path",
+            "defaultValue": "reply"
+          },
+          {
+            "id": 903,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Value"
+          },
+          {
+            "id": 904,
+            "kind": 1,
+            "dataType": 1,
+            "name": "Found"
+          }
+        ]
+      },
+      {
+        "id": 91,
+        "definitionId": "JSON.GetPath",
+        "name": "Parse emotion",
+        "pins": [
+          {
+            "id": 911,
+            "kind": 0,
+            "dataType": 4,
+            "name": "JSON"
+          },
+          {
+            "id": 912,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Path",
+            "defaultValue": "emotion"
+          },
+          {
+            "id": 913,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Value"
+          },
+          {
+            "id": 914,
+            "kind": 1,
+            "dataType": 1,
+            "name": "Found"
+          }
+        ]
+      },
+      {
+        "id": 92,
+        "definitionId": "JSON.GetPath",
+        "name": "Parse action",
+        "pins": [
+          {
+            "id": 921,
+            "kind": 0,
+            "dataType": 4,
+            "name": "JSON"
+          },
+          {
+            "id": 922,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Path",
+            "defaultValue": "action"
+          },
+          {
+            "id": 923,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Value"
+          },
+          {
+            "id": 924,
+            "kind": 1,
+            "dataType": 1,
+            "name": "Found"
+          }
+        ]
+      },
+      {
+        "id": 110,
+        "definitionId": "FormatString",
+        "name": "Wrap REPLY",
+        "pins": [
+          {
+            "id": 1101,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Format",
+            "defaultValue": "REPLY:{0}"
+          },
+          {
+            "id": 1102,
+            "kind": 0,
+            "dataType": 9,
+            "name": "arg0"
+          },
+          {
+            "id": 1103,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Result"
+          }
+        ]
+      },
+      {
+        "id": 111,
+        "definitionId": "PrintString",
+        "name": "Emit REPLY",
+        "pins": [
+          {
+            "id": 1111,
+            "kind": 0,
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 1112,
+            "kind": 0,
+            "dataType": 4,
+            "name": "In String"
+          },
+          {
+            "id": 1113,
+            "kind": 1,
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      },
+      {
+        "id": 120,
+        "definitionId": "FormatString",
+        "name": "Wrap EMOTION",
+        "pins": [
+          {
+            "id": 1201,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Format",
+            "defaultValue": "EMOTION:{0}"
+          },
+          {
+            "id": 1202,
+            "kind": 0,
+            "dataType": 9,
+            "name": "arg0"
+          },
+          {
+            "id": 1203,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Result"
+          }
+        ]
+      },
+      {
+        "id": 121,
+        "definitionId": "PrintString",
+        "name": "Emit EMOTION",
+        "pins": [
+          {
+            "id": 1211,
+            "kind": 0,
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 1212,
+            "kind": 0,
+            "dataType": 4,
+            "name": "In String"
+          },
+          {
+            "id": 1213,
+            "kind": 1,
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      },
+      {
+        "id": 130,
+        "definitionId": "FormatString",
+        "name": "Wrap ACTION",
+        "pins": [
+          {
+            "id": 1301,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Format",
+            "defaultValue": "ACTION:{0}"
+          },
+          {
+            "id": 1302,
+            "kind": 0,
+            "dataType": 9,
+            "name": "arg0"
+          },
+          {
+            "id": 1303,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Result"
+          }
+        ]
+      },
+      {
+        "id": 131,
+        "definitionId": "PrintString",
+        "name": "Emit ACTION",
+        "pins": [
+          {
+            "id": 1311,
+            "kind": 0,
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 1312,
+            "kind": 0,
+            "dataType": 4,
+            "name": "In String"
+          },
+          {
+            "id": 1313,
+            "kind": 1,
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      },
+      {
+        "id": 140,
+        "definitionId": "FormatString",
+        "name": "Wrap ERROR",
+        "pins": [
+          {
+            "id": 1401,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Format",
+            "defaultValue": "ERROR:{0}"
+          },
+          {
+            "id": 1402,
+            "kind": 0,
+            "dataType": 9,
+            "name": "arg0"
+          },
+          {
+            "id": 1403,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Result"
+          }
+        ]
+      },
+      {
+        "id": 141,
+        "definitionId": "PrintString",
+        "name": "Emit ERROR",
+        "pins": [
+          {
+            "id": 1411,
+            "kind": 0,
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 1412,
+            "kind": 0,
+            "dataType": 4,
+            "name": "In String"
+          },
+          {
+            "id": 1413,
+            "kind": 1,
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "id": 1,
+        "startPinId": 2,
+        "endPinId": 801,
+        "isEnabled": true
+      },
+      {
+        "id": 2,
+        "startPinId": 102,
+        "endPinId": 202,
+        "isEnabled": true
+      },
+      {
+        "id": 3,
+        "startPinId": 204,
+        "endPinId": 301,
+        "isEnabled": true
+      },
+      {
+        "id": 4,
+        "startPinId": 302,
+        "endPinId": 805,
+        "isEnabled": true
+      },
+      {
+        "id": 5,
+        "startPinId": 402,
+        "endPinId": 806,
+        "isEnabled": true
+      },
+      {
+        "id": 6,
+        "startPinId": 502,
+        "endPinId": 802,
+        "isEnabled": true
+      },
+      {
+        "id": 7,
+        "startPinId": 602,
+        "endPinId": 803,
+        "isEnabled": true
+      },
+      {
+        "id": 8,
+        "startPinId": 702,
+        "endPinId": 804,
+        "isEnabled": true
+      },
+      {
+        "id": 9,
+        "startPinId": 813,
+        "endPinId": 901,
+        "isEnabled": true
+      },
+      {
+        "id": 10,
+        "startPinId": 813,
+        "endPinId": 911,
+        "isEnabled": true
+      },
+      {
+        "id": 11,
+        "startPinId": 813,
+        "endPinId": 921,
+        "isEnabled": true
+      },
+      {
+        "id": 12,
+        "startPinId": 810,
+        "endPinId": 1111,
+        "isEnabled": true
+      },
+      {
+        "id": 13,
+        "startPinId": 903,
+        "endPinId": 1102,
+        "isEnabled": true
+      },
+      {
+        "id": 14,
+        "startPinId": 1103,
+        "endPinId": 1112,
+        "isEnabled": true
+      },
+      {
+        "id": 15,
+        "startPinId": 1113,
+        "endPinId": 1211,
+        "isEnabled": true
+      },
+      {
+        "id": 16,
+        "startPinId": 913,
+        "endPinId": 1202,
+        "isEnabled": true
+      },
+      {
+        "id": 17,
+        "startPinId": 1203,
+        "endPinId": 1212,
+        "isEnabled": true
+      },
+      {
+        "id": 18,
+        "startPinId": 1213,
+        "endPinId": 1311,
+        "isEnabled": true
+      },
+      {
+        "id": 19,
+        "startPinId": 923,
+        "endPinId": 1302,
+        "isEnabled": true
+      },
+      {
+        "id": 20,
+        "startPinId": 1303,
+        "endPinId": 1312,
+        "isEnabled": true
+      },
+      {
+        "id": 21,
+        "startPinId": 812,
+        "endPinId": 1411,
+        "isEnabled": true
+      },
+      {
+        "id": 22,
+        "startPinId": 817,
+        "endPinId": 1402,
+        "isEnabled": true
+      },
+      {
+        "id": 23,
+        "startPinId": 1403,
+        "endPinId": 1412,
+        "isEnabled": true
+      }
+    ]
+  },
+  "editor": {
+    "fileType": "editor",
+    "metadata": {
+      "author": "",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "nodes": [
+      {
+        "id": 1,
+        "position": {
+          "x": -400,
+          "y": 0
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 10,
+        "position": {
+          "x": -50,
+          "y": -240
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 40,
+        "position": {
+          "x": -50,
+          "y": -120
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 50,
+        "position": {
+          "x": -50,
+          "y": 0
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 60,
+        "position": {
+          "x": -50,
+          "y": 120
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 70,
+        "position": {
+          "x": -50,
+          "y": 240
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 20,
+        "position": {
+          "x": 300,
+          "y": -300
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 30,
+        "position": {
+          "x": 300,
+          "y": -180
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 110,
+        "position": {
+          "x": 300,
+          "y": -60
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 120,
+        "position": {
+          "x": 300,
+          "y": 60
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 130,
+        "position": {
+          "x": 300,
+          "y": 180
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 140,
+        "position": {
+          "x": 300,
+          "y": 300
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 80,
+        "position": {
+          "x": 650,
+          "y": 0
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 90,
+        "position": {
+          "x": 1000,
+          "y": -120
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 91,
+        "position": {
+          "x": 1000,
+          "y": 0
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 92,
+        "position": {
+          "x": 1000,
+          "y": 120
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 111,
+        "position": {
+          "x": 1350,
+          "y": -180
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 121,
+        "position": {
+          "x": 1350,
+          "y": -60
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 131,
+        "position": {
+          "x": 1350,
+          "y": 60
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 141,
+        "position": {
+          "x": 1350,
+          "y": 180
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      }
+    ]
+  }
+}

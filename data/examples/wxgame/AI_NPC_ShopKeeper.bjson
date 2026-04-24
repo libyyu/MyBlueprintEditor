@@ -4,98 +4,686 @@
       "name": "AI_NPC_ShopKeeper",
       "description": "商店 NPC 对话蓝图：根据好感度推荐商品、折扣、发任务",
       "version": 1,
-      "tags": ["minigame", "npc", "shop", "affinity"]
+      "tags": [
+        "minigame",
+        "npc",
+        "shop",
+        "affinity"
+      ]
     },
     "variables": [
-      {"name": "PlayerInput",    "type": "String", "value": ""},
-      {"name": "Personality",    "type": "String", "value": "你是一家魔法道具店的猫头鹰老板，博学稳重，偶尔冷笑话。回复2-3句。"},
-      {"name": "Affinity",       "type": "Float",  "value": 0},
-      {"name": "PlayerName",     "type": "String", "value": "冒险者"},
-      {"name": "PlayerGold",     "type": "Integer","value": 0},
-      {"name": "PlayerLevel",    "type": "Integer","value": 1},
-      {"name": "ShopItems",      "type": "String", "value": ""},
-      {"name": "InventoryItems", "type": "String", "value": ""},
-      {"name": "MeetCount",      "type": "Integer","value": 0},
-      {"name": "KnownFacts",     "type": "String", "value": ""},
-      {"name": "WorldTime",      "type": "String", "value": "白天"},
-      {"name": "BaseURL",        "type": "String", "value": "https://open.bigmodel.cn/api/paas/v4"},
-      {"name": "ApiKey",         "type": "String", "value": ""},
-      {"name": "Model",          "type": "String", "value": "glm-4-flash"}
+      {
+        "name": "PlayerInput",
+        "type": "String",
+        "value": ""
+      },
+      {
+        "name": "Personality",
+        "type": "String",
+        "value": "你是一家魔法道具店的猫头鹰老板，博学稳重，偶尔冷笑话。回复2-3句。"
+      },
+      {
+        "name": "Affinity",
+        "type": "Float",
+        "value": 0
+      },
+      {
+        "name": "PlayerName",
+        "type": "String",
+        "value": "冒险者"
+      },
+      {
+        "name": "PlayerGold",
+        "type": "Integer",
+        "value": 0
+      },
+      {
+        "name": "PlayerLevel",
+        "type": "Integer",
+        "value": 1
+      },
+      {
+        "name": "ShopItems",
+        "type": "String",
+        "value": ""
+      },
+      {
+        "name": "InventoryItems",
+        "type": "String",
+        "value": ""
+      },
+      {
+        "name": "MeetCount",
+        "type": "Integer",
+        "value": 0
+      },
+      {
+        "name": "KnownFacts",
+        "type": "String",
+        "value": ""
+      },
+      {
+        "name": "WorldTime",
+        "type": "String",
+        "value": "白天"
+      },
+      {
+        "name": "BaseURL",
+        "type": "String",
+        "value": "https://open.bigmodel.cn/api/paas/v4"
+      },
+      {
+        "name": "ApiKey",
+        "type": "String",
+        "value": ""
+      },
+      {
+        "name": "Model",
+        "type": "String",
+        "value": "glm-4-flash"
+      }
     ],
     "nodes": [
-      {"id": 1, "definitionId": "OnExecute", "name": "Start"},
-
-      {"id": 10, "definitionId": "GetVariable", "name": "Get PlayerInput",
-       "nodeData": {"VariableName": "PlayerInput"}},
-      {"id": 11, "definitionId": "GetVariable", "name": "Get Personality",
-       "nodeData": {"VariableName": "Personality"}},
-      {"id": 12, "definitionId": "GetVariable", "name": "Get Affinity",
-       "nodeData": {"VariableName": "Affinity"}},
-      {"id": 13, "definitionId": "GetVariable", "name": "Get PlayerName",
-       "nodeData": {"VariableName": "PlayerName"}},
-      {"id": 14, "definitionId": "GetVariable", "name": "Get PlayerGold",
-       "nodeData": {"VariableName": "PlayerGold"}},
-      {"id": 15, "definitionId": "GetVariable", "name": "Get ShopItems",
-       "nodeData": {"VariableName": "ShopItems"}},
-      {"id": 16, "definitionId": "GetVariable", "name": "Get MeetCount",
-       "nodeData": {"VariableName": "MeetCount"}},
-      {"id": 17, "definitionId": "GetVariable", "name": "Get WorldTime",
-       "nodeData": {"VariableName": "WorldTime"}},
-      {"id": 18, "definitionId": "GetVariable", "name": "Get InventoryItems",
-       "nodeData": {"VariableName": "InventoryItems"}},
-      {"id": 19, "definitionId": "GetVariable", "name": "Get KnownFacts",
-       "nodeData": {"VariableName": "KnownFacts"}},
-
-      {"id": 50, "definitionId": "GetVariable", "name": "Get BaseURL",
-       "nodeData": {"VariableName": "BaseURL"}},
-      {"id": 60, "definitionId": "GetVariable", "name": "Get ApiKey",
-       "nodeData": {"VariableName": "ApiKey"}},
-      {"id": 70, "definitionId": "GetVariable", "name": "Get Model",
-       "nodeData": {"VariableName": "Model"}},
-
-      {"id": 100, "definitionId": "FormatString", "name": "Build SystemPrompt",
-       "pinValues": {
-         "Format": "{0}\n\n== 状态 ==\n时间:{1} | 玩家:{2}(Lv.{3}) | 金币:{4} | 好感度:{5}/100 | 见面次数:{6}\n\n== 你的商品 ==\n{7}\n\n== 玩家背包 ==\n{8}\n\n== 你记得的事 ==\n{9}\n\n== 规则 ==\n- 好感度<30：态度冷淡，不打折\n- 好感度30-60：友好，偶尔推荐商品\n- 好感度>60：热情，主动打折，推荐稀有商品\n- 好感度>80：把玩家当朋友，分享秘密，给独家任务\n- 如果玩家要买东西，告诉价格让他确认\n- 如果玩家金币不够，温和提醒"
-       }},
-
-      {"id": 20, "definitionId": "JSON.MakeMessage", "name": "Make User Msg",
-       "pinValues": {"Role": "user"}},
-      {"id": 30, "definitionId": "JSON.MakeMessageArray", "name": "Messages"},
-
-      {"id": 40, "definitionId": "LLM.Chat", "name": "Ask LLM"},
-
-      {"id": 80, "definitionId": "PrintString", "name": "Show Reply"},
-      {"id": 81, "definitionId": "PrintString", "name": "Show Error",
-       "pinValues": {"In String": "ERROR:"}}
+      {
+        "id": 1,
+        "definitionId": "OnExecute",
+        "name": "Start"
+      },
+      {
+        "id": 10,
+        "definitionId": "GetVariable",
+        "name": "Get PlayerInput",
+        "nodeData": {
+          "VariableName": "PlayerInput"
+        }
+      },
+      {
+        "id": 11,
+        "definitionId": "GetVariable",
+        "name": "Get Personality",
+        "nodeData": {
+          "VariableName": "Personality"
+        }
+      },
+      {
+        "id": 12,
+        "definitionId": "GetVariable",
+        "name": "Get Affinity",
+        "nodeData": {
+          "VariableName": "Affinity"
+        }
+      },
+      {
+        "id": 13,
+        "definitionId": "GetVariable",
+        "name": "Get PlayerName",
+        "nodeData": {
+          "VariableName": "PlayerName"
+        }
+      },
+      {
+        "id": 14,
+        "definitionId": "GetVariable",
+        "name": "Get PlayerGold",
+        "nodeData": {
+          "VariableName": "PlayerGold"
+        }
+      },
+      {
+        "id": 15,
+        "definitionId": "GetVariable",
+        "name": "Get ShopItems",
+        "nodeData": {
+          "VariableName": "ShopItems"
+        }
+      },
+      {
+        "id": 16,
+        "definitionId": "GetVariable",
+        "name": "Get MeetCount",
+        "nodeData": {
+          "VariableName": "MeetCount"
+        }
+      },
+      {
+        "id": 17,
+        "definitionId": "GetVariable",
+        "name": "Get WorldTime",
+        "nodeData": {
+          "VariableName": "WorldTime"
+        }
+      },
+      {
+        "id": 18,
+        "definitionId": "GetVariable",
+        "name": "Get InventoryItems",
+        "nodeData": {
+          "VariableName": "InventoryItems"
+        }
+      },
+      {
+        "id": 19,
+        "definitionId": "GetVariable",
+        "name": "Get KnownFacts",
+        "nodeData": {
+          "VariableName": "KnownFacts"
+        }
+      },
+      {
+        "id": 50,
+        "definitionId": "GetVariable",
+        "name": "Get BaseURL",
+        "nodeData": {
+          "VariableName": "BaseURL"
+        }
+      },
+      {
+        "id": 60,
+        "definitionId": "GetVariable",
+        "name": "Get ApiKey",
+        "nodeData": {
+          "VariableName": "ApiKey"
+        }
+      },
+      {
+        "id": 70,
+        "definitionId": "GetVariable",
+        "name": "Get Model",
+        "nodeData": {
+          "VariableName": "Model"
+        }
+      },
+      {
+        "id": 100,
+        "definitionId": "FormatString",
+        "name": "Build SystemPrompt",
+        "pinValues": {
+          "Format": "{0}\n\n== 状态 ==\n时间:{1} | 玩家:{2}(Lv.{3}) | 金币:{4} | 好感度:{5}/100 | 见面次数:{6}\n\n== 你的商品 ==\n{7}\n\n== 玩家背包 ==\n{8}\n\n== 你记得的事 ==\n{9}\n\n== 规则 ==\n- 好感度<30：态度冷淡，不打折\n- 好感度30-60：友好，偶尔推荐商品\n- 好感度>60：热情，主动打折，推荐稀有商品\n- 好感度>80：把玩家当朋友，分享秘密，给独家任务\n- 如果玩家要买东西，告诉价格让他确认\n- 如果玩家金币不够，温和提醒"
+        }
+      },
+      {
+        "id": 20,
+        "definitionId": "JSON.MakeMessage",
+        "name": "Make User Msg",
+        "pinValues": {
+          "Role": "user"
+        }
+      },
+      {
+        "id": 30,
+        "definitionId": "JSON.MakeMessageArray",
+        "name": "Messages"
+      },
+      {
+        "id": 40,
+        "definitionId": "LLM.Chat",
+        "name": "Ask LLM"
+      },
+      {
+        "id": 80,
+        "definitionId": "PrintString",
+        "name": "Show Reply"
+      },
+      {
+        "id": 81,
+        "definitionId": "PrintString",
+        "name": "Show Error",
+        "pinValues": {
+          "In String": "ERROR:"
+        }
+      }
     ],
     "links": [
-      {"from": {"nodeId": 1, "pin": ""},          "to": {"nodeId": 40, "pin": ""}},
-
-      {"from": {"nodeId": 10, "pin": "Value"},    "to": {"nodeId": 20, "pin": "Content"}},
-      {"from": {"nodeId": 20, "pin": "Message"},  "to": {"nodeId": 30, "pin": "Message 0"}},
-      {"from": {"nodeId": 30, "pin": "Messages"}, "to": {"nodeId": 40, "pin": "Messages"}},
-
-      {"from": {"nodeId": 11, "pin": "Value"},    "to": {"nodeId": 100, "pin": "0"}},
-      {"from": {"nodeId": 17, "pin": "Value"},    "to": {"nodeId": 100, "pin": "1"}},
-      {"from": {"nodeId": 13, "pin": "Value"},    "to": {"nodeId": 100, "pin": "2"}},
-      {"from": {"nodeId": 14, "pin": "Value"},    "to": {"nodeId": 100, "pin": "3"}},
-      {"from": {"nodeId": 14, "pin": "Value"},    "to": {"nodeId": 100, "pin": "4"}},
-      {"from": {"nodeId": 12, "pin": "Value"},    "to": {"nodeId": 100, "pin": "5"}},
-      {"from": {"nodeId": 16, "pin": "Value"},    "to": {"nodeId": 100, "pin": "6"}},
-      {"from": {"nodeId": 15, "pin": "Value"},    "to": {"nodeId": 100, "pin": "7"}},
-      {"from": {"nodeId": 18, "pin": "Value"},    "to": {"nodeId": 100, "pin": "8"}},
-      {"from": {"nodeId": 19, "pin": "Value"},    "to": {"nodeId": 100, "pin": "9"}},
-
-      {"from": {"nodeId": 100, "pin": "Result"},  "to": {"nodeId": 40, "pin": "SystemPrompt"}},
-
-      {"from": {"nodeId": 50, "pin": "Value"},    "to": {"nodeId": 40, "pin": "BaseURL"}},
-      {"from": {"nodeId": 60, "pin": "Value"},    "to": {"nodeId": 40, "pin": "ApiKey"}},
-      {"from": {"nodeId": 70, "pin": "Value"},    "to": {"nodeId": 40, "pin": "Model"}},
-
-      {"from": {"nodeId": 40, "pin": "onDone"},   "to": {"nodeId": 80, "pin": ""}},
-      {"from": {"nodeId": 40, "pin": "Response"},  "to": {"nodeId": 80, "pin": "In String"}},
-      {"from": {"nodeId": 40, "pin": "onError"},  "to": {"nodeId": 81, "pin": ""}},
-      {"from": {"nodeId": 40, "pin": "ErrorMessage"}, "to": {"nodeId": 81, "pin": "In String"}}
+      {
+        "from": {
+          "nodeId": 1,
+          "pin": ""
+        },
+        "to": {
+          "nodeId": 40,
+          "pin": ""
+        }
+      },
+      {
+        "from": {
+          "nodeId": 10,
+          "pin": "Value"
+        },
+        "to": {
+          "nodeId": 20,
+          "pin": "Content"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 20,
+          "pin": "Message"
+        },
+        "to": {
+          "nodeId": 30,
+          "pin": "Message 0"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 30,
+          "pin": "Messages"
+        },
+        "to": {
+          "nodeId": 40,
+          "pin": "Messages"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 11,
+          "pin": "Value"
+        },
+        "to": {
+          "nodeId": 100,
+          "pin": "0"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 17,
+          "pin": "Value"
+        },
+        "to": {
+          "nodeId": 100,
+          "pin": "1"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 13,
+          "pin": "Value"
+        },
+        "to": {
+          "nodeId": 100,
+          "pin": "2"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 14,
+          "pin": "Value"
+        },
+        "to": {
+          "nodeId": 100,
+          "pin": "3"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 14,
+          "pin": "Value"
+        },
+        "to": {
+          "nodeId": 100,
+          "pin": "4"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 12,
+          "pin": "Value"
+        },
+        "to": {
+          "nodeId": 100,
+          "pin": "5"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 16,
+          "pin": "Value"
+        },
+        "to": {
+          "nodeId": 100,
+          "pin": "6"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 15,
+          "pin": "Value"
+        },
+        "to": {
+          "nodeId": 100,
+          "pin": "7"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 18,
+          "pin": "Value"
+        },
+        "to": {
+          "nodeId": 100,
+          "pin": "8"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 19,
+          "pin": "Value"
+        },
+        "to": {
+          "nodeId": 100,
+          "pin": "9"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 100,
+          "pin": "Result"
+        },
+        "to": {
+          "nodeId": 40,
+          "pin": "SystemPrompt"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 50,
+          "pin": "Value"
+        },
+        "to": {
+          "nodeId": 40,
+          "pin": "BaseURL"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 60,
+          "pin": "Value"
+        },
+        "to": {
+          "nodeId": 40,
+          "pin": "ApiKey"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 70,
+          "pin": "Value"
+        },
+        "to": {
+          "nodeId": 40,
+          "pin": "Model"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 40,
+          "pin": "onDone"
+        },
+        "to": {
+          "nodeId": 80,
+          "pin": ""
+        }
+      },
+      {
+        "from": {
+          "nodeId": 40,
+          "pin": "Response"
+        },
+        "to": {
+          "nodeId": 80,
+          "pin": "In String"
+        }
+      },
+      {
+        "from": {
+          "nodeId": 40,
+          "pin": "onError"
+        },
+        "to": {
+          "nodeId": 81,
+          "pin": ""
+        }
+      },
+      {
+        "from": {
+          "nodeId": 40,
+          "pin": "ErrorMessage"
+        },
+        "to": {
+          "nodeId": 81,
+          "pin": "In String"
+        }
+      }
+    ]
+  },
+  "editor": {
+    "fileType": "editor",
+    "metadata": {
+      "author": "",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "nodes": [
+      {
+        "id": 1,
+        "position": {
+          "x": -400,
+          "y": 0
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 10,
+        "position": {
+          "x": -50,
+          "y": -720
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 11,
+        "position": {
+          "x": -50,
+          "y": -600
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 12,
+        "position": {
+          "x": -50,
+          "y": -480
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 13,
+        "position": {
+          "x": -50,
+          "y": -360
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 14,
+        "position": {
+          "x": -50,
+          "y": -240
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 15,
+        "position": {
+          "x": -50,
+          "y": -120
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 16,
+        "position": {
+          "x": -50,
+          "y": 0
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 17,
+        "position": {
+          "x": -50,
+          "y": 120
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 18,
+        "position": {
+          "x": -50,
+          "y": 240
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 19,
+        "position": {
+          "x": -50,
+          "y": 360
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 50,
+        "position": {
+          "x": -50,
+          "y": 480
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 60,
+        "position": {
+          "x": -50,
+          "y": 600
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 70,
+        "position": {
+          "x": -50,
+          "y": 720
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 100,
+        "position": {
+          "x": 300,
+          "y": -120
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 20,
+        "position": {
+          "x": 300,
+          "y": 0
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 30,
+        "position": {
+          "x": 300,
+          "y": 120
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 40,
+        "position": {
+          "x": 650,
+          "y": 0
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 80,
+        "position": {
+          "x": 1350,
+          "y": -60
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      },
+      {
+        "id": 81,
+        "position": {
+          "x": 1350,
+          "y": 60
+        },
+        "size": {
+          "width": 200,
+          "height": 80
+        }
+      }
     ]
   }
 }
