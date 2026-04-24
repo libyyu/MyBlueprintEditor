@@ -387,6 +387,36 @@ void BlueprintEditor::DoOpenFile(const std::string& path)
         std::string dir = BpPath::ParentDir(ActiveDoc()->filePath);
         if (dir.empty()) dir = ".";
 
+        // 1. 按 metadata.dependencies 精确加载依赖（相对于蓝图所在目录）
+        for (const auto& dep : result.data.metadata.dependencies)
+        {
+            std::string depPath = dir + "/" + dep;
+            ::NodeEditor::Runtime::JsonBlueprintExporter depExporter;
+            auto depResult = depExporter.importRuntimeFromFile(depPath);
+            if (depResult.success)
+            {
+                int n = ::NodeEditor::Runtime::RegisterLibraryFunctions(
+                    m_NodeRegistry, depResult.data, depPath);
+                if (n > 0)
+                {
+                    ActiveDoc()->executionLog.push_back(
+                        "[INFO] Loaded dependency '" + dep + "': " + std::to_string(n) + " function(s)");
+                    m_CachedDefCount = 0;  // 强制重建菜单缓存
+                }
+                else
+                {
+                    ActiveDoc()->executionLog.push_back(
+                        "[WARN] Dependency '" + dep + "' loaded but registered 0 functions (not a Library?)");
+                }
+            }
+            else
+            {
+                ActiveDoc()->executionLog.push_back(
+                    "[WARN] Failed to load dependency '" + dep + "': " + depResult.errorMessage);
+            }
+        }
+
+        // 2. 再扫描同目录下所有 Library（补充未在 dependencies 中声明的）
         int libCount = ::NodeEditor::Runtime::LoadFunctionLibrary(m_NodeRegistry, dir);
         if (libCount > 0)
         {
