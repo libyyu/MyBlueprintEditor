@@ -40,6 +40,14 @@ namespace BlueprintRuntime.Samples.AINpc
         /// <summary>运行时修改 API Key（例如玩家在设置页填入后调用）</summary>
         public void SetApiKey(string key) => llmApiKey = key ?? "";
 
+        /// <summary>一次性覆盖全部 LLM 配置（MiniGameBootstrap 等引导脚本用）</summary>
+        public void OverrideLlm(string baseUrl, string apiKey, string model)
+        {
+            if (!string.IsNullOrEmpty(baseUrl)) llmBaseUrl = baseUrl;
+            if (apiKey != null)                 llmApiKey  = apiKey;
+            if (!string.IsNullOrEmpty(model))   llmModel   = model;
+        }
+
         // ── Runner 管理 ───────────────────────────────────────────
         private readonly List<BPRunner> _runners = new List<BPRunner>();
 
