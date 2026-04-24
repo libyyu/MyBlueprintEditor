@@ -53,6 +53,7 @@ namespace BlueprintRuntime.Samples.AINpc
 
         // ── 状态 ──────────────────────────────────────────────────
         public event Action OnReady;    // HTTP 初始化完成
+        public event Action<BPRunner> OnRunnerCreated;  // Runner 创建后触发（用于注册自定义节点）
         public bool IsReady { get; private set; }
 
         void Awake()
@@ -94,6 +95,7 @@ namespace BlueprintRuntime.Samples.AINpc
 
             var r = new BPRunner();
             _runners.Add(r);
+            OnRunnerCreated?.Invoke(r);
             return r;
         }
 

@@ -182,6 +182,7 @@ namespace BlueprintRuntime.Samples.MiniGame
         [SerializeField] private bool injectNearbyNpcs      = true;
         [SerializeField] private bool injectPlayerStats     = true;
         [SerializeField] private bool injectQuests          = true;
+        [SerializeField] private bool injectInventory       = true;
 
         private NpcIdentity _identity;
         private AINpcController          _basic;
@@ -249,6 +250,8 @@ namespace BlueprintRuntime.Samples.MiniGame
                 PlayerStats.Instance.InjectInto(runner);
             if (injectQuests && Quest.QuestSystem.Instance != null)
                 Quest.QuestSystem.Instance.InjectInto(runner);
+            if (injectInventory && Inventory.Instance != null)
+                Inventory.Instance.InjectInto(runner);
         }
 
         private string GetControllerName()

@@ -70,6 +70,27 @@ namespace BlueprintRuntime.Samples.MiniGame
                     WeChat.WeChatSDK.PreloadRewardedVideoAd(rewardAdUnitId, gameObject, nameof(OnRewardedAd));
             }
 #endif
+
+            // 5. 注册所有自定义蓝图节点（在 BlueprintService 创建 Runner 后调用）
+            RegisterCustomNodes();
+        }
+
+        /// <summary>注册所有游戏系统的蓝图节点。
+        /// 由 Bootstrap 统一管理，新增系统只需在这里加一行。</summary>
+        private void RegisterCustomNodes()
+        {
+            // 订阅 BlueprintService 的 Runner 创建事件
+            // 由于 Service 管理多 Runner，每个 Runner 都需注册
+            if (BlueprintService.Instance != null)
+            {
+                BlueprintService.Instance.OnRunnerCreated += runner =>
+                {
+                    WeChat.BlueprintWeChatNodes.RegisterAll(runner);
+                    Quest.BlueprintQuestNodes.RegisterAll(runner);
+                    BlueprintItemNodes.RegisterAll(runner);
+                    BlueprintTutorialNodes.RegisterAll(runner);
+                };
+            }
         }
 
         private void ApplyLlmConfig()

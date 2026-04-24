@@ -62,8 +62,26 @@ Samples/MiniGame/
 │   ├── QuestTrackerUI.cs                     ← 屏幕角落任务追踪面板
 │   └── QuestRewardPopup.cs                   ← 任务完成奖励弹窗
 │
-├── Player/                                    ← ★ 玩家属性
-│   └── PlayerStats.cs                        ← 金币/等级/经验 + 蓝图注入
+├── Player/                                    ← ★ 玩家属性 + 背包
+│   ├── PlayerStats.cs                        ← 金币/等级/经验 + 蓝图注入
+│   ├── Inventory.cs                          ← ★ 背包系统（堆叠/容量/持久化）
+│   ├── InventoryUI.cs                        ← ★ 背包 UI 面板（网格 + 详情）
+│   └── BlueprintItemNodes.cs                 ← ★ 蓝图节点 Item.Give/Remove/Check/Use
+│
+├── Shop/                                      ← ★ NPC 商店
+│   ├── NpcShop.cs                            ← 买卖/库存/好感折扣/交易记录
+│   └── ShopUI.cs                             ← 商店 UI（列表 + 详情 + 折扣提示）
+│
+├── SaveLoad/                                  ← ★ 存档/读档
+│   ├── SaveManager.cs                        ← 多存档槽 + 自动存档 + 全系统汇总
+│   └── SaveSlotUI.cs                         ← 存档槽选择面板（预览 + 覆盖确认）
+│
+├── Minimap/                                   ← ★ 小地图
+│   └── MinimapSystem.cs                      ← 正交相机 + NPC/任务标记 + 玩家跟随
+│
+├── Tutorial/                                  ← ★ 新手引导
+│   ├── TutorialSystem.cs                     ← 步骤序列 + 高亮遮罩 + 箭头 + 持久化
+│   └── BlueprintTutorialNodes.cs             ← 蓝图节点 Tutorial.Start/ShowStep/Complete/Check
 │
 ├── Voice/                                     ← ★ TTS 语音
 │   ├── NpcVoice.cs                           ← TTS 语音合成（OpenAI/Azure/自定义）
