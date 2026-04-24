@@ -52,7 +52,27 @@ Samples/MiniGame/
 │   ├── WorldState.cs                         ← 时间/天气/全局事件
 │   ├── NpcRegistry.cs                        ← NPC 注册 + 附近感知 + 话题广播
 │   ├── NpcBehaviorGate.cs                    ← 好感度段位切换 Personality
-│   └── AffinityHeart.cs                      ← 头顶 ❤❤♡♡♡ UI
+│   ├── AffinityHeart.cs                      ← 头顶 ❤❤♡♡♡ UI
+│   ├── NpcGossip.cs                          ← ★ NPC 闲聊触发器
+│   └── NpcConversationDemo.cs                ← ★ NPC 互相对话演示控制器
+│
+├── Quest/                                     ← ★ 任务系统
+│   ├── QuestSystem.cs                        ← 任务管理（接受/完成/进度/奖励）
+│   ├── BlueprintQuestNodes.cs                ← 蓝图节点 Quest.Give/Complete/Progress/Check
+│   ├── QuestTrackerUI.cs                     ← 屏幕角落任务追踪面板
+│   └── QuestRewardPopup.cs                   ← 任务完成奖励弹窗
+│
+├── Player/                                    ← ★ 玩家属性
+│   └── PlayerStats.cs                        ← 金币/等级/经验 + 蓝图注入
+│
+├── Voice/                                     ← ★ TTS 语音
+│   ├── NpcVoice.cs                           ← TTS 语音合成（OpenAI/Azure/自定义）
+│   └── SpeakingIndicator.cs                  ← 说话口型/波形视觉反馈
+│
+├── ChatApp/                                   ← ★ 2D 聊天 App 风格
+│   ├── ChatAppController.cs                  ← 聊天主控制器（多 NPC 切换）
+│   ├── ChatBubbleView.cs                     ← 单个聊天气泡组件
+│   └── ContactListUI.cs                      ← NPC 联系人列表
 │
 ├── Loader/
 │   ├── BlueprintLoader.cs                    ← CDN 动态蓝图 + ETag 热更新
@@ -82,7 +102,8 @@ data/examples/wxgame/
 ├── AI_NPC_Streaming.bjson      ← 流式对话
 ├── AI_NPC_Emotional.bjson      ← 情绪 + 动作 JSON
 ├── AI_NPC_Memory.bjson         ← 好感度/见面次数/事实库
-└── AI_NPC_WorldAware.bjson     ← ★ 世界感知（时间/天气/附近 NPC）
+├── AI_NPC_WorldAware.bjson     ← 世界感知（时间/天气/附近 NPC）
+└── AI_NPC_Questgiver.bjson     ← ★ 任务发放（含玩家等级/金币/任务列表）
 ```
 
 ---
