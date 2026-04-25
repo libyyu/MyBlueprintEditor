@@ -147,9 +147,10 @@ namespace BlueprintRuntime.Samples.MiniGame
             if (WorldState.Instance == null) return;
 
             // 时段变化 → 所有 NPC 知道
-            WorldState.Instance.OnTimePhaseChanged += phase =>
+            WorldState.Instance.OnChanged += () =>
             {
-                Debug.Log($"[TavernDemo] 时段变为: {phase}");
+                string phase = WorldState.Instance.GetTimeText();
+                Debug.Log($"[TavernDemo] 世界状态变化, 时段: {phase}");
                 // BGM 联动
                 GameAudioManager.Instance?.UpdateBgmForTime(phase);
             };
@@ -179,8 +180,9 @@ namespace BlueprintRuntime.Samples.MiniGame
 
             if (!unlocked && WeChat.ShareViralSystem.Instance != null)
             {
-                WeChat.ShareViralSystem.Instance.OnTotalSharesChanged += total =>
+                WeChat.ShareViralSystem.Instance.OnShareTriggered += () =>
                 {
+                    int total = BlueprintStorage.GetInt("viral_total_shares", 0);
                     if (total >= shareUnlockTarget && !npcMysterious.activeSelf)
                     {
                         npcMysterious.SetActive(true);
@@ -218,7 +220,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             foreach (var ctrl in FindObjectsOfType<AINpcStreamingController>())
             {
                 var c = ctrl;  // capture
-                ctrl.OnReply += msg =>
+                ctrl.OnReplyDone += msg =>
                 {
                     // 过滤已在 DialogUI 或 OpenWorldDialogPanel 做，此处仅日志
                 };

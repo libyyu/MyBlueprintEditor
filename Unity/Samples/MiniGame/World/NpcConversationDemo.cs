@@ -121,8 +121,8 @@ namespace BlueprintRuntime.Samples.MiniGame
             string topic = "";
             if (WorldState.Instance != null)
             {
-                var events = WorldState.Instance.RecentEvents;
-                if (events.Count > 0)
+                var events = WorldState.Instance.Data.recentEvents;
+                if (events != null && events.Count > 0)
                     topic = events[Random.Range(0, events.Count)];
             }
 
@@ -163,9 +163,9 @@ namespace BlueprintRuntime.Samples.MiniGame
                 var stream = ctrl as AINpcStreamingController;
                 var emo = ctrl as EmotionalNpcController;
 
-                if (basic != null)     basic.OnReply += captureReply;
-                else if (stream != null) stream.OnReply += captureReply;
-                else if (emo != null)    emo.OnReply += (r, e, a) => { reply = r; done = true; };
+                if (basic != null)       basic.OnReply += captureReply;
+                else if (stream != null) stream.OnReplyDone += captureReply;
+                else if (emo != null)    emo.OnReply += captureReply;
 
                 // Say
                 if (basic != null) basic.Say(input);
@@ -180,8 +180,9 @@ namespace BlueprintRuntime.Samples.MiniGame
                 }
 
                 // 取消订阅
-                if (basic != null)     basic.OnReply -= captureReply;
-                else if (stream != null) stream.OnReply -= captureReply;
+                if (basic != null)       basic.OnReply -= captureReply;
+                else if (stream != null) stream.OnReplyDone -= captureReply;
+                else if (emo != null)    emo.OnReply -= captureReply;
 
                 if (string.IsNullOrEmpty(reply))
                 {

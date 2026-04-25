@@ -87,13 +87,8 @@ namespace BlueprintRuntime.Samples.MiniGame
             var emotional = GetComponent<EmotionalNpcController>();
 
             if (basic     != null) basic.OnReply     += Speak;
-            if (streaming != null) streaming.OnReply  += Speak;
-            if (emotional != null) emotional.OnReply  += OnEmotionalReply;
-        }
-
-        private void OnEmotionalReply(string reply, string emotion, string action)
-        {
-            Speak(reply);
+            if (streaming != null) streaming.OnReplyDone += Speak;
+            if (emotional != null) emotional.OnReply     += Speak;
         }
 
         // ── 公共 API ────────────────────────────────────────────────
