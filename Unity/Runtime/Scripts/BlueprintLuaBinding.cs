@@ -96,7 +96,8 @@ namespace BlueprintRuntime
         internal LuaExecutionContext(BPContext ctx) { _ctx = ctx; }
 
         // --- 输入引脚 ---
-        public long   GetInputInt   (string pin) => _ctx.GetInputInt(pin);
+        public int   GetInputInt   (string pin) => _ctx.GetInputInt(pin);
+        public long   GetInputLong   (string pin) => _ctx.GetInputLong(pin);
         public double GetInputFloat (string pin) => _ctx.GetInputFloat(pin);
         public bool   GetInputBool  (string pin) => _ctx.GetInputBool(pin);
         public string GetInputString(string pin) => _ctx.GetInputString(pin) ?? "";
@@ -112,7 +113,8 @@ namespace BlueprintRuntime
         }
 
         // --- 输出引脚 ---
-        public void SetOutputInt   (string pin, long   val) => _ctx.SetOutputInt(pin, val);
+        public void SetOutputInt   (string pin, int   val) => _ctx.SetOutputInt(pin, val);
+        public void SetOutputLong  (string pin, long   val) => _ctx.SetOutputLong(pin, val);
         public void SetOutputFloat (string pin, double val) => _ctx.SetOutputFloat(pin, val);
         public void SetOutputBool  (string pin, bool   val) => _ctx.SetOutputBool(pin, val);
         public void SetOutputString(string pin, string val) => _ctx.SetOutputString(pin, val ?? "");
@@ -122,7 +124,7 @@ namespace BlueprintRuntime
         {
             if (val is string s)          _ctx.SetOutputString(pin, s);
             else if (val is bool b)        _ctx.SetOutputBool(pin, b);
-            else if (val is long l)        _ctx.SetOutputInt(pin, l);
+            else if (val is long l)        _ctx.SetOutputLong(pin, l);
             else if (val is int i)         _ctx.SetOutputInt(pin, i);
             else if (val is double d)      _ctx.SetOutputFloat(pin, d);
             else if (val is float f)       _ctx.SetOutputFloat(pin, f);
@@ -133,12 +135,14 @@ namespace BlueprintRuntime
         public bool ActivateOutputFlow(string pin) => _ctx.ActivateOutputFlow(pin);
 
         // --- 变量 ---
-        public long   GetVariableInt   (string name) => _ctx.GetVariableInt(name);
+        public int   GetVariableInt   (string name) => _ctx.GetVariableInt(name);
+        public long   GetVariableLong   (string name) => _ctx.GetVariableLong(name);
         public double GetVariableFloat (string name) => _ctx.GetVariableFloat(name);
         public bool   GetVariableBool  (string name) => _ctx.GetVariableBool(name);
         public string GetVariableString(string name) => _ctx.GetVariableString(name) ?? "";
 
-        public void SetVariableInt   (string name, long   val) => _ctx.SetVariableInt(name, val);
+        public void SetVariableInt   (string name, int   val) => _ctx.SetVariableInt(name, val);
+        public void SetVariableLong   (string name, long   val) => _ctx.SetVariableLong(name, val);
         public void SetVariableFloat (string name, double val) => _ctx.SetVariableFloat(name, val);
         public void SetVariableBool  (string name, bool   val) => _ctx.SetVariableBool(name, val);
         public void SetVariableString(string name, string val) => _ctx.SetVariableString(name, val ?? "");
