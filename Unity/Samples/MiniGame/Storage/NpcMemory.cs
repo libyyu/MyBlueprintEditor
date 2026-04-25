@@ -23,6 +23,7 @@ using BlueprintRuntime.Samples.AINpc;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using BlueprintRuntime.Samples.AINpc.OpenWorld;
 
 namespace BlueprintRuntime.Samples.MiniGame
 {

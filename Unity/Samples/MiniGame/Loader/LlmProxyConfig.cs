@@ -32,6 +32,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 using UnityEngine;
+using BlueprintRuntime.Samples.AINpc;
 
 namespace BlueprintRuntime.Samples.MiniGame
 {

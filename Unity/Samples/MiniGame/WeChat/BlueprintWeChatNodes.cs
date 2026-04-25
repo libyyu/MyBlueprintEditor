@@ -21,6 +21,8 @@
 
 using UnityEngine;
 using BlueprintRuntime;
+using BlueprintRuntime.Samples.AINpc;
+using BlueprintRuntime.Samples.AINpc.OpenWorld;
 
 namespace BlueprintRuntime.Samples.MiniGame.WeChat
 {

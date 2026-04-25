@@ -16,6 +16,7 @@ using System.Collections;
 using System.Text;
 using UnityEngine;
 using TMPro;
+using BlueprintRuntime.Samples.AINpc.OpenWorld;
 
 namespace BlueprintRuntime.Samples.MiniGame
 {

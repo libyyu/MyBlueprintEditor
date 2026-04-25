@@ -12,6 +12,7 @@
 
 using UnityEngine;
 using BlueprintRuntime;
+using BlueprintRuntime.Samples.AINpc;
 
 namespace BlueprintRuntime.Samples.MiniGame.Quest
 {
