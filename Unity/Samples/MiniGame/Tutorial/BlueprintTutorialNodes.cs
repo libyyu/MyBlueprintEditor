@@ -7,7 +7,7 @@
 using UnityEngine;
 using BlueprintRuntime;
 
-namespace BlueprintMiniGame
+namespace BlueprintRuntime.Samples.MiniGame
 {
     public static class BlueprintTutorialNodes
     {

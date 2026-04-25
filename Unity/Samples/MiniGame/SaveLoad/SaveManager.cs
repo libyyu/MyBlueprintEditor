@@ -13,7 +13,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace BlueprintMiniGame
+namespace BlueprintRuntime.Samples.MiniGame
 {
     public class SaveManager : MonoBehaviour
     {

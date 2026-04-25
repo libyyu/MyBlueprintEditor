@@ -7,7 +7,7 @@
 
 using UnityEngine;
 
-namespace BlueprintMiniGame
+namespace BlueprintRuntime.Samples.MiniGame
 {
     public class GameAudioManager : MonoBehaviour
     {

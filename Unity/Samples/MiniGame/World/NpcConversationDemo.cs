@@ -16,7 +16,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace BlueprintMiniGame
+namespace BlueprintRuntime.Samples.MiniGame
 {
     public class NpcConversationDemo : MonoBehaviour
     {

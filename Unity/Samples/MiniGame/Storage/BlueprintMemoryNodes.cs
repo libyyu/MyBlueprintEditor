@@ -7,9 +7,8 @@
 
 using UnityEngine;
 using BlueprintRuntime;
-using BlueprintRuntime.Samples.MiniGame;
 
-namespace BlueprintMiniGame
+namespace BlueprintRuntime.Samples.MiniGame
 {
     public static class BlueprintMemoryNodes
     {

@@ -15,7 +15,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using BlueprintRuntime;
 
-namespace BlueprintMiniGame
+namespace BlueprintRuntime.Samples.MiniGame
 {
     // ── 物品定义 ────────────────────────────────────────────────────
     public enum ItemType { Consumable, Equipment, Quest, Gift, Material, Key }

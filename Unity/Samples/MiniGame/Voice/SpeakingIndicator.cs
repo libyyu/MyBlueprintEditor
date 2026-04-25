@@ -11,7 +11,7 @@
 
 using UnityEngine;
 
-namespace BlueprintMiniGame
+namespace BlueprintRuntime.Samples.MiniGame
 {
     public class SpeakingIndicator : MonoBehaviour
     {

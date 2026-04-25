@@ -45,8 +45,10 @@
 
 using System.Collections;
 using UnityEngine;
+using BlueprintRuntime.Samples.MiniGame;
+using BlueprintRuntime.Samples.MiniGame.WeChat;
 
-namespace BlueprintMiniGame
+namespace BlueprintRuntime.Samples.MiniGame
 {
     public class TavernDemo : MonoBehaviour
     {

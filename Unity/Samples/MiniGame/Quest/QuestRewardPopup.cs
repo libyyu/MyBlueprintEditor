@@ -9,7 +9,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-namespace BlueprintMiniGame.Quest
+namespace BlueprintRuntime.Samples.MiniGame.Quest
 {
     public class QuestRewardPopup : MonoBehaviour
     {

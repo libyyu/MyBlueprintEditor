@@ -23,7 +23,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-namespace BlueprintMiniGame
+namespace BlueprintRuntime.Samples.MiniGame
 {
     public class DialogChoicePanel : MonoBehaviour
     {

@@ -15,7 +15,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using BlueprintRuntime;
 
-namespace BlueprintMiniGame
+namespace BlueprintRuntime.Samples.MiniGame
 {
     public class NpcShop : MonoBehaviour
     {

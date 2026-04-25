@@ -13,7 +13,7 @@
 using UnityEngine;
 using BlueprintRuntime;
 
-namespace BlueprintMiniGame.Quest
+namespace BlueprintRuntime.Samples.MiniGame.Quest
 {
     public static class BlueprintQuestNodes
     {

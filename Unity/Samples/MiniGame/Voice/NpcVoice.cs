@@ -18,7 +18,7 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace BlueprintMiniGame
+namespace BlueprintRuntime.Samples.MiniGame
 {
     [RequireComponent(typeof(AudioSource))]
     public class NpcVoice : MonoBehaviour

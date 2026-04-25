@@ -10,7 +10,7 @@
 using System;
 using UnityEngine;
 
-namespace BlueprintMiniGame
+namespace BlueprintRuntime.Samples.MiniGame
 {
     public class NpcSchedule : MonoBehaviour
     {
