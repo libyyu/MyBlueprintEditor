@@ -15,25 +15,28 @@ namespace BlueprintRuntime.Samples.MiniGame
         {
             runner.RegisterHandler("Tutorial.Start", (ctx) =>
             {
-                if (TutorialSystem.Instance == null) { ctx.LogError("TutorialSystem not found"); return; }
+                if (TutorialSystem.Instance == null) { ctx.LogError("TutorialSystem not found"); return false; }
                 TutorialSystem.Instance.StartTutorial();
                 ctx.ActivateOutputFlow("Out");
+                return true;
             });
 
             runner.RegisterHandler("Tutorial.ShowStep", (ctx) =>
             {
-                if (TutorialSystem.Instance == null) return;
+                if (TutorialSystem.Instance == null) return false;
                 string id = ctx.GetInputString("StepId");
                 TutorialSystem.Instance.ShowStep(id);
                 ctx.ActivateOutputFlow("Out");
+                return true;
             });
 
             runner.RegisterHandler("Tutorial.Complete", (ctx) =>
             {
-                if (TutorialSystem.Instance == null) return;
+                if (TutorialSystem.Instance == null) return false;
                 string id = ctx.GetInputString("StepId");
                 TutorialSystem.Instance.CompleteStep(id);
                 ctx.ActivateOutputFlow("Out");
+                return true;
             });
 
             runner.RegisterHandler("Tutorial.Check", (ctx) =>
@@ -42,11 +45,12 @@ namespace BlueprintRuntime.Samples.MiniGame
                 {
                     ctx.SetOutputBool("IsDone", false);
                     ctx.SetOutputBool("AllDone", false);
-                    return;
+                    return false;
                 }
                 string id = ctx.GetInputString("StepId");
                 ctx.SetOutputBool("IsDone", TutorialSystem.Instance.IsStepDone(id));
                 ctx.SetOutputBool("AllDone", TutorialSystem.Instance.IsAllDone());
+                return true;
             });
 
             Debug.Log("[BlueprintTutorialNodes] Registered 4 nodes: Tutorial.Start/ShowStep/Complete/Check");

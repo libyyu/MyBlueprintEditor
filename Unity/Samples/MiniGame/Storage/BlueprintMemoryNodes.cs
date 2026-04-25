@@ -24,7 +24,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 if (mem == null)
                 {
                     ctx.LogError($"Memory.AddAffinity: NpcMemory '{npcId}' not found");
-                    return;
+                    return false;
                 }
 
                 mem.AddAffinity(delta);
@@ -36,6 +36,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                     ctx.Print($"好感度 {delta} → {mem.Data.affinity}");
 
                 ctx.ActivateOutputFlow("Out");
+                return true;
             });
 
             // ── Memory.RememberFact ─────────────────────────────────
@@ -48,11 +49,12 @@ namespace BlueprintRuntime.Samples.MiniGame
                 if (mem == null)
                 {
                     ctx.LogError($"Memory.RememberFact: NpcMemory '{npcId}' not found");
-                    return;
+                    return false;
                 }
 
                 mem.RememberFact(fact);
                 ctx.ActivateOutputFlow("Out");
+                return true;
             });
 
             // ── Memory.GetAffinity ──────────────────────────────────
@@ -64,6 +66,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 ctx.SetOutputInt("Affinity", mem?.Data.affinity ?? 0);
                 ctx.SetOutputInt("MeetCount", mem?.Data.meetCount ?? 0);
                 ctx.SetOutputBool("IsFirstMeet", mem != null && mem.Data.meetCount <= 1);
+                return true;
             });
 
             // ── Memory.ClearHistory ─────────────────────────────────
@@ -78,6 +81,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                     ctx.Print("对话历史已清除");
                 }
                 ctx.ActivateOutputFlow("Out");
+                return true;
             });
 
             Debug.Log("[BlueprintMemoryNodes] Registered 4 nodes: Memory.AddAffinity/RememberFact/GetAffinity/ClearHistory");

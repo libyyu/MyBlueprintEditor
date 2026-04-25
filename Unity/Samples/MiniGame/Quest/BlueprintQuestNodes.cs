@@ -27,7 +27,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
                 {
                     ctx.LogError("QuestSystem not found");
                     ctx.ActivateOutputFlow("onError");
-                    return;
+                    return false;
                 }
 
                 string id    = ctx.GetInputString("QuestId");
@@ -59,6 +59,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
                 {
                     ctx.ActivateOutputFlow("onDuplicate");
                 }
+                return true;
             });
 
             // ── Quest.Complete ──────────────────────────────────────
@@ -67,14 +68,14 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
                 if (QuestSystem.Instance == null)
                 {
                     ctx.LogError("QuestSystem not found");
-                    return;
+                    return false;
                 }
 
                 string id = ctx.GetInputString("QuestId");
                 if (string.IsNullOrEmpty(id))
                 {
                     ctx.LogError("Quest.Complete: QuestId is empty");
-                    return;
+                    return false;
                 }
 
                 bool ok = QuestSystem.Instance.CompleteQuest(id);
@@ -87,12 +88,13 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
                 {
                     ctx.ActivateOutputFlow("onNotFound");
                 }
+                return true;
             });
 
             // ── Quest.Progress ──────────────────────────────────────
             runner.RegisterHandler("Quest.Progress", (ctx) =>
             {
-                if (QuestSystem.Instance == null) return;
+                if (QuestSystem.Instance == null) return false;
 
                 string id = ctx.GetInputString("QuestId");
                 int amount = ctx.GetInputInt("Amount");
@@ -100,6 +102,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
 
                 QuestSystem.Instance.UpdateProgress(id, amount);
                 ctx.ActivateOutputFlow("Out");
+                return true;
             });
 
             // ── Quest.Check ─────────────────────────────────────────
@@ -109,7 +112,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
                 {
                     ctx.SetOutputBool("IsActive", false);
                     ctx.SetOutputBool("IsComplete", false);
-                    return;
+                    return false;
                 }
 
                 string id = ctx.GetInputString("QuestId");
@@ -125,6 +128,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
                     quest?.currentCount ?? 0);
                 ctx.SetOutputInt("Target",
                     quest?.targetCount ?? 0);
+                return true;
             });
 
             Debug.Log("[BlueprintQuestNodes] Registered 4 nodes: Quest.Give/Complete/Progress/Check");

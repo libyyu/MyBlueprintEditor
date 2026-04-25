@@ -17,7 +17,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             // ── Item.Give ───────────────────────────────────────────
             runner.RegisterHandler("Item.Give", (ctx) =>
             {
-                if (Inventory.Instance == null) { ctx.LogError("Inventory not found"); return; }
+                if (Inventory.Instance == null) { ctx.LogError("Inventory not found"); return false; }
                 string id = ctx.GetInputString("ItemId");
                 int count = ctx.GetInputInt("Count");
                 if (count <= 0) count = 1;
@@ -29,12 +29,13 @@ namespace BlueprintRuntime.Samples.MiniGame
                 ctx.SetOutputInt("Added", added);
                 ctx.Print($"获得 {name} x{added}");
                 ctx.ActivateOutputFlow(added > 0 ? "onSuccess" : "onFull");
+                return true;
             });
 
             // ── Item.Remove ─────────────────────────────────────────
             runner.RegisterHandler("Item.Remove", (ctx) =>
             {
-                if (Inventory.Instance == null) { ctx.LogError("Inventory not found"); return; }
+                if (Inventory.Instance == null) { ctx.LogError("Inventory not found"); return false; }
                 string id = ctx.GetInputString("ItemId");
                 int count = ctx.GetInputInt("Count");
                 if (count <= 0) count = 1;
@@ -42,6 +43,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 int removed = Inventory.Instance.RemoveItem(id, count);
                 ctx.SetOutputInt("Removed", removed);
                 ctx.ActivateOutputFlow(removed >= count ? "onSuccess" : "onInsufficient");
+                return true;
             });
 
             // ── Item.Check ──────────────────────────────────────────
@@ -51,7 +53,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 {
                     ctx.SetOutputInt("Count", 0);
                     ctx.SetOutputBool("HasItem", false);
-                    return;
+                    return false;
                 }
                 string id = ctx.GetInputString("ItemId");
                 int need = ctx.GetInputInt("RequiredCount");
@@ -60,18 +62,19 @@ namespace BlueprintRuntime.Samples.MiniGame
                 int has = Inventory.Instance.GetItemCount(id);
                 ctx.SetOutputInt("Count", has);
                 ctx.SetOutputBool("HasItem", has >= need);
+                return true;
             });
 
             // ── Item.Use ────────────────────────────────────────────
             runner.RegisterHandler("Item.Use", (ctx) =>
             {
-                if (Inventory.Instance == null) { ctx.LogError("Inventory not found"); return; }
+                if (Inventory.Instance == null) { ctx.LogError("Inventory not found"); return false; }
                 string id = ctx.GetInputString("ItemId");
 
                 if (!Inventory.Instance.HasItem(id))
                 {
                     ctx.ActivateOutputFlow("onNotFound");
-                    return;
+                    return true;
                 }
 
                 Inventory.Instance.RemoveItem(id, 1);
@@ -79,6 +82,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 string name = def?.displayName ?? id;
                 ctx.Print($"使用了 {name}");
                 ctx.ActivateOutputFlow("onUsed");
+                return true;
             });
 
             Debug.Log("[BlueprintItemNodes] Registered 4 nodes: Item.Give/Remove/Check/Use");

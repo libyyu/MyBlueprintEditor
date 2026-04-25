@@ -27,7 +27,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 {
                     ctx.LogError($"Shop.Buy: no shop found on NPC '{npcId}'");
                     ctx.ActivateOutputFlow("onError");
-                    return;
+                    return false;
                 }
 
                 var shopItem = FindShopItem(shop, itemId);
@@ -35,7 +35,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 {
                     ctx.Print($"这个商品不在售卖列表里");
                     ctx.ActivateOutputFlow("onNotFound");
-                    return;
+                    return false;
                 }
 
                 int price = shop.GetBuyPrice(shopItem) * count;
@@ -44,7 +44,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                     ctx.Print($"金币不足（需要 {price}G）");
                     ctx.SetOutputInt("Cost", price);
                     ctx.ActivateOutputFlow("onPoor");
-                    return;
+                    return false;
                 }
 
                 bool ok = shop.Buy(shopItem, count);
@@ -60,6 +60,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 {
                     ctx.ActivateOutputFlow("onError");
                 }
+                return true;
             });
 
             // ── Shop.Sell ───────────────────────────────────────────
@@ -75,14 +76,14 @@ namespace BlueprintRuntime.Samples.MiniGame
                 {
                     ctx.LogError($"Shop.Sell: no shop found on NPC '{npcId}'");
                     ctx.ActivateOutputFlow("onError");
-                    return;
+                    return false;
                 }
 
                 if (Inventory.Instance == null || !Inventory.Instance.HasItem(itemId, count))
                 {
                     ctx.Print("你没有足够的物品可以卖");
                     ctx.ActivateOutputFlow("onInsufficient");
-                    return;
+                    return false;
                 }
 
                 int revenue = shop.GetSellPrice(itemId) * count;
@@ -99,6 +100,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 {
                     ctx.ActivateOutputFlow("onError");
                 }
+                return true;
             });
 
             // ── Shop.GetPrice ───────────────────────────────────────
@@ -112,7 +114,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 {
                     ctx.SetOutputInt("BuyPrice", 0);
                     ctx.SetOutputInt("SellPrice", 0);
-                    return;
+                    return false;
                 }
 
                 var shopItem = FindShopItem(shop, itemId);
@@ -121,6 +123,7 @@ namespace BlueprintRuntime.Samples.MiniGame
 
                 ctx.SetOutputInt("BuyPrice", buyPrice);
                 ctx.SetOutputInt("SellPrice", sellPrice);
+                return true;
             });
 
             // ── Shop.ListItems ──────────────────────────────────────
@@ -132,7 +135,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 {
                     ctx.SetOutputString("ItemList", "");
                     ctx.SetOutputInt("Count", 0);
-                    return;
+                    return false;
                 }
 
                 var sb = new System.Text.StringBuilder();
@@ -148,6 +151,7 @@ namespace BlueprintRuntime.Samples.MiniGame
 
                 ctx.SetOutputString("ItemList", sb.ToString().TrimEnd());
                 ctx.SetOutputInt("Count", count);
+                return true;
             });
 
             Debug.Log("[BlueprintShopNodes] Registered 4 nodes: Shop.Buy/Sell/GetPrice/ListItems");
