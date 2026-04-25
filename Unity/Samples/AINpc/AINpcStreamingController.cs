@@ -79,8 +79,9 @@ namespace BlueprintRuntime.Samples.AINpc
             _runner.OnLog   += (lv, msg) => {
                 if (lv >= BPLogLevel.Warning) Debug.LogWarning($"[BP-{npcName}] {msg}");
             };
-
-            if (!_runner.LoadFromJson(streamingBlueprint.text))
+            try
+            { _runner.LoadFromJson(streamingBlueprint.text); }
+            catch (Exception e)
             {
                 Debug.LogError($"[{npcName}] 流式蓝图加载失败");
                 return;

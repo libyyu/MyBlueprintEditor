@@ -80,8 +80,9 @@ namespace BlueprintRuntime.Samples.AINpc
                     Debug.LogWarning($"[BP-{npcName}] {msg}");
             };
 
-            if (!_runner.LoadFromJson(dialogBlueprint.text))
-            {
+            try
+            { _runner.LoadFromJson(dialogBlueprint.text); } 
+            catch (Exception e) {
                 Debug.LogError($"[{npcName}] 蓝图加载失败");
                 return;
             }

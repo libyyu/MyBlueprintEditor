@@ -47,7 +47,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
                 QuestSystem.Instance.OnQuestCompleted -= OnComplete;
         }
 
-        private void OnComplete(QuestSystem.QuestData q)
+        private void OnComplete(QuestDefinition q)
         {
             Show(q.title, q.rewardDescription, q.description);
         }

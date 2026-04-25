@@ -47,6 +47,7 @@ using System.Collections;
 using UnityEngine;
 using BlueprintRuntime.Samples.MiniGame;
 using BlueprintRuntime.Samples.MiniGame.WeChat;
+using BlueprintRuntime.Samples.AINpc;
 
 namespace BlueprintRuntime.Samples.MiniGame
 {

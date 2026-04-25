@@ -12,6 +12,7 @@
 //   MP3 在 WebGL 下不支持 AudioClip.Create。
 // ─────────────────────────────────────────────────────────────────────
 
+using BlueprintRuntime.Samples.AINpc;
 using System;
 using System.Collections;
 using System.Text;

@@ -17,6 +17,7 @@
 //   监听 OnTopicPosted 事件 + LLM 决策是否接话。
 // ─────────────────────────────────────────────────────────────────────────────
 
+using BlueprintRuntime.Samples.AINpc;
 using System;
 using System.Collections.Generic;
 using UnityEngine;

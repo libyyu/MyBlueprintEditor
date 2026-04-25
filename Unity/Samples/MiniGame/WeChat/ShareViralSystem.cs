@@ -46,7 +46,7 @@ namespace BlueprintRuntime.Samples.MiniGame.WeChat
         [SerializeField] private string shareImageUrl = "";   // 建议 500x400
 
         [Header("奖励冷却")]
-        [Tooltip("两次"有效分享"的最小间隔（秒），防刷")]
+        [Tooltip("两次\"有效分享\"的最小间隔（秒），防刷")]
         [SerializeField] private int cooldownSeconds = 30;
 
         [Header("debug / editor 模拟")]

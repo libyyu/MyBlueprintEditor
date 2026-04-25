@@ -95,7 +95,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             if (Inventory.Instance == null || PlayerStats.Instance == null) return false;
 
             int price = GetBuyPrice(item) * count;
-            if (PlayerStats.Instance.Gold < price) return false;
+            if (PlayerStats.Instance.Data.gold < price) return false;
 
             // 库存检查
             if (hasLimitedStock && item.stock >= 0 && item.stock < count) return false;
@@ -162,7 +162,7 @@ namespace BlueprintRuntime.Samples.MiniGame
         {
             var mem = GetComponent<NpcMemory>();
             if (mem == null) return 1f;
-            float affinity = mem.Affinity;
+            float affinity = mem.Data.affinity;
             // 好感度 0→100 映射到 1.0→maxDiscount
             return Mathf.Lerp(1f, maxDiscount, affinity / 100f);
         }

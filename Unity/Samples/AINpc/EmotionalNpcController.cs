@@ -60,8 +60,9 @@ namespace BlueprintRuntime.Samples.AINpc
 
             _runner = svc.CreateRunner();
             _runner.OnPrint += HandlePrint;
-
-            if (!_runner.LoadFromJson(emotionalBlueprint.text)) {
+            try { _runner.LoadFromJson(emotionalBlueprint.text); }
+            catch (Exception e)
+            {
                 Debug.LogError($"[{npcName}] 蓝图加载失败"); return;
             }
 

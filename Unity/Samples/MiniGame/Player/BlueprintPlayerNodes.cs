@@ -19,11 +19,11 @@ namespace BlueprintRuntime.Samples.MiniGame
                 if (PlayerStats.Instance == null) { ctx.LogError("PlayerStats not found"); return false; }
                 int amount = ctx.GetInputInt("Amount");
                 PlayerStats.Instance.AddGold(amount);
-                ctx.SetOutputInt("NewGold", PlayerStats.Instance.Gold);
+                ctx.SetOutputInt("NewGold", PlayerStats.Instance.Data.gold);
                 if (amount > 0)
-                    ctx.Print($"获得 {amount} 金币（余额: {PlayerStats.Instance.Gold}）");
+                    ctx.Print($"获得 {amount} 金币（余额: {PlayerStats.Instance.Data.gold}）");
                 else if (amount < 0)
-                    ctx.Print($"花费 {-amount} 金币（余额: {PlayerStats.Instance.Gold}）");
+                    ctx.Print($"花费 {-amount} 金币（余额: {PlayerStats.Instance.Data.gold}）");
                 ctx.ActivateOutputFlow("Out");
                 return true;
             });
@@ -33,11 +33,11 @@ namespace BlueprintRuntime.Samples.MiniGame
             {
                 if (PlayerStats.Instance == null) { ctx.LogError("PlayerStats not found"); return false; }
                 int amount = ctx.GetInputInt("Amount");
-                int oldLevel = PlayerStats.Instance.Level;
+                int oldLevel = PlayerStats.Instance.Data.level;
                 PlayerStats.Instance.AddExp(amount);
-                int newLevel = PlayerStats.Instance.Level;
+                int newLevel = PlayerStats.Instance.Data.level;
 
-                ctx.SetOutputInt("NewExp", PlayerStats.Instance.Exp);
+                ctx.SetOutputInt("NewExp", PlayerStats.Instance.Data.exp);
                 ctx.SetOutputInt("NewLevel", newLevel);
                 ctx.SetOutputBool("LeveledUp", newLevel > oldLevel);
 
@@ -65,10 +65,10 @@ namespace BlueprintRuntime.Samples.MiniGame
                     ctx.SetOutputString("Name", "");
                     return false;
                 }
-                ctx.SetOutputInt("Gold", PlayerStats.Instance.Gold);
-                ctx.SetOutputInt("Level", PlayerStats.Instance.Level);
-                ctx.SetOutputInt("Exp", PlayerStats.Instance.Exp);
-                ctx.SetOutputString("Name", PlayerStats.Instance.PlayerName);
+                ctx.SetOutputInt("Gold", PlayerStats.Instance.Data.gold);
+                ctx.SetOutputInt("Level", PlayerStats.Instance.Data.level);
+                ctx.SetOutputInt("Exp", PlayerStats.Instance.Data.exp);
+                ctx.SetOutputString("Name", PlayerStats.Instance.Data.playerName);
                 return true;
             });
 

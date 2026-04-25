@@ -20,6 +20,7 @@
 // 本文件只负责"段位切换"逻辑，不强制使用哪种 Add 方案。
 // ─────────────────────────────────────────────────────────────────────────────
 
+using BlueprintRuntime.Samples.AINpc;
 using System;
 using System.Collections.Generic;
 using UnityEngine;

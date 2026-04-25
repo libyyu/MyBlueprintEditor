@@ -19,6 +19,7 @@
 //   让蓝图的 SystemPrompt 能拼接这些上下文。
 // ─────────────────────────────────────────────────────────────────────────────
 
+using BlueprintRuntime.Samples.AINpc;
 using System;
 using System.Collections.Generic;
 using UnityEngine;

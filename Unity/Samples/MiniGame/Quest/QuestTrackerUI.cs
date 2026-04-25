@@ -93,7 +93,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
                 var q = active[i];
                 var v = _views[i];
                 v.go.SetActive(!_collapsed);
-                v.questId = q.id;
+                v.questId = q.questId;
 
                 if (v.titleText != null)
                 {

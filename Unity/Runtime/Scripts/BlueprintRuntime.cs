@@ -138,7 +138,7 @@ namespace BlueprintRuntime
         internal BPContext(IntPtr ctx) { _ctx = ctx; }
 
         // --- Input ---
-        public long   GetInputInt   (string pin) => Native.BP_GetInputInt   (_ctx, pin);
+        public long   GetInputLong   (string pin) => Native.BP_GetInputInt   (_ctx, pin);
         public double GetInputFloat (string pin) => Native.BP_GetInputFloat (_ctx, pin);
         public bool   GetInputBool  (string pin) => Native.BP_GetInputBool  (_ctx, pin) != 0;
         public string GetInputString(string pin)
@@ -151,12 +151,25 @@ namespace BlueprintRuntime
             }
             finally { Marshal.FreeHGlobal(buf); }
         }
+        public int GetInputInt (string pin)
+        {
+            long val = GetInputLong(pin);
+            if (val < int.MinValue || val > int.MaxValue)
+                throw new OverflowException($"Input '{pin}' value {val} overflows int");
+            return (int)val;
+        }
 
         // --- Output ---
-        public void SetOutputInt   (string pin, long   val) => Native.BP_SetOutputInt   (_ctx, pin, val);
+        public void SetOutputLong   (string pin, long   val) => Native.BP_SetOutputInt   (_ctx, pin, val);
         public void SetOutputFloat (string pin, double val) => Native.BP_SetOutputFloat (_ctx, pin, val);
         public void SetOutputBool  (string pin, bool   val) => Native.BP_SetOutputBool  (_ctx, pin, val ? 1 : 0);
         public void SetOutputString(string pin, string val) => Native.BP_SetOutputString(_ctx, pin, val ?? "");
+
+        public void SetOutputInt(string pin, int val)
+        {
+            long longVal = val;
+            SetOutputLong(pin, longVal);
+        }
 
         // Convenience float overload
         public void SetOutputFloat(string pin, float val) => SetOutputFloat(pin, (double)val);
@@ -166,7 +179,7 @@ namespace BlueprintRuntime
         public bool ActivateOutputFlow(string pin) => Native.BP_ActivateOutputFlow(_ctx, pin) != 0;
 
         // --- Variables ---
-        public long   GetVariableInt   (string name) => Native.BP_CtxGetVariableInt   (_ctx, name);
+        public long   GetVariableLong   (string name) => Native.BP_CtxGetVariableInt   (_ctx, name);
         public double GetVariableFloat (string name) => Native.BP_CtxGetVariableFloat (_ctx, name);
         public bool   GetVariableBool  (string name) => Native.BP_CtxGetVariableBool  (_ctx, name) != 0;
         public string GetVariableString(string name)
@@ -179,12 +192,19 @@ namespace BlueprintRuntime
             }
             finally { Marshal.FreeHGlobal(buf); }
         }
+        public int GetVariableInt(string name)
+        {
+            long val = GetVariableLong(name);
+            if (val < int.MinValue || val > int.MaxValue)
+                throw new OverflowException($"Input '{name}' value {val} overflows int");
+            return (int)val;
+        }
 
-        public void SetVariableInt   (string name, long   val) => Native.BP_CtxSetVariableInt   (_ctx, name, val);
+        public void SetVariableLong   (string name, long   val) => Native.BP_CtxSetVariableInt   (_ctx, name, val);
         public void SetVariableFloat (string name, double val) => Native.BP_CtxSetVariableFloat (_ctx, name, val);
         public void SetVariableBool  (string name, bool   val) => Native.BP_CtxSetVariableBool  (_ctx, name, val ? 1 : 0);
         public void SetVariableString(string name, string val) => Native.BP_CtxSetVariableString(_ctx, name, val ?? "");
-
+        public void SetVariableInt(string name, int val) => SetVariableLong(name, (long)val);
         // --- Logging / Print ---
         public void Log     (string msg) => Native.BP_CtxLog     (_ctx, msg);
         public void LogWarn (string msg) => Native.BP_CtxLogWarn (_ctx, msg);

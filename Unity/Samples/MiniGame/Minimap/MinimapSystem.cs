@@ -58,7 +58,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             // 自动注册所有已有 NPC
             if (NpcRegistry.Instance != null)
             {
-                foreach (var npc in NpcRegistry.Instance.GetAll())
+                foreach (var npc in NpcRegistry.Instance.All)
                     AddNpcMarker(npc.id, npc.displayName, npc.transform);
             }
         }

@@ -5,6 +5,7 @@
 // 支持音量控制和静音。
 // ─────────────────────────────────────────────────────────────────────
 
+using BlueprintRuntime.Samples.MiniGame.Quest;
 using UnityEngine;
 
 namespace BlueprintRuntime.Samples.MiniGame
@@ -54,10 +55,10 @@ namespace BlueprintRuntime.Samples.MiniGame
         void Start()
         {
             // 自动订阅游戏事件
-            if (Quest.QuestSystem.Instance != null)
+            if (QuestSystem.Instance != null)
             {
-                Quest.QuestSystem.Instance.OnQuestAccepted  += _ => PlayUI(questAcceptSound);
-                Quest.QuestSystem.Instance.OnQuestCompleted += _ => PlayUI(questCompleteSound);
+                QuestSystem.Instance.OnQuestAccepted  += _ => PlayUI(questAcceptSound);
+                QuestSystem.Instance.OnQuestCompleted += _ => PlayUI(questCompleteSound);
             }
             if (PlayerStats.Instance != null)
             {

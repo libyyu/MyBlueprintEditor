@@ -12,6 +12,7 @@
 // 之后所有 NPC Controller 的 Start 里，直接用 BlueprintService.Instance.Llm* 即可。
 // ─────────────────────────────────────────────────────────────────────────────
 
+using BlueprintRuntime.Samples.AINpc;
 using System;
 using UnityEngine;
 

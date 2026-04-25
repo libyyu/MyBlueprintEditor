@@ -131,7 +131,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             if (detailPrice != null) detailPrice.text = $"买入: {price}G | 卖出: {_currentShop.GetSellPrice(item.itemId)}G";
             if (detailIcon  != null) { detailIcon.sprite = def?.icon; detailIcon.enabled = def?.icon != null; }
 
-            bool canBuy = PlayerStats.Instance != null && PlayerStats.Instance.Gold >= price;
+            bool canBuy = PlayerStats.Instance != null && PlayerStats.Instance.Data.gold >= price;
             if (buyButton != null) buyButton.interactable = canBuy;
 
             bool canSell = Inventory.Instance != null && Inventory.Instance.HasItem(item.itemId);

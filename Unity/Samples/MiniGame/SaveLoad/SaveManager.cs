@@ -9,6 +9,7 @@
 //   - 存档预览（截图缩略图 / 进度摘要）
 // ─────────────────────────────────────────────────────────────────────
 
+using BlueprintRuntime.Samples.MiniGame.Quest;
 using System;
 using System.Collections.Generic;
 using UnityEngine;

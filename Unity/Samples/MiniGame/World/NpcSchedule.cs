@@ -7,6 +7,8 @@
 // 用法：挂到 NPC 上，在 Inspector 配置每个时段的目标位置。
 // ─────────────────────────────────────────────────────────────────────
 
+using BlueprintRuntime.Samples.AINpc;
+using BlueprintRuntime.Samples.AINpc.OpenWorld;
 using System;
 using UnityEngine;
 
@@ -37,7 +39,7 @@ namespace BlueprintRuntime.Samples.MiniGame
         [SerializeField] private float arriveThreshold = 0.5f;
 
         [Header("不可交互时")]
-        [Tooltip("NPC 不可交互时的提示（如"店长已经休息了"）")]
+        [Tooltip("NPC 不可交互时的提示（如\"店长已经休息了\"）")]
         [SerializeField] private string unavailableMessage = "（NPC 正在休息，无法对话）";
 
         // ── 状态 ────────────────────────────────────────────────────

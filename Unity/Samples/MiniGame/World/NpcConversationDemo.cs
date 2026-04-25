@@ -12,6 +12,7 @@
 //   (两个 NPC 面对面，说话时轮流播放气泡)
 // ─────────────────────────────────────────────────────────────────────
 
+using BlueprintRuntime.Samples.AINpc;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
