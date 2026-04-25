@@ -194,7 +194,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             if (basic != null)
                 basic.OnReply += reply => ParseAndShow(reply);
             if (stream != null)
-                stream.OnReply += reply => ParseAndShow(reply);
+                stream.OnReplyDone += reply => ParseAndShow(reply);
         }
 
         private void ClearButtons()

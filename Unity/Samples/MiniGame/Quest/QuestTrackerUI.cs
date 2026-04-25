@@ -97,11 +97,12 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
 
                 if (v.titleText != null)
                 {
-                    string statusEmoji = q.status switch
+                    var state = QuestSystem.Instance.GetState(q.questId);
+                    string statusEmoji = state switch
                     {
-                        QuestSystem.QuestStatus.Active    => "📌",
-                        QuestSystem.QuestStatus.Completed => "✅",
-                        QuestSystem.QuestStatus.Failed    => "❌",
+                        QuestState.Active    => "📌",
+                        QuestState.Completed => "✅",
+                        QuestState.Failed    => "❌",
                         _ => "📋"
                     };
                     v.titleText.text = $"{statusEmoji} {q.title}";
@@ -109,19 +110,23 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
 
                 if (v.progressText != null)
                 {
-                    if (q.targetCount > 1)
-                        v.progressText.text = $"{q.currentCount}/{q.targetCount}";
+                    var p = QuestSystem.Instance.GetProgress(q.questId);
+                    int cur = p != null && p.objectiveCounts.Count > 0 ? p.objectiveCounts[0] : 0;
+                    int tgt = q.objectives.Count > 0 ? q.objectives[0].targetCount : 1;
+                    if (tgt > 1)
+                        v.progressText.text = $"{cur}/{tgt}";
                     else
                         v.progressText.text = q.description;
                 }
 
                 if (v.statusIcon != null)
                 {
-                    v.statusIcon.color = q.status switch
+                    var state2 = QuestSystem.Instance.GetState(q.questId);
+                    v.statusIcon.color = state2 switch
                     {
-                        QuestSystem.QuestStatus.Active    => new Color(1f, 0.85f, 0.3f),
-                        QuestSystem.QuestStatus.Completed => new Color(0.3f, 0.9f, 0.4f),
-                        QuestSystem.QuestStatus.Failed    => new Color(0.9f, 0.3f, 0.3f),
+                        QuestState.Active    => new Color(1f, 0.85f, 0.3f),
+                        QuestState.Completed => new Color(0.3f, 0.9f, 0.4f),
+                        QuestState.Failed    => new Color(0.9f, 0.3f, 0.3f),
                         _ => Color.white
                     };
                 }
@@ -133,7 +138,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
                 int total = active.Count;
                 int done  = 0;
                 foreach (var q in active)
-                    if (q.status == QuestSystem.QuestStatus.Completed) done++;
+                    if (QuestSystem.Instance.GetState(q.questId) == QuestState.Completed) done++;
                 headerText.text = $"任务 ({done}/{total})";
             }
 

@@ -43,13 +43,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
 
                 string npcId = ctx.GetInputString("NpcId");
 
-                bool ok = QuestSystem.Instance.GiveQuest(
-                    id, title, desc,
-                    npcId ?? "",
-                    reward ?? $"+50 金币",
-                    target,
-                    50  // 默认奖励 50 金币
-                );
+                bool ok = QuestSystem.Instance.AcceptQuest(id);
 
                 if (ok)
                 {
@@ -79,9 +73,10 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
                     return false;
                 }
 
-                bool ok = QuestSystem.Instance.CompleteQuest(id);
+                bool ok = QuestSystem.Instance.GetState(id) == QuestState.Active;
                 if (ok)
                 {
+                    QuestSystem.Instance.ForceComplete(id);
                     ctx.Print($"✅ 任务完成：{id}");
                     ctx.ActivateOutputFlow("onSuccess");
                 }
@@ -98,10 +93,11 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
                 if (QuestSystem.Instance == null) return false;
 
                 string id = ctx.GetInputString("QuestId");
+                string objId = ctx.GetInputString("ObjectiveId");
                 int amount = (int)ctx.GetInputInt("Amount");
                 if (amount <= 0) amount = 1;
 
-                QuestSystem.Instance.UpdateProgress(id, amount);
+                QuestSystem.Instance.Progress(id, objId ?? "", amount);
                 ctx.ActivateOutputFlow("Out");
                 return true;
             });
@@ -117,18 +113,20 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
                 }
 
                 string id = ctx.GetInputString("QuestId");
-                var quest = QuestSystem.Instance.GetQuest(id);
+                var quest = QuestSystem.Instance.Find(id);
+                var state = QuestSystem.Instance.GetState(id);
+                var progress = QuestSystem.Instance.GetProgress(id);
 
                 ctx.SetOutputBool("IsActive",
-                    quest != null && quest.status == QuestSystem.QuestStatus.Active);
+                    state == QuestState.Active);
                 ctx.SetOutputBool("IsComplete",
-                    quest != null && quest.status == QuestSystem.QuestStatus.Completed);
+                    state == QuestState.Completed);
                 ctx.SetOutputString("Title",
                     quest?.title ?? "");
                 ctx.SetOutputInt("Progress",
-                    quest?.currentCount ?? 0);
+                    progress != null && progress.objectiveCounts.Count > 0 ? progress.objectiveCounts[0] : 0);
                 ctx.SetOutputInt("Target",
-                    quest?.targetCount ?? 0);
+                    quest != null && quest.objectives.Count > 0 ? quest.objectives[0].targetCount : 0);
                 return true;
             });
 

@@ -99,7 +99,7 @@ namespace BlueprintRuntime.Samples.MiniGame
 
         public void Delete(int slot)
         {
-            BlueprintStorage.DeleteKey(GetKey(slot));
+            BlueprintStorage.Remove(GetKey(slot));
             Debug.Log($"[SaveManager] Deleted slot {slot}");
             OnDeleted?.Invoke(slot);
         }
@@ -170,9 +170,9 @@ namespace BlueprintRuntime.Samples.MiniGame
             if (WorldState.Instance != null)
             {
                 data.worldTimePhase = WorldState.Instance.GetTimeText();
-                data.worldWeather   = WorldState.Instance.Weather;
+                data.worldWeather   = WorldState.Instance.GetWeatherText();
                 data.worldEventsJson = JsonUtility.ToJson(
-                    new StringListWrapper { items = WorldState.Instance.RecentEvents });
+                    new StringListWrapper { items = WorldState.Instance.Data.recentEvents });
             }
 
             // NpcMemory（遍历所有 NPC）
@@ -184,9 +184,9 @@ namespace BlueprintRuntime.Samples.MiniGame
                 npcList.Add(new NpcMemorySaveEntry
                 {
                     npcId    = mem.NpcId,
-                    affinity = mem.Affinity,
-                    meetCount = mem.MeetCount,
-                    factsJson = JsonUtility.ToJson(new StringListWrapper { items = new List<string>(mem.KnownFacts) }),
+                    affinity = mem.Data.affinity,
+                    meetCount = mem.Data.meetCount,
+                    factsJson = JsonUtility.ToJson(new StringListWrapper { items = new List<string>(mem.Data.knownFacts) }),
                 });
             }
             data.npcMemoriesJson = JsonUtility.ToJson(new NpcMemoryListWrapper { entries = npcList });

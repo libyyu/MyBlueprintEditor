@@ -61,7 +61,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             if (shopNameText != null) shopNameText.text = shop.ShopName;
 
             Refresh();
-            shop.OnShopOpened?.Invoke();
+            // OnShopOpened 是 event，只能在 NpcShop 内部 Invoke
         }
 
         public void Close()
