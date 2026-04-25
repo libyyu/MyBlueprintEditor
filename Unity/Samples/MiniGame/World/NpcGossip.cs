@@ -23,6 +23,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using BlueprintRuntime.Samples.MiniGame.Quest;
 
 namespace BlueprintRuntime.Samples.MiniGame
 {

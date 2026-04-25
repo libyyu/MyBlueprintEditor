@@ -49,6 +49,7 @@ using BlueprintRuntime.Samples.MiniGame;
 using BlueprintRuntime.Samples.MiniGame.WeChat;
 using BlueprintRuntime.Samples.AINpc;
 using BlueprintRuntime.Samples.AINpc.OpenWorld;
+using BlueprintRuntime.Samples.MiniGame.Quest;
 
 namespace BlueprintRuntime.Samples.MiniGame
 {

@@ -19,7 +19,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             {
                 if (Inventory.Instance == null) { ctx.LogError("Inventory not found"); return false; }
                 string id = ctx.GetInputString("ItemId");
-                int count = ctx.GetInputInt("Count");
+                int count = (int)ctx.GetInputInt("Count");
                 if (count <= 0) count = 1;
 
                 int added = Inventory.Instance.AddItem(id, count);
@@ -37,7 +37,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             {
                 if (Inventory.Instance == null) { ctx.LogError("Inventory not found"); return false; }
                 string id = ctx.GetInputString("ItemId");
-                int count = ctx.GetInputInt("Count");
+                int count = (int)ctx.GetInputInt("Count");
                 if (count <= 0) count = 1;
 
                 int removed = Inventory.Instance.RemoveItem(id, count);
@@ -56,7 +56,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                     return false;
                 }
                 string id = ctx.GetInputString("ItemId");
-                int need = ctx.GetInputInt("RequiredCount");
+                int need = (int)ctx.GetInputInt("RequiredCount");
                 if (need <= 0) need = 1;
 
                 int has = Inventory.Instance.GetItemCount(id);

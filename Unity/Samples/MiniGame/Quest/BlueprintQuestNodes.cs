@@ -35,7 +35,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
                 string title = ctx.GetInputString("Title");
                 string desc  = ctx.GetInputString("Description");
                 string reward = ctx.GetInputString("RewardDescription");
-                int target   = ctx.GetInputInt("TargetCount");
+                int target   = (int)ctx.GetInputInt("TargetCount");
 
                 if (string.IsNullOrEmpty(id))   id = $"quest_{Time.frameCount}";
                 if (string.IsNullOrEmpty(title)) title = "新任务";
@@ -98,7 +98,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
                 if (QuestSystem.Instance == null) return false;
 
                 string id = ctx.GetInputString("QuestId");
-                int amount = ctx.GetInputInt("Amount");
+                int amount = (int)ctx.GetInputInt("Amount");
                 if (amount <= 0) amount = 1;
 
                 QuestSystem.Instance.UpdateProgress(id, amount);

@@ -18,7 +18,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             runner.RegisterHandler("Memory.AddAffinity", (ctx) =>
             {
                 string npcId = ctx.GetInputString("NpcId");
-                int delta = ctx.GetInputInt("Delta");
+                int delta = (int)ctx.GetInputInt("Delta");
 
                 var mem = FindMemory(npcId);
                 if (mem == null)

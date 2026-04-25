@@ -51,6 +51,12 @@ namespace BlueprintRuntime.Samples.MiniGame
 
         public PlayerStatsData Data { get; private set; } = new PlayerStatsData();
 
+        // 便捷只读属性（避免外部直接操作 Data）
+        public int    Gold       => Data.gold;
+        public int    Level      => Data.level;
+        public int    Exp        => Data.exp;
+        public string PlayerName => Data.playerName;
+
         public event Action          OnStatsChanged;
         public event Action<int>     OnGoldChanged;
         public event Action<int>     OnLevelUp;

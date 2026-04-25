@@ -17,7 +17,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             runner.RegisterHandler("Player.AddGold", (ctx) =>
             {
                 if (PlayerStats.Instance == null) { ctx.LogError("PlayerStats not found"); return false; }
-                int amount = ctx.GetInputInt("Amount");
+                int amount = (int)ctx.GetInputInt("Amount");
                 PlayerStats.Instance.AddGold(amount);
                 ctx.SetOutputInt("NewGold", PlayerStats.Instance.Data.gold);
                 if (amount > 0)
@@ -32,7 +32,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             runner.RegisterHandler("Player.AddExp", (ctx) =>
             {
                 if (PlayerStats.Instance == null) { ctx.LogError("PlayerStats not found"); return false; }
-                int amount = ctx.GetInputInt("Amount");
+                int amount = (int)ctx.GetInputInt("Amount");
                 int oldLevel = PlayerStats.Instance.Data.level;
                 PlayerStats.Instance.AddExp(amount);
                 int newLevel = PlayerStats.Instance.Data.level;
@@ -78,7 +78,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 if (PlayerStats.Instance == null) { ctx.LogError("PlayerStats not found"); return false; }
                 string name = ctx.GetInputString("Name");
                 if (!string.IsNullOrEmpty(name))
-                    PlayerStats.Instance.SetName(name);
+                    PlayerStats.Instance.SetPlayerName(name);
                 ctx.ActivateOutputFlow("Out");
                 return true;
             });

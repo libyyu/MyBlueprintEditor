@@ -19,7 +19,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             {
                 string npcId = ctx.GetInputString("NpcId");
                 string itemId = ctx.GetInputString("ItemId");
-                int count = ctx.GetInputInt("Count");
+                int count = (int)ctx.GetInputInt("Count");
                 if (count <= 0) count = 1;
 
                 var shop = FindShop(npcId);
@@ -68,7 +68,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             {
                 string npcId = ctx.GetInputString("NpcId");
                 string itemId = ctx.GetInputString("ItemId");
-                int count = ctx.GetInputInt("Count");
+                int count = (int)ctx.GetInputInt("Count");
                 if (count <= 0) count = 1;
 
                 var shop = FindShop(npcId);

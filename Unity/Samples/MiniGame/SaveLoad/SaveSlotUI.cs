@@ -7,6 +7,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using BlueprintRuntime.Samples.MiniGame.WeChat;
 
 namespace BlueprintRuntime.Samples.MiniGame
 {
