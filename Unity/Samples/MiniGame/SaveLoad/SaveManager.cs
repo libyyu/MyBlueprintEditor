@@ -288,7 +288,7 @@ namespace BlueprintRuntime.Samples.MiniGame
         }
 
         [Serializable] private class InventoryWrapper { public List<InventorySlot> slots; }
-        [Serializable] private class QuestListWrapper { public List<Quest.QuestSystem.QuestData> quests; }
+        [Serializable] private class QuestListWrapper { public List<QuestData> quests; }
         [Serializable] private class StringListWrapper { public List<string> items; }
         [Serializable] private class NpcMemorySaveEntry { public string npcId; public float affinity; public int meetCount; public string factsJson; }
         [Serializable] private class NpcMemoryListWrapper { public List<NpcMemorySaveEntry> entries; }

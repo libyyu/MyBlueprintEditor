@@ -47,9 +47,13 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
                 QuestSystem.Instance.OnQuestCompleted -= OnComplete;
         }
 
-        private void OnComplete(Quest.QuestSystem.QuestData q)
+        private void OnComplete(QuestData q)
         {
-            Show(q.title, q.rewardDescription, q.description);
+            string reward = "";
+            if (q.rewardGold > 0) reward += $"金币 +{q.rewardGold}";
+            if (q.rewardAffinity > 0) reward += (reward.Length > 0 ? "  " : "") + $"好感 +{q.rewardAffinity}";
+            if (string.IsNullOrEmpty(reward)) reward = "已完成";
+            Show(q.title, reward, q.description);
         }
 
         public void Show(string title, string reward, string desc = "")

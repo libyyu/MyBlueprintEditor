@@ -59,7 +59,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
 
     // ── 任务定义（ScriptableObject）──────────────────────────────────
     [CreateAssetMenu(fileName = "Quest_", menuName = "Blueprint/Quest Definition", order = 10)]
-    public class Quest.QuestSystem.QuestData : ScriptableObject
+    public class QuestData : ScriptableObject
     {
         [Tooltip("全局唯一 ID，如 'find_lost_cat'")]
         public string questId = "quest_id";
@@ -95,20 +95,20 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
     {
         public static QuestSystem Instance { get; private set; }
 
-        [Header("所有可用任务定义（拖 Quest.QuestSystem.QuestData 资源进来）")]
-        [SerializeField] private List<Quest.QuestSystem.QuestData> allQuests = new List<Quest.QuestSystem.QuestData>();
+        [Header("所有可用任务定义（拖 QuestData 资源进来）")]
+        [SerializeField] private List<QuestData> allQuests = new List<QuestData>();
 
         [Header("存档 Key")]
         [SerializeField] private string storageKey = "Quests.save";
 
         public QuestSaveData Save { get; private set; } = new QuestSaveData();
 
-        public event Action<Quest.QuestSystem.QuestData>                     OnQuestAccepted;
-        public event Action<Quest.QuestSystem.QuestData, QuestObjective>     OnObjectiveProgressed;
-        public event Action<Quest.QuestSystem.QuestData>                     OnQuestCompleted;
+        public event Action<QuestData>                     OnQuestAccepted;
+        public event Action<QuestData, QuestObjective>     OnObjectiveProgressed;
+        public event Action<QuestData>                     OnQuestCompleted;
 
         // ── 查询接口 ───────────────────────────────────────────────
-        public Quest.QuestSystem.QuestData Find(string questId)
+        public QuestData Find(string questId)
         {
             if (string.IsNullOrEmpty(questId)) return null;
             return allQuests.Find(q => q != null && q.questId == questId);
@@ -125,9 +125,9 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
             return p != null ? p.state : QuestState.NotStarted;
         }
 
-        public List<Quest.QuestSystem.QuestData> GetActiveQuests()
+        public List<QuestData> GetActiveQuests()
         {
-            var list = new List<Quest.QuestSystem.QuestData>();
+            var list = new List<QuestData>();
             foreach (var p in Save.progresses)
             {
                 if (p.state != QuestState.Active) continue;
@@ -137,9 +137,9 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
             return list;
         }
 
-        public List<Quest.QuestSystem.QuestData> GetCompletedQuests()
+        public List<QuestData> GetCompletedQuests()
         {
-            var list = new List<Quest.QuestSystem.QuestData>();
+            var list = new List<QuestData>();
             foreach (var p in Save.progresses)
             {
                 if (p.state != QuestState.Completed) continue;
@@ -221,7 +221,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
             Persist();
         }
 
-        private void InternalComplete(Quest.QuestSystem.QuestData def, QuestProgress p)
+        private void InternalComplete(QuestData def, QuestProgress p)
         {
             if (p.state == QuestState.Completed) return;
             p.state       = QuestState.Completed;
@@ -243,7 +243,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
         }
 
         // ── 前置条件 ───────────────────────────────────────────────
-        public bool CheckPrerequisites(Quest.QuestSystem.QuestData def)
+        public bool CheckPrerequisites(QuestData def)
         {
             foreach (var req in def.requiredCompletedQuests)
             {
@@ -265,7 +265,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
             runner.SetVariable("CompletedQuests", BuildQuestText(GetCompletedQuests(), false));
         }
 
-        private string BuildQuestText(List<Quest.QuestSystem.QuestData> defs, bool includeProgress)
+        private string BuildQuestText(List<QuestData> defs, bool includeProgress)
         {
             if (defs.Count == 0) return "无";
             var sb = new System.Text.StringBuilder();
