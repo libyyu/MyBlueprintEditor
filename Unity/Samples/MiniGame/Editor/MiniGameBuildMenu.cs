@@ -30,9 +30,9 @@ namespace BlueprintRuntime.Samples.MiniGame.EditorTools
             PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli;
 
             // 代码优化：Size（比 Speed 小 20~30%，运行速度对 AI 对话类影响不大）
-#if UNITY_2021_2_OR_NEWER
-            PlayerSettings.WebGL.codeOptimization = WebGLCodeOptimization.Size;
-#endif
+// #if UNITY_2021_2_OR_NEWER
+//             PlayerSettings.WebGL.codeOptimization = WebGLCodeOptimization.Size;
+// #endif
 
             // 异常处理：Explicitly thrown exceptions only（小 + 足够）
             PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly;
