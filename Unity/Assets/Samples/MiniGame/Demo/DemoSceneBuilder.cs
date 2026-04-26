@@ -20,6 +20,7 @@ using TMPro;
 using BlueprintRuntime.Samples.AINpc;
 using BlueprintRuntime.Samples.AINpc.OpenWorld;
 using BlueprintRuntime.Samples.MiniGame;
+using BlueprintRuntime.Samples.MiniGame.Storage;
 
 namespace BlueprintRuntime.Samples.MiniGame.Demo
 {
@@ -289,7 +290,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
             SetField(trigger, "interactRadius", 3f);
 
             // NpcMemory
-            var memory = npc.AddComponent<Storage.NpcMemory>();
+            var memory = npc.AddComponent<NpcMemory>();
             SetField(memory, "npcId", def.name);
 
             // 头顶气泡

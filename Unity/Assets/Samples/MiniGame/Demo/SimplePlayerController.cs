@@ -90,8 +90,8 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
             float speed = moveSpeed * (Input.GetKey(KeyCode.LeftShift) ? sprintMultiplier : 1f);
 
             Vector3 vel = dir * speed;
-            vel.y = _rb.linearVelocity.y; // 保持重力
-            _rb.linearVelocity = vel;
+            vel.y = _rb.velocity.y; // 保持重力
+            _rb.velocity = vel;
         }
 
         // ── 光标锁定 ────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
         {
             IsInDialog = true;
             SetCursorLock(false);
-            _rb.linearVelocity = Vector3.zero;
+            _rb.velocity = Vector3.zero;
         }
 
         /// <summary>退出对话模式（锁定光标 + 恢复移动）</summary>
