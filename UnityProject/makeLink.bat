@@ -1,5 +1,10 @@
-mklink /J C:\Workspace\C++\MyBlueprintEditor\UnityProject\Assets\Plugins C:\Workspace\C++\MyBlueprintEditor\Unity\Runtime\Plugins
-mklink /J C:\Workspace\C++\MyBlueprintEditor\UnityProject\Assets\Samples C:\Workspace\C++\MyBlueprintEditor\Unity\Samples
-mklink /J C:\Workspace\C++\MyBlueprintEditor\UnityProject\Assets\Scripts C:\Workspace\C++\MyBlueprintEditor\Unity\Runtime\Scripts
-mklink /J C:\Workspace\C++\MyBlueprintEditor\UnityProject\Assets\Data C:\Workspace\C++\MyBlueprintEditor\data
+@echo off
+::get current directory
+@set self_path=%~dp0
+@set self_path=%self_path:~,-1%
+@echo current dir: %self_path%
+mklink /J %self_path%\Assets\Plugins %self_path%\..\Unity\Runtime\Plugins
+mklink /J %self_path%\Assets\Samples %self_path%\..\Unity\Samples
+mklink /J %self_path%\Assets\Scripts %self_path%\..\Unity\Runtime\Scripts
+mklink /J %self_path%\Assets\Data %self_path%\..\data
 pause
