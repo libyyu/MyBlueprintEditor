@@ -242,9 +242,9 @@ MonoBehaviour:
   basicNpc: {fileID: 0}
   streamNpc: {fileID: 856128560}
   emotionalNpc: {fileID: 0}
-  followTarget: {fileID: 0}
+  followTarget: {fileID: 856128558}
   worldOffset: {x: 0, y: 2, z: 0}
-  targetCamera: {fileID: 0}
+  targetCamera: {fileID: 1800637150}
   billboard: 1
   perspectiveCompensation: 0.5
   baseScale: 0.01
@@ -561,8 +561,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: New Text
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 3679859fcd57f0549947ea7ccbaecce2, type: 2}
+  m_sharedMaterial: {fileID: -3474922439180226507, guid: 3679859fcd57f0549947ea7ccbaecce2, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
