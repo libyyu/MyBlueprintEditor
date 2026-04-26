@@ -175,6 +175,13 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_IsLoaded(BP_Runner runner);
 /// Returns 0 on success, non-zero on failure.
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_Execute(BP_Runner runner);
 
+/// Execute data-flow + dispatch "OnBeginPlay" in one call.
+/// This is the recommended way to run a blueprint — equivalent to:
+///   BP_Execute(runner);
+///   BP_DispatchEvent(runner, "OnBeginPlay");
+/// Returns 0 on success, non-zero on failure.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_ExecuteAll(BP_Runner runner);
+
 /// Dispatch a named event (e.g. "OnBeginPlay", "OnTick").
 /// Finds the event source node with the matching definitionId and executes its
 /// exec-downstream chain. Returns 0 on success, non-zero on failure.

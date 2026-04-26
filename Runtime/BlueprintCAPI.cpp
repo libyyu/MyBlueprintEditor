@@ -330,6 +330,28 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_Execute(BP_Runner runner)
     return 0;
 }
 
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_ExecuteAll(BP_Runner runner)
+{
+    if (!runner) return 1;
+    auto* w = asWrapper(runner);
+    // Step 1: data-flow topological evaluation
+    ExecutionResult result = w->runner.Execute();
+    if (!result.success)
+    {
+        w->lastError = result.errorMessage;
+        return 1;
+    }
+    // Step 2: dispatch OnBeginPlay event (exec-flow entry point)
+    ExecutionResult evResult = w->runner.DispatchEvent("OnBeginPlay");
+    if (!evResult.success)
+    {
+        w->lastError = evResult.errorMessage;
+        return 1;
+    }
+    w->lastError.clear();
+    return 0;
+}
+
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_DispatchEvent(BP_Runner runner, const char* eventDefinitionId)
 {
     if (!runner || !eventDefinitionId) return 1;

@@ -108,7 +108,7 @@ namespace BlueprintRuntime.Samples.AINpc
             Debug.Log($"[{npcName}] Say() executing blueprint with input: {playerInput.Substring(0, Mathf.Min(50, playerInput.Length))}...");
             _runner.SetVariable("PlayerInput", playerInput);
             _runner.Execute();
-            Debug.Log($"[{npcName}] Execute() done, HasPendingWork={_runner.HasPendingWork}");
+            Debug.Log($"[{npcName}] Execute done, HasPendingWork={_runner.HasPendingWork}");
             return true;
         }
 

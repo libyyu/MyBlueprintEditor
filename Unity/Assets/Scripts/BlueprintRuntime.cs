@@ -331,6 +331,9 @@ namespace BlueprintRuntime
         public static extern int BP_Execute(IntPtr runner);
 
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BP_ExecuteAll(IntPtr runner);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
         public static extern int BP_DispatchEvent(IntPtr runner,
             [MarshalAs(UnmanagedType.LPStr)] string eventDefinitionId);
 
@@ -685,11 +688,22 @@ namespace BlueprintRuntime
         // Execution
         // ---------------------------------------------------------------------
 
+        /// <summary>Execute the blueprint: data-flow evaluation + dispatch OnBeginPlay event.
+        /// This is the standard way to run a blueprint. Equivalent to ExecuteDataFlow() + DispatchEvent("OnBeginPlay").</summary>
         public void Execute()
         {
             ThrowIfDisposed();
-            if (Native.BP_Execute(_handle) != 0)
+            if (Native.BP_ExecuteAll(_handle) != 0)
                 throw new BPException("Execute failed: " + GetLastError());
+        }
+
+        /// <summary>Execute only the data-flow topological evaluation (no event dispatch).
+        /// Use this when you need fine-grained control and will call DispatchEvent() separately.</summary>
+        public void ExecuteDataFlow()
+        {
+            ThrowIfDisposed();
+            if (Native.BP_Execute(_handle) != 0)
+                throw new BPException("ExecuteDataFlow failed: " + GetLastError());
         }
 
         /// <summary>Dispatch a named event (triggers all OnEvent nodes matching the id).
