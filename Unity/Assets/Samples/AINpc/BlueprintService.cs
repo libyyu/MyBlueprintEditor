@@ -109,6 +109,9 @@ namespace BlueprintRuntime.Samples.AINpc
 
         void Update()
         {
+            // 先 drain 全局异步队列（HTTP 回调等），即使没有 runner 也要做
+            BPRunner.DrainQueue();
+
             float dt = Time.unscaledDeltaTime;
             // 倒序遍历以防 Tick 回调里自销毁
             for (int i = _runners.Count - 1; i >= 0; i--)
@@ -117,8 +120,6 @@ namespace BlueprintRuntime.Samples.AINpc
                 if (r == null) { _runners.RemoveAt(i); continue; }
                 try
                 {
-                    // 优化：空闲 runner 跳过 Tick（无 HTTP 异步/无定时器）
-                    if (!r.HasPendingWork) continue;
                     r.Tick(dt);
                 }
                 catch (Exception e) { Debug.LogError($"[BlueprintService] Tick failed: {e}"); }

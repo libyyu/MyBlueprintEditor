@@ -95,24 +95,27 @@ namespace BlueprintRuntime.Samples.AINpc
 
         public bool Say(string playerInput)
         {
-            if (_runner == null) return false;
-            if (IsStreaming) return false;
-            if (_lastSayTime != -1 && Time.time - _lastSayTime < cooldown) return false;
-            if (string.IsNullOrWhiteSpace(playerInput)) return false;
+            if (_runner == null) { Debug.LogError($"[{npcName}] Say failed: runner is null"); return false; }
+            if (IsStreaming) { Debug.Log($"[{npcName}] Say skipped: already streaming"); return false; }
+            if (_lastSayTime != -1 && Time.time - _lastSayTime < cooldown) { Debug.Log($"[{npcName}] Say skipped: cooldown"); return false; }
+            if (string.IsNullOrWhiteSpace(playerInput)) { Debug.Log($"[{npcName}] Say skipped: empty input"); return false; }
 
             _lastSayTime   = Time.time;
             IsStreaming    = true;
             _replyStarted  = false;
             OnThinking?.Invoke();
 
+            Debug.Log($"[{npcName}] Say() executing blueprint with input: {playerInput.Substring(0, Mathf.Min(50, playerInput.Length))}...");
             _runner.SetVariable("PlayerInput", playerInput);
             _runner.Execute();
+            Debug.Log($"[{npcName}] Execute() done, HasPendingWork={_runner.HasPendingWork}");
             return true;
         }
 
         private void HandlePrint(BPLogLevel level, string msg)
         {
             if (string.IsNullOrEmpty(msg)) return;
+            Debug.Log($"[{npcName}] PrintCallback: {msg}");
 
             // 按前缀分派
             if (msg.StartsWith("CHUNK:"))
