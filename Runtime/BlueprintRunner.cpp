@@ -129,6 +129,17 @@ bool BlueprintRunner::Load(const BlueprintData& data)
         }
     }
 
+    // 缓存：蓝图是否包含 OnTick 事件节点（避免每帧扫描）
+    m_hasOnTickNode = false;
+    for (const auto& node : data.nodes)
+    {
+        if (node.definitionId == "OnTick")
+        {
+            m_hasOnTickNode = true;
+            break;
+        }
+    }
+
     return true;
 }
 
@@ -2371,6 +2382,12 @@ void BlueprintRunner::Tick(float deltaTime)
 
     // 消费后台线程（或 emscripten_fetch）dispatch 回来的主线程任务
     MainThreadDispatcher::Get().DrainQueue();
+
+    // 如果蓝图有 OnTick 节点，每帧 dispatch（DeltaTime 已通过 __DeltaTime 变量注入）
+    if (m_hasOnTickNode)
+    {
+        DispatchEvent("OnTick");
+    }
 
     m_timerManager->Tick(deltaTime);
 

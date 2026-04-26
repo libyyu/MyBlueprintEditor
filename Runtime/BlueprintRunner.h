@@ -776,13 +776,17 @@ public:
     bool HasPendingAsync() const { return m_pendingAsyncCount.load(std::memory_order_acquire) > 0; }
     int  PendingAsyncCount() const { return m_pendingAsyncCount.load(std::memory_order_acquire); }
 
-    // 统一判断"是否还有未完成的异步工作"（timer + async 两者都检查）
+    // 统一判断"是否还有未完成的异步工作"（timer + async + OnTick 都检查）
     // 用于 Tick 循环退出条件，替代分别检查 GetActiveTimerCount()/HasPendingAsync()
     bool HasPendingWork() const
     {
         return m_pendingAsyncCount.load(std::memory_order_acquire) > 0
-            || GetTimerManager().GetActiveTimerCount() > 0;
+            || GetTimerManager().GetActiveTimerCount() > 0
+            || m_hasOnTickNode;
     }
+
+    // 蓝图是否包含 OnTick 事件节点（Load 后缓存，Tick 时用）
+    bool HasOnTickNode() const { return m_hasOnTickNode; }
 
     // RAII 封装：构造时 Acquire，析构时 Release（支持移动，不可拷贝）
     struct AsyncGuard
@@ -889,6 +893,9 @@ private:
     // AcquireAsync/ReleaseAsync 维护；Tick() 用于判断是否可回收
     // 使用 atomic：AcquireAsync/ReleaseAsync 可能从后台线程调用
     std::atomic<int>                                    m_pendingAsyncCount { 0 };
+
+    // 蓝图是否包含 OnTick 事件节点（Load 时缓存）
+    bool                                                m_hasOnTickNode { false };
 
     // ── Pin 快照存储 ─────────────────────────────────────────────────────────
     bool                                                m_snapshotEnabled { false };
