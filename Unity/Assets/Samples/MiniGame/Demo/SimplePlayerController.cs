@@ -18,9 +18,9 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
         [SerializeField] private float turnSmooth = 0.12f;
 
         [Header("相机（第三人称俯视）")]
-        [SerializeField] private float camHeight = 8f;
-        [SerializeField] private float camDistance = 4f;
-        [SerializeField] private float camAngle = 55f;           // 俯角
+        [SerializeField] private float camHeight = 5f;
+        [SerializeField] private float camDistance = 2f;
+        [SerializeField] private float camAngle = 45f;           // 俯角
         [SerializeField] private float camFollowSpeed = 8f;
 
         [Header("交互")]

@@ -72,6 +72,59 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
             },
         };
 
+        // 中文 SDF 字体缓存（自动搜索项目中的中文字体）
+        private static TMP_FontAsset _chineseFont;
+        private static bool _fontSearched;
+
+        static TMP_FontAsset FindChineseFont()
+        {
+            if (_fontSearched) return _chineseFont;
+            _fontSearched = true;
+
+            // 搜索项目里所有 SDF 字体资源
+            string[] guids = AssetDatabase.FindAssets("t:TMP_FontAsset");
+            foreach (string guid in guids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                string lower = path.ToLower();
+                // 优先匹配中文字体关键词
+                if (lower.Contains("msyh") || lower.Contains("chinese") || lower.Contains("中文")
+                    || lower.Contains("simhei") || lower.Contains("simsun") || lower.Contains("noto")
+                    || lower.Contains("sourcehansans") || lower.Contains("思源"))
+                {
+                    _chineseFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path);
+                    if (_chineseFont != null)
+                    {
+                        Debug.Log($"[DemoBuilder] 找到中文字体: {path}");
+                        return _chineseFont;
+                    }
+                }
+            }
+
+            // 没找到，用默认字体 + 打警告
+            Debug.LogWarning(
+                "[DemoBuilder] ⚠️ 未找到中文 SDF 字体！NPC 对话会显示方块。\n" +
+                "请执行：Window → TextMeshPro → Font Asset Creator\n" +
+                "  Source Font: C:\\Windows\\Fonts\\msyh.ttc\n" +
+                "  Character Set: Unicode Range → 20-7E,3000-30FF,4E00-9FFF,FF00-FFEF\n" +
+                "  Atlas: 8192×8192 → Generate → Save 到 Assets/Fonts/");
+            return null;
+        }
+
+        /// <summary>给 TMP 组件设置中文字体（如果有）</summary>
+        static void ApplyChineseFont(TMP_Text tmp)
+        {
+            var font = FindChineseFont();
+            if (font != null) tmp.font = font;
+        }
+
+        /// <summary>给 3D TextMeshPro 设置中文字体（如果有）</summary>
+        static void ApplyChineseFont(TextMeshPro tmp)
+        {
+            var font = FindChineseFont();
+            if (font != null) tmp.font = font;
+        }
+
         [MenuItem("Blueprint/生成 AI 酒馆 Demo 场景", false, 200)]
         public static void BuildDemoScene()
         {
@@ -239,8 +292,8 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
             var camGO = new GameObject("Main Camera");
             camGO.tag = "MainCamera";
             camGO.transform.SetParent(player.transform); // 初始挂载，Controller.Start 会 SetParent(null)
-            camGO.transform.localPosition = new Vector3(0, 8, -4);
-            camGO.transform.localRotation = Quaternion.Euler(55, 0, 0);
+            camGO.transform.localPosition = new Vector3(0, 5, -2);
+            camGO.transform.localRotation = Quaternion.Euler(45, 0, 0);
             var cam = camGO.AddComponent<Camera>();
             cam.clearFlags = CameraClearFlags.Skybox;
             cam.fieldOfView = 50;
@@ -275,6 +328,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
             nameTMP.fontSize = 4;
             nameTMP.alignment = TextAlignmentOptions.Center;
             nameTMP.color = def.color;
+            ApplyChineseFont(nameTMP);
 
             // AINpcStreamingController
             var ctrl = npc.AddComponent<AINpcStreamingController>();
@@ -349,6 +403,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.enableWordWrapping = true;
             tmp.text = "";
+            ApplyChineseFont(tmp);
 
             // WorldSpeechBubble 组件
             var wsb = bubbleRoot.AddComponent<WorldSpeechBubble>();
@@ -572,6 +627,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
             tmp.fontSize = fontSize;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.enableWordWrapping = true;
+            ApplyChineseFont(tmp);
             return go;
         }
 
