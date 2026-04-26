@@ -87,6 +87,10 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
             // 新建空场景
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
+            // 竖屏设置提示
+            PlayerSettings.defaultScreenWidth = 750;
+            PlayerSettings.defaultScreenHeight = 1334;
+
             // ── 1. 环境 ─────────────────────────────────────────────────
             CreateEnvironment();
 
@@ -211,29 +215,35 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
             var player = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             player.name = "Player";
             player.tag = "Player";
-            player.transform.position = new Vector3(0, 1, -5);
+            player.transform.position = new Vector3(0, 0, -5);
 
             // 玩家颜色
             var mat = new Material(Shader.Find("Standard"));
             mat.color = new Color(0.2f, 0.5f, 0.9f);
             player.GetComponent<Renderer>().material = mat;
 
-            // 物理
-            var rb = player.AddComponent<Rigidbody>();
-            rb.constraints = RigidbodyConstraints.FreezeRotation;
-            rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+            // 移除默认 CapsuleCollider（CharacterController 自带）
+            var col = player.GetComponent<CapsuleCollider>();
+            if (col) Object.DestroyImmediate(col);
+
+            // CharacterController（不会被物理弹飞）
+            var cc = player.AddComponent<CharacterController>();
+            cc.height = 2f;
+            cc.radius = 0.4f;
+            cc.center = new Vector3(0, 1f, 0);
 
             // 控制器
             player.AddComponent<SimplePlayerController>();
 
-            // 相机挂到玩家
+            // 相机（第三人称俯视，不挂在玩家下——跟随脚本在 Controller 里）
             var camGO = new GameObject("Main Camera");
             camGO.tag = "MainCamera";
-            camGO.transform.SetParent(player.transform);
-            camGO.transform.localPosition = new Vector3(0, 0.5f, 0);
+            camGO.transform.SetParent(player.transform); // 初始挂载，Controller.Start 会 SetParent(null)
+            camGO.transform.localPosition = new Vector3(0, 8, -4);
+            camGO.transform.localRotation = Quaternion.Euler(55, 0, 0);
             var cam = camGO.AddComponent<Camera>();
             cam.clearFlags = CameraClearFlags.Skybox;
-            cam.fieldOfView = 70;
+            cam.fieldOfView = 50;
             cam.nearClipPlane = 0.1f;
             camGO.AddComponent<AudioListener>();
 

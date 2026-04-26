@@ -1,83 +1,67 @@
 // SimplePlayerController.cs
 // ─────────────────────────────────────────────────────────────────────────────
-// 极简第一人称控制器 — WASD 移动 + 鼠标转向
-// 对话时自动锁定移动，释放光标给 UI
+// 第三人称俯视角控制器 — 适合竖屏小游戏
+// WASD/摇杆移动，角色朝移动方向转身，相机固定俯视跟随
 // ─────────────────────────────────────────────────────────────────────────────
 
 using UnityEngine;
 
 namespace BlueprintRuntime.Samples.MiniGame.Demo
 {
-    [RequireComponent(typeof(Rigidbody))]
+    [RequireComponent(typeof(CharacterController))]
     public class SimplePlayerController : MonoBehaviour
     {
         [Header("移动")]
         [SerializeField] private float moveSpeed = 5f;
-        [SerializeField] private float sprintMultiplier = 1.8f;
+        [SerializeField] private float sprintMultiplier = 1.6f;
+        [SerializeField] private float gravity = -15f;
+        [SerializeField] private float turnSmooth = 0.12f;
 
-        [Header("视角")]
-        [SerializeField] private float mouseSensitivity = 2f;
-        [SerializeField] private float maxLookAngle = 80f;
+        [Header("相机（第三人称俯视）")]
+        [SerializeField] private float camHeight = 8f;
+        [SerializeField] private float camDistance = 4f;
+        [SerializeField] private float camAngle = 55f;           // 俯角
+        [SerializeField] private float camFollowSpeed = 8f;
 
         [Header("交互")]
         [SerializeField] private KeyCode interactKey = KeyCode.E;
-        [SerializeField] private KeyCode toggleCursorKey = KeyCode.Tab;
 
         // ── 状态 ────────────────────────────────────────────────────────
-        public bool IsInDialog { get; set; }  // 外部设，对话时锁定移动
+        public bool IsInDialog { get; set; }
 
-        private Rigidbody _rb;
+        private CharacterController _cc;
         private Transform _camTF;
-        private float     _rotX;
-        private bool      _cursorLocked = true;
+        private float     _verticalVel;
+        private float     _turnSmoothVel;
 
         void Start()
         {
-            _rb = GetComponent<Rigidbody>();
-            _rb.freezeRotation = true;
+            _cc = GetComponent<CharacterController>();
 
+            // 找相机
             _camTF = GetComponentInChildren<Camera>()?.transform;
-            if (_camTF == null)
-                _camTF = Camera.main?.transform;
+            if (_camTF == null && Camera.main != null)
+                _camTF = Camera.main.transform;
 
-            SetCursorLock(true);
+            // 相机不再是子物体（第三人称跟随）
+            if (_camTF != null && _camTF.parent == transform)
+                _camTF.SetParent(null);
+
+            // 竖屏光标默认可见（手机端没有鼠标锁定需求）
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
         }
 
         void Update()
         {
-            // Tab 切换光标
-            if (Input.GetKeyDown(toggleCursorKey))
-                SetCursorLock(!_cursorLocked);
-
-            // 对话时不处理移动和视角
             if (IsInDialog) return;
 
-            HandleLook();
-        }
-
-        void FixedUpdate()
-        {
-            if (IsInDialog) return;
             HandleMove();
         }
 
-        // ── 视角 ────────────────────────────────────────────────────────
-        void HandleLook()
+        void LateUpdate()
         {
-            if (!_cursorLocked) return;
-
-            float mx = Input.GetAxis("Mouse X") * mouseSensitivity;
-            float my = Input.GetAxis("Mouse Y") * mouseSensitivity;
-
-            // 水平旋转整个 Player
-            transform.Rotate(Vector3.up, mx);
-
-            // 垂直旋转相机
-            _rotX -= my;
-            _rotX = Mathf.Clamp(_rotX, -maxLookAngle, maxLookAngle);
-
-            if (_camTF != null)
-                _camTF.localRotation = Quaternion.Euler(_rotX, 0, 0);
+            HandleCamera();
         }
 
         // ── 移动 ────────────────────────────────────────────────────────
@@ -85,36 +69,53 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
         {
             float h = Input.GetAxisRaw("Horizontal");
             float v = Input.GetAxisRaw("Vertical");
+            Vector3 input = new Vector3(h, 0, v).normalized;
 
-            Vector3 dir = (transform.forward * v + transform.right * h).normalized;
-            float speed = moveSpeed * (Input.GetKey(KeyCode.LeftShift) ? sprintMultiplier : 1f);
+            // 重力
+            if (_cc.isGrounded && _verticalVel < 0)
+                _verticalVel = -2f;
+            _verticalVel += gravity * Time.deltaTime;
 
-            Vector3 vel = dir * speed;
-            vel.y = _rb.velocity.y; // 保持重力
-            _rb.velocity = vel;
+            if (input.magnitude >= 0.1f)
+            {
+                // 朝移动方向转身
+                float targetAngle = Mathf.Atan2(input.x, input.z) * Mathf.Rad2Deg;
+                float angle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle, ref _turnSmoothVel, turnSmooth);
+                transform.rotation = Quaternion.Euler(0, angle, 0);
+
+                float speed = moveSpeed * (Input.GetKey(KeyCode.LeftShift) ? sprintMultiplier : 1f);
+                Vector3 moveDir = Quaternion.Euler(0, targetAngle, 0) * Vector3.forward;
+                _cc.Move((moveDir * speed + Vector3.up * _verticalVel) * Time.deltaTime);
+            }
+            else
+            {
+                _cc.Move(Vector3.up * _verticalVel * Time.deltaTime);
+            }
         }
 
-        // ── 光标锁定 ────────────────────────────────────────────────────
-        public void SetCursorLock(bool locked)
+        // ── 相机跟随（俯视角） ──────────────────────────────────────────
+        void HandleCamera()
         {
-            _cursorLocked = locked;
-            Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
-            Cursor.visible = !locked;
+            if (_camTF == null) return;
+
+            // 目标位置：玩家后上方
+            Vector3 targetPos = transform.position
+                + Vector3.up * camHeight
+                - Vector3.forward * camDistance;
+
+            _camTF.position = Vector3.Lerp(_camTF.position, targetPos, camFollowSpeed * Time.deltaTime);
+            _camTF.rotation = Quaternion.Euler(camAngle, 0, 0);
         }
 
-        /// <summary>进入对话模式（释放光标 + 禁止移动）</summary>
+        // ── 对话模式 ────────────────────────────────────────────────────
         public void EnterDialog()
         {
             IsInDialog = true;
-            SetCursorLock(false);
-            _rb.velocity = Vector3.zero;
         }
 
-        /// <summary>退出对话模式（锁定光标 + 恢复移动）</summary>
         public void ExitDialog()
         {
             IsInDialog = false;
-            SetCursorLock(true);
         }
     }
 }
