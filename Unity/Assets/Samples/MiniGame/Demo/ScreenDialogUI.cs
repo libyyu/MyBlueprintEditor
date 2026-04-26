@@ -24,6 +24,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
         [Header("UI 引用（自动创建时会填好）")]
         [SerializeField] private GameObject promptPanel;       // "按 E 对话" 提示
         [SerializeField] private Text       promptText;
+        [SerializeField] private Button     promptButton;       // 点击提示面板也能开始对话（手机端）
         [SerializeField] private GameObject dialogPanel;       // 对话面板
         [SerializeField] private Text       npcNameText;
         [SerializeField] private Image      npcAvatarImage;
@@ -31,6 +32,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
         [SerializeField] private Text       historyText;       // 历史记录
         [SerializeField] private InputField inputField;
         [SerializeField] private Button     sendButton;
+        [SerializeField] private Button     closeButton;        // 关闭按钮（右上角 ✕）
         [SerializeField] private ScrollRect historyScroll;
 
         [Header("设置")]
@@ -55,6 +57,12 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
 
             if (sendButton != null)
                 sendButton.onClick.AddListener(OnSendClicked);
+
+            if (closeButton != null)
+                closeButton.onClick.AddListener(CloseDialog);
+
+            if (promptButton != null)
+                promptButton.onClick.AddListener(OpenDialog);
 
             if (inputField != null)
                 inputField.onEndEdit.AddListener(s => { if (Input.GetKeyDown(KeyCode.Return)) OnSendClicked(); });

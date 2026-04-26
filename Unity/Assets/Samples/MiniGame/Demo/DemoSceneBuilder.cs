@@ -277,11 +277,31 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
             btn.targetGraphic = btnGO.GetComponent<Image>();
             MakeUIText(btnGO, "Text", "发送", 20, Color.white, TextAnchor.MiddleCenter);
 
+            // ── 关闭按钮（右上角 ✕） ──
+            var closeGO = new GameObject("CloseBtn");
+            closeGO.layer = 5;
+            closeGO.transform.SetParent(dialog.transform, false);
+            var closeRT = closeGO.AddComponent<RectTransform>();
+            closeRT.anchorMin = new Vector2(1, 1);
+            closeRT.anchorMax = new Vector2(1, 1);
+            closeRT.pivot = new Vector2(1, 1);
+            closeRT.anchoredPosition = new Vector2(-5, -2);
+            closeRT.sizeDelta = new Vector2(44, 44);
+            var closeBG = closeGO.AddComponent<Image>();
+            closeBG.color = new Color(0.8f, 0.25f, 0.25f);
+            var closeBtn = closeGO.AddComponent<Button>();
+            closeBtn.targetGraphic = closeBG;
+            MakeUIText(closeGO, "X", "✕", 24, Color.white, TextAnchor.MiddleCenter);
+
+            // ── 提示面板也加"点击对话"按钮（手机端） ──
+            var talkBtn = prompt.AddComponent<Button>();
+            talkBtn.targetGraphic = prompt.GetComponent<Image>();
+
             // ── 左上角帮助 ──
             var help = MakePanel(canvasGO, "HelpPanel",
                 new Vector2(0, 0.88f), new Vector2(0.45f, 1), new Color(0, 0, 0, 0.5f));
             MakeUIText(help, "Text",
-                "<b>AI 魔法酒馆</b>\nWASD 移动 | 右键旋转\nE 对话 | ESC 关闭",
+                "<b>AI 魔法酒馆</b>\n移动 | 旋转视角\n靠近 NPC 点击对话",
                 14, new Color(0.8f, 0.8f, 0.8f), TextAnchor.UpperLeft)
                 .GetComponent<RectTransform>().offsetMin = new Vector2(8, 4);
 
@@ -289,6 +309,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
             var ui = canvasGO.AddComponent<ScreenDialogUI>();
             Set(ui, "promptPanel", prompt);
             Set(ui, "promptText", promptText.GetComponent<Text>());
+            Set(ui, "promptButton", talkBtn);
             Set(ui, "dialogPanel", dialog);
             Set(ui, "npcNameText", npcName.GetComponent<Text>());
             Set(ui, "npcAvatarImage", avatarImg);
@@ -296,6 +317,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
             Set(ui, "historyText", historyText.GetComponent<Text>());
             Set(ui, "inputField", inputField);
             Set(ui, "sendButton", btn);
+            Set(ui, "closeButton", closeBtn);
             Set(ui, "historyScroll", dialogScroll);
 
             return canvasGO;
