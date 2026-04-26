@@ -12,7 +12,7 @@ setlocal enabledelayedexpansion
 ::   --ndk <path>       Android NDK root (required for android)
 ::   --api <N>          Android min API level (default: 21)
 ::   --emsdk <path>     Emscripten SDK root (default: %EMSDK% env var)
-::   --unity <path>     Unity Plugins output dir (default: Unity\Runtime\Plugins)
+::   --unity <path>     Unity Plugins output dir (default: Unity\Assets\Plugins)
 ::   --skip <platform>  Skip a platform (repeatable)
 ::   --only <platform>  Build only this platform (repeatable)
 ::   /?  /help
@@ -22,7 +22,7 @@ setlocal enabledelayedexpansion
 ::   wasm     WebAssembly static lib (requires Emscripten)
 ::   android  Android ARM64-v8a .so (requires Android NDK)
 ::
-:: Artifacts collected to Unity\Runtime\Plugins\:
+:: Artifacts collected to Unity\Assets\Plugins\:
 ::   Windows\x86_64\
 ::     BlueprintRuntime.dll
 ::     liblua54.dll
@@ -51,7 +51,7 @@ set CLEAN_FLAG=
 set NDK_PATH=
 set ANDROID_API=21
 set EMSDK_PATH=%EMSDK%
-set UNITY_PLUGINS_DIR=%PROJECT_DIR%\Unity\Runtime\Plugins
+set UNITY_PLUGINS_DIR=%PROJECT_DIR%\Unity\Assets\Plugins
 
 set SKIP_LIST=
 set ONLY_LIST=

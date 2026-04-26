@@ -11,7 +11,7 @@
 #   --ndk <path>       Android NDK 路径（android 平台必填）
 #   --api <N>          Android 最低 API Level（默认 21）
 #   --emsdk <path>     Emscripten SDK 根目录（默认 $EMSDK 环境变量）
-#   --unity <path>     Unity Plugins 目标目录（默认 Unity/Runtime/Plugins）
+#   --unity <path>     Unity Plugins 目标目录（默认 Unity/Assets/Plugins）
 #   --skip <platform>  跳过指定平台（可多次使用，如 --skip android --skip ios）
 #   --only <platform>  只构建指定平台（可多次使用）
 #   -h/--help
@@ -23,7 +23,7 @@
 #   ios      iOS arm64（仅 macOS 宿主）
 #   windows  Windows x64（需要 MinGW-w64 交叉编译器）
 #
-# 产物收集到 Unity/Runtime/Plugins/:
+# 产物收集到 Unity/Assets/Plugins/:
 #   Windows/x86_64/
 #     BlueprintRuntime.dll          ← 运行时主体
 #     liblua54.dll                  ← Lua VM（动态链接）
@@ -76,7 +76,7 @@ CLEAN_FLAG=""
 NDK_PATH=""
 ANDROID_API=21
 EMSDK_PATH="${EMSDK:-}"
-UNITY_PLUGINS_DIR="${PROJECT_DIR}/Unity/Runtime/Plugins"
+UNITY_PLUGINS_DIR="${PROJECT_DIR}/Unity/Assets/Plugins"
 SKIP_PLATFORMS=()
 ONLY_PLATFORMS=()
 HOST_OS="$(uname -s)"
