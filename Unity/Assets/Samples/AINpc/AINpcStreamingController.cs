@@ -77,7 +77,8 @@ namespace BlueprintRuntime.Samples.AINpc
             _runner = svc.CreateRunner();
             _runner.OnPrint += HandlePrint;
             _runner.OnLog   += (lv, msg) => {
-                if (lv >= BPLogLevel.Verbose) Debug.LogWarning($"[BP-{npcName}] {msg}");
+                if (lv == BPLogLevel.Verbose) Debug.Log($"[BP-{npcName}] {msg}");
+                if (lv > BPLogLevel.Verbose) Debug.LogWarning($"[BP-{npcName}] {msg}");
             };
             try
             { _runner.LoadFromJson(streamingBlueprint.text); }
