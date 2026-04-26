@@ -397,7 +397,7 @@ MonoBehaviour:
   npcName: "\u55B5\u55B5\u5E97\u957F"
   personality: "\u4F60\u662F\u4E00\u5BB6\u5E7B\u60F3\u4E16\u754C\u9152\u9986\u7684\u732B\u54AA\u5E97\u957F\uFF0C\u53EB\u55B5\u55B5\u3002\u8BF4\u8BDD\u6E29\u67D4\u597D\u5947\uFF0C\u53E5\u5C3E\u5E38\u52A0
     \"\u55B5~\"\u3002\u73A9\u5BB6\u662F\u5192\u9669\u8005\u3002\u7528 2~3 \u53E5\u8BDD\u56DE\u590D\u3002"
-  streamingBlueprint: {fileID: 9027929339269108002, guid: 0d44da53319561241ac5cc21525f65ee, type: 3}
+  streamingBlueprint: {fileID: 9027929339269108002, guid: d4cfffd86f00eba489c6b3ce6c772ca6, type: 3}
   cooldown: 1
 --- !u!114 &856128561
 MonoBehaviour:

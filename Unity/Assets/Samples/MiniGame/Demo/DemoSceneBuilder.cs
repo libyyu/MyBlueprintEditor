@@ -20,7 +20,6 @@ using TMPro;
 using BlueprintRuntime.Samples.AINpc;
 using BlueprintRuntime.Samples.AINpc.OpenWorld;
 using BlueprintRuntime.Samples.MiniGame;
-using BlueprintRuntime.Samples.MiniGame.Storage;
 
 namespace BlueprintRuntime.Samples.MiniGame.Demo
 {
