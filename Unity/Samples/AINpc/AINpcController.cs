@@ -76,7 +76,7 @@ namespace BlueprintRuntime.Samples.AINpc
             _runner.OnPrint += HandlePrint;
             _runner.OnLog   += (lv, msg) =>
             {
-                if (lv >= BPLogLevel.Warning)
+                if (lv >= BPLogLevel.Info)
                     Debug.LogWarning($"[BP-{npcName}] {msg}");
             };
 
