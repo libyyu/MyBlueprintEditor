@@ -52,6 +52,15 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
         {
             _player = FindObjectOfType<SimplePlayerController>();
 
+            // 聊天奖励反馈
+            var reward = FindObjectOfType<Tavern.ChatRewardSystem>();
+            if (reward != null)
+                reward.OnReward += (gold, rep, aff) =>
+                {
+                    if (dialogText != null && _isDialogOpen)
+                        AppendHistory($"<color=#FFD700>  +{gold}💰  +{rep}⭐  +{aff}❤</color>");
+                };
+
             if (promptPanel != null) promptPanel.SetActive(false);
             if (dialogPanel != null) dialogPanel.SetActive(false);
 

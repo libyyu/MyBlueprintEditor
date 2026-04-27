@@ -10,6 +10,7 @@ using BlueprintRuntime.Samples.AINpc;
 using BlueprintRuntime.Samples.AINpc.OpenWorld;
 using BlueprintRuntime.Samples.MiniGame;
 using BlueprintRuntime.Samples.MiniGame.Storage;
+using BlueprintRuntime.Samples.MiniGame.Tavern;
 
 namespace BlueprintRuntime.Samples.MiniGame.Demo
 {
@@ -59,6 +60,10 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
             CreateEnvironment();
             var player = CreatePlayer();
             CreateBootstrap();
+
+            // 经营系统
+            CreateTavernSystems();
+
             foreach (var def in NPCs) CreateNPC(def, player.transform);
             var dialogUI = Create2DDialogUI();
 
@@ -187,6 +192,33 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
             // Memory
             var mem = go.AddComponent<NpcMemory>();
             Set(mem, "npcId", def.name);
+
+            // 动态人设（根据好感度/酒馆等级自动更新 Personality）
+            go.AddComponent<DynamicPersonality>();
+
+            // Lv.1 只显示喵喵，其他 NPC 默认隐藏（TavernManager 解锁后显示）
+            if (def.name != "NPC_MeowMeow")
+                go.SetActive(false);
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // 酒馆经营系统
+        // ══════════════════════════════════════════════════════════════
+        static void CreateTavernSystems()
+        {
+            var go = new GameObject("TavernSystems");
+
+            // TavernManager（经营核心）
+            go.AddComponent<TavernManager>();
+
+            // PlayerStats（金币/等级）
+            go.AddComponent<PlayerStats>();
+
+            // ChatRewardSystem（聊天奖励）
+            go.AddComponent<ChatRewardSystem>();
+
+            // NPC 可见性控制（根据解锁状态）
+            go.AddComponent<NpcVisibilityController>();
         }
 
         // ══════════════════════════════════════════════════════════════
@@ -299,11 +331,86 @@ namespace BlueprintRuntime.Samples.MiniGame.Demo
 
             // ── 左上角帮助 ──
             var help = MakePanel(canvasGO, "HelpPanel",
-                new Vector2(0, 0.88f), new Vector2(0.45f, 1), new Color(0, 0, 0, 0.5f));
+                new Vector2(0, 0.85f), new Vector2(0.45f, 0.92f), new Color(0, 0, 0, 0.5f));
             MakeUIText(help, "Text",
-                "<b>AI 魔法酒馆</b>\n移动 | 旋转视角\n靠近 NPC 点击对话",
-                14, new Color(0.8f, 0.8f, 0.8f), TextAnchor.UpperLeft)
-                .GetComponent<RectTransform>().offsetMin = new Vector2(8, 4);
+                "WASD 移动 | 右键旋转 | 靠近 NPC 点击对话",
+                12, new Color(0.7f, 0.7f, 0.7f), TextAnchor.MiddleLeft)
+                .GetComponent<RectTransform>().offsetMin = new Vector2(8, 0);
+
+            // ══════════════════════════════════════════════════════════
+            // 顶部经营状态栏
+            // ══════════════════════════════════════════════════════════
+            var topBar = MakePanel(canvasGO, "TopBar",
+                new Vector2(0, 0.93f), new Vector2(1, 1), new Color(0.08f, 0.06f, 0.04f, 0.9f));
+
+            // 酒馆名
+            var tvNameText = MakeUIText(topBar, "TavernName", "破旧小酒馆", 20,
+                new Color(1f, 0.85f, 0.4f), TextAnchor.MiddleLeft);
+            var tvNameRT = tvNameText.GetComponent<RectTransform>();
+            tvNameRT.anchorMin = new Vector2(0.02f, 0); tvNameRT.anchorMax = new Vector2(0.35f, 1);
+
+            // 等级
+            var lvlText = MakeUIText(topBar, "Level", "Lv.1", 16,
+                Color.white, TextAnchor.MiddleCenter);
+            var lvlRT = lvlText.GetComponent<RectTransform>();
+            lvlRT.anchorMin = new Vector2(0.35f, 0); lvlRT.anchorMax = new Vector2(0.45f, 1);
+
+            // 金币
+            var goldTxt = MakeUIText(topBar, "Gold", "💰 0", 16,
+                new Color(1f, 0.9f, 0.3f), TextAnchor.MiddleCenter);
+            var goldRT = goldTxt.GetComponent<RectTransform>();
+            goldRT.anchorMin = new Vector2(0.45f, 0); goldRT.anchorMax = new Vector2(0.6f, 1);
+
+            // 声望
+            var repTxt = MakeUIText(topBar, "Rep", "⭐ 0", 16,
+                new Color(0.5f, 0.8f, 1f), TextAnchor.MiddleCenter);
+            var repRT = repTxt.GetComponent<RectTransform>();
+            repRT.anchorMin = new Vector2(0.6f, 0); repRT.anchorMax = new Vector2(0.75f, 1);
+
+            // 今日客人
+            var guestTxt = MakeUIText(topBar, "Guests", "👤 0", 16,
+                Color.white, TextAnchor.MiddleCenter);
+            var guestRT = guestTxt.GetComponent<RectTransform>();
+            guestRT.anchorMin = new Vector2(0.75f, 0); guestRT.anchorMax = new Vector2(0.88f, 1);
+
+            // 升级按钮
+            var upgBtnGO = MakePanel(topBar, "UpgradeBtn",
+                new Vector2(0.89f, 0.1f), new Vector2(0.99f, 0.9f), new Color(0.6f, 0.4f, 0.1f));
+            var upgBtn = upgBtnGO.AddComponent<Button>();
+            upgBtn.targetGraphic = upgBtnGO.GetComponent<Image>();
+            MakeUIText(upgBtnGO, "Text", "⬆", 18, Color.white, TextAnchor.MiddleCenter);
+
+            // ── 升级面板（默认隐藏） ──
+            var upgPanel = MakePanel(canvasGO, "UpgradePanel",
+                new Vector2(0.1f, 0.35f), new Vector2(0.9f, 0.65f), new Color(0.1f, 0.08f, 0.05f, 0.95f));
+            upgPanel.SetActive(false);
+            var upgCostText = MakeUIText(upgPanel, "Cost", "", 18, Color.white, TextAnchor.MiddleCenter);
+            var upgDescText = MakeUIText(upgPanel, "Desc", "", 16,
+                new Color(0.8f, 0.8f, 0.8f), TextAnchor.UpperCenter);
+            upgDescText.GetComponent<RectTransform>().anchorMin = new Vector2(0.05f, 0.05f);
+            upgDescText.GetComponent<RectTransform>().anchorMax = new Vector2(0.95f, 0.5f);
+            upgCostText.GetComponent<RectTransform>().anchorMin = new Vector2(0.05f, 0.5f);
+            upgCostText.GetComponent<RectTransform>().anchorMax = new Vector2(0.95f, 0.95f);
+
+            // ── 通知面板（居中浮动） ──
+            var notifyPanel = MakePanel(canvasGO, "NotifyPanel",
+                new Vector2(0.1f, 0.4f), new Vector2(0.9f, 0.6f), new Color(0.05f, 0.15f, 0.05f, 0.9f));
+            notifyPanel.SetActive(false);
+            var notifyText = MakeUIText(notifyPanel, "Text", "", 20, Color.white, TextAnchor.MiddleCenter);
+
+            // ── TavernUI 组件 ──
+            var tavernUI = canvasGO.AddComponent<TavernUI>();
+            Set(tavernUI, "tavernNameText", tvNameText.GetComponent<Text>());
+            Set(tavernUI, "levelText",      lvlText.GetComponent<Text>());
+            Set(tavernUI, "goldText",       goldTxt.GetComponent<Text>());
+            Set(tavernUI, "repText",        repTxt.GetComponent<Text>());
+            Set(tavernUI, "guestsText",     guestTxt.GetComponent<Text>());
+            Set(tavernUI, "upgradePanel",   upgPanel);
+            Set(tavernUI, "upgradeButton",  upgBtn);
+            Set(tavernUI, "upgradeCostText", upgCostText.GetComponent<Text>());
+            Set(tavernUI, "upgradeDescText", upgDescText.GetComponent<Text>());
+            Set(tavernUI, "notifyPanel",    notifyPanel);
+            Set(tavernUI, "notifyText",     notifyText.GetComponent<Text>());
 
             // ── ScreenDialogUI 组件 ──
             var ui = canvasGO.AddComponent<ScreenDialogUI>();
