@@ -203,7 +203,9 @@ echo.
 echo [2/3] Running CMake configure...
 
 if /i "%PLATFORM%"=="wasm" (
-    %EMCMAKE% cmake -G "Ninja" -S "%PROJECT_DIR%" -B "%BUILD_DIR%" %CMAKE_EXTRA%
+    :: Activate emsdk environment
+    if exist "%EMSDK_PATH%\emsdk_env.bat" call "%EMSDK_PATH%\emsdk_env.bat"
+    emcmake cmake -S "%PROJECT_DIR%" -B "%BUILD_DIR%" -G "Ninja" %CMAKE_EXTRA%
 ) else (
     cmake -S "%PROJECT_DIR%" -B "%BUILD_DIR%" %CMAKE_EXTRA%
 )

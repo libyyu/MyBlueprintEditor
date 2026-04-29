@@ -740,7 +740,7 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
 
     # Include lprotos_s when both BUNDLE_LUA and BUNDLE_PROTOBUF are ON
     # （无需独立选项，自动跟随 Lua+Protobuf 一起合并）
-    if(BUNDLE_LUA AND BUNDLE_PROTOBUF AND TARGET lprotos_s)
+    if(BLUEPRINT_LUA AND BUNDLE_LUA AND BUNDLE_PROTOBUF AND TARGET lprotos_s)
         list(APPEND _BUNDLE_INPUTS $<TARGET_FILE:lprotos_s>)
         message(STATUS "[BlueprintBundle] lprotos_s WILL be merged (BUNDLE_LUA=ON + BUNDLE_PROTOBUF=ON)")
     endif()
