@@ -24,7 +24,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Tavern
         void UpdatePersonality()
         {
             int affinity = 50;
-            var memory = GetComponent<Storage.NpcMemory>();
+            var memory = GetComponent<NpcMemory>();
             if (memory != null)
                 affinity = memory.Data.affinity;
 

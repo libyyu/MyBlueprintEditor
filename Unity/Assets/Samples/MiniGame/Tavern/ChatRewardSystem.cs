@@ -68,7 +68,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Tavern
             // 发奖
             PlayerStats.Instance?.AddGold(gold);
             TavernManager.Instance?.GuestSatisfied(0, rep); // 声望
-            var memory = ctrl.GetComponent<Storage.NpcMemory>();
+            var memory = ctrl.GetComponent<NpcMemory>();
             memory?.AddAffinity(aff);
 
             OnReward?.Invoke(gold, rep, aff);

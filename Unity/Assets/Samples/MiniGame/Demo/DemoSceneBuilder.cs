@@ -9,7 +9,6 @@ using UnityEngine.UI;
 using BlueprintRuntime.Samples.AINpc;
 using BlueprintRuntime.Samples.AINpc.OpenWorld;
 using BlueprintRuntime.Samples.MiniGame;
-using BlueprintRuntime.Samples.MiniGame.Storage;
 using BlueprintRuntime.Samples.MiniGame.Tavern;
 
 namespace BlueprintRuntime.Samples.MiniGame.Demo
