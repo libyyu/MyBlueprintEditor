@@ -203,7 +203,7 @@ echo.
 echo [2/3] Running CMake configure...
 
 if /i "%PLATFORM%"=="wasm" (
-    %EMCMAKE% cmake -S "%PROJECT_DIR%" -B "%BUILD_DIR%" %CMAKE_EXTRA%
+    %EMCMAKE% cmake -G "Ninja" -S "%PROJECT_DIR%" -B "%BUILD_DIR%" %CMAKE_EXTRA%
 ) else (
     cmake -S "%PROJECT_DIR%" -B "%BUILD_DIR%" %CMAKE_EXTRA%
 )

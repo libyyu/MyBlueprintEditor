@@ -232,7 +232,7 @@ goto :after_collect_req
             echo [OK]   [%_CP%] -^> %_DST_DIR%\%_DST_FILE%
         ) else (
             echo [WARN] Required artifact not found: %_SRC%
-            set %_SV%=FAIL
+            for /f "tokens=*" %%x in ("%_SV%") do set %%x=FAIL
             set OVERALL_OK=0
         )
     )
@@ -243,7 +243,7 @@ goto :after_collect_req
 call :run_build windows windows
 if "!STATUS_windows!"=="OK" (
     echo.
-    echo [1b] Building BlueprintRuntimeNoLua (windows)...
+    echo [1b] Building BlueprintRuntimeNoLua (windows)
     call :build_nolua "%PROJECT_DIR%\build-windows" "%PROJECT_DIR%" %BUILD_TYPE%
 )
 echo.
@@ -251,7 +251,7 @@ echo.
 :: ── 2. WebAssembly ────────────────────────────────────────────────────────────
 set WASM_ARGS=
 if not "%EMSDK_PATH%"=="" set WASM_ARGS=--emsdk "%EMSDK_PATH%"
-
+echo Checking for Emscripten SDK %EMSDK_PATH%
 where emcmake >nul 2>&1
 if not errorlevel 1 (
     call :run_build wasm wasm %WASM_ARGS%
@@ -266,13 +266,13 @@ if not errorlevel 1 (
 :: Build 4 BlueprintBundle variants
 if "!STATUS_wasm!"=="OK" (
     echo.
-    echo [2b] Building BlueprintBundle +Lua +Proto (wasm^)...
+    echo [2b] Building BlueprintBundle +Lua +Proto (wasm)
     call :build_bundle "%PROJECT_DIR%\build-wasm" "%PROJECT_DIR%" %BUILD_TYPE% ON ON
-    echo [2c] Building BlueprintBundleNoLua +Proto (wasm^)...
+    echo [2c] Building BlueprintBundleNoLua +Proto (wasm)
     call :build_bundle "%PROJECT_DIR%\build-wasm" "%PROJECT_DIR%" %BUILD_TYPE% OFF ON
-    echo [2d] Building BlueprintBundleNoProto +Lua (wasm^)...
+    echo [2d] Building BlueprintBundleNoProto +Lua (wasm)
     call :build_bundle "%PROJECT_DIR%\build-wasm" "%PROJECT_DIR%" %BUILD_TYPE% ON OFF
-    echo [2e] Building BlueprintBundleMin -Lua -Proto (wasm^)...
+    echo [2e] Building BlueprintBundleMin -Lua -Proto (wasm)
     call :build_bundle "%PROJECT_DIR%\build-wasm" "%PROJECT_DIR%" %BUILD_TYPE% OFF OFF
 )
 echo.
@@ -286,7 +286,7 @@ if not "%NDK_PATH%"=="" (
     call :run_build android android --ndk "%NDK_PATH%" --api %ANDROID_API%
     if "!STATUS_android!"=="OK" (
         echo.
-        echo [3b] Building BlueprintRuntimeNoLua (android)...
+        echo [3b] Building BlueprintRuntimeNoLua (android)
         call :build_nolua "%PROJECT_DIR%\build-android" "%PROJECT_DIR%" %BUILD_TYPE%
     )
 ) else (
@@ -330,10 +330,11 @@ for %%B in (libBlueprintBundle.a libBlueprintBundleNoLua.a libBlueprintBundleNoP
     )
 )
 :: Fallback to bare Runtime if no Bundle found
-if not exist "%UNITY_PLUGINS_DIR%\WebGL\libBlueprintBundle.a" ^
-if not exist "%UNITY_PLUGINS_DIR%\WebGL\libBlueprintBundleMin.a" (
-    call :collect_req wasm "%PROJECT_DIR%\build-wasm\Runtime\libBlueprintRuntime.a" ^
-        "%UNITY_PLUGINS_DIR%\WebGL" "libBlueprintRuntime.a"
+if not exist "%UNITY_PLUGINS_DIR%\WebGL\libBlueprintBundle.a" (
+    if not exist "%UNITY_PLUGINS_DIR%\WebGL\libBlueprintBundleMin.a" (
+        call :collect_req wasm "%PROJECT_DIR%\build-wasm\Runtime\libBlueprintRuntime.a" ^
+            "%UNITY_PLUGINS_DIR%\WebGL" "libBlueprintRuntime.a"
+    )
 )
 
 :: ── Summary ───────────────────────────────────────────────────────────────────
