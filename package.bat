@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 setlocal enabledelayedexpansion
 :: ==============================================================================
 :: package.bat — 一键构建所有平台 + 打包到 dist/ 目录
