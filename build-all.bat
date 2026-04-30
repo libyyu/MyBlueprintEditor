@@ -1,5 +1,4 @@
 @echo off
-chcp 65001 >nul
 setlocal enabledelayedexpansion
 :: ==============================================================================
 :: build-all.bat - Build all platforms and collect artifacts to Unity Plugins dir

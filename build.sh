@@ -1,13 +1,14 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # ==============================================================================
 # build.sh – MyBlueprintEditor cross-platform build script
 #
 # Usage:
-#   ./build.sh [platform] [options...]
+#   sh build.sh [platform] [options...]
 #
 # Platforms:
 #   linux         Linux x64 (GLFW + OpenGL3) – default on Linux
 #   macos         macOS (GLFW + OpenGL3)     – default on macOS
+#   windows       Windows x64 (native MSVC or direct cmake)
 #   windows-dll   Windows x64 via MinGW-w64: full editor + shared DLL
 #   dll           Windows x64 via MinGW-w64: Runtime DLL only (no Editor)
 #   wasm          WebAssembly via Emscripten (Runtime only, static)
@@ -26,29 +27,29 @@
 #   --emsdk <path> Path to Emscripten SDK root (default: $EMSDK env var)
 #
 # Examples:
-#   ./build.sh                         # Linux Release
-#   ./build.sh macos debug             # macOS Debug
-#   ./build.sh windows-dll             # Windows DLL via MinGW-w64 (needs mingw)
-#   ./build.sh dll                     # Windows Runtime DLL only via MinGW-w64
-#   ./build.sh wasm                    # WASM Release (needs Emscripten)
-#   ./build.sh android --ndk ~/ndk     # Android Release
-#   ./build.sh ios                     # iOS Release (macOS host required)
-#   ./build.sh runtime shared          # Runtime-only shared lib, host platform
+#   sh build.sh                         # Linux Release
+#   sh build.sh macos debug             # macOS Debug
+#   sh build.sh windows                 # Windows native (MSVC/cmake)
+#   sh build.sh windows-dll             # Windows DLL via MinGW-w64
+#   sh build.sh wasm                    # WASM Release (needs Emscripten)
+#   sh build.sh android --ndk ~/ndk     # Android Release
+#   sh build.sh ios                     # iOS Release (macOS host required)
+#   sh build.sh runtime shared          # Runtime-only shared lib, host platform
 # ==============================================================================
 
-set -euo pipefail
+set -eu
 
 # ── Colours ───────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
 
-info()    { echo -e "${CYAN}[INFO]${NC}  $*"; }
-success() { echo -e "${GREEN}[OK]${NC}    $*"; }
-warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
-error()   { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
+info()    { printf "${CYAN}[INFO]${NC}  %s\n" "$*"; }
+success() { printf "${GREEN}[OK]${NC}    %s\n" "$*"; }
+warn()    { printf "${YELLOW}[WARN]${NC}  %s\n" "$*"; }
+error()   { printf "${RED}[ERROR]${NC} %s\n" "$*" >&2; exit 1; }
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLATFORM=""
 BUILD_TYPE="Release"
 CLEAN_BUILD=0
@@ -60,9 +61,9 @@ ANDROID_API=21
 EMSDK_PATH="${EMSDK:-}"
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
-while [[ $# -gt 0 ]]; do
+while [ $# -gt 0 ]; do
     case "$1" in
-        linux|macos|wasm|android|ios|runtime|windows-dll|dll)
+        linux|macos|wasm|android|ios|runtime|windows|windows-dll|dll)
             PLATFORM="$1"; shift ;;
         debug)
             BUILD_TYPE="Debug"; shift ;;
@@ -81,7 +82,7 @@ while [[ $# -gt 0 ]]; do
         --emsdk)
             EMSDK_PATH="$2"; shift 2 ;;
         -h|--help)
-            sed -n '2,/^# ===/p' "$0" | sed 's/^# \?//'
+            sed -n '2,/^# ===/p' "$0" | sed 's/^# \{0,1\}//'
             exit 0 ;;
         *)
             error "Unknown option: $1  (run with --help for usage)" ;;
@@ -89,13 +90,14 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ── Detect host platform if none given ────────────────────────────────────────
-if [[ -z "$PLATFORM" ]]; then
+if [ -z "$PLATFORM" ]; then
     case "$(uname -s)" in
-        Linux)   PLATFORM="linux" ;;
-        Darwin)  PLATFORM="macos" ;;
-        *)       PLATFORM="runtime" ;;
+        Linux)                          PLATFORM="linux" ;;
+        Darwin)                         PLATFORM="macos" ;;
+        MINGW*|MSYS*|CYGWIN*|Windows*) PLATFORM="windows" ;;
+        *)                              PLATFORM="runtime" ;;
     esac
-    info "No platform specified – detected: ${BOLD}${PLATFORM}${NC}"
+    info "No platform specified - detected: ${BOLD}${PLATFORM}${NC}"
 fi
 
 # ── Locate MinGW toolchain (for windows-dll / dll) ────────────────────────────
@@ -104,142 +106,92 @@ find_mingw_toolchain() {
         "x86_64-w64-mingw32-gcc" \
         "/usr/bin/x86_64-w64-mingw32-gcc" \
         "/usr/local/bin/x86_64-w64-mingw32-gcc"; do
-        if command -v "$candidate" &>/dev/null; then
+        if command -v "$candidate" >/dev/null 2>&1; then
             MINGW_PREFIX="${candidate%-gcc}"
             return 0
         fi
     done
-    error "MinGW-w64 cross-compiler not found.\n  Install: apt install mingw-w64  /  brew install mingw-w64\n  Or use build.bat on a Windows host for a native MSVC build."
+    error "MinGW-w64 cross-compiler not found. Install: apt install mingw-w64 / brew install mingw-w64"
 }
 
 # ── Derive build directory & CMake flags ─────────────────────────────────────
 BUILD_DIR="${PROJECT_DIR}/build-${PLATFORM}"
-CMAKE_EXTRA_ARGS=()
+CMAKE_EXTRA_ARGS=""
+EMCMAKE=""
 
 case "$PLATFORM" in
     linux|macos)
-        CMAKE_EXTRA_ARGS+=(
-            "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
-            "-DBUILD_EXAMPLES=${BUILD_EXAMPLES}"
-            "-DBUILD_SHARED_LIBS=${BUILD_SHARED}"
-        )
+        CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_EXAMPLES=${BUILD_EXAMPLES} -DBUILD_SHARED_LIBS=${BUILD_SHARED}"
+        ;;
+
+    windows)
+        CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_EXAMPLES=${BUILD_EXAMPLES} -DBUILD_SHARED_LIBS=ON"
+        BUILD_SHARED="ON"
         ;;
 
     runtime)
         RUNTIME_ONLY=1
-        CMAKE_EXTRA_ARGS+=(
-            "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
-            "-DBUILD_RUNTIME_ONLY=ON"
-            "-DBUILD_SHARED_LIBS=${BUILD_SHARED}"
-            "-DBUILD_EXAMPLES=${BUILD_EXAMPLES}"
-        )
+        CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=${BUILD_SHARED} -DBUILD_EXAMPLES=${BUILD_EXAMPLES}"
         ;;
 
     windows-dll)
-        # Full editor + shared DLL via MinGW-w64 cross-compile
         find_mingw_toolchain
         BUILD_SHARED="ON"
-        CMAKE_EXTRA_ARGS+=(
-            "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
-            "-DCMAKE_SYSTEM_NAME=Windows"
-            "-DCMAKE_C_COMPILER=${MINGW_PREFIX}-gcc"
-            "-DCMAKE_CXX_COMPILER=${MINGW_PREFIX}-g++"
-            "-DCMAKE_RC_COMPILER=${MINGW_PREFIX}-windres"
-            "-DBUILD_SHARED_LIBS=ON"
-            "-DBUILD_EXAMPLES=${BUILD_EXAMPLES}"
-        )
+        CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=${MINGW_PREFIX}-gcc -DCMAKE_CXX_COMPILER=${MINGW_PREFIX}-g++ -DCMAKE_RC_COMPILER=${MINGW_PREFIX}-windres -DBUILD_SHARED_LIBS=ON -DBUILD_EXAMPLES=${BUILD_EXAMPLES}"
         ;;
 
     dll)
-        # Runtime-only shared DLL via MinGW-w64 cross-compile
         find_mingw_toolchain
         RUNTIME_ONLY=1
         BUILD_SHARED="ON"
-        CMAKE_EXTRA_ARGS+=(
-            "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
-            "-DCMAKE_SYSTEM_NAME=Windows"
-            "-DCMAKE_C_COMPILER=${MINGW_PREFIX}-gcc"
-            "-DCMAKE_CXX_COMPILER=${MINGW_PREFIX}-g++"
-            "-DCMAKE_RC_COMPILER=${MINGW_PREFIX}-windres"
-            "-DBUILD_RUNTIME_ONLY=ON"
-            "-DBUILD_SHARED_LIBS=ON"
-            "-DBUILD_EXAMPLES=${BUILD_EXAMPLES}"
-        )
+        CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=${MINGW_PREFIX}-gcc -DCMAKE_CXX_COMPILER=${MINGW_PREFIX}-g++ -DCMAKE_RC_COMPILER=${MINGW_PREFIX}-windres -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=ON -DBUILD_EXAMPLES=${BUILD_EXAMPLES}"
         ;;
 
     wasm)
         RUNTIME_ONLY=1
-        # Locate emcmake
-        if [[ -z "$EMSDK_PATH" ]]; then
-            if command -v emcmake &>/dev/null; then
+        if [ -z "$EMSDK_PATH" ]; then
+            if command -v emcmake >/dev/null 2>&1; then
                 EMSDK_PATH="$(dirname "$(command -v emcmake)")"
             else
-                error "Emscripten not found. Install the Emscripten SDK or pass --emsdk <path>.\n  See: https://emscripten.org/docs/getting_started/downloads.html"
+                error "Emscripten not found. Install the Emscripten SDK or pass --emsdk <path>."
             fi
         fi
-        if [[ ! -f "${EMSDK_PATH}/emcmake" && ! -f "${EMSDK_PATH}/upstream/emscripten/emcmake" ]]; then
-            # Try sourcing emsdk_env.sh
-            if [[ -f "${EMSDK_PATH}/emsdk_env.sh" ]]; then
-                # shellcheck source=/dev/null
-                source "${EMSDK_PATH}/emsdk_env.sh" >/dev/null 2>&1
+        if [ ! -f "${EMSDK_PATH}/emcmake" ] && [ ! -f "${EMSDK_PATH}/upstream/emscripten/emcmake" ]; then
+            if [ -f "${EMSDK_PATH}/emsdk_env.sh" ]; then
+                . "${EMSDK_PATH}/emsdk_env.sh" >/dev/null 2>&1 || true
             fi
         fi
         EMCMAKE="$(command -v emcmake 2>/dev/null)" || error "emcmake not found after sourcing EMSDK. Check your Emscripten installation."
-        CMAKE_EXTRA_ARGS+=(
-            "-DBUILD_RUNTIME_ONLY=ON"
-            "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
-        )
+        CMAKE_EXTRA_ARGS="-DBUILD_RUNTIME_ONLY=ON -DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
         ;;
 
     android)
         RUNTIME_ONLY=1
-        if [[ -z "$NDK_PATH" ]]; then
-            # Try common locations
+        if [ -z "$NDK_PATH" ]; then
             for candidate in \
                 "${ANDROID_NDK:-}" \
                 "${ANDROID_NDK_HOME:-}" \
                 "${HOME}/Library/Android/sdk/ndk-bundle" \
                 "${HOME}/Android/Sdk/ndk-bundle" \
                 "/opt/android-ndk"; do
-                if [[ -n "$candidate" && -d "$candidate" ]]; then
+                if [ -n "$candidate" ] && [ -d "$candidate" ]; then
                     NDK_PATH="$candidate"; break
                 fi
             done
         fi
-        [[ -n "$NDK_PATH" ]] || error "Android NDK not found. Pass --ndk <path> or set \$ANDROID_NDK."
-        CMAKE_EXTRA_ARGS+=(
-            "-DCMAKE_TOOLCHAIN_FILE=${NDK_PATH}/build/cmake/android.toolchain.cmake"
-            "-DANDROID_ABI=arm64-v8a"
-            "-DANDROID_PLATFORM=android-${ANDROID_API}"
-            "-DBUILD_RUNTIME_ONLY=ON"
-            "-DBUILD_SHARED_LIBS=${BUILD_SHARED}"
-            "-DBUILD_EXAMPLES=OFF"
-            "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
-        )
+        [ -n "$NDK_PATH" ] || error "Android NDK not found. Pass --ndk <path> or set \$ANDROID_NDK."
+        CMAKE_EXTRA_ARGS="-DCMAKE_TOOLCHAIN_FILE=${NDK_PATH}/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-${ANDROID_API} -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=${BUILD_SHARED} -DBUILD_EXAMPLES=OFF -DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
         ;;
 
     ios)
         RUNTIME_ONLY=1
-        [[ "$(uname -s)" == "Darwin" ]] || error "iOS builds must be run on macOS."
-        # Try to find iOS toolchain (use the one bundled in cmake/ios or a well-known one)
+        [ "$(uname -s)" = "Darwin" ] || error "iOS builds must be run on macOS."
         IOS_TOOLCHAIN="${PROJECT_DIR}/cmake/ios.toolchain.cmake"
-        if [[ ! -f "$IOS_TOOLCHAIN" ]]; then
-            # Fallback: use Xcode's built-in CMake support
-            IOS_TOOLCHAIN=""
+        IOS_TC_ARG=""
+        if [ -f "$IOS_TOOLCHAIN" ]; then
+            IOS_TC_ARG="-DCMAKE_TOOLCHAIN_FILE=${IOS_TOOLCHAIN}"
         fi
-        if [[ -n "$IOS_TOOLCHAIN" ]]; then
-            CMAKE_EXTRA_ARGS+=("-DCMAKE_TOOLCHAIN_FILE=${IOS_TOOLCHAIN}")
-        fi
-        CMAKE_EXTRA_ARGS+=(
-            "-DCMAKE_SYSTEM_NAME=iOS"
-            "-DCMAKE_OSX_ARCHITECTURES=arm64"
-            "-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0"
-            "-DBUILD_RUNTIME_ONLY=ON"
-            "-DBUILD_SHARED_LIBS=OFF"
-            "-DBUILD_EXAMPLES=OFF"
-            "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
-            "-G" "Xcode"
-        )
+        CMAKE_EXTRA_ARGS="${IOS_TC_ARG} -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_EXAMPLES=OFF -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -G Xcode"
         ;;
 
     *)
@@ -248,19 +200,19 @@ esac
 
 # ── Banner ────────────────────────────────────────────────────────────────────
 echo ""
-echo -e "${BOLD}============================================${NC}"
-echo -e "${BOLD}  Blueprint Editor – Build Script${NC}"
-echo -e "  Platform      : ${CYAN}${PLATFORM}${NC}"
-echo -e "  Configuration : ${CYAN}${BUILD_TYPE}${NC}"
-echo -e "  Runtime only  : ${CYAN}${RUNTIME_ONLY}${NC}"
-echo -e "  Shared libs   : ${CYAN}${BUILD_SHARED}${NC}"
-echo -e "  Examples      : ${CYAN}${BUILD_EXAMPLES}${NC}"
-echo -e "  Build dir     : ${CYAN}${BUILD_DIR}${NC}"
-echo -e "${BOLD}============================================${NC}"
+printf "${BOLD}============================================${NC}\n"
+printf "${BOLD}  Blueprint Editor - Build Script${NC}\n"
+printf "  Platform      : ${CYAN}%s${NC}\n" "$PLATFORM"
+printf "  Configuration : ${CYAN}%s${NC}\n" "$BUILD_TYPE"
+printf "  Runtime only  : ${CYAN}%s${NC}\n" "$RUNTIME_ONLY"
+printf "  Shared libs   : ${CYAN}%s${NC}\n" "$BUILD_SHARED"
+printf "  Examples      : ${CYAN}%s${NC}\n" "$BUILD_EXAMPLES"
+printf "  Build dir     : ${CYAN}%s${NC}\n" "$BUILD_DIR"
+printf "${BOLD}============================================${NC}\n"
 echo ""
 
-# ── Step 1 – Clean ────────────────────────────────────────────────────────────
-if [[ $CLEAN_BUILD -eq 1 ]]; then
+# ── Step 1 - Clean ────────────────────────────────────────────────────────────
+if [ $CLEAN_BUILD -eq 1 ]; then
     info "[1/3] Cleaning build directory..."
     rm -rf "${BUILD_DIR}"
     success "Cleaned."
@@ -270,21 +222,22 @@ fi
 
 mkdir -p "${BUILD_DIR}"
 
-# ── Step 2 – CMake configure ─────────────────────────────────────────────────
+# ── Step 2 - CMake configure ─────────────────────────────────────────────────
 info "[2/3] Running CMake configure..."
-if [[ "$PLATFORM" == "wasm" ]]; then
-    "${EMCMAKE}" cmake -S "${PROJECT_DIR}" -B "${BUILD_DIR}" "${CMAKE_EXTRA_ARGS[@]}"
+if [ "$PLATFORM" = "wasm" ]; then
+    # shellcheck disable=SC2086
+    "${EMCMAKE}" cmake -S "${PROJECT_DIR}" -B "${BUILD_DIR}" ${CMAKE_EXTRA_ARGS}
 else
-    cmake -S "${PROJECT_DIR}" -B "${BUILD_DIR}" "${CMAKE_EXTRA_ARGS[@]}"
+    # shellcheck disable=SC2086
+    cmake -S "${PROJECT_DIR}" -B "${BUILD_DIR}" ${CMAKE_EXTRA_ARGS}
 fi
 success "CMake configure complete."
 
-# ── Step 3 – Build ───────────────────────────────────────────────────────────
+# ── Step 3 - Build ───────────────────────────────────────────────────────────
 info "[3/3] Building..."
 PARALLEL_JOBS="${PARALLEL_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 
-if [[ "$PLATFORM" == "ios" ]]; then
-    # Xcode generator requires --config
+if [ "$PLATFORM" = "ios" ]; then
     cmake --build "${BUILD_DIR}" --config "${BUILD_TYPE}" -- -jobs "${PARALLEL_JOBS}"
 else
     cmake --build "${BUILD_DIR}" --config "${BUILD_TYPE}" --parallel "${PARALLEL_JOBS}"
@@ -292,15 +245,15 @@ fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
-echo -e "${BOLD}============================================${NC}"
-echo -e "${GREEN}${BOLD}  Build succeeded!${NC} (${PLATFORM} / ${BUILD_TYPE})"
-echo -e "  Output: ${CYAN}${BUILD_DIR}/bin${NC}"
-if [[ "$PLATFORM" == "wasm" ]]; then
-    echo -e "  WASM lib: ${CYAN}${BUILD_DIR}/Runtime/libBlueprintRuntime.a${NC}"
-    echo -e "  → Drop into Assets/Plugins/WebGL/ for Unity"
-elif [[ "$PLATFORM" == "android" ]]; then
-    echo -e "  Android lib: ${CYAN}${BUILD_DIR}/Runtime/libBlueprintRuntime.so (or .a)${NC}"
-elif [[ "$PLATFORM" == "ios" ]]; then
-    echo -e "  iOS lib: ${CYAN}${BUILD_DIR}/Runtime/libBlueprintRuntime.a${NC}"
+printf "${BOLD}============================================${NC}\n"
+printf "${GREEN}${BOLD}  Build succeeded!${NC} (%s / %s)\n" "$PLATFORM" "$BUILD_TYPE"
+printf "  Output: ${CYAN}%s/bin${NC}\n" "$BUILD_DIR"
+if [ "$PLATFORM" = "wasm" ]; then
+    printf "  WASM lib: ${CYAN}%s/Runtime/libBlueprintRuntime.a${NC}\n" "$BUILD_DIR"
+    printf "  -> Drop into Assets/Plugins/WebGL/ for Unity\n"
+elif [ "$PLATFORM" = "android" ]; then
+    printf "  Android lib: ${CYAN}%s/Runtime/libBlueprintRuntime.so (or .a)${NC}\n" "$BUILD_DIR"
+elif [ "$PLATFORM" = "ios" ]; then
+    printf "  iOS lib: ${CYAN}%s/Runtime/libBlueprintRuntime.a${NC}\n" "$BUILD_DIR"
 fi
-echo -e "${BOLD}============================================${NC}"
+printf "${BOLD}============================================${NC}\n"
