@@ -781,9 +781,10 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
             xcrun ${_APPLE_LIBTOOL} -static -o "${_BUNDLE_OUT}" ${_BUNDLE_INPUTS}
         )
     elseif(EMSCRIPTEN)
-        # Emscripten: emar (llvm-ar wrapper)
+        # Emscripten: emar (llvm-ar wrapper) — use fat archive (no -T)
+        # Thin archives only store references; Unity WebGL linker needs self-contained .a
         set(_MERGE_CMD
-            ${CMAKE_AR} -rcsT "${_BUNDLE_OUT}" ${_BUNDLE_INPUTS}
+            ${CMAKE_AR} rcs "${_BUNDLE_OUT}" ${_BUNDLE_INPUTS}
         )
     else()
         # Linux / Android NDK: generate the MRI script at build time (after
@@ -816,13 +817,44 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
     endif()
 
     if(APPLE OR EMSCRIPTEN)
-        add_custom_target(BlueprintBundle ${_BUNDLE_ALL}
-            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/bin/Release"
-            COMMAND ${_MERGE_CMD}
-            DEPENDS BlueprintRuntime crude_json
-            COMMENT "Merging static libs → libBlueprintBundle.a"
-            VERBATIM
-        )
+        # Single-config generator (Ninja): paths are deterministic at configure time.
+        # Collect resolved paths (no generator expressions).
+        set(_RESOLVED_INPUTS "")
+        list(APPEND _RESOLVED_INPUTS "${CMAKE_BINARY_DIR}/Runtime/libBlueprintRuntime.a")
+        list(APPEND _RESOLVED_INPUTS "${CMAKE_BINARY_DIR}/Utils/Json/libcrude_json.a")
+        if(BUNDLE_LUA AND BLUEPRINT_LUA)
+            list(APPEND _RESOLVED_INPUTS "${CMAKE_BINARY_DIR}/Runtime/liblua54.a")
+        endif()
+        if(BUNDLE_PROTOBUF AND TARGET protobuf_s)
+            list(APPEND _RESOLVED_INPUTS "${CMAKE_BINARY_DIR}/external/protobuf/libprotobuf_s.a")
+        endif()
+        if(BUNDLE_LUA AND BUNDLE_PROTOBUF AND TARGET lprotos_s)
+            list(APPEND _RESOLVED_INPUTS "${CMAKE_BINARY_DIR}/external/lprotos/liblprotos_s.a")
+        endif()
+
+        if(APPLE)
+            find_program(_APPLE_LIBTOOL libtool HINTS /usr/bin /usr/local/bin)
+            if(NOT _APPLE_LIBTOOL)
+                set(_APPLE_LIBTOOL libtool)
+            endif()
+            add_custom_target(BlueprintBundle ${_BUNDLE_ALL}
+                COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/bin/Release"
+                COMMAND xcrun ${_APPLE_LIBTOOL} -static -o "${_BUNDLE_OUT}" ${_RESOLVED_INPUTS}
+                DEPENDS BlueprintRuntime crude_json
+                COMMENT "Merging static libs → lib${BUNDLE_NAME}.a (Apple libtool)"
+                VERBATIM
+            )
+        else()
+            # Emscripten: emar
+            add_custom_target(BlueprintBundle ${_BUNDLE_ALL}
+                COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/bin/Release"
+                COMMAND ${CMAKE_COMMAND} -E remove -f "${_BUNDLE_OUT}"
+                COMMAND ${CMAKE_AR} rcs "${_BUNDLE_OUT}" ${_RESOLVED_INPUTS}
+                DEPENDS BlueprintRuntime crude_json
+                COMMENT "Merging static libs → lib${BUNDLE_NAME}.a (emar)"
+                VERBATIM
+            )
+        endif()
     else()
         # Linux/Android: two-step (write MRI then ar -M).
         set(_MRI_FILE "${CMAKE_CURRENT_BINARY_DIR}/bundle.mri")

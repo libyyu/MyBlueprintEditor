@@ -162,7 +162,7 @@ goto :after_build_bundle
     if "%_BP%"=="" set _BP=OFF
     if not exist "%_BD%" exit /b 0
     echo   Configuring BlueprintBundle (BUNDLE_LUA=%_BL%, BUNDLE_PROTOBUF=%_BP%) in %_BD% ...
-    cmake -S "%_SD%" -B "%_BD%" -DBUILD_BUNDLE=ON -DBUNDLE_LUA=%_BL% -DBUNDLE_PROTOBUF=%_BP% -DCMAKE_BUILD_TYPE=%_BT% >nul
+    cmake -S "%_SD%" -B "%_BD%" -UBUILD_BUNDLE -UBUNDLE_LUA -UBUNDLE_PROTOBUF -UBUNDLE_NAME -DBUILD_BUNDLE=ON -DBUNDLE_LUA=%_BL% -DBUNDLE_PROTOBUF=%_BP% -DCMAKE_BUILD_TYPE=%_BT% >nul
     cmake --build "%_BD%" --target BlueprintBundle --config %_BT% --parallel
     if %ERRORLEVEL% neq 0 (
         echo [WARN] BlueprintBundle ^(LUA=%_BL% PROTO=%_BP%^) failed in %_BD%
