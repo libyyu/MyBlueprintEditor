@@ -150,9 +150,13 @@ else
     HAS_EMSDK=0
     HAS_NDK=0
     [[ -n "${EMSDK:-}" ]] && HAS_EMSDK=1
-    command -v emcmake &>/dev/null && HAS_EMSDK=1
+    if [ $HAS_EMSDK != 1 ] && [ "$(find_command emsdk)" = "true" ]; then
+        EMSDK_PATH="$(which emsdk)"
+        EMSDK_DIR="$(dirname "$EMSDK_PATH")"
+        export EMSDK="$EMSDK_DIR"
+        HAS_EMSDK=1
+    fi
     [[ -n "${ANDROID_NDK:-}" || -n "${ANDROID_NDK_HOME:-}" ]] && HAS_NDK=1
-
     BUILD_SH="${PROJECT_DIR}/build.sh"
     BUILD_BAT="${PROJECT_DIR}/build.bat"
 
@@ -230,7 +234,7 @@ else
 
     # -- WebGL --
     if [[ $HAS_EMSDK -eq 1 ]]; then
-        info ""
+        echo -e "\n"
         info "  [WebGL]   Building..."
         sh "$BUILD_SH" wasm release
         if [[ $? -eq 0 ]]; then
@@ -248,22 +252,26 @@ else
             warn "  [WebGL]   FAILED"
         fi
     else
+        echo -e "\n"
         warn "  [WebGL]   SKIP - Emscripten not found. Set \$EMSDK to enable."
     fi
 
     # -- Android --
     if [[ $HAS_NDK -eq 1 ]]; then
         _NDK="${ANDROID_NDK:-${ANDROID_NDK_HOME:-}}"
+        echo -e "\n"
         info "  [Android] Building..."
         sh "$BUILD_SH" android release --ndk "$_NDK" > /dev/null 2>&1 \
             && success "  [Android] OK" \
             || warn "  [Android] FAILED"
     else
+        echo -e "\n"
         warn "  [Android] SKIP - NDK not found. Set \$ANDROID_NDK to enable."
     fi
 
     # -- iOS (macOS only) --
     if [[ "$HOST_OS" == "Darwin" ]]; then
+        echo -e "\n"
         info "  [iOS]     Building..."
         bash "$BUILD_SH" ios release > /dev/null 2>&1 \
             && success "  [iOS]     OK" \
@@ -272,7 +280,7 @@ else
 fi
 
 # ── 2/3: Collect artifacts ───────────────────────────────────────────────────
-echo ""
+echo -e "\n"
 info "[2/3] Collecting artifacts to dist/..."
 
 rm -rf "$DIST_DIR"

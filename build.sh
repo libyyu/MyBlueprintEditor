@@ -49,6 +49,7 @@ warn()    { printf "${YELLOW}[WARN]${NC}  %s\n" "$*"; }
 error()   { printf "${RED}[ERROR]${NC} %s\n" "$*" >&2; exit 1; }
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
+HOST_OS="$(uname -s)"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLATFORM=""
 BUILD_TYPE="Release"
@@ -114,6 +115,13 @@ find_mingw_toolchain() {
     error "MinGW-w64 cross-compiler not found. Install: apt install mingw-w64 / brew install mingw-w64"
 }
 
+is_windows_host() {
+    case "$HOST_OS" in
+        MINGW*|MSYS*|CYGWIN*|Windows_NT|WINDOWS*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 # ── Derive build directory & CMake flags ─────────────────────────────────────
 BUILD_DIR="${PROJECT_DIR}/build-${PLATFORM}"
 CMAKE_EXTRA_ARGS=""
@@ -152,6 +160,12 @@ case "$PLATFORM" in
         if [ -z "$EMSDK_PATH" ]; then
             if command -v emcmake >/dev/null 2>&1; then
                 EMSDK_PATH="$(dirname "$(command -v emcmake)")"
+            elif command -v emsdk >/dev/null 2>&1; then
+                EMSDK_PATH="$(dirname "$(command -v emsdk)")"
+                echo "EMSDK_PATH $EMSDK_PATH"
+                if [ -f "${EMSDK_PATH}/emsdk_env.sh" ]; then
+                    . "${EMSDK_PATH}/emsdk_env.sh" #>/dev/null 2>&1 || true
+                fi
             else
                 error "Emscripten not found. Install the Emscripten SDK or pass --emsdk <path>."
             fi
@@ -161,7 +175,13 @@ case "$PLATFORM" in
                 . "${EMSDK_PATH}/emsdk_env.sh" >/dev/null 2>&1 || true
             fi
         fi
-        EMCMAKE="$(command -v emcmake 2>/dev/null)" || error "emcmake not found after sourcing EMSDK. Check your Emscripten installation."
+            
+        if is_windows_host; then
+            EMCMAKE="$(command -v ${EMSDK_PATH}/upstream/emscripten/emcmake.py 2>/dev/null)" || error "emcmake.py not found after sourcing EMSDK. Check your Emscripten installation."
+        else
+            EMCMAKE="$(command -v emcmake 2>/dev/null)" || error "emcmake not found after sourcing EMSDK. Check your Emscripten installation."
+        fi
+        echo "Using Emscripten EMCMAKE: ${EMCMAKE}"
         CMAKE_EXTRA_ARGS="-DBUILD_RUNTIME_ONLY=ON -DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
         ;;
 
@@ -226,7 +246,11 @@ mkdir -p "${BUILD_DIR}"
 info "[2/3] Running CMake configure..."
 if [ "$PLATFORM" = "wasm" ]; then
     # shellcheck disable=SC2086
-    "${EMCMAKE}" cmake -S "${PROJECT_DIR}" -B "${BUILD_DIR}" ${CMAKE_EXTRA_ARGS}
+    if is_windows_host; then
+        python "${EMCMAKE}" cmake -S "${PROJECT_DIR}" -B "${BUILD_DIR}" ${CMAKE_EXTRA_ARGS}
+    else
+        "${EMCMAKE}" cmake -S "${PROJECT_DIR}" -B "${BUILD_DIR}" ${CMAKE_EXTRA_ARGS}
+    fi
 else
     # shellcheck disable=SC2086
     cmake -S "${PROJECT_DIR}" -B "${BUILD_DIR}" ${CMAKE_EXTRA_ARGS}
