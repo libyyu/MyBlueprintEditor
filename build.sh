@@ -98,7 +98,7 @@ if [ -z "$PLATFORM" ]; then
         MINGW*|MSYS*|CYGWIN*|Windows*) PLATFORM="windows" ;;
         *)                              PLATFORM="runtime" ;;
     esac
-    info "No platform specified - detected: ${BOLD}${PLATFORM}${NC}"
+    printf "No platform specified - detected: ${GREEN}${BOLD}${PLATFORM}${NC}\n"
 fi
 
 # ── Locate MinGW toolchain (for windows-dll / dll) ────────────────────────────
