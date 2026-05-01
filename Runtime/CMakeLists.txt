@@ -26,6 +26,7 @@ cmake_minimum_required(VERSION 3.12)
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     project(BlueprintRuntime VERSION 1.0.0 LANGUAGES C CXX)
     set(BLUEPRINT_STANDALONE TRUE)
+    option(BLUEPRINT_PROTOBUF      "Enable Protocol Buffers support (requires Protobuf)" ON)
     # 独立构建时，根目录默认为上一级
     if(NOT DEFINED BLUEPRINT_ROOT_DIR)
         set(BLUEPRINT_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
@@ -122,16 +123,8 @@ set(RUNTIME_PUBLIC_HEADERS
 option(BLUEPRINT_LUA "Enable Lua scripting support (requires Lua 5.4)" ON)
 
 # RUNTIME_NAME – override the output file name of the BlueprintRuntime library.
-# Default: "BlueprintRuntime"  → libBlueprintRuntime.so / BlueprintRuntime.dll
-# Example: cmake -DRUNTIME_NAME=BlueprintRuntimeNoLua -DBLUEPRINT_LUA=OFF ..
-#          → libBlueprintRuntimeNoLua.so / BlueprintRuntimeNoLua.dll
-# When unset, auto-derived: BLUEPRINT_LUA=OFF → append "NoLua" suffix.
 if(NOT DEFINED RUNTIME_NAME OR RUNTIME_NAME STREQUAL "")
-    if(NOT BLUEPRINT_LUA)
-        set(RUNTIME_NAME "BlueprintRuntimeNoLua")
-    else()
-        set(RUNTIME_NAME "BlueprintRuntime")
-    endif()
+    set(RUNTIME_NAME "BlueprintRuntime")
 endif()
 
 # LUA_LINK_STATIC – controls how Lua is linked when BlueprintRuntime is SHARED.
@@ -390,11 +383,11 @@ if(TARGET protobuf_s)
         target_compile_definitions(BlueprintRuntime PRIVATE GOOGLE_PROTOBUF_NO_RTTI)
     endif()
     message(STATUS "[BlueprintRuntime] protobuf_s linked → Proto.* nodes enabled")
-elseif(EXISTS "${BLUEPRINT_ROOT_DIR}/external/protobuf/CMakeLists.txt")
+elseif(BLUEPRINT_PROTOBUF AND EXISTS "${BLUEPRINT_ROOT_DIR}/external/protobuf/CMakeLists.txt")
     # standalone Runtime build: add protobuf ourselves
 
     add_subdirectory("${BLUEPRINT_ROOT_DIR}/external/protobuf"
-                     "${CMAKE_CURRENT_BINARY_DIR}/protobuf")
+                    "${CMAKE_CURRENT_BINARY_DIR}/protobuf")
     target_link_libraries(BlueprintRuntime PRIVATE protobuf_s)
     target_include_directories(BlueprintRuntime PRIVATE
         ${BLUEPRINT_ROOT_DIR}/external/protobuf
@@ -416,6 +409,16 @@ if(BLUEPRINT_LUA)
         target_link_libraries(BlueprintRuntime PUBLIC ${LUA_LIBRARIES})
     else()
         target_link_libraries(BlueprintRuntime PRIVATE ${LUA_LIBRARIES})
+    endif()
+    if(BLUEPRINT_PROTOBUF AND BLUEPRINT_STANDALONE)
+        # Standalone build with Protobuf: also link Lua to lprotos (which uses Lua C API).
+        add_subdirectory("${BLUEPRINT_ROOT_DIR}/external/lprotos"
+                    "${CMAKE_CURRENT_BINARY_DIR}/lprotos")
+        if(_LUA_LIB_TYPE STREQUAL "SHARED")
+            target_link_libraries(lprotos_s PUBLIC ${LUA_LIBRARIES})
+        else()
+            target_link_libraries(lprotos_s PRIVATE ${LUA_LIBRARIES})
+        endif()
     endif()
     target_include_directories(BlueprintRuntime PRIVATE ${LUA_INCLUDE_DIR})
     target_compile_definitions(BlueprintRuntime PUBLIC BLUEPRINT_HAS_LUA)
@@ -614,12 +617,20 @@ set_property(TARGET BlueprintRuntime PROPERTY FOLDER "Libraries")
 # ---------------------------------------------------------------------------
 include(GNUInstallDirs)
 
-install(TARGETS BlueprintRuntime crude_json protobuf_s
+install(TARGETS BlueprintRuntime crude_json
     EXPORT BlueprintRuntimeTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}   # .dll on Windows
 )
+if(BLUEPRINT_PROTOBUF AND TARGET protobuf_s)
+    install(TARGETS protobuf_s
+        EXPORT BlueprintRuntimeTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}   # .dll on Windows
+    )
+endif()
 
 # Install Lua library when built from FetchContent
 if(BLUEPRINT_LUA AND TARGET ${LUA_LIBRARIES})
@@ -638,6 +649,15 @@ if(BLUEPRINT_LUA AND TARGET ${LUA_LIBRARIES})
             "${LUA54_SRC_DIR}/lauxlib.h"
             "${LUA54_SRC_DIR}/lua.hpp"
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/lua54
+        )
+    endif()
+
+    if(BLUEPRINT_PROTOBUF AND TARGET lprotos_s)
+        install(TARGETS lprotos_s
+            EXPORT BlueprintRuntimeTargets
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}   # .dll on Windows
         )
     endif()
 endif()

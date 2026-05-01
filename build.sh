@@ -60,6 +60,16 @@ RUNTIME_ONLY=0
 NDK_PATH=""
 ANDROID_API=21
 EMSDK_PATH="${EMSDK:-}"
+RUNTIME_NAME=""
+BLUEPRINT_LUA="ON"
+LUA_LINK_STATIC="ON"
+BLUEPRINT_PROTOBUF="ON"
+BUILD_MACOS_BUNDLE="ON"
+
+BUILD_BUNDLE="OFF"
+BUNDLE_LUA="OFF"
+BUNDLE_PROTOBUF="OFF"
+
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
 while [ $# -gt 0 ]; do
@@ -82,6 +92,22 @@ while [ $# -gt 0 ]; do
             ANDROID_API="$2"; shift 2 ;;
         --emsdk)
             EMSDK_PATH="$2"; shift 2 ;;
+        --runtime-name)
+            RUNTIME_NAME="$2"; shift 2 ;;
+        --nolua)
+            BLUEPRINT_LUA="OFF"; shift ;;
+        --lua-dynamic)
+            LUA_LINK_STATIC="OFF"; shift ;;
+        --no-protobuf)
+            BLUEPRINT_PROTOBUF="OFF"; shift ;;
+        --macos-bundle-off)
+            BUILD_MACOS_BUNDLE="OFF"; shift ;;
+        --merge-libs)
+            BUILD_BUNDLE="ON"; shift ;;
+        --merge-lua)
+            BUNDLE_LUA="ON"; shift ;;
+        --merge-protobuf)
+            BUNDLE_PROTOBUF="ON"; shift ;;
         -h|--help)
             sed -n '2,/^# ===/p' "$0" | sed 's/^# \{0,1\}//'
             exit 0 ;;
@@ -129,30 +155,30 @@ EMCMAKE=""
 
 case "$PLATFORM" in
     linux|macos)
-        CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_EXAMPLES=${BUILD_EXAMPLES} -DBUILD_SHARED_LIBS=${BUILD_SHARED}"
+        CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_EXAMPLES=${BUILD_EXAMPLES} -DBUILD_SHARED_LIBS=${BUILD_SHARED} -DBUILD_MACOS_BUNDLE=${BUILD_MACOS_BUNDLE} -DRUNTIME_NAME=${RUNTIME_NAME} -DBLUEPRINT_LUA=${BLUEPRINT_LUA} -DLUA_LINK_STATIC=${LUA_LINK_STATIC} -DBLUEPRINT_PROTOBUF=${BLUEPRINT_PROTOBUF} -DBUILD_BUNDLE=${BUILD_BUNDLE} -DBUNDLE_LUA=${BUNDLE_LUA} -DBUNDLE_PROTOBUF=${BUNDLE_PROTOBUF}"
         ;;
 
     windows)
-        CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_EXAMPLES=${BUILD_EXAMPLES} -DBUILD_SHARED_LIBS=ON"
+        CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_EXAMPLES=${BUILD_EXAMPLES} -DBUILD_SHARED_LIBS=ON -DBUILD_MACOS_BUNDLE=${BUILD_MACOS_BUNDLE} -DRUNTIME_NAME=${RUNTIME_NAME} -DBLUEPRINT_LUA=${BLUEPRINT_LUA} -DLUA_LINK_STATIC=${LUA_LINK_STATIC} -DBLUEPRINT_PROTOBUF=${BLUEPRINT_PROTOBUF} -DBUILD_BUNDLE=${BUILD_BUNDLE} -DBUNDLE_LUA=${BUNDLE_LUA} -DBUNDLE_PROTOBUF=${BUNDLE_PROTOBUF}"
         BUILD_SHARED="ON"
         ;;
 
     runtime)
         RUNTIME_ONLY=1
-        CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=${BUILD_SHARED} -DBUILD_EXAMPLES=${BUILD_EXAMPLES}"
+        CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=${BUILD_SHARED} -DBUILD_EXAMPLES=${BUILD_EXAMPLES} -DRUNTIME_NAME=${RUNTIME_NAME} -DBLUEPRINT_LUA=${BLUEPRINT_LUA} -DLUA_LINK_STATIC=${LUA_LINK_STATIC} -DBLUEPRINT_PROTOBUF=${BLUEPRINT_PROTOBUF} -DBUILD_BUNDLE=${BUILD_BUNDLE} -DBUNDLE_LUA=${BUNDLE_LUA} -DBUNDLE_PROTOBUF=${BUNDLE_PROTOBUF}"
         ;;
 
     windows-dll)
         find_mingw_toolchain
         BUILD_SHARED="ON"
-        CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=${MINGW_PREFIX}-gcc -DCMAKE_CXX_COMPILER=${MINGW_PREFIX}-g++ -DCMAKE_RC_COMPILER=${MINGW_PREFIX}-windres -DBUILD_SHARED_LIBS=ON -DBUILD_EXAMPLES=${BUILD_EXAMPLES}"
+        CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=${MINGW_PREFIX}-gcc -DCMAKE_CXX_COMPILER=${MINGW_PREFIX}-g++ -DCMAKE_RC_COMPILER=${MINGW_PREFIX}-windres -DBUILD_SHARED_LIBS=ON -DBUILD_EXAMPLES=${BUILD_EXAMPLES} -DRUNTIME_NAME=${RUNTIME_NAME} -DBLUEPRINT_LUA=${BLUEPRINT_LUA} -DLUA_LINK_STATIC=${LUA_LINK_STATIC} -DBLUEPRINT_PROTOBUF=${BLUEPRINT_PROTOBUF} -DBUILD_BUNDLE=${BUILD_BUNDLE} -DBUNDLE_LUA=${BUNDLE_LUA} -DBUNDLE_PROTOBUF=${BUNDLE_PROTOBUF}"
         ;;
 
     dll)
         find_mingw_toolchain
         RUNTIME_ONLY=1
         BUILD_SHARED="ON"
-        CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=${MINGW_PREFIX}-gcc -DCMAKE_CXX_COMPILER=${MINGW_PREFIX}-g++ -DCMAKE_RC_COMPILER=${MINGW_PREFIX}-windres -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=ON -DBUILD_EXAMPLES=${BUILD_EXAMPLES}"
+        CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=${MINGW_PREFIX}-gcc -DCMAKE_CXX_COMPILER=${MINGW_PREFIX}-g++ -DCMAKE_RC_COMPILER=${MINGW_PREFIX}-windres -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=ON -DBUILD_EXAMPLES=${BUILD_EXAMPLES} -DRUNTIME_NAME=${RUNTIME_NAME} -DBLUEPRINT_LUA=${BLUEPRINT_LUA} -DLUA_LINK_STATIC=${LUA_LINK_STATIC} -DBLUEPRINT_PROTOBUF=${BLUEPRINT_PROTOBUF} -DBUILD_BUNDLE=${BUILD_BUNDLE} -DBUNDLE_LUA=${BUNDLE_LUA} -DBUNDLE_PROTOBUF=${BUNDLE_PROTOBUF}"
         ;;
 
     wasm)
@@ -182,7 +208,8 @@ case "$PLATFORM" in
             EMCMAKE="$(command -v emcmake 2>/dev/null)" || error "emcmake not found after sourcing EMSDK. Check your Emscripten installation."
         fi
         echo "Using Emscripten EMCMAKE: ${EMCMAKE}"
-        CMAKE_EXTRA_ARGS="-DBUILD_RUNTIME_ONLY=ON -DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
+        LUA_LINK_STATIC="OFF"
+        CMAKE_EXTRA_ARGS="-DBUILD_RUNTIME_ONLY=ON -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DRUNTIME_NAME=${RUNTIME_NAME} -DBLUEPRINT_LUA=${BLUEPRINT_LUA} -DLUA_LINK_STATIC=OFF -DBLUEPRINT_PROTOBUF=${BLUEPRINT_PROTOBUF} -DBUILD_BUNDLE=${BUILD_BUNDLE} -DBUNDLE_LUA=${BUNDLE_LUA} -DBUNDLE_PROTOBUF=${BUNDLE_PROTOBUF}"
         ;;
 
     android)
@@ -200,7 +227,7 @@ case "$PLATFORM" in
             done
         fi
         [ -n "$NDK_PATH" ] || error "Android NDK not found. Pass --ndk <path> or set \$ANDROID_NDK."
-        CMAKE_EXTRA_ARGS="-DCMAKE_TOOLCHAIN_FILE=${NDK_PATH}/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-${ANDROID_API} -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=${BUILD_SHARED} -DBUILD_EXAMPLES=OFF -DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
+        CMAKE_EXTRA_ARGS="-DCMAKE_TOOLCHAIN_FILE=${NDK_PATH}/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-${ANDROID_API} -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=${BUILD_SHARED} -DBUILD_EXAMPLES=OFF -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DRUNTIME_NAME=${RUNTIME_NAME} -DBLUEPRINT_LUA=${BLUEPRINT_LUA} -DLUA_LINK_STATIC=${LUA_LINK_STATIC} -DBLUEPRINT_PROTOBUF=${BLUEPRINT_PROTOBUF} -DBUILD_BUNDLE=${BUILD_BUNDLE} -DBUNDLE_LUA=${BUNDLE_LUA} -DBUNDLE_PROTOBUF=${BUNDLE_PROTOBUF}"
         ;;
 
     ios)
@@ -211,7 +238,8 @@ case "$PLATFORM" in
         if [ -f "$IOS_TOOLCHAIN" ]; then
             IOS_TC_ARG="-DCMAKE_TOOLCHAIN_FILE=${IOS_TOOLCHAIN}"
         fi
-        CMAKE_EXTRA_ARGS="${IOS_TC_ARG} -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_EXAMPLES=OFF -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -G Xcode"
+        LUA_LINK_STATIC="OFF"
+        CMAKE_EXTRA_ARGS="${IOS_TC_ARG} -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_EXAMPLES=OFF -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -G Xcode  -DRUNTIME_NAME=${RUNTIME_NAME} -DBLUEPRINT_LUA=${BLUEPRINT_LUA} -DLUA_LINK_STATIC=OFF -DBLUEPRINT_PROTOBUF=${BLUEPRINT_PROTOBUF} -DBUILD_BUNDLE=${BUILD_BUNDLE} -DBUNDLE_LUA=${BUNDLE_LUA} -DBUNDLE_PROTOBUF=${BUNDLE_PROTOBUF}"
         ;;
 
     *)
@@ -220,15 +248,26 @@ esac
 
 # ── Banner ────────────────────────────────────────────────────────────────────
 echo ""
-printf "${BOLD}============================================${NC}\n"
+printf "${BOLD}====================================================================${NC}\n"
 printf "${BOLD}  Blueprint Editor - Build Script${NC}\n"
 printf "  Platform      : ${CYAN}%s${NC}\n" "$PLATFORM"
 printf "  Configuration : ${CYAN}%s${NC}\n" "$BUILD_TYPE"
 printf "  Runtime only  : ${CYAN}%s${NC}\n" "$RUNTIME_ONLY"
 printf "  Shared libs   : ${CYAN}%s${NC}\n" "$BUILD_SHARED"
+printf "  LuaVM         : ${CYAN}%s${NC}\n" "$BLUEPRINT_LUA"
+printf "  Protobuf      : ${CYAN}%s${NC}\n" "$BLUEPRINT_PROTOBUF"
+if [ "$BUILD_SHARED" = "ON" ]; then
+    printf "  Static Lua    : ${CYAN}%s${NC}\n" "$LUA_LINK_STATIC"
+else
+    printf "  Bundle runtime      : ${CYAN}%s${NC}\n" "$BUILD_BUNDLE"
+    if [ "$BUILD_BUNDLE" = "ON" ] && [ "$BUNDLE_LUA" = "ON" ]; then
+        printf "  -> Bundle Lua      : ${CYAN}%s${NC}\n" "$BUNDLE_LUA"
+        printf "  -> Bundle Protobuf : ${CYAN}%s${NC}\n" "$BUNDLE_PROTOBUF"
+    fi
+fi
 printf "  Examples      : ${CYAN}%s${NC}\n" "$BUILD_EXAMPLES"
 printf "  Build dir     : ${CYAN}%s${NC}\n" "$BUILD_DIR"
-printf "${BOLD}============================================${NC}\n"
+printf "${BOLD}====================================================================${NC}\n"
 echo ""
 
 # ── Step 1 - Clean ────────────────────────────────────────────────────────────
@@ -269,7 +308,7 @@ fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
-printf "${BOLD}============================================${NC}\n"
+printf "${BOLD}====================================================================${NC}\n"
 printf "${GREEN}${BOLD}  Build succeeded!${NC} (%s / %s)\n" "$PLATFORM" "$BUILD_TYPE"
 printf "  Output: ${CYAN}%s/bin${NC}\n" "$BUILD_DIR"
 if [ "$PLATFORM" = "wasm" ]; then
@@ -280,4 +319,4 @@ elif [ "$PLATFORM" = "android" ]; then
 elif [ "$PLATFORM" = "ios" ]; then
     printf "  iOS lib: ${CYAN}%s/Runtime/libBlueprintRuntime.a${NC}\n" "$BUILD_DIR"
 fi
-printf "${BOLD}============================================${NC}\n"
+printf "${BOLD}====================================================================${NC}\n"

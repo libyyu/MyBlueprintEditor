@@ -54,6 +54,7 @@ option(BUILD_RUNTIME_ONLY      "Build only BlueprintRuntime (no Editor / Applica
 option(BUILD_EXAMPLES          "Build example applications" ON)
 option(BLUEPRINT_NO_FILESYSTEM "Exclude DefaultFileSystem from BlueprintRuntime" OFF)
 option(BLUEPRINT_WXGAME        "Emscripten: export extra symbols for 微信/抖音小游戏 (adds .js+.wasm with addFunction support)" OFF)
+option(BLUEPRINT_PROTOBUF      "Enable Protocol Buffers support (requires Protobuf)" ON)
 
 # Emscripten: force runtime-only + static
 if(EMSCRIPTEN)
@@ -89,7 +90,9 @@ endif()
 # ---------------------------------------------------------------------------
 # protobuf  (vendored, supports Windows/Linux/macOS/iOS/Android/WebGL)
 # ---------------------------------------------------------------------------
-add_subdirectory(external/protobuf)
+if(BLUEPRINT_PROTOBUF)
+    add_subdirectory(external/protobuf)
+endif()
 
 # ---------------------------------------------------------------------------
 # crude_json  (lightweight JSON parser – used by Runtime and Editor)
@@ -106,10 +109,12 @@ add_subdirectory(Runtime)
 # LUA_INCLUDE_DIR / LUA_LIBRARIES are set by Runtime/CMakeLists.txt above.
 # ---------------------------------------------------------------------------
 if(BLUEPRINT_LUA AND TARGET lua54)
-    # 强制使用 FetchContent Lua 5.4 路径，不使用系统 Lua 5.1
-    set(LUA_INCLUDE_DIR "${LUA_INCLUDE_DIR}" CACHE PATH "Lua 5.4 include dir for lprotos" FORCE)
-    set(LUA_LIBRARIES   "${LUA_LIBRARIES}"   CACHE STRING "Lua 5.4 libraries for lprotos" FORCE)
-    add_subdirectory(external/lprotos)
+    if(BLUEPRINT_PROTOBUF)
+        # 强制使用 FetchContent Lua 5.4 路径，不使用系统 Lua 5.1
+        set(LUA_INCLUDE_DIR "${LUA_INCLUDE_DIR}" CACHE PATH "Lua 5.4 include dir for lprotos" FORCE)
+        set(LUA_LIBRARIES   "${LUA_LIBRARIES}"   CACHE STRING "Lua 5.4 libraries for lprotos" FORCE)
+        add_subdirectory(external/lprotos)
+    endif()
     # 额外强制：把正确的 Lua 5.4 include 加到 lprotos targets
     if(TARGET lprotos_s)
         target_include_directories(lprotos_s BEFORE PUBLIC
