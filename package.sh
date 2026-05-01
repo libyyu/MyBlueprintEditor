@@ -163,7 +163,7 @@ else
     # -- Host platform (Windows / Linux / macOS) --
     if is_windows_host; then
         info "  [Windows] Building..."
-        _win_built=0
+   
         # Configure with lua=ON
         cmake -S "$PROJECT_DIR" -B "${PROJECT_DIR}/build-windows" -DBLUEPRINT_LUA=ON > /dev/null 2>&1
         if [[ ! $? -eq 0 ]]; then
@@ -335,6 +335,9 @@ for editor_src in "${WIN_BIN}/BlueprintEditor.exe" \
                    libBlueprintRuntime.dylib liblua54.dll liblua54.so liblua54.dylib; do
             [[ -f "${WIN_BIN}/${lib}" ]] && cp -f "${WIN_BIN}/${lib}" "${DIST_DIR}/Editor/${lib}"
         done
+        if [[ -d "${PROJECT_DIR}/BlueprintEditor/resource" ]]; then
+            cp -rf "${PROJECT_DIR}/BlueprintEditor/resource" "${DIST_DIR}/Editor/resource"
+        fi
         success "  Editor: $(basename "$editor_src")"
         COLLECTED=$((COLLECTED + 1))
         break
@@ -350,6 +353,9 @@ for host_dir in "${PROJECT_DIR}/build-linux/bin" \
                    liblua54.so liblua54.dylib; do
             [[ -f "${host_dir}/${lib}" ]] && cp -f "${host_dir}/${lib}" "${DIST_DIR}/Editor/${lib}"
         done
+        if [[ -d "${PROJECT_DIR}/BlueprintEditor/resource" ]]; then
+            cp -rf "${PROJECT_DIR}/BlueprintEditor/resource" "${DIST_DIR}/Editor/resource"
+        fi
         success "  Editor: BlueprintEditor ($(basename "$(dirname "$(dirname "$host_dir")")"))"
         COLLECTED=$((COLLECTED + 1))
         break
