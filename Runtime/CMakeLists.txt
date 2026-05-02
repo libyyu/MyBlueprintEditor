@@ -121,6 +121,7 @@ set(RUNTIME_PUBLIC_HEADERS
 # Optional: Lua scripting support
 # ---------------------------------------------------------------------------
 option(BLUEPRINT_LUA "Enable Lua scripting support (requires Lua 5.4)" ON)
+option(BLUEPRINT_LINK_XLUA "Enable XLua scripting support (requires Lua 5.4)" ON)
 
 # RUNTIME_NAME – override the output file name of the BlueprintRuntime library.
 if(NOT DEFINED RUNTIME_NAME OR RUNTIME_NAME STREQUAL "")
@@ -346,6 +347,13 @@ if(BLUEPRINT_LUA)
         ${CMAKE_CURRENT_SOURCE_DIR}/LuaLib_Http.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/LuaLib_File.cpp
     )
+    if(BLUEPRINT_LINK_XLUA)
+        list(APPEND RUNTIME_SOURCES
+            ${CMAKE_CURRENT_SOURCE_DIR}/../external/xlua/xlua.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/../external/xlua/perflib.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/../external/xlua/i64lib.c
+        )
+    endif()
     list(APPEND RUNTIME_PUBLIC_HEADERS
         ${CMAKE_CURRENT_SOURCE_DIR}/LuaScriptEngine.h
         ${CMAKE_CURRENT_SOURCE_DIR}/LuaBindings.h

@@ -73,7 +73,7 @@ static void lua_rawgetp(lua_State *L, int idx, const void *p) {
 
 #endif
 
-#if LUA_VERSION_NUM == 503
+#if LUA_VERSION_NUM >= 503
 #define lua_objlen(L,i)		lua_rawlen(L, (i))
 #endif
 
@@ -301,7 +301,7 @@ static int snapshot(lua_State* L) {
 	const void * p;
 	lua_newtable(dL);
 	
-#if LUA_VERSION_NUM == 503
+#if LUA_VERSION_NUM >= 503
 	lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS);
 #else
 	lua_pushvalue(L, LUA_GLOBALSINDEX);
@@ -341,7 +341,7 @@ static const luaL_Reg preflib[] = {
 
 LUALIB_API int luaopen_perflib(lua_State* L)
 {
-#if LUA_VERSION_NUM == 503
+#if LUA_VERSION_NUM >= 503
 	luaL_newlib(L, preflib);
 	lua_setglobal(L, "perf");
 #else
