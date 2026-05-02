@@ -1170,7 +1170,8 @@ static const lua_CFunction direct_setters[10] = {
 	xlua_struct_set_double
 };
 
-int nop(lua_State *) {
+int nop(lua_State *L) {
+	(void*)(L);
 	return 0;
 }
 
