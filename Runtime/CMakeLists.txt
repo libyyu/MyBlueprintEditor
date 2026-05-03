@@ -315,6 +315,14 @@ if(BLUEPRINT_LUA)
                         INSTALL_NAME_DIR "@rpath"
                     )
                 endif()
+            else()
+                if(BLUEPRINT_LINK_XLUA)
+                    if(MSVC)
+                        target_compile_definitions(${_LUA_TARGET_NAME}
+                            PUBLIC LUA_BUILD_AS_DLL
+                        )
+                    endif()
+                endif()
             endif()
 
             # Suppress warnings in third-party Lua code
