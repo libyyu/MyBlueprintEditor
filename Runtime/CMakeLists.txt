@@ -316,7 +316,7 @@ if(BLUEPRINT_LUA)
                     )
                 endif()
             else()
-                if(BLUEPRINT_LINK_XLUA)
+                if(BLUEPRINT_LINK_XLUA AND _RUNTIME_LIB_TYPE STREQUAL "SHARED")
                     if(MSVC)
                         target_compile_definitions(${_LUA_TARGET_NAME}
                             PUBLIC LUA_BUILD_AS_DLL
