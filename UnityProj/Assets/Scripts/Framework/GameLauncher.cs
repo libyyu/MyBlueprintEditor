@@ -10,6 +10,7 @@
 //   - 同一 GameObject 上需有 YooAssetInitializer、LuaManager
 //   - Execution Order 设为 -100（早于一切游戏逻辑）
 
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -52,9 +53,13 @@ namespace CutRope.Framework
         private void OnDefaultPackageReady()
         {
             Debug.Log("[GameLauncher] DefaultPackage ready. Starting Lua...");
+            StartCoroutine(StartLuaAndLoadScene());
+        }
 
-            // 启动 Lua
-            _luaMgr.StartLua();
+        private IEnumerator StartLuaAndLoadScene()
+        {
+            // 异步启动 Lua（从 YooAsset 加载 main.lua）
+            yield return _luaMgr.StartLuaAsync();
 
             // 跳转主场景
             if (!skipSceneLoad && !string.IsNullOrEmpty(mainSceneName))

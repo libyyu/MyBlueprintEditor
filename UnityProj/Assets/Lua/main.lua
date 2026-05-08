@@ -1,6 +1,5 @@
 -- main.lua
--- 游戏 Lua 入口，由 LuaManager.StartLua() 执行
--- 此时 YooAsset 主包已就绪
+-- 游戏 Lua 入口，由 LuaManager 从 YooAsset 加载后执行
 
 print("[Lua] main.lua loaded!")
 
@@ -8,7 +7,7 @@ print("[Lua] main.lua loaded!")
 
 --- 每帧调用（由 LuaManager.Update 驱动）
 function update()
-    -- 目前留空，后续游戏逻辑挂在这里
+    -- 后续游戏逻辑挂在这里
 end
 
 --- 销毁时调用
@@ -17,6 +16,6 @@ function on_destroy()
 end
 
 -- ── 后续扩展区 ────────────────────────────────────────────────────────
--- require 'game.scene_manager'
--- require 'game.level_manager'
--- require 'ui.main_menu'
+-- require 'game/scene_manager'
+-- require 'game/level_manager'
+-- require 'ui/main_menu'
