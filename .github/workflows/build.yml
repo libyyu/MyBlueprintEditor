@@ -10,7 +10,7 @@ jobs:
   # ── Windows / MSVC shared ────────────────────────────────────────────────────
   windows:
     name: Windows (MSVC x64)
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
 
@@ -48,7 +48,7 @@ jobs:
   # ── Windows / MSVC static ────────────────────────────────────────────────────
   windows-static:
     name: Windows (MSVC x64 static)
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
 
