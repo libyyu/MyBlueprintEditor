@@ -21,7 +21,7 @@ jobs:
           key: gtest-v1.14.0-windows
 
       - name: Configure (shared runtime + editor)
-        run: cmake -B build -A x64 -DBUILD_SHARED_LIBS=ON -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON -DBLUEPRINT_LUA=ON -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}\install"
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_SHARED_LIBS=ON -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON -DBLUEPRINT_LUA=ON -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}\install"
 
       - name: Build Release
         run: cmake --build build --config Release --parallel
@@ -59,7 +59,7 @@ jobs:
           key: gtest-v1.14.0-windows-static
 
       - name: Configure (static runtime)
-        run: cmake -B build -A x64 -DBUILD_SHARED_LIBS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=ON
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_SHARED_LIBS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=ON
 
       - name: Build Release
         run: cmake --build build --config Release --parallel
