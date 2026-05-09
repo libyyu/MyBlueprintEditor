@@ -10,8 +10,8 @@ namespace CutRope.Framework
 {
     public interface ILoadingUI
     {
-        /// <summary>显示 Loading UI</summary>
-        void Show();
+        /// <summary>显示 Loading UI，可传入初始进度避免从 0 闪一帧</summary>
+        void Show(float initialProgress = 0f, string initialLabel = null);
 
         /// <summary>更新进度（0~1）和提示文字</summary>
         void SetProgress(float t, string label = null);

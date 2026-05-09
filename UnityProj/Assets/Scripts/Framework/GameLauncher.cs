@@ -165,10 +165,14 @@ namespace CutRope.Framework
                 yield break;
             }
 
-            // 正式 UI 就绪，销毁极简 UI
+            // 先把极简 UI 的当前进度同步给正式 UI，再显示正式 UI
+            // 注意顺序：Show(含初始进度) → WaitForEndOfFrame → Hide极简UI
+            // 确保正式 UI 先渲染一帧再销毁极简 UI，避免闪烁
+            float currentProgress = 0.1f;
+            _formalUI.Show(currentProgress, "加载界面...");
+            yield return new WaitForEndOfFrame();
             _bootstrapUI.Hide();
             _bootstrapUI = null;
-            _formalUI.Show();
             Debug.Log("[GameLauncher] Formal LoadingUI activated");
         }
 

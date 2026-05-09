@@ -29,11 +29,13 @@ namespace CutRope.Framework
         // ── 公共 API ─────────────────────────────────────────────────
 
         /// <summary>创建并显示极简 Loading UI</summary>
-        public void Show()
+        public void Show(float initialProgress = 0f, string initialLabel = null)
         {
             if (_canvas != null) return;
             CreateUI();
             gameObject.SetActive(true);
+            // 直接设置初始进度，避免第一帧显示 0
+            SetProgress(initialProgress, initialLabel);
         }
 
         /// <summary>更新进度（0~1）</summary>

@@ -34,10 +34,12 @@ namespace CutRope.Framework
 
         // ── ILoadingUI 实现 ──────────────────────────────────────────
 
-        public void Show()
+        public void Show(float initialProgress = 0f, string initialLabel = null)
         {
             gameObject.SetActive(true);
             if (errorPanel) errorPanel.SetActive(false);
+            // 先设进度再播动画，确保第一帧就是正确进度状态而非初始帧
+            SetProgress(initialProgress, initialLabel);
             if (logoAnimator && !string.IsNullOrEmpty(showTrigger))
                 logoAnimator.SetTrigger(showTrigger);
         }
