@@ -201,6 +201,13 @@ if(BLUEPRINT_LUA)
     if(NOT LUA_FOUND)
         message(STATUS "[BlueprintRuntime] Lua not found via find_package/pkg-config, using FetchContent")
         include(FetchContent)
+
+        # CMake 4.x deprecates calling FetchContent_Populate() directly (CMP0169).
+        # We need Populate (not MakeAvailable) because Lua has no CMakeLists.txt.
+        if(POLICY CMP0169)
+            cmake_policy(SET CMP0169 OLD)
+        endif()
+
         FetchContent_Declare(lua54
             URL      https://www.lua.org/ftp/lua-5.4.7.tar.gz
             DOWNLOAD_EXTRACT_TIMESTAMP ON
