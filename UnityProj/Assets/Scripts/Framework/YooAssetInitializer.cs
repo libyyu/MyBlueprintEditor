@@ -3,13 +3,18 @@
 //
 // 初始化流程（每个 Package）：
 //   1. CreatePackage / 获取已有包
-//   2. 初始化（Editor 模式用 EditorSimulate，真机用 HostPlay）
+//   2. 初始化（Editor 模式用 EditorSimulate，WebGL 用 WebPlay，真机用 HostPlay）
 //   3. 请求最新版本号
 //   4. 更新 Manifest
 //   5. 创建下载器下载缺失资源
 //
 // 主包（DefaultPackage）：游戏启动时必须完成，包含 Loading UI、主菜单、第1章前2关
 // DLC 包（DlcChapterXX）：按需初始化，玩家进入对应章节时调用 InitDlcPackageAsync
+//
+// 平台分流：
+//   UNITY_EDITOR              → EditorSimulate（跳过网络，快速迭代）
+//   UNITY_WEBGL && !UNITY_EDITOR → WebPlay（纯远端，无本地文件缓存）
+//   其他（iOS / Android / PC）  → HostPlay（内置包 + CDN 增量下载）
 
 using System;
 using System.Collections;
@@ -81,7 +86,7 @@ namespace CutRope.Framework
             if (isDefault)
                 YooAssets.SetDefaultPackage(package);
 
-            // 2. 初始化参数（Editor 模拟 / 真机分流）
+            // 2. 初始化参数（Editor 模拟 / WebGL 远端 / 真机分流）
             InitializationOperationBase initOp;
 #if UNITY_EDITOR
             // Editor 下使用模拟模式，不需要实际打包
@@ -91,8 +96,17 @@ namespace CutRope.Framework
                 EditorFileSystemParameters = FileSystemParameters.CreateDefaultEditorFileSystemParameters(buildResult)
             };
             initOp = package.InitializeAsync(editorParam);
+#elif UNITY_WEBGL
+            // WebGL / 微信小游戏：无本地文件系统，只走远端 CDN
+            // WebPlay 模式仅需 RemoteFileSystem，不配置 BuildinFileSystem
+            var webRemoteServices = new RemoteServices(cdnBaseUrl, cdnFallbackUrl);
+            var webParam = new WebPlayModeParameters
+            {
+                WebFileSystemParameters = FileSystemParameters.CreateDefaultWebFileSystemParameters(webRemoteServices)
+            };
+            initOp = package.InitializeAsync(webParam);
 #else
-            // 真机 HostPlay 模式：内置资源 + CDN 更新
+            // 真机 HostPlay 模式（iOS / Android / PC）：内置资源 + CDN 增量更新
             var remoteServices = new RemoteServices(cdnBaseUrl, cdnFallbackUrl);
             var hostParam = new HostPlayModeParameters
             {
@@ -125,8 +139,17 @@ namespace CutRope.Framework
 
             if (versionOp.Status != EOperationStatus.Succeed)
             {
-                // 版本请求失败时使用本地缓存版本继续（离线容错）
+#if UNITY_WEBGL
+                // WebGL 无本地缓存可回退，版本请求失败直接报错
+                string verErr = $"[YooAsset] RequestVersion failed for '{packageName}': {versionOp.Error}";
+                Debug.LogError(verErr);
+                onFailed?.Invoke(verErr);
+                if (isDefault) OnInitFailed?.Invoke(verErr);
+                yield break;
+#else
+                // 原生平台：版本请求失败时使用本地缓存版本继续（离线容错）
                 Debug.LogWarning($"[YooAsset] RequestVersion failed for '{packageName}', using cached version. Error: {versionOp.Error}");
+#endif
             }
 
             // 4. 更新 Manifest
@@ -146,7 +169,11 @@ namespace CutRope.Framework
             // 5. 检查并下载缺失资源
             yield return DownloadMissingBundles(package, packageName);
 
+#if UNITY_WEBGL
+            Debug.Log($"[YooAsset] Package '{packageName}' ready (WebPlay)");
+#else
             Debug.Log($"[YooAsset] Package '{packageName}' ready (HostPlay)");
+#endif
             SetPackageReady(packageName, isDefault, onReady);
 #endif
         }
