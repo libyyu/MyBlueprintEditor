@@ -316,3 +316,39 @@ jobs:
             build-wxgame/**/runtime-example.js
             build-wxgame/**/runtime-example.wasm
           if-no-files-found: error
+
+  # ── Unity Windows Build ────────────────────────────────────────────────────
+  unity-windows:
+    name: Unity (Windows, StandaloneWindows64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Unity/Library
+          key: unity-library-windows-${{ hashFiles('Unity/Assets/**', 'Unity/Packages/manifest.json', 'Unity/ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: |
+            unity-library-windows-
+
+      - name: Build Unity project (Windows)
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: Unity
+          targetPlatform: StandaloneWindows64
+          unityVersion: 2022.3.62f1
+          buildMethod: ""
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Unity-Windows-Build
+          path: build
+          if-no-files-found: warn
