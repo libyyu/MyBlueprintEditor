@@ -3,16 +3,23 @@
 //
 // 启动流程：
 //
-//   Step 1  显示极简内置 Loading UI（纯代码生成，零资源依赖，秒显示）
-//   Step 2  YooAsset Phase 1：初始化本地文件系统（内置包 or 缓存，不访问网络）
-//   Step 3  从本地加载正式 LoadingUI prefab 替换极简 UI（内置版 or 上次缓存的最新版）
-//   Step 4  YooAsset Phase 2：请求版本号 → 更新 Manifest → 下载缺失 bundle
-//             进度实时显示在 Loading UI 上；无需下载时直接跳过
+//   [原生平台 iOS / Android / PC]
+//   Step 1  YooAsset Phase 1：初始化本地文件系统（内置包 or 缓存，不访问网络）
+//   Step 2  从本地加载正式 LoadingUI prefab 并显示（内置版 or 上次缓存的最新版）
+//   Step 3  YooAsset Phase 2：请求版本号 → 更新 Manifest → 下载缺失 bundle（进度显示）
+//   Step 4  xLua 启动，执行 main.lua
+//   Step 5  跳转主场景
+//
+//   [WebGL / 微信小游戏]
+//   Step 1  极简 BootstrapLoadingUI 立即显示（纯代码生成，零资源依赖，秒显示）
+//   Step 2  YooAsset Phase 1：初始化远端文件系统
+//   Step 3  从 CDN 加载正式 LoadingUI bundle，替换极简 UI（WaitForEndOfFrame 避免闪烁）
+//   Step 4  YooAsset Phase 2：下载缺失 bundle（进度显示）
 //   Step 5  xLua 启动，执行 main.lua
 //   Step 6  跳转主场景
 //
-//   再次启动：Step 2 读缓存（上次下好的最新版），Step 3 显示最新 LoadingUI，
-//             Step 4 只下本次有差量的部分
+//   再次启动（所有平台）：
+//     Phase 1 读缓存/内置，Phase 2 只下本次差量
 //
 // 挂载要求：
 //   - 同一 GameObject 上需有 YooAssetInitializer、LuaManager
@@ -47,11 +54,16 @@ namespace CutRope.Framework
         private YooAssetInitializer _yooInit;
         private LuaManager          _luaMgr;
 
-        private BootstrapLoadingUI _bootstrapUI;   // 极简兜底 UI（Step 1）
-        private ILoadingUI         _formalUI;      // 正式 LoadingUI（Step 3，可为空）
+        // WebGL 专用极简兜底 UI（原生平台不创建）
+        private BootstrapLoadingUI _bootstrapUI;
 
-        // 当前活跃 UI（优先 formalUI，否则 bootstrapUI）
-        private ILoadingUI ActiveUI => (_formalUI != null) ? _formalUI : _bootstrapUI;
+        // 正式 LoadingUI（原生平台从 Step 1 后立即加载，WebGL 在 Step 3 替换极简 UI）
+        private ILoadingUI _loadingUI;
+
+        // 当前活跃 UI
+        private ILoadingUI ActiveUI => (_loadingUI != null)
+            ? _loadingUI
+            : (_bootstrapUI as ILoadingUI);
 
         // ── 生命周期 ─────────────────────────────────────────────────
         private void Awake()
@@ -63,85 +75,101 @@ namespace CutRope.Framework
         private void Start()
         {
             Debug.Log("[GameLauncher] Starting...");
-            StartCoroutine(LaunchSequence());
+#if UNITY_WEBGL && !UNITY_EDITOR
+            StartCoroutine(LaunchWebGL());
+#else
+            StartCoroutine(LaunchNative());
+#endif
         }
 
-        // ── 主启动协程 ────────────────────────────────────────────────
-        private IEnumerator LaunchSequence()
+        // ════════════════════════════════════════════════════════════
+        // 原生平台启动流程（iOS / Android / PC / Editor）
+        // ════════════════════════════════════════════════════════════
+        private IEnumerator LaunchNative()
         {
-            // ── Step 1：极简 Loading UI 立即显示 ─────────────────────
-            var uiGo = new GameObject("BootstrapLoadingUI");
-            DontDestroyOnLoad(uiGo);
-            _bootstrapUI = uiGo.AddComponent<BootstrapLoadingUI>();
-            _bootstrapUI.Show();
-            _bootstrapUI.SetProgress(0f, "初始化...");
+            // Step 1：本地初始化（内置包 or 缓存，不访问网络）
+            yield return WaitForLocalReady();
+            if (_yooInit.IsLocalReady == false) yield break; // 失败由回调处理
 
-            // ── Step 2：YooAsset Phase 1（本地，不访问网络） ──────────
-            bool localReady  = false;
-            bool localFailed = false;
-            string localErr  = "";
+            // Step 2：从本地加载正式 LoadingUI 并显示
+            yield return LoadAndShowFormalUI(initialProgress: 0.1f, label: "加载界面...");
 
-            _yooInit.OnLocalReady  += () => localReady  = true;
-            _yooInit.OnInitFailed  += e  => { localFailed = true; localErr = e; };
+            if (_loadingUI == null)
+            {
+                // 本地加载失败（资源配置错误），用极简 UI 兜底继续
+                Debug.LogWarning("[GameLauncher] Native: LoadingUI load failed, fallback to bootstrap UI");
+                ShowBootstrapUI(0.1f, "加载界面失败，继续...");
+            }
 
+            // Step 3：检查更新 + 下载差量
+            yield return WaitForDownloadDone();
+            if (!_yooInit.IsDefaultPackageReady) yield break;
+
+            // Step 4 & 5：Lua + 场景
+            yield return FinishLaunch();
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // WebGL 启动流程
+        // ════════════════════════════════════════════════════════════
+        private IEnumerator LaunchWebGL()
+        {
+            // Step 1：极简 UI 立即显示（零资源依赖）
+            ShowBootstrapUI(0f, "初始化...");
+
+            // Step 2：初始化远端文件系统（不下载资源）
+            yield return WaitForLocalReady();
+            if (_yooInit.IsLocalReady == false) yield break;
+
+            _bootstrapUI?.SetProgress(0.08f, "加载界面...");
+
+            // Step 3：从 CDN 下载并加载正式 LoadingUI bundle，替换极简 UI
+            yield return LoadAndShowFormalUI(initialProgress: 0.1f, label: "加载界面...");
+
+            if (_loadingUI != null)
+            {
+                // 正式 UI 已渲染一帧，安全销毁极简 UI
+                _bootstrapUI?.Hide();
+                _bootstrapUI = null;
+            }
+            // 若正式 UI 加载失败，继续用极简 UI（网络差时的兜底）
+
+            // Step 4：检查更新 + 下载差量
+            yield return WaitForDownloadDone();
+            if (!_yooInit.IsDefaultPackageReady) yield break;
+
+            // Step 5 & 6：Lua + 场景
+            yield return FinishLaunch();
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // 共用步骤
+        // ════════════════════════════════════════════════════════════
+
+        /// <summary>等待 YooAsset Phase 1 本地初始化完成</summary>
+        private IEnumerator WaitForLocalReady()
+        {
+            bool ready = false, failed = false;
+            string err = "";
+
+            _yooInit.OnLocalReady += () => ready = true;
+            _yooInit.OnInitFailed += e => { failed = true; err = e; };
             _yooInit.InitLocal();
-            while (!localReady && !localFailed) yield return null;
 
-            if (localFailed)
+            while (!ready && !failed) yield return null;
+
+            if (failed)
             {
-                // 本地初始化失败（极少发生），直接报错等待重试
-                _bootstrapUI.ShowError($"初始化失败\n{localErr}",
-                    () => StartCoroutine(LaunchSequence()));
-                yield break;
-            }
-
-            _bootstrapUI.SetProgress(0.1f, "加载界面...");
-
-            // ── Step 3：从本地（内置/缓存）加载正式 LoadingUI ─────────
-            // 此时 YooAsset 已可读取本地 bundle，不需要网络
-            yield return LoadFormalLoadingUI();
-            // 无论成功与否，ActiveUI 都已指向当前最优 UI
-
-            ActiveUI.SetProgress(0.15f, "检查更新...");
-
-            // ── Step 4：YooAsset Phase 2（检查 + 下载差量） ───────────
-            bool downloadDone   = false;
-            bool downloadFailed = false;
-            string downloadErr  = "";
-
-            _yooInit.OnDefaultPackageReady += () => downloadDone   = true;
-            // OnInitFailed 已在 Step 2 订阅，追加 download 判断
-            _yooInit.OnInitFailed          += e  => { downloadFailed = true; downloadErr = e; };
-            _yooInit.OnDownloadProgress    += OnDownloadProgress;
-
-            _yooInit.CheckAndDownload();
-            while (!downloadDone && !downloadFailed) yield return null;
-
-            if (downloadFailed)
-            {
-                ActiveUI.ShowError($"资源下载失败\n{downloadErr}",
-                    () => StartCoroutine(RetryDownload()));
-                yield break;
-            }
-
-            // ── Step 5：启动 Lua ──────────────────────────────────────
-            ActiveUI.SetProgress(0.95f, "启动游戏...");
-            yield return _luaMgr.StartLuaAsync();
-
-            // ── Step 6：进入主场景 ────────────────────────────────────
-            ActiveUI.SetProgress(1f, "完成！");
-            yield return new WaitForSeconds(0.2f);
-            ActiveUI.Hide();
-
-            if (!skipSceneLoad && !string.IsNullOrEmpty(mainSceneName))
-            {
-                Debug.Log($"[GameLauncher] Loading scene: {mainSceneName}");
-                SceneManager.LoadScene(mainSceneName);
+                var msg = $"初始化失败\n{err}";
+                if (ActiveUI != null)
+                    ActiveUI.ShowError(msg, () => StartCoroutine(LaunchSequenceRetry()));
+                else
+                    Debug.LogError($"[GameLauncher] {msg}");
             }
         }
 
-        // ── 加载正式 Loading UI（从本地包，无网络） ───────────────────
-        private IEnumerator LoadFormalLoadingUI()
+        /// <summary>从 YooAsset 本地包加载正式 LoadingUI，Show 后等一帧确保渲染</summary>
+        private IEnumerator LoadAndShowFormalUI(float initialProgress, string label)
         {
             if (string.IsNullOrEmpty(loadingUiAddress)) yield break;
 
@@ -150,69 +178,114 @@ namespace CutRope.Framework
 
             if (handle.Status != EOperationStatus.Succeed)
             {
-                Debug.LogWarning($"[GameLauncher] LoadingUI load failed: {handle.LastError}，继续用极简 UI");
+                Debug.LogWarning($"[GameLauncher] LoadingUI load failed: {handle.LastError}");
                 yield break;
             }
 
             var go = Instantiate(handle.AssetObject as GameObject);
             DontDestroyOnLoad(go);
-            _formalUI = go.GetComponent<ILoadingUI>();
+            var ui = go.GetComponent<ILoadingUI>();
 
-            if (_formalUI == null)
+            if (ui == null)
             {
-                Debug.LogWarning("[GameLauncher] LoadingUI prefab 缺少 ILoadingUI 组件，继续用极简 UI");
+                Debug.LogWarning("[GameLauncher] LoadingUI prefab 缺少 ILoadingUI 组件");
                 Destroy(go);
                 yield break;
             }
 
-            // 先把极简 UI 的当前进度同步给正式 UI，再显示正式 UI
-            // 注意顺序：Show(含初始进度) → WaitForEndOfFrame → Hide极简UI
-            // 确保正式 UI 先渲染一帧再销毁极简 UI，避免闪烁
-            float currentProgress = 0.1f;
-            _formalUI.Show(currentProgress, "加载界面...");
+            // 带初始进度显示，避免第一帧从 0 闪烁
+            ui.Show(initialProgress, label);
+            _loadingUI = ui;
+
+            // 等一帧确保正式 UI 已渲染，此后销毁极简 UI 不会出现黑帧
             yield return new WaitForEndOfFrame();
-            _bootstrapUI.Hide();
-            _bootstrapUI = null;
-            Debug.Log("[GameLauncher] Formal LoadingUI activated");
         }
 
-        // ── 下载进度回调（Phase 2） ───────────────────────────────────
+        /// <summary>等待 YooAsset Phase 2 下载完成</summary>
+        private IEnumerator WaitForDownloadDone()
+        {
+            bool done = false, failed = false;
+            string err = "";
+
+            _yooInit.OnDefaultPackageReady += () => done = true;
+            _yooInit.OnInitFailed          += e => { failed = true; err = e; };
+            _yooInit.OnDownloadProgress    += OnDownloadProgress;
+
+            ActiveUI?.SetProgress(0.15f, "检查更新...");
+            _yooInit.CheckAndDownload();
+
+            while (!done && !failed) yield return null;
+
+            if (failed)
+                ActiveUI?.ShowError($"资源下载失败\n{err}",
+                    () => StartCoroutine(RetryDownload()));
+        }
+
+        /// <summary>Lua 启动 + 进入主场景</summary>
+        private IEnumerator FinishLaunch()
+        {
+            ActiveUI?.SetProgress(0.95f, "启动游戏...");
+            yield return _luaMgr.StartLuaAsync();
+
+            ActiveUI?.SetProgress(1f, "完成！");
+            yield return new WaitForSeconds(0.2f);
+            ActiveUI?.Hide();
+
+            if (!skipSceneLoad && !string.IsNullOrEmpty(mainSceneName))
+            {
+                Debug.Log($"[GameLauncher] Loading scene: {mainSceneName}");
+                SceneManager.LoadScene(mainSceneName);
+            }
+        }
+
+        // ── 下载进度回调 ──────────────────────────────────────────────
         private void OnDownloadProgress(float progress)
         {
-            // 进度映射到 15%~90%（Phase 1 占 0~15%）
-            ActiveUI.SetProgress(0.15f + progress * 0.75f,
+            // 下载进度映射到 15%~90%
+            ActiveUI?.SetProgress(0.15f + progress * 0.75f,
                 progress > 0f ? $"下载资源 {progress * 100:F0}%" : "检查更新...");
         }
 
-        // ── 重试下载 ─────────────────────────────────────────────────
+        // ── 极简 UI 工具方法 ──────────────────────────────────────────
+        private void ShowBootstrapUI(float initialProgress, string label)
+        {
+            if (_bootstrapUI != null) return;
+            var go = new GameObject("BootstrapLoadingUI");
+            DontDestroyOnLoad(go);
+            _bootstrapUI = go.AddComponent<BootstrapLoadingUI>();
+            _bootstrapUI.Show(initialProgress, label);
+        }
+
+        // ── 重试 ─────────────────────────────────────────────────────
         private IEnumerator RetryDownload()
         {
-            ActiveUI.SetProgress(0.15f, "重试中...");
+            ActiveUI?.SetProgress(0.15f, "重试中...");
 
             bool done = false, failed = false;
             string err = "";
 
-            _yooInit.OnDefaultPackageReady += () => done   = true;
-            _yooInit.OnInitFailed          += e  => { failed = true; err = e; };
+            _yooInit.OnDefaultPackageReady += () => done = true;
+            _yooInit.OnInitFailed          += e => { failed = true; err = e; };
 
             _yooInit.CheckAndDownload();
             while (!done && !failed) yield return null;
 
             if (failed)
             {
-                ActiveUI.ShowError($"资源下载失败\n{err}",
+                ActiveUI?.ShowError($"资源下载失败\n{err}",
                     () => StartCoroutine(RetryDownload()));
                 yield break;
             }
+            yield return FinishLaunch();
+        }
 
-            ActiveUI.SetProgress(0.95f, "启动游戏...");
-            yield return _luaMgr.StartLuaAsync();
-            ActiveUI.SetProgress(1f, "完成！");
-            yield return new WaitForSeconds(0.2f);
-            ActiveUI.Hide();
-
-            if (!skipSceneLoad && !string.IsNullOrEmpty(mainSceneName))
-                SceneManager.LoadScene(mainSceneName);
+        private IEnumerator LaunchSequenceRetry()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            yield return LaunchWebGL();
+#else
+            yield return LaunchNative();
+#endif
         }
     }
 }
