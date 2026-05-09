@@ -329,8 +329,8 @@ jobs:
       - name: Cache Unity Library
         uses: actions/cache@v4
         with:
-          path: Unity/Library
-          key: unity-library-windows-${{ hashFiles('Unity/Assets/**', 'Unity/Packages/manifest.json', 'Unity/ProjectSettings/ProjectVersion.txt') }}
+          path: UnityProj/Library
+          key: unity-library-windows-${{ hashFiles('UnityProj/Assets/**', 'UnityProj/Packages/manifest.json', 'UnityProj/ProjectSettings/ProjectVersion.txt') }}
           restore-keys: |
             unity-library-windows-
 
@@ -341,7 +341,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
-          projectPath: Unity
+          projectPath: UnityProj
           targetPlatform: StandaloneWindows64
           unityVersion: 2022.3.62f1
           buildMethod: ""
