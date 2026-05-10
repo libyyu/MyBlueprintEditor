@@ -45,6 +45,7 @@ namespace CutRope.Framework
         [DllImport(DLL)] static extern IntPtr BP_CreateRunner();
         [DllImport(DLL)] static extern void   BP_DestroyRunner(IntPtr runner);
         [DllImport(DLL)] static extern void   BP_SetExternalLuaState(IntPtr runner, IntPtr L);
+        [DllImport(DLL)] static extern IntPtr BP_GetLuaState(IntPtr runner);
         [DllImport(DLL)] static extern int    BP_LoadGlobalLuaEntry(IntPtr runner);
         [DllImport(DLL)] static extern int    BP_LoadFromJson(IntPtr runner, string json);
         [DllImport(DLL)] static extern void   BP_Tick(IntPtr runner, float deltaTime);
@@ -71,7 +72,7 @@ namespace CutRope.Framework
         // ── 公共 API ─────────────────────────────────────────────────
 
         /// <summary>
-        /// 初始化 Blueprint Runtime，共享 xLua 的 lua_State。
+        /// 初始化 Blueprint Runtime，并将 Runtime 内部的 lua_State 注入到 xLua LuaEnv。
         /// 必须在 LuaEnv 创建后、Lua 脚本执行前调用。
         /// </summary>
         public bool Init(LuaEnv luaEnv)
@@ -84,6 +85,7 @@ namespace CutRope.Framework
 
             try
             {
+                // 1. 创建 Runner — Runtime 会自建 Lua VM 并注入 Blueprint 全局对象
                 _runner = BP_CreateRunner();
                 if (_runner == IntPtr.Zero)
                 {
@@ -91,25 +93,23 @@ namespace CutRope.Framework
                     return false;
                 }
 
-                // 关键：共享 xLua 的 lua_State，让 Blueprint 在同一 VM 里注入全局对象
-                var L = luaEnv.rawL;
-                BP_SetExternalLuaState(_runner, L);
-                Debug.Log($"[BlueprintRuntime] Shared lua_State: 0x{L.ToInt64():X}");
+                // 2. 加载 BlueprintEntry（注册内置节点到 Runtime VM）
+                BP_LoadGlobalLuaEntry(_runner);
 
-                // 设置 Lua 入口文件搜索路径（StreamingAssets 或 Application.dataPath）
-#if UNITY_EDITOR
-                var basePath = System.IO.Path.Combine(Application.dataPath, "Lua");
-                BP_SetBasePath(_runner, basePath);
-#endif
-                // 加载全局 BlueprintEntry（注入 Blueprint 全局对象 + 注册内置节点）
-                int ret = BP_LoadGlobalLuaEntry(_runner);
-                if (ret != 0)
+                // 3. 获取 Runtime 内部的 lua_State
+                var runtimeL = BP_GetLuaState(_runner);
+                if (runtimeL == IntPtr.Zero)
                 {
-                    // 非致命：可能 BlueprintEntry.lua 不在搜索路径，由 LuaManager 显式 require
-                    Debug.LogWarning($"[BlueprintRuntime] BP_LoadGlobalLuaEntry returned {ret} (will load via LuaManager)");
+                    Debug.LogError("[BlueprintRuntime] BP_GetLuaState returned null");
+                    return false;
                 }
 
-                Debug.Log("[BlueprintRuntime] Initialized. Blueprint global injected into xLua VM.");
+                // 4. 把 Runtime 的 lua_State 注入到 xLua LuaEnv.rawL
+                //    这样 xLua 就使用 Runtime 的 VM，Blueprint 全局对象对 Lua 可见
+                //    注意：此时 xLua 尚未用自己的 rawL 执行任何脚本，替换是安全的
+                luaEnv.rawL = runtimeL;
+                Debug.Log($"[BlueprintRuntime] Injected Runtime lua_State into xLua: 0x{runtimeL.ToInt64():X}");
+
                 return true;
             }
             catch (Exception e)

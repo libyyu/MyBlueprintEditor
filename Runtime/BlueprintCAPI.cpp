@@ -528,6 +528,15 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetExternalLuaState(BP_Runner 
 
     engine->InitializeWithExternalState(L, &w->runner);
 }
+
+BLUEPRINT_CAPI_EXPORT lua_State* BLUEPRINT_CAPI_CALL BP_GetLuaState(BP_Runner runner)
+{
+    if (!runner) return nullptr;
+    auto* w = asWrapper(runner);
+    LuaScriptEngine* engine = w->runner.GetLuaEngine();
+    if (!engine) return nullptr;
+    return engine->GetState();
+}
 #endif
 
 // ---------------------------------------------------------------------------

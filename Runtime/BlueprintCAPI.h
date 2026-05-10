@@ -281,6 +281,10 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetLastError(BP_Runner runner, 
 #ifdef BLUEPRINT_HAS_LUA
 struct lua_State;
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetExternalLuaState(BP_Runner runner, lua_State* L);
+/// Get the internal lua_State used by this runner.
+/// Returns NULL if the runner is not yet initialized or has no Lua engine.
+/// Use this to attach an xLua LuaEnv to the same VM as the Blueprint Runtime.
+BLUEPRINT_CAPI_EXPORT lua_State* BLUEPRINT_CAPI_CALL BP_GetLuaState(BP_Runner runner);
 #endif
 
 // ---------------------------------------------------------------------------
