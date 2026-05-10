@@ -5,11 +5,13 @@
 --   1. 从 C# 取得 LevelController 引用
 --   2. 加载对应关卡脚本 levels/<id>.lua，注入钩子
 --   3. 连接 LevelManager（通关/失败）
+--   4. 加载关卡蓝图 levels/blueprint_<id>.bjson，驱动 UI 编排
 --
 -- 每个关卡只需实现自己的规则文件 levels/<levelId>.lua，
 -- 通用框架逻辑全在此文件，不需要重复写。
 
-local LM = require 'game/level_manager'
+local LM  = require 'game/level_manager'
+local BPR = CS.CutRope.Framework.BlueprintRuntime  -- C# BlueprintRuntime 单例
 
 local M = {}
 local _ctrl    = nil   -- C# LevelController
@@ -60,6 +62,23 @@ function M.init(levelId)
         M._handle_fail()
     end
 
+    -- ── 加载关卡蓝图（负责 UI 编排：通关/失败面板等）────────────────────
+    local bjsonKey = 'game/levels/blueprint_' .. _levelId
+    -- Lua 读取 bjson 文本（YooAsset 已预加载到 LuaManager 缓存；bjson 当 TextAsset 加载）
+    -- 用 pcall 保护，找不到蓝图不影响关卡基本逻辑
+    local ok, bjsonText = pcall(function()
+        local ta = CS.UnityEngine.Resources.Load(bjsonKey)
+        return ta and ta.text or nil
+    end)
+    if ok and bjsonText then
+        if BPR and BPR.Instance then
+            BPR.Instance:LoadFromJson(bjsonText)
+            print('[level_controller] Blueprint loaded: ' .. bjsonKey)
+        end
+    else
+        print('[level_controller] No blueprint for ' .. _levelId .. ' (optional, skipped)')
+    end
+
     print('[level_controller] Initialized: ' .. _levelId)
 end
 
@@ -86,7 +105,10 @@ function M._handle_win()
     -- 触发关卡脚本的通关回调（可显示特效等）
     if _levelMod.on_win then _levelMod.on_win(_ctrl, stars, score) end
 
-    -- TODO: 打开通关面板
+    -- 触发蓝图自定义事件 on_win → 由蓝图处理打开通关面板
+    if BPR and BPR.Instance then
+        BPR.Instance:DispatchEvent('on_win')
+    end
 end
 
 -- ── 内部：失败 ────────────────────────────────────────────────────────────
@@ -99,7 +121,10 @@ function M._handle_fail()
 
     if _levelMod.on_fail then _levelMod.on_fail(_ctrl) end
 
-    -- TODO: 打开失败面板
+    -- 触发蓝图自定义事件 on_fail → 由蓝图处理打开失败面板
+    if BPR and BPR.Instance then
+        BPR.Instance:DispatchEvent('on_fail')
+    end
 end
 
 --- 获取 C# LevelController（供其他模块使用）
