@@ -3,7 +3,8 @@
     "rootNamespace": "CutRope.Framework",
     "references": [
         "YooAsset",
-        "XLua.Runtime"
+        "XLua.Runtime",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

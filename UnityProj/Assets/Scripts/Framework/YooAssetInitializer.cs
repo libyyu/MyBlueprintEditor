@@ -111,16 +111,14 @@ namespace CutRope.Framework
             YooAssets.SetDefaultPackage(package);
 
             // 2. 初始化参数
-            InitializationOperationBase initOp;
 #if UNITY_EDITOR
-            var buildResult = EditorSimulateModeHelper.SimulateBuild(
-                EDefaultBuildPipeline.BuiltinBuildPipeline, packageName);
+            var buildResult = EditorSimulateModeHelper.SimulateBuild(packageName);
             var editorParam = new EditorSimulateModeParameters
             {
                 EditorFileSystemParameters =
-                    FileSystemParameters.CreateDefaultEditorFileSystemParameters(buildResult)
+                    FileSystemParameters.CreateDefaultEditorFileSystemParameters(buildResult.PackageRootDirectory)
             };
-            initOp = package.InitializeAsync(editorParam);
+            var initOp = package.InitializeAsync(editorParam);
 #elif UNITY_WEBGL
             // WebGL：无本地文件系统，Phase 1 直接初始化远端 FS
             // 首次启动没有本地缓存，资源全部来自 CDN
@@ -130,7 +128,7 @@ namespace CutRope.Framework
                 WebFileSystemParameters =
                     FileSystemParameters.CreateDefaultWebFileSystemParameters(webRemote)
             };
-            initOp = package.InitializeAsync(webParam);
+            var initOp = package.InitializeAsync(webParam);
 #else
             // 原生平台：内置包 + 缓存，不访问网络
             var hostRemote = new RemoteServices(cdnBaseUrl, cdnFallbackUrl);
@@ -141,7 +139,7 @@ namespace CutRope.Framework
                 CacheFileSystemParameters   =
                     FileSystemParameters.CreateDefaultCacheFileSystemParameters(hostRemote)
             };
-            initOp = package.InitializeAsync(hostParam);
+            var initOp = package.InitializeAsync(hostParam);
 #endif
 
             yield return initOp;
@@ -234,16 +232,14 @@ namespace CutRope.Framework
             else
                 package = YooAssets.CreatePackage(packageName);
 
-            InitializationOperationBase initOp;
 #if UNITY_EDITOR
-            var buildResult = EditorSimulateModeHelper.SimulateBuild(
-                EDefaultBuildPipeline.BuiltinBuildPipeline, packageName);
+            var buildResult = EditorSimulateModeHelper.SimulateBuild(packageName);
             var editorParam = new EditorSimulateModeParameters
             {
                 EditorFileSystemParameters =
-                    FileSystemParameters.CreateDefaultEditorFileSystemParameters(buildResult)
+                    FileSystemParameters.CreateDefaultEditorFileSystemParameters(buildResult.PackageRootDirectory)
             };
-            initOp = package.InitializeAsync(editorParam);
+            var initOp = package.InitializeAsync(editorParam);
 #elif UNITY_WEBGL
             var webRemote = new RemoteServices(cdnBaseUrl, cdnFallbackUrl);
             var webParam  = new WebPlayModeParameters
@@ -251,7 +247,7 @@ namespace CutRope.Framework
                 WebFileSystemParameters =
                     FileSystemParameters.CreateDefaultWebFileSystemParameters(webRemote)
             };
-            initOp = package.InitializeAsync(webParam);
+            var initOp = package.InitializeAsync(webParam);
 #else
             var hostRemote = new RemoteServices(cdnBaseUrl, cdnFallbackUrl);
             var hostParam  = new HostPlayModeParameters
@@ -261,7 +257,7 @@ namespace CutRope.Framework
                 CacheFileSystemParameters   =
                     FileSystemParameters.CreateDefaultCacheFileSystemParameters(hostRemote)
             };
-            initOp = package.InitializeAsync(hostParam);
+            var initOp = package.InitializeAsync(hostParam);
 #endif
 
             yield return initOp;
@@ -298,10 +294,11 @@ namespace CutRope.Framework
             Debug.Log($"[YooAsset] '{packageName}': {downloader.TotalDownloadCount} bundles " +
                       $"({downloader.TotalDownloadBytes / 1024f / 1024f:F1} MB)");
 
-            downloader.OnDownloadProgressCallback = (total, done, totalBytes, doneBytes) =>
+            downloader.DownloadUpdateCallback = (data) =>
             {
-                float p = total > 0 ? (float)done / total : 0f;
-                OnDownloadProgress?.Invoke(p);
+                //TODO: 下载进度
+                //float p = total > 0 ? (float)done / total : 0f;
+                //OnDownloadProgress?.Invoke(p);
             };
 
             downloader.BeginDownload();
