@@ -22,7 +22,7 @@ end
 LM.on_level_loaded = function(levelId)
     print('[main] level loaded: ' .. levelId)
     local LC = require 'game/level_controller'
-    LC.init()  -- 绑定 C# LevelController，注入通关/失败/切割钩子
+    LC.init(levelId)  -- 加载 levels/<levelId>.lua 并注入所有钩子
 end
 
 LM.on_level_complete = function(levelId, stars, score)
