@@ -71,17 +71,15 @@ namespace CutRope.Game
                 var joint = go.GetComponent<HingeJoint2D>() ?? go.AddComponent<HingeJoint2D>();
                 if (i == 0)
                 {
-                    // 第0节连到锚点（kinematic static body）
-                    joint.connectedBody = null;
-                    joint.connectedAnchor = transform.position;
-                    joint.useConnectedAnchor = false;
-                    // 用 AnchoredJoint2D 锁住锚点
-                    joint.anchor = Vector2.zero;
+                    // 第0节：connectedBody 为 null，通过 connectedAnchor 锁到世界锚点
+                    joint.connectedBody   = null;
+                    joint.anchor          = Vector2.zero;
+                    joint.connectedAnchor = transform.position;  // 世界坐标锚点
                 }
                 else
                 {
-                    joint.connectedBody = _segments[i - 1].Rb;
-                    joint.anchor        = Vector2.zero;
+                    joint.connectedBody   = _segments[i - 1].Rb;
+                    joint.anchor          = Vector2.zero;
                     joint.connectedAnchor = Vector2.zero;
                 }
 
