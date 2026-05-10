@@ -1,7 +1,7 @@
 -- main.lua
 -- 游戏 Lua 入口，由 LuaManager 从 YooAsset 加载后执行
 
-print("[Lua] main.lua loaded!")
+print("main.lua loaded!")
 
 -- ── 全局钩子（供 LuaManager 调用）────────────────────────────────────
 
@@ -12,7 +12,7 @@ end
 
 --- 销毁时调用
 function on_destroy()
-    print("[Lua] on_destroy called")
+    print("on_destroy called")
 end
 
 -- ── 后续扩展区 ────────────────────────────────────────────────────────

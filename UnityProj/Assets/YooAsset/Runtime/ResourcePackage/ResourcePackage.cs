@@ -1198,5 +1198,37 @@ namespace YooAsset
             return data;
         }
         #endregion
+
+#if YOOASSET_LIBYYU_CUSTOM
+        #region Bundle
+        public List<string> GetPackageBundleList()
+        {
+            List<string> result = new List<string>();
+            if (null == _playModeImpl)
+                return result;
+            var bundles = _playModeImpl.ActiveManifest.BundleList;
+            foreach (var bundle in bundles)
+            {
+                result.Add(bundle.BundleName);
+            }
+            return result;
+        }
+        #endregion
+
+        #region AssetList
+        public List<string> GetPackageAssetList()
+        {
+            List<string> result = new List<string>();
+            if (null == _playModeImpl)
+                return result;
+            var assets = _playModeImpl.ActiveManifest.AssetList;
+            foreach (var asset in assets)
+            {
+                result.Add(asset.AssetPath);
+            }
+            return result;
+        }
+        #endregion
+#endif
     }
 }

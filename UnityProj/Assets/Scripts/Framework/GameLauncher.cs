@@ -33,6 +33,7 @@ using YooAsset;
 namespace CutRope.Framework
 {
     [DefaultExecutionOrder(-100)]
+    [RequireComponent(typeof(FileLoggger))]
     [RequireComponent(typeof(YooAssetInitializer))]
     [RequireComponent(typeof(LuaManager))]
     public class GameLauncher : MonoBehaviour

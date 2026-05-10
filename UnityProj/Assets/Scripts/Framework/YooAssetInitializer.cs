@@ -155,8 +155,20 @@ namespace CutRope.Framework
 
             // 激活本地 Manifest（InitializeAsync 只初始化文件系统，不激活 Manifest）
             // 无论何种平台，必须先 UpdatePackageManifestAsync 才能加载任何资源
-            var localVersion = package.GetPackageVersion();
-            var localManifestOp = package.UpdatePackageManifestAsync(localVersion);
+            var packageVersionOperation = package.RequestPackageVersionAsync();
+            yield return packageVersionOperation;
+
+            if (packageVersionOperation.Status != EOperationStatus.Succeed)
+            {
+                string err = $"[YooAsset] Phase1 RequestPackageVersionAsync failed: {packageVersionOperation.Error}";
+                Debug.LogError(err);
+                OnInitFailed?.Invoke(err);
+                yield break;
+            }
+            string packageLocalVersion = packageVersionOperation.PackageVersion;
+            Debug.Log($"Package `{packageName}` version is {packageLocalVersion}");
+            //var localVersion = package.GetPackageVersion();
+            var localManifestOp = package.UpdatePackageManifestAsync(packageLocalVersion);
             yield return localManifestOp;
 
             if (localManifestOp.Status != EOperationStatus.Succeed)

@@ -13,6 +13,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using XLua;
 using YooAsset;
@@ -41,7 +42,7 @@ namespace CutRope.Framework
         private Action _luaOnDestroy;
 
         // 预加载缓存：key = lua模块路径（如 "main", "game/util"）
-        private readonly Dictionary<string, byte[]> _luaCache = new Dictionary<string, byte[]>();
+        private readonly Dictionary<string, string> _luaCache = new Dictionary<string, string>();
 
         // ── 生命周期 ─────────────────────────────────────────────────
         private void Awake()
@@ -55,7 +56,9 @@ namespace CutRope.Framework
             DontDestroyOnLoad(gameObject);
 
             LuaEnv = new LuaEnv();
-
+            StaticLuaCallbacks.lua_Print = new StaticLuaCallbacks.LuaPrintDelegate(s => Debug.Log("[Lua]" + s));
+            StaticLuaCallbacks.lua_Warning = new StaticLuaCallbacks.LuaPrintDelegate(s => Debug.LogWarning("[Lua]" + s));
+            StaticLuaCallbacks.lua_Error = new StaticLuaCallbacks.LuaPrintDelegate(s => Debug.LogError("[Lua]" + s));
             // Loader：从内存缓存同步返回（WebGL 安全）
             LuaEnv.AddLoader(CachedLuaLoader);
         }
@@ -78,10 +81,7 @@ namespace CutRope.Framework
                 yield break;
             }
 
-            LuaEnv.DoString(
-                System.Text.Encoding.UTF8.GetString(_luaCache[mainLuaAddress]),
-                mainLuaAddress
-            );
+            LuaEnv.DoString($"require '{mainLuaAddress}'");
 
             // 3. 取出 Lua 钩子
             _luaUpdate    = LuaEnv.Global.Get<Action>("update");
@@ -113,42 +113,23 @@ namespace CutRope.Framework
 
             // 并发加载所有 Lua 文件
             var handles = new List<AssetHandle>();
+            var prefix = ("assets/" + luaAddressPrefix).ToLower();
             foreach (var info in assetInfos)
             {
-                handles.Add(package.LoadAssetAsync<TextAsset>(info.Address));
+                var assetPath = info.AssetPath.ToLower();
+                if (!assetPath.EndsWith(".lua"))
+                {
+                    Debug.LogWarning($"`{assetPath}` is not a valid lua script");
+                    continue;
+                }
+                assetPath = assetPath.Replace(".lua", "").Replace("\\", "/").Replace(prefix, "");
+                _luaCache.Add(assetPath, info.AssetPath);
+                handles.Add(package.LoadAssetAsync<TextAsset>(info.AssetPath));
             }
 
             // 等待全部完成
             foreach (var handle in handles)
                 yield return handle;
-
-            // 存入缓存
-            for (int i = 0; i < handles.Count; i++)
-            {
-                var handle = handles[i];
-                var info   = assetInfos[i];
-
-                if (handle.Status != EOperationStatus.Succeed)
-                {
-                    Debug.LogWarning($"[LuaManager] Failed to load lua: {info.Address} — {handle.LastError}");
-                    handle.Release();
-                    continue;
-                }
-
-                var ta = handle.AssetObject as TextAsset;
-                if (ta != null)
-                {
-                    // key: 去掉 luaAddressPrefix，得到 "main" / "game/util" 等
-                    string key = info.Address.StartsWith(luaAddressPrefix)
-                        ? info.Address.Substring(luaAddressPrefix.Length)
-                        : info.Address;
-
-                    _luaCache[key] = ta.bytes;
-                }
-
-                // 缓存 bytes 后即可释放句柄（bytes 已脱离 AssetBundle）
-                handle.Release();
-            }
 
             Debug.Log($"[LuaManager] Lua preload done. {_luaCache.Count} files ready.");
         }
@@ -156,9 +137,30 @@ namespace CutRope.Framework
         // ── 内存缓存 Loader（同步，WebGL 安全）──────────────────────
         private byte[] CachedLuaLoader(ref string luaPath)
         {
-            // xLua 传入 "main" 或 "game/util"
-            if (_luaCache.TryGetValue(luaPath, out var bytes))
-                return bytes;
+            var package = YooAssets.GetPackage("DefaultPackage");
+            if (package == null) return null;
+           
+            var matchluaPath = luaPath.Replace(".lua", "").Replace(".", "/").ToLower();
+            string packageAssetPath;
+            // xLua 传入 "main" 或 "game/util" 或 "game.util"
+            if (_luaCache.TryGetValue(matchluaPath, out packageAssetPath) && !string.IsNullOrEmpty(packageAssetPath))
+            {
+                luaPath = packageAssetPath;
+                Debug.Log($"CustomLoader: {packageAssetPath}");
+                var handle = package.LoadAssetSync<TextAsset>(packageAssetPath);
+                if (null != handle)
+                {
+                    var textAsset = handle.AssetObject as TextAsset;
+                    var result = textAsset.bytes;
+                    handle.Release();
+                    return result;
+                }
+                else
+                {
+                    Debug.LogWarning($"lua script load failed. {packageAssetPath}");
+                    return null;
+                }
+            }
 
             Debug.LogWarning($"[LuaManager] Lua not in cache: '{luaPath}'. Did you preload?");
             return null;
@@ -180,6 +182,8 @@ namespace CutRope.Framework
         private void OnDestroy()
         {
             _luaOnDestroy?.Invoke();
+            _luaOnDestroy = null;
+            _luaUpdate = null;
             _luaCache.Clear();
             LuaEnv?.Dispose();
             LuaEnv = null;
