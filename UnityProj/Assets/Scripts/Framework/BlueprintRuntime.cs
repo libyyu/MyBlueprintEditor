@@ -72,17 +72,11 @@ namespace CutRope.Framework
         // ── 公共 API ─────────────────────────────────────────────────
 
         /// <summary>
-        /// 初始化 Blueprint Runtime，并将 Runtime 内部的 lua_State 注入到 xLua LuaEnv。
-        /// 必须在 LuaEnv 创建后、Lua 脚本执行前调用。
+        /// 初始化 Blueprint Runtime，并将 Runtime 内部的 lua_State 共享给 xLua LuaEnv。
+        /// 必须在 LuaEnv 创建前调用：先 Init()，再 new LuaEnv(BlueprintRuntime.Instance.LuaState)。
         /// </summary>
-        public bool Init(LuaEnv luaEnv)
+        public bool Init()
         {
-            if (luaEnv == null)
-            {
-                Debug.LogError("[BlueprintRuntime] LuaEnv is null");
-                return false;
-            }
-
             try
             {
                 // 1. 创建 Runner — Runtime 会自建 Lua VM 并注入 Blueprint 全局对象
@@ -97,27 +91,14 @@ namespace CutRope.Framework
                 BP_LoadGlobalLuaEntry(_runner);
 
                 // 3. 获取 Runtime 内部的 lua_State
-                var runtimeL = BP_GetLuaState(_runner);
-                if (runtimeL == IntPtr.Zero)
+                _luaState = BP_GetLuaState(_runner);
+                if (_luaState == IntPtr.Zero)
                 {
                     Debug.LogError("[BlueprintRuntime] BP_GetLuaState returned null");
                     return false;
                 }
 
-                // 4. 把 Runtime 的 lua_State 注入到 xLua LuaEnv.rawL
-                //    rawL 是 internal 字段，用反射写入
-                var rawLField = typeof(LuaEnv).GetField("rawL",
-                    System.Reflection.BindingFlags.Instance |
-                    System.Reflection.BindingFlags.NonPublic |
-                    System.Reflection.BindingFlags.Public);
-                if (rawLField == null)
-                {
-                    Debug.LogError("[BlueprintRuntime] Cannot find LuaEnv.rawL field via reflection");
-                    return false;
-                }
-                rawLField.SetValue(luaEnv, runtimeL);
-                Debug.Log($"[BlueprintRuntime] Injected Runtime lua_State into xLua: 0x{runtimeL.ToInt64():X}");
-
+                Debug.Log($"[BlueprintRuntime] Ready. lua_State=0x{_luaState.ToInt64():X}");
                 return true;
             }
             catch (Exception e)
@@ -127,6 +108,12 @@ namespace CutRope.Framework
                 return false;
             }
         }
+
+        /// <summary>
+        /// Runtime 内部的 lua_State（传给 new LuaEnv(externalL) 使用）
+        /// </summary>
+        public IntPtr LuaState => _luaState;
+        private IntPtr _luaState;
 
         /// <summary>从 JSON 字符串加载并执行蓝图</summary>
         public bool LoadFromJson(string json)

@@ -28,6 +28,7 @@ namespace XLua
         public const string MAIN_SHREAD = "xlua_main_thread";
 
         internal RealStatePtr rawL;
+        private  bool          _ownsLuaState = true;  // false when using external lua_State
 
         public RealStatePtr L
         {
@@ -61,7 +62,16 @@ namespace XLua
 
         const int LIB_VERSION_EXPECT = 105;
 
-        public LuaEnv()
+        public LuaEnv() : this(RealStatePtr.Zero)
+        {
+        }
+
+        /// <summary>
+        /// 使用外部已初始化的 lua_State 创建 LuaEnv。
+        /// 适用于与 Blueprint C++ Runtime 共享 Lua VM 的场景。
+        /// 注意：外部 lua_State 的生命周期由调用方管理，LuaEnv.Dispose 不会关闭它。
+        /// </summary>
+        public LuaEnv(RealStatePtr externalL)
         {
             if (LuaAPI.xlua_get_lib_version() != LIB_VERSION_EXPECT)
             {
@@ -79,7 +89,17 @@ namespace XLua
                 LuaAPI.xlua_set_csharp_wrapper_caller(InternalGlobals.CSharpWrapperCallerPtr);
 #endif
                 // Create State
-                rawL = LuaAPI.luaL_newstate();
+                if (externalL != RealStatePtr.Zero)
+                {
+                    // 使用外部 lua_State（与 Blueprint Runtime 共享 VM）
+                    rawL = externalL;
+                    _ownsLuaState = false;
+                }
+                else
+                {
+                    rawL = LuaAPI.luaL_newstate();
+                    _ownsLuaState = true;
+                }
 
                 //Init Base Libs
                 LuaAPI.luaopen_xlua(rawL);
@@ -424,7 +444,11 @@ namespace XLua
                 
                 ObjectTranslatorPool.Instance.Remove(L);
 
-                LuaAPI.lua_close(L);
+                // 只关闭自建的 lua_State；外部共享的 state 由调用方（Blueprint Runtime）管理
+                if (_ownsLuaState)
+                {
+                    LuaAPI.lua_close(L);
+                }
                 translator = null;
 
                 rawL = IntPtr.Zero;

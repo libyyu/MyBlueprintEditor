@@ -55,20 +55,31 @@ namespace CutRope.Framework
             Instance = this;
             DontDestroyOnLoad(gameObject);
 
-            LuaEnv = new LuaEnv();
-            StaticLuaCallbacks.lua_Print = new StaticLuaCallbacks.LuaPrintDelegate(s => Debug.Log("[Lua]" + s));
-            StaticLuaCallbacks.lua_Warning = new StaticLuaCallbacks.LuaPrintDelegate(s => Debug.LogWarning("[Lua]" + s));
-            StaticLuaCallbacks.lua_Error = new StaticLuaCallbacks.LuaPrintDelegate(s => Debug.LogError("[Lua]" + s));
-
-            // 将 xLua lua_State 共享给 Blueprint C++ Runtime
-            // Blueprint Runtime 会在同一个 VM 里注入 Blueprint 全局对象
-            // 必须在 AddLoader / DoString 之前执行
+            // 1. 先初始化 Blueprint Runtime，建立内部 Lua VM
             var bpRuntime = BlueprintRuntime.Instance
                          ?? gameObject.AddComponent<BlueprintRuntime>();
-            bpRuntime.Init(LuaEnv);
+            bpRuntime.Init();
+
+            // 2. 用 Runtime 的 lua_State 创建 LuaEnv（共享同一个 VM）
+            //    Blueprint 全局对象已在 VM 里，BlueprintEntry.lua 的注册能正常工作
+            if (bpRuntime.LuaState != System.IntPtr.Zero)
+            {
+                LuaEnv = new LuaEnv(bpRuntime.LuaState);
+                Debug.Log("[LuaManager] Using Blueprint Runtime lua_State");
+            }
+            else
+            {
+                // DLL 不存在时回落到独立 VM（Editor 工具模式）
+                Debug.LogWarning("[LuaManager] Blueprint Runtime unavailable, using standalone LuaEnv");
+                LuaEnv = new LuaEnv();
+            }
 
             // Loader：从内存缓存同步返回（WebGL 安全）
             LuaEnv.AddLoader(CachedLuaLoader);
+
+            StaticLuaCallbacks.lua_Print   = s => Debug.Log("[Lua]" + s);
+            StaticLuaCallbacks.lua_Warning = s => Debug.LogWarning("[Lua]" + s);
+            StaticLuaCallbacks.lua_Error   = s => Debug.LogError("[Lua]" + s);
         }
 
         /// <summary>
