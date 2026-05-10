@@ -19,4 +19,4 @@ end
 
 -- ── 启动：跳转主菜单 ────────────────────────────────────────────────
 print('[main] current scene: ' .. SM.current())
--- SM.goto_main_menu()  -- 主菜单场景就绪后取消注释
+SM.goto_main_menu()  -- 加载主菜单场景，场景就绪后由 ui/main_menu.lua 打开面板
