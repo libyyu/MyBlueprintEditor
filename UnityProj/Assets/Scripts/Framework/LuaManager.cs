@@ -59,6 +59,14 @@ namespace CutRope.Framework
             StaticLuaCallbacks.lua_Print = new StaticLuaCallbacks.LuaPrintDelegate(s => Debug.Log("[Lua]" + s));
             StaticLuaCallbacks.lua_Warning = new StaticLuaCallbacks.LuaPrintDelegate(s => Debug.LogWarning("[Lua]" + s));
             StaticLuaCallbacks.lua_Error = new StaticLuaCallbacks.LuaPrintDelegate(s => Debug.LogError("[Lua]" + s));
+
+            // 将 xLua lua_State 共享给 Blueprint C++ Runtime
+            // Blueprint Runtime 会在同一个 VM 里注入 Blueprint 全局对象
+            // 必须在 AddLoader / DoString 之前执行
+            var bpRuntime = BlueprintRuntime.Instance
+                         ?? gameObject.AddComponent<BlueprintRuntime>();
+            bpRuntime.Init(LuaEnv);
+
             // Loader：从内存缓存同步返回（WebGL 安全）
             LuaEnv.AddLoader(CachedLuaLoader);
         }
