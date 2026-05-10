@@ -115,6 +115,7 @@ namespace CutRope.Framework
             var buildResult = EditorSimulateModeHelper.SimulateBuild(packageName);
             var editorParam = new EditorSimulateModeParameters
             {
+                AutoUnloadBundleWhenUnused = true,
                 EditorFileSystemParameters =
                     FileSystemParameters.CreateDefaultEditorFileSystemParameters(buildResult.PackageRootDirectory)
             };
