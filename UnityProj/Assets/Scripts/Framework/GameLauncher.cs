@@ -36,6 +36,7 @@ namespace CutRope.Framework
     [RequireComponent(typeof(FileLoggger))]
     [RequireComponent(typeof(YooAssetInitializer))]
     [RequireComponent(typeof(LuaManager))]
+    [RequireComponent(typeof(SceneLoader))]
     public class GameLauncher : MonoBehaviour
     {
         // ── Inspector 配置 ────────────────────────────────────────────

@@ -3,6 +3,8 @@
 
 print("main.lua loaded!")
 
+local SM = require 'game/scene_manager'
+
 -- ── 全局钩子（供 LuaManager 调用）────────────────────────────────────
 
 --- 每帧调用（由 LuaManager.Update 驱动）
@@ -15,7 +17,6 @@ function on_destroy()
     print("on_destroy called")
 end
 
--- ── 后续扩展区 ────────────────────────────────────────────────────────
--- require 'game/scene_manager'
--- require 'game/level_manager'
--- require 'ui/main_menu'
+-- ── 启动：跳转主菜单 ────────────────────────────────────────────────
+print('[main] current scene: ' .. SM.current())
+-- SM.goto_main_menu()  -- 主菜单场景就绪后取消注释
