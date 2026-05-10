@@ -38,8 +38,8 @@ namespace CutRope.Framework
 
         // ── 私有 ─────────────────────────────────────────────────────
         private float  _gcTimer;
-        private Action _luaUpdate;
-        private Action _luaOnDestroy;
+        private LuaFunction _luaUpdate;
+        private LuaFunction _luaOnDestroy;
 
         // 预加载缓存：key = lua模块路径（如 "main", "game/util"）
         private readonly Dictionary<string, string> _luaCache = new Dictionary<string, string>();
@@ -84,8 +84,8 @@ namespace CutRope.Framework
             LuaEnv.DoString($"require '{mainLuaAddress}'");
 
             // 3. 取出 Lua 钩子
-            _luaUpdate    = LuaEnv.Global.Get<Action>("update");
-            _luaOnDestroy = LuaEnv.Global.Get<Action>("on_destroy");
+            _luaUpdate    = LuaEnv.Global.Get<LuaFunction>("update");
+            _luaOnDestroy = LuaEnv.Global.Get<LuaFunction>("on_destroy");
 
             Debug.Log($"[LuaManager] Lua started. {_luaCache.Count} files cached.");
         }
@@ -169,7 +169,7 @@ namespace CutRope.Framework
         // ── Update / Destroy ─────────────────────────────────────────
         private void Update()
         {
-            _luaUpdate?.Invoke();
+            _luaUpdate?.Call();
 
             _gcTimer += Time.deltaTime;
             if (_gcTimer >= gcInterval)
@@ -181,8 +181,10 @@ namespace CutRope.Framework
 
         private void OnDestroy()
         {
-            _luaOnDestroy?.Invoke();
+            _luaOnDestroy?.Call();
+            _luaOnDestroy?.Dispose();
             _luaOnDestroy = null;
+            _luaUpdate?.Dispose();
             _luaUpdate = null;
             _luaCache.Clear();
             LuaEnv?.Dispose();
