@@ -116,6 +116,17 @@ function M.next()
     end
 end
 
+--- 是否有下一关
+function M.has_next()
+    if not M.current_level_id then return false end
+    return LevelData.next_level(M.current_level_id) ~= nil
+end
+
+--- 加载下一关（同 next，供 UI 直接调用）
+function M.load_next()
+    M.next()
+end
+
 --- 返回主菜单
 function M.back_to_menu()
     M.current_level_id = nil

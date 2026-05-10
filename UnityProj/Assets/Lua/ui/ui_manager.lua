@@ -1,39 +1,77 @@
 -- ui/ui_manager.lua
--- UI 管理器 Lua 封装
+-- Lua 侧 UI 管理器
+-- 封装 C# UIManager 静态绑定，并在打开面板后自动调用对应 Lua 脚本的 open() 初始化逻辑
 --
--- 用法：
---   local UI = require 'ui/ui_manager'
---   UI.open('UI/MainMenu', nil, function(view) ... end)
---   UI.close('UI/MainMenu')
---   UI.dispose('UI/MainMenu')
---   UI.close_all()
+-- 面板地址 → Lua 脚本映射表（新增面板时在此注册）：
+--   "UI/MainMenu"       → ui/main_menu
+--   "UI/HUD"            → ui/hud
+--   "UI/LevelComplete"  → ui/level_complete
+--   "UI/LevelFailed"    → ui/level_failed
+--   "UI/LevelSelect"    → ui/level_select
+--   "UI/Pause"          → ui/pause
 
-local M = {}
+local CS_UIManager = CS.CutRope.Framework.UIManager
 
-local UIManager = CS.CutRope.Framework.UIManager
+-- 面板地址 → Lua 模块路径
+local LUA_MODULES = {
+    ["UI/MainMenu"]      = "ui/main_menu",
+    ["UI/HUD"]           = "ui/hud",
+    ["UI/LevelComplete"] = "ui/level_complete",
+    ["UI/LevelFailed"]   = "ui/level_failed",
+    ["UI/LevelSelect"]   = "ui/level_select",
+    ["UI/Pause"]         = "ui/pause",
+}
 
---- 异步打开面板
--- @param address    string   YooAsset address（如 'UI/MainMenu'）
--- @param param      string   传给 IView.Show 的参数，可为 nil
--- @param onComplete function(view) 完成回调，可为 nil
-function M.open(address, param, onComplete)
-    assert(type(address) == 'string', 'ui_manager.open: address must be string')
-    UIManager.LuaOpen(address, param, onComplete)
+-- 当前打开的面板 Lua 对象缓存（address → panel 对象）
+local _panels = {}
+
+local UI = {}
+
+--- 打开面板
+-- @param address  YooAsset 地址，如 "UI/MainMenu"
+-- @param ...      透传给 Lua open() 函数的额外参数（如 stars, score）
+function UI.open(address, ...)
+    local args = {...}
+    CS_UIManager.LuaOpen(address, nil, function(ctrl)
+        local modPath = LUA_MODULES[address]
+        if modPath then
+            local ok, mod = pcall(require, modPath)
+            if ok and mod and mod.open then
+                -- 把 UIController（ctrl.ViewObject 上的组件）取出来
+                local go = ctrl:get_view_object and ctrl:get_view_object() or ctrl.ViewObject
+                local uiCtrl = go:GetComponent(typeof(CS.CutRope.Game.UI.UIController))
+                if uiCtrl then
+                    local panel = mod.open(uiCtrl, table.unpack(args))
+                    _panels[address] = panel
+                else
+                    print("[UI] UIController not found on: " .. address)
+                end
+            else
+                print("[UI] No Lua module for: " .. address)
+            end
+        end
+    end)
 end
 
 --- 隐藏面板（不销毁）
-function M.close(address)
-    UIManager.LuaClose(address)
+function UI.close(address)
+    CS_UIManager.LuaClose(address)
 end
 
---- 销毁面板（释放资源）
-function M.dispose(address)
-    UIManager.LuaDispose(address)
+--- 销毁面板
+function UI.dispose(address)
+    _panels[address] = nil
+    CS_UIManager.LuaDispose(address)
 end
 
 --- 隐藏所有面板
-function M.close_all()
-    UIManager.LuaCloseAll()
+function UI.close_all()
+    CS_UIManager.LuaCloseAll()
 end
 
-return M
+--- 获取已打开的面板 Lua 对象
+function UI.get(address)
+    return _panels[address]
+end
+
+return UI

@@ -133,7 +133,7 @@ namespace CutRope.Framework
             if (_panels.TryGetValue(address, out go))
             {
                 var cachedView = go.GetComponent<IView>();
-                cachedView?.Show(param);
+                cachedView?.Show();
                 onComplete?.Invoke(cachedView);
                 yield break;
             }
@@ -162,10 +162,12 @@ namespace CutRope.Framework
             var view = go.GetComponent<IView>();
             if (view == null)
             {
-                Debug.LogWarning($"[UIManager] Prefab '{address}' has no IView component. Add one.");
+                // Prefab 上未挂 IView 实现时，自动挂通用 UIController
+                go.AddComponent<CutRope.Game.UI.UIController>();
+                view = go.GetComponent<IView>();
             }
 
-            view?.Show(param);
+            view?.Show();
             onComplete?.Invoke(view);
         }
     }

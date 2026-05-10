@@ -13,8 +13,8 @@ namespace CutRope.Framework
 {
     public interface IView
     {
-        /// <summary>显示面板（可附带参数 JSON 字符串）</summary>
-        void Show(string param = null);
+        /// <summary>显示面板</summary>
+        void Show();
 
         /// <summary>隐藏面板（不销毁，保留状态）</summary>
         void Hide();
