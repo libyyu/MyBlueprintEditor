@@ -105,9 +105,17 @@ namespace CutRope.Framework
                 }
 
                 // 4. 把 Runtime 的 lua_State 注入到 xLua LuaEnv.rawL
-                //    这样 xLua 就使用 Runtime 的 VM，Blueprint 全局对象对 Lua 可见
-                //    注意：此时 xLua 尚未用自己的 rawL 执行任何脚本，替换是安全的
-                luaEnv.rawL = runtimeL;
+                //    rawL 是 internal 字段，用反射写入
+                var rawLField = typeof(LuaEnv).GetField("rawL",
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Public);
+                if (rawLField == null)
+                {
+                    Debug.LogError("[BlueprintRuntime] Cannot find LuaEnv.rawL field via reflection");
+                    return false;
+                }
+                rawLField.SetValue(luaEnv, runtimeL);
                 Debug.Log($"[BlueprintRuntime] Injected Runtime lua_State into xLua: 0x{runtimeL.ToInt64():X}");
 
                 return true;
