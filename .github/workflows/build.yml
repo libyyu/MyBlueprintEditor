@@ -321,6 +321,7 @@ jobs:
   unity-windows:
     name: Unity (Windows, StandaloneWindows64)
     runs-on: ubuntu-latest
+    environment: UNITY_LICENSE
     steps:
       - uses: actions/checkout@v4
         with:
