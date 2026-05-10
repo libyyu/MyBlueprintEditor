@@ -168,8 +168,9 @@ namespace CutRope.Framework
 
             if (_sceneHandles.TryGetValue(sceneName, out var handle))
             {
-                // YooAsset 场景通过 handle.UnloadScene() 卸载
-                handle.UnloadScene();
+                // YooAsset 场景通过 handle.UnloadAsync() 卸载
+                var unloadOp = handle.UnloadAsync();
+                if (unloadOp != null) yield return unloadOp;
                 _sceneHandles.Remove(sceneName);
             }
             else
