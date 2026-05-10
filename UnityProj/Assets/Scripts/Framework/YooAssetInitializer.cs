@@ -153,6 +153,20 @@ namespace CutRope.Framework
                 yield break;
             }
 
+            // 激活本地 Manifest（InitializeAsync 只初始化文件系统，不激活 Manifest）
+            // 无论何种平台，必须先 UpdatePackageManifestAsync 才能加载任何资源
+            var localVersion = package.GetPackageVersion();
+            var localManifestOp = package.UpdatePackageManifestAsync(localVersion);
+            yield return localManifestOp;
+
+            if (localManifestOp.Status != EOperationStatus.Succeed)
+            {
+                string err = $"[YooAsset] Phase1 activate manifest failed: {localManifestOp.Error}";
+                Debug.LogError(err);
+                OnInitFailed?.Invoke(err);
+                yield break;
+            }
+
 #if UNITY_EDITOR
             // Editor：跳过网络，Phase 1 = Phase 2，直接全部就绪
             Debug.Log($"[YooAsset] '{packageName}' ready (Editor Simulate)");
@@ -165,6 +179,7 @@ namespace CutRope.Framework
             IsLocalReady = true;
             OnLocalReady?.Invoke();
             // Phase 2 由 GameLauncher 在加载完 LoadingUI 后显式调用 CheckAndDownload()
+            // Phase 2 的 UpdatePackageManifestAsync 会用远端版本覆盖此处的本地版本
 #endif
         }
 
@@ -266,6 +281,19 @@ namespace CutRope.Framework
             if (initOp.Status != EOperationStatus.Succeed)
             {
                 string err = $"[YooAsset] DLC '{packageName}' init failed: {initOp.Error}";
+                Debug.LogError(err);
+                onFailed?.Invoke(err);
+                yield break;
+            }
+
+            // 激活本地 Manifest（同主包逻辑）
+            var dlcLocalVersion = package.GetPackageVersion();
+            var dlcLocalManifestOp = package.UpdatePackageManifestAsync(dlcLocalVersion);
+            yield return dlcLocalManifestOp;
+
+            if (dlcLocalManifestOp.Status != EOperationStatus.Succeed)
+            {
+                string err = $"[YooAsset] DLC '{packageName}' activate manifest failed: {dlcLocalManifestOp.Error}";
                 Debug.LogError(err);
                 onFailed?.Invoke(err);
                 yield break;
