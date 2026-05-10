@@ -7,6 +7,7 @@
 
 local UI = require 'ui/ui_manager'
 local SM = require 'game/scene_manager'
+local LM = require 'game/level_manager'
 
 local M = {}
 
@@ -55,14 +56,11 @@ end
 -- ── 按钮响应 ──────────────────────────────────────────────────────────────
 
 function M.on_start_clicked()
-    print('[main_menu] Start clicked -> loading Level_1_1')
+    print('[main_menu] Start clicked')
     M.close()
-    -- TODO: 替换为真实关卡场景名
-    SM.load('Level_1_1', function(p)
-        -- 可在此驱动加载进度条
-    end, function()
-        print('[main_menu] Level_1_1 loaded')
-    end)
+    local Save = require 'game/save_manager'
+    local lastLevel = Save.get_last_level()
+    LM.load_level(lastLevel)
 end
 
 function M.on_settings_clicked()
