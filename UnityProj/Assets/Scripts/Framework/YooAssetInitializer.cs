@@ -296,9 +296,7 @@ namespace CutRope.Framework
 
             downloader.DownloadUpdateCallback = (data) =>
             {
-                //TODO: 下载进度
-                //float p = total > 0 ? (float)done / total : 0f;
-                //OnDownloadProgress?.Invoke(p);
+                OnDownloadProgress?.Invoke(data.Progress);
             };
 
             downloader.BeginDownload();
