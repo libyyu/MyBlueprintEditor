@@ -3,6 +3,12 @@
 
 print("main.lua loaded!")
 
+-- ── 注册蓝图节点（必须在任何 Blueprint Runner 启动前执行）─────────────
+local ok, err = pcall(require, 'BlueprintEntry')
+if not ok then
+    print('[main] Warning: BlueprintEntry failed: ' .. tostring(err))
+end
+
 local SM = require 'game/scene_manager'
 local LM = require 'game/level_manager'
 
