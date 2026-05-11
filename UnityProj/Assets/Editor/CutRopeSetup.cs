@@ -320,8 +320,10 @@ namespace CutRope.Editor
             // Root GameObject — 所有 Framework 组件挂这里
             var root = new GameObject("GameLauncher");
 
-            var launcherType = GetTypeByName("CutRope.Framework.GameLauncher");
-            if (launcherType != null) root.AddComponent(launcherType);
+            var launcherType  = GetTypeByName("CutRope.Framework.GameLauncher");
+            var bootstrapType = GetTypeByName("CutRope.Game.GameBootstrap");
+            if (launcherType  != null) root.AddComponent(launcherType);
+            if (bootstrapType != null) root.AddComponent(bootstrapType);
 
             // 摄像机
             var camGo = new GameObject("Main Camera");

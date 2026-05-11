@@ -28,6 +28,16 @@ namespace CutRope.Framework
         // 已加载的面板缓存：address → GameObject
         private readonly Dictionary<string, GameObject> _panels = new Dictionary<string, GameObject>();
 
+        // Game 层通过此工厂注入默认 IView 实现，避免 Framework 反向依赖 Game
+        private static Func<GameObject, IView> _viewFactory;
+        /// <summary>
+        /// 注册默认组件工厂。
+        /// 应在 Game 层初始化时调用，例：
+        ///   UIManager.RegisterViewFactory(go => go.AddComponent&lt;UIController&gt;());
+        /// </summary>
+        public static void RegisterViewFactory(Func<GameObject, IView> factory)
+            => _viewFactory = factory;
+
         // ── 生命周期 ─────────────────────────────────────────────────
         private void Awake()
         {
@@ -162,9 +172,13 @@ namespace CutRope.Framework
             var view = go.GetComponent<IView>();
             if (view == null)
             {
-                // Prefab 上未挂 IView 实现时，自动挂通用 UIController
-                go.AddComponent<CutRope.Game.UI.UIController>();
-                view = go.GetComponent<IView>();
+                // Prefab 上未挂 IView 实现时，通过注册的工厂方法添加组件
+                // 由 Game 层在启动时调用 UIManager.RegisterViewFactory() 注入，
+                // 避免 Framework 层直接依赖 CutRope.Game.UI
+                if (_viewFactory != null)
+                    view = _viewFactory(go);
+                else
+                    Debug.LogWarning($"[UIManager] Prefab '{address}' has no IView component and no ViewFactory registered.");
             }
 
             view?.Show();
