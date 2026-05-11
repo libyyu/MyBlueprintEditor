@@ -55,24 +55,18 @@ namespace CutRope.Framework
             Instance = this;
             DontDestroyOnLoad(gameObject);
 
-            // 1. 先初始化 Blueprint Runtime，建立内部 Lua VM
+            // 1. 先创建独立的 LuaEnv（xLua 创建并拥有 Lua VM）
+            LuaEnv = new LuaEnv();
+
+            // 2. 将 LuaEnv 的 lua_State 注入给 Blueprint Runtime
+            //    Runtime 的 LuaScriptEngine 用 InitializeWithExternalState 注册 Blueprint.* 绑定
+            //    此后 Lua 代码里的 Blueprint.RegisterNodeDef 等 API 就可正常使用
             var bpRuntime = BlueprintRuntime.Instance
                          ?? gameObject.AddComponent<BlueprintRuntime>();
-            bpRuntime.Init();
-
-            // 2. 用 Runtime 的 lua_State 创建 LuaEnv（共享同一个 VM）
-            //    Blueprint 全局对象已在 VM 里，BlueprintEntry.lua 的注册能正常工作
-            if (bpRuntime.LuaState != System.IntPtr.Zero)
-            {
-                LuaEnv = new LuaEnv(bpRuntime.LuaState);
-                Debug.Log("[LuaManager] Using Blueprint Runtime lua_State");
-            }
+            if (bpRuntime.Init(LuaEnv))
+                Debug.Log("[LuaManager] Blueprint Runtime initialized with shared lua_State");
             else
-            {
-                // DLL 不存在时回落到独立 VM（Editor 工具模式）
-                Debug.LogWarning("[LuaManager] Blueprint Runtime unavailable, using standalone LuaEnv");
-                LuaEnv = new LuaEnv();
-            }
+                Debug.LogWarning("[LuaManager] Blueprint Runtime init failed, BP nodes unavailable");
 
             // Loader：从内存缓存同步返回（WebGL 安全）
             LuaEnv.AddLoader(CachedLuaLoader);
