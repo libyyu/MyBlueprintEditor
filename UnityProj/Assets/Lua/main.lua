@@ -9,8 +9,8 @@ if not ok then
     print('[main] Warning: BlueprintEntry failed: ' .. tostring(err))
 end
 
-local SM = require 'game/scene_manager'
-local LM = require 'game/level_manager'
+local SM = require 'game.scene_manager'
+local LM = require 'game.level_manager'
 
 -- ── 全局钩子（供 LuaManager 调用）────────────────────────────────────
 

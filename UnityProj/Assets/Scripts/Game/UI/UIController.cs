@@ -102,7 +102,7 @@ namespace CutRope.Game.UI
         }
 
         /// <summary>获取 TMP_Text 或 legacy Text 的文字</summary>
-        public string GetText(string childName)
+        public string GetTextValue(string childName)
         {
             if (GetTMP(childName) is TMP_Text tmp) return tmp.text;
             if (GetLegacyText(childName) is Text t) return t.text;
