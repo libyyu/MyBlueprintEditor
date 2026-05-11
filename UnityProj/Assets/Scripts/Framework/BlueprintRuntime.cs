@@ -91,8 +91,8 @@ namespace CutRope.Framework
                 }
 
                 // 2. 将 xLua lua_State 注入给 Runtime
-                //    Runtime 的 LuaScriptEngine 用 InitializeWithExternalState 注册 Blueprint.* 绑定
-                _luaState = luaEnv.rawL;
+                //    用公开属性 L（等同于 rawL，已做非空检查）
+                _luaState = luaEnv.L;
                 BP_SetExternalLuaState(_runner, _luaState);
 
                 Debug.Log($"[BlueprintRuntime] Ready. lua_State=0x{_luaState.ToInt64():X}");
