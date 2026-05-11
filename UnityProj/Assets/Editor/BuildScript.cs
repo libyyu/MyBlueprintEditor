@@ -17,22 +17,12 @@ namespace CutRope.Editor
         // 需要打包的场景（按顺序）
         private static readonly string[] Scenes =
         {
-            "Assets/Scenes/GameLauncher.unity",
-            "Assets/Scenes/MainMenu.unity",
-            "Assets/Scenes/Level_1_1.unity",
+            "Assets/GameLauncher.unity",
         };
 
         [MenuItem("Tools/CutRope/Build Windows (CI)", priority = 50)]
         public static void BuildWindows()
         {
-            // CI 环境下先自动搭建场景和 Prefab
-            CutRopeSetup.SetupTags();
-            CutRopeSetup.CreatePrefabs();
-            AssetDatabase.Refresh();
-            CutRopeSetup.CreateScenes();
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-
             Build(BuildTarget.StandaloneWindows64, "build/StandaloneWindows64/CutRope.exe");
         }
 
