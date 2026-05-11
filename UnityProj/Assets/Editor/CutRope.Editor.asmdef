@@ -4,6 +4,7 @@
     "references": [
         "CutRope.Framework",
         "Unity.TextMeshPro",
+        "YooAsset",
         "YooAsset.Editor"
     ],
     "includePlatforms": [
