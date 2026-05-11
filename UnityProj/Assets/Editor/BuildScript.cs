@@ -12,7 +12,6 @@ using System.IO;
 using System.Linq;
 using System.Collections.Generic;
 using UnityEditor;
-using UnityEditor.Build.Reporting;
 using UnityEngine;
 using YooAsset.Editor;
 
@@ -90,7 +89,7 @@ namespace CutRope.Editor
                 var report  = BuildPipeline.BuildPlayer(opt);
                 var summary = report.summary;
 
-                if (summary.result == BuildResult.Succeeded)
+                if (summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded)
                 {
                     Debug.Log($"[BuildScript] ✓ Build succeeded → {outputPath}  ({summary.totalSize / 1024 / 1024} MB)");
                     EditorApplication.Exit(0);
@@ -170,7 +169,7 @@ namespace CutRope.Editor
             }
             else
             {
-                Debug.LogError($"[BuildScript] Step 2: YooAsset build FAILED: {result.FailedInfo}");
+                Debug.LogError($"[BuildScript] Step 2: YooAsset build FAILED: {result.ErrorInfo}");
                 return false;
             }
         }
