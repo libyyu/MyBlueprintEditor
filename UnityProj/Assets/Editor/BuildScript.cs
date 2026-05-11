@@ -152,6 +152,7 @@ namespace CutRope.Editor
                 PackageName          = PackageName,
                 PackageVersion       = PackageVersion,
                 CompressOption       = ECompressOption.LZ4,
+                BuildinFileCopyOption = EBuildinFileCopyOption.ClearAndCopyAll,
                 VerifyBuildingResult = true,
                 EnableSharePackRule  = true,
                 ClearBuildCacheFiles = false,   // 增量打包
