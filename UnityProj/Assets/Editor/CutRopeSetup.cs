@@ -340,7 +340,7 @@ namespace CutRope.Editor
             cam.clearFlags        = CameraClearFlags.SolidColor;
             cam.backgroundColor   = Color.black;
             cam.orthographic      = true;
-            cam.orthographicSize  = 5f;
+            cam.orthographicSize  = 9f;
 
             EditorSceneManager.SaveScene(scene, path);
             EditorSceneManager.CloseScene(scene, true);
@@ -361,7 +361,7 @@ namespace CutRope.Editor
             cam.clearFlags       = CameraClearFlags.SolidColor;
             cam.backgroundColor  = new Color(0.1f, 0.6f, 0.9f); // 蓝天
             cam.orthographic     = true;
-            cam.orthographicSize = 5f;
+            cam.orthographicSize = 9f;
 
             // 占位背景（正式版换成 Sprite）
             var bg  = new GameObject("Background");
@@ -388,7 +388,7 @@ namespace CutRope.Editor
             cam.clearFlags       = CameraClearFlags.SolidColor;
             cam.backgroundColor  = new Color(0.15f, 0.15f, 0.25f);
             cam.orthographic     = true;
-            cam.orthographicSize = 5f;
+            cam.orthographicSize = 9f;
 
             // LevelController
             var lcGo     = new GameObject("LevelController");
@@ -404,7 +404,7 @@ namespace CutRope.Editor
             var monster       = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             monster.name      = "Monster";
             monster.tag       = "Monster";
-            monster.transform.position = new Vector3(0f, -3.5f, 0f);
+            monster.transform.position = new Vector3(0f, -6f, 0f);
             monster.transform.localScale = Vector3.one * 1.2f;
             var mr = monster.GetComponent<MeshRenderer>();
             if (mr) mr.material = new Material(Shader.Find("Sprites/Default")) { color = new Color(0.3f, 0.8f, 0.3f) };
@@ -414,7 +414,7 @@ namespace CutRope.Editor
 
             // 绳子挂点（天花板钉子）
             var anchor       = new GameObject("RopeAnchor");
-            anchor.transform.position = new Vector3(0f, 4f, 0f);
+            anchor.transform.position = new Vector3(0f, 7f, 0f);
             var anchorSr     = anchor.AddComponent<SpriteRenderer>();
             anchorSr.sprite  = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
             anchorSr.color   = Color.gray;
