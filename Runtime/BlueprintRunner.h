@@ -585,6 +585,8 @@ public:
 
     // 获取 Lua 引擎实例（高级用途：注册自定义 C 函数等）
     LuaScriptEngine* GetLuaEngine();
+    /// 确保 Lua VM 已初始化（首次调用时创建）。返回 false 表示初始化失败。
+    bool EnsureLuaEngine();
 
     // 心跳 Tick：驱动 Lua 脚本的 onTick(deltaSeconds) 全局函数（若存在）。
     // 建议在游戏循环 / Editor 定时器里每帧或固定间隔调用。

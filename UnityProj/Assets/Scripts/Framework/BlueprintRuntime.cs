@@ -72,17 +72,15 @@ namespace CutRope.Framework
         // ── 公共 API ─────────────────────────────────────────────────
 
         /// <summary>
-        /// 初始化 Blueprint Runtime，将外部 xLua LuaEnv 的 lua_State 共享给 Runtime。
-        /// 调用方式：
-        ///   1. LuaManager 先 new LuaEnv() 建立 VM
-        ///   2. 调用 BlueprintRuntime.Init(luaEnv) 把 lua_State 注入给 Runtime
-        ///   3. Runtime 的 LuaScriptEngine 用 InitializeWithExternalState 注册 Blueprint.* 绑定
+        /// 初始化 Blueprint Runtime。
+        /// BP_CreateRunner 内部会立即初始化 Lua VM，
+        /// 完成后 C# 就能通过 LuaState 取得 lua_State*，
+        /// 传给 new LuaEnv(externalL) 共享同一个 VM。
         /// </summary>
-        public bool Init(LuaEnv luaEnv)
+        public bool Init()
         {
             try
             {
-                // 1. 创建 Runner
                 _runner = BP_CreateRunner();
                 if (_runner == IntPtr.Zero)
                 {
@@ -90,10 +88,12 @@ namespace CutRope.Framework
                     return false;
                 }
 
-                // 2. 将 xLua lua_State 注入给 Runtime
-                //    用公开属性 L（等同于 rawL，已做非空检查）
-                _luaState = luaEnv.L;
-                BP_SetExternalLuaState(_runner, _luaState);
+                _luaState = BP_GetLuaState(_runner);
+                if (_luaState == IntPtr.Zero)
+                {
+                    Debug.LogError("[BlueprintRuntime] BP_GetLuaState returned null");
+                    return false;
+                }
 
                 Debug.Log($"[BlueprintRuntime] Ready. lua_State=0x{_luaState.ToInt64():X}");
                 return true;
