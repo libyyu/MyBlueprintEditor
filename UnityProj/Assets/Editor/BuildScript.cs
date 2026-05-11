@@ -4,13 +4,11 @@
 // 构建顺序：
 //   1. Setup Tags / Prefabs / Scenes（幂等，已存在则跳过）
 //   2. YooAsset 打包 DefaultPackage（BuiltinBuildPipeline）
-//   3. 复制 StreamingAssets 到项目目录（内置包）
+//   3. YooAsset ClearAndCopyAll 自动拷贝内置包到 StreamingAssets
 //   4. BuildPlayer
 
 using System;
-using System.IO;
 using System.Linq;
-using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using YooAsset;
@@ -156,6 +154,8 @@ namespace CutRope.Editor
                 VerifyBuildingResult = true,
                 EnableSharePackRule  = true,
                 ClearBuildCacheFiles = false,   // 增量打包
+                // 让 YooAsset 自动把内置包（含 BuiltinCategory）拷贝到 StreamingAssets
+                CopyBuiltinFileOption = ECopyBuildinFileOption.ClearAndCopyAll,
             };
 
             var pipeline = new BuiltinBuildPipeline();
@@ -164,9 +164,7 @@ namespace CutRope.Editor
             if (result.Success)
             {
                 Debug.Log($"[BuildScript] Step 2: YooAsset build succeeded → {result.OutputPackageDirectory}");
-
-                // 把打好的包复制到 StreamingAssets/（内置包，随安装包发布）
-                CopyBuildinFiles(result.OutputPackageDirectory, buildinFileRoot, PackageName, PackageVersion);
+                // ClearAndCopyAll 已自动拷贝内置包到 StreamingAssets，无需手动复制
                 AssetDatabase.Refresh();
                 return true;
             }
@@ -177,38 +175,5 @@ namespace CutRope.Editor
             }
         }
 
-        // ── 复制内置包到 StreamingAssets ──────────────────────────────
-
-        static void CopyBuildinFiles(string packageOutputDir, string streamingAssetsRoot, string packageName, string version)
-        {
-            // 目标：StreamingAssets/yoo/<PackageName>/
-            string destDir = Path.Combine(streamingAssetsRoot, "yoo", packageName);
-            if (!Directory.Exists(destDir))
-                Directory.CreateDirectory(destDir);
-
-            // 源：YooAssetBundles/<platform>/<PackageName>/<version>/
-            if (!Directory.Exists(packageOutputDir))
-            {
-                Debug.LogWarning($"[BuildScript] CopyBuildinFiles: source dir not found: {packageOutputDir}");
-                return;
-            }
-
-            int count = 0;
-            foreach (var file in Directory.GetFiles(packageOutputDir, "*", SearchOption.AllDirectories))
-            {
-                // 只复制 bundle / manifest / hash 文件，跳过 .meta
-                if (file.EndsWith(".meta")) continue;
-
-                string relativePath = file.Substring(packageOutputDir.Length).TrimStart('/', '\\');
-                string destPath     = Path.Combine(destDir, relativePath);
-                string destFileDir  = Path.GetDirectoryName(destPath);
-                if (!Directory.Exists(destFileDir))
-                    Directory.CreateDirectory(destFileDir);
-
-                File.Copy(file, destPath, overwrite: true);
-                count++;
-            }
-            Debug.Log($"[BuildScript] Copied {count} files → {destDir}");
-        }
     }
 }
