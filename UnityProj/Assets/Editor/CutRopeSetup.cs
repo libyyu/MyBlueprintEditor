@@ -37,7 +37,8 @@ namespace CutRope.Editor
             if (!ok) return;
 
             SetupTags();
-            CreatePrefabs();
+            CreatePrefabs();           // 创建 Prefab + 强制导入
+            AssetDatabase.Refresh();   // 确保場景创建时 LoadAssetAtPath 能取到
             CreateScenes();
             AddScenesToBuildSettings();
 
@@ -73,6 +74,9 @@ namespace CutRope.Editor
             CreateMainMenuCanvasPrefab();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+            // 强制同步导入，确保后续 LoadAssetAtPath 能立即获取
+            AssetDatabase.ImportAsset("Assets/Prefabs/Rope/RopeSegment.prefab", ImportAssetOptions.ForceUpdate);
+            AssetDatabase.ImportAsset("Assets/Prefabs/Game/Candy.prefab",       ImportAssetOptions.ForceUpdate);
             Debug.Log("[CutRopeSetup] Prefabs created.");
         }
 
@@ -105,23 +109,27 @@ namespace CutRope.Editor
 
         static void EnsureDir(string path)
         {
-            if (!AssetDatabase.IsValidFolder(path))
+            // 统一换正斜杠（Windows 下 Path.GetDirectoryName 返回反斜杠）
+            path = path.Replace("\\", "/");
+            if (AssetDatabase.IsValidFolder(path)) return;
+
+            var parts = path.Split('/');
+            string cur = parts[0];
+            for (int i = 1; i < parts.Length; i++)
             {
-                var parts = path.Split('/');
-                string cur = parts[0];
-                for (int i = 1; i < parts.Length; i++)
-                {
-                    string next = cur + "/" + parts[i];
-                    if (!AssetDatabase.IsValidFolder(next))
-                        AssetDatabase.CreateFolder(cur, parts[i]);
-                    cur = next;
-                }
+                string next = cur + "/" + parts[i];
+                if (!AssetDatabase.IsValidFolder(next))
+                    AssetDatabase.CreateFolder(cur, parts[i]);
+                cur = next;
             }
+            // 确保目录已被 AssetDatabase 识别
+            AssetDatabase.Refresh();
         }
 
         static void SavePrefab(GameObject go, string assetPath)
         {
-            EnsureDir(Path.GetDirectoryName(assetPath));
+            assetPath = assetPath.Replace("\\", "/");
+            EnsureDir(Path.GetDirectoryName(assetPath).Replace("\\", "/"));
             PrefabUtility.SaveAsPrefabAsset(go, assetPath);
             Object.DestroyImmediate(go);
         }
