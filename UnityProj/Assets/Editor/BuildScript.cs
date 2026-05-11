@@ -13,6 +13,7 @@ using System.Linq;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using YooAsset;
 using YooAsset.Editor;
 
 namespace CutRope.Editor
@@ -146,6 +147,7 @@ namespace CutRope.Editor
                 BuildOutputRoot      = buildOutputRoot,
                 BuildinFileRoot      = buildinFileRoot,
                 BuildPipeline        = EBuildPipeline.BuiltinBuildPipeline.ToString(),
+                BuildBundleType      = (int)EBuildBundleType.AssetBundle,
                 BuildTarget          = target,
                 PackageName          = PackageName,
                 PackageVersion       = PackageVersion,
