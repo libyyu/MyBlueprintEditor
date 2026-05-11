@@ -40,6 +40,24 @@ namespace CutRope.Editor
 
         static void Build(BuildTarget target, string outputPath)
         {
+            // CI 环境：先静默执行 Setup 确保资源完整
+            Debug.Log("[BuildScript] Running silent setup for CI...");
+            try
+            {
+                CutRopeSetup.SetupTags();
+                CutRopeSetup.CreatePrefabs();
+                AssetDatabase.Refresh();
+                CutRopeSetup.CreateScenes();
+                CutRopeSetup.AddScenesToBuildSettings();
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                Debug.Log("[BuildScript] Silent setup complete.");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[BuildScript] Setup warning (non-fatal): {e.Message}");
+            }
+
             // 验证场景文件存在
             var missing = Scenes.Where(s => !System.IO.File.Exists(s)).ToArray();
             if (missing.Length > 0)

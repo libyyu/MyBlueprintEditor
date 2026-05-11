@@ -465,7 +465,7 @@ namespace CutRope.Editor
 
         // ── Build Settings ────────────────────────────────────────────
 
-        static void AddScenesToBuildSettings()
+        public static void AddScenesToBuildSettings()
         {
             var scenePaths = new[]
             {
