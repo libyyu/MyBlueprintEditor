@@ -27,9 +27,9 @@ namespace CutRope.Editor
 
         // YooAsset 包名
         private const string PackageName    = "DefaultPackage";
-        // 包版本（CI 可通过环境变量覆盖）
+        // 包版本（CI 可通过环境变量覆盖，否则用时间戳确保目录唯一）
         private static string PackageVersion =>
-            Environment.GetEnvironmentVariable("PACKAGE_VERSION") ?? "1.0.0";
+            Environment.GetEnvironmentVariable("PACKAGE_VERSION") ?? DateTime.Now.ToString("yyyyMMddHHmm");
 
         // ── 菜单入口 ──────────────────────────────────────────────────
 
