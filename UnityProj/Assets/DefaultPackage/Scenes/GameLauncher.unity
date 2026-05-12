@@ -169,7 +169,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2da67cd8c31b4ab48a4aecd03874c816, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  loadingUiAddress: Assets/UI/LoadingUI.prefab
+  loadingUiAddress: Assets/DefaultPackage/UI/Prefab/LoadingUI.prefab
   mainSceneName: Main
   skipSceneLoad: 0
 --- !u!114 &1129865736
