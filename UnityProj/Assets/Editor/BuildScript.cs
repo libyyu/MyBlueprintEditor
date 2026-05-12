@@ -138,8 +138,8 @@ namespace CutRope.Editor
 
             // 输出目录：项目根/YooAssetBundles
             string buildOutputRoot  = Path.Combine(Application.dataPath, "../Bundles");
-            // 内置包目录：StreamingAssets（Unity 会自动打进包体）
-            string buildinFileRoot  = Application.streamingAssetsPath;
+            // 内置包目录：StreamingAssets/yoo（与运行时 DefaultBuildinFileSystem 查找路径一致）
+            string buildinFileRoot  = Path.Combine(Application.streamingAssetsPath, "yoo");
 
             var buildParameters = new BuiltinBuildParameters
             {
