@@ -97,7 +97,7 @@ namespace CutRope.Game.UI
         public void SetText(string childName, string text)
         {
             if (GetTMP(childName) is TMP_Text tmp) { tmp.text = text; return; }
-            if (GetText(childName) is Text t)      { t.text   = text; return; }
+            if (GetLegacyText(childName) is Text t) { t.text   = text; return; }
             Debug.LogWarning($"[UIController] Text not found: {childName}");
         }
 
@@ -181,9 +181,6 @@ namespace CutRope.Game.UI
             if (c != null) _tmpCache[name] = c;
             return c;
         }
-
-        private Text GetText(string name)  // 防止与公开 GetText(string) 冲突
-            => GetLegacyText(name);
 
         private Text GetLegacyText(string name)
         {

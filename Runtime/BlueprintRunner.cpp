@@ -2474,19 +2474,8 @@ bool ExecutionContext::EvaluateConditionPin(const std::string& pinName)
 
 bool BlueprintRunner::LoadLuaScript(const std::string& filePath)
 {
-    // 延迟创建 Lua 引擎
-    if (!m_luaEngine)
-    {
-        m_luaEngine = std::make_unique<LuaScriptEngine>();
-        if (!m_luaEngine->Initialize(this))
-        {
-            m_lastError = "Failed to initialize Lua: " + m_luaEngine->GetLastError();
-            LogError("[Lua] " + m_lastError);
-            m_luaEngine.reset();
-            return false;
-        }
-        Log("[Lua] Engine initialized", LogLevel::Verbose);
-    }
+    // 确保 Lua 引擎已初始化（首次调用时创建，后续复用）
+    if (!EnsureLuaEngine()) return false;
 
     Log("[Lua] Loading script: " + filePath + " (order: " +
         std::to_string(m_luaEngine->GetLoadedCount() + 1) + ")", LogLevel::Verbose);
@@ -2599,6 +2588,21 @@ bool BlueprintRunner::LoadLuaString(const std::string& code, const std::string& 
 LuaScriptEngine* BlueprintRunner::GetLuaEngine()
 {
     return m_luaEngine.get();
+}
+
+bool BlueprintRunner::EnsureLuaEngine()
+{
+    if (m_luaEngine) return true;
+    m_luaEngine = std::make_unique<LuaScriptEngine>();
+    if (!m_luaEngine->Initialize(this))
+    {
+        m_lastError = "Failed to initialize Lua: " + m_luaEngine->GetLastError();
+        LogError("[Lua] " + m_lastError);
+        m_luaEngine.reset();
+        return false;
+    }
+    Log("[Lua] Engine initialized", LogLevel::Verbose);
+    return true;
 }
 
 void BlueprintRunner::TickLua(double deltaSeconds)

@@ -55,12 +55,12 @@ namespace CutRope.Framework
             Instance = this;
             DontDestroyOnLoad(gameObject);
 
-            // 1. 先初始化 Blueprint Runtime，建立内部 Lua VM
+            // 1. 初始化 Blueprint Runtime（内部立即创建 Lua VM）
             var bpRuntime = BlueprintRuntime.Instance
                          ?? gameObject.AddComponent<BlueprintRuntime>();
             bpRuntime.Init();
 
-            // 2. 用 Runtime 的 lua_State 创建 LuaEnv（共享同一个 VM）
+            // 2. 用 Runtime 的 lua_State 创建 LuaEnv（共享同一 VM）
             //    Blueprint 全局对象已在 VM 里，BlueprintEntry.lua 的注册能正常工作
             if (bpRuntime.LuaState != System.IntPtr.Zero)
             {
@@ -69,7 +69,6 @@ namespace CutRope.Framework
             }
             else
             {
-                // DLL 不存在时回落到独立 VM（Editor 工具模式）
                 Debug.LogWarning("[LuaManager] Blueprint Runtime unavailable, using standalone LuaEnv");
                 LuaEnv = new LuaEnv();
             }

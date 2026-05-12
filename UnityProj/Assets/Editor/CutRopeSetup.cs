@@ -37,7 +37,8 @@ namespace CutRope.Editor
             if (!ok) return;
 
             SetupTags();
-            CreatePrefabs();
+            CreatePrefabs();           // 创建 Prefab + 强制导入
+            AssetDatabase.Refresh();   // 确保場景创建时 LoadAssetAtPath 能取到
             CreateScenes();
             AddScenesToBuildSettings();
 
@@ -73,6 +74,9 @@ namespace CutRope.Editor
             CreateMainMenuCanvasPrefab();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+            // 强制同步导入，确保后续 LoadAssetAtPath 能立即获取
+            AssetDatabase.ImportAsset("Assets/Prefabs/Rope/RopeSegment.prefab", ImportAssetOptions.ForceUpdate);
+            AssetDatabase.ImportAsset("Assets/Prefabs/Game/Candy.prefab",       ImportAssetOptions.ForceUpdate);
             Debug.Log("[CutRopeSetup] Prefabs created.");
         }
 
@@ -105,23 +109,27 @@ namespace CutRope.Editor
 
         static void EnsureDir(string path)
         {
-            if (!AssetDatabase.IsValidFolder(path))
+            // 统一换正斜杠（Windows 下 Path.GetDirectoryName 返回反斜杠）
+            path = path.Replace("\\", "/");
+            if (AssetDatabase.IsValidFolder(path)) return;
+
+            var parts = path.Split('/');
+            string cur = parts[0];
+            for (int i = 1; i < parts.Length; i++)
             {
-                var parts = path.Split('/');
-                string cur = parts[0];
-                for (int i = 1; i < parts.Length; i++)
-                {
-                    string next = cur + "/" + parts[i];
-                    if (!AssetDatabase.IsValidFolder(next))
-                        AssetDatabase.CreateFolder(cur, parts[i]);
-                    cur = next;
-                }
+                string next = cur + "/" + parts[i];
+                if (!AssetDatabase.IsValidFolder(next))
+                    AssetDatabase.CreateFolder(cur, parts[i]);
+                cur = next;
             }
+            // 确保目录已被 AssetDatabase 识别
+            AssetDatabase.Refresh();
         }
 
         static void SavePrefab(GameObject go, string assetPath)
         {
-            EnsureDir(Path.GetDirectoryName(assetPath));
+            assetPath = assetPath.Replace("\\", "/");
+            EnsureDir(Path.GetDirectoryName(assetPath).Replace("\\", "/"));
             PrefabUtility.SaveAsPrefabAsset(go, assetPath);
             Object.DestroyImmediate(go);
         }
@@ -332,7 +340,7 @@ namespace CutRope.Editor
             cam.clearFlags        = CameraClearFlags.SolidColor;
             cam.backgroundColor   = Color.black;
             cam.orthographic      = true;
-            cam.orthographicSize  = 5f;
+            cam.orthographicSize  = 9f;
 
             EditorSceneManager.SaveScene(scene, path);
             EditorSceneManager.CloseScene(scene, true);
@@ -353,7 +361,7 @@ namespace CutRope.Editor
             cam.clearFlags       = CameraClearFlags.SolidColor;
             cam.backgroundColor  = new Color(0.1f, 0.6f, 0.9f); // 蓝天
             cam.orthographic     = true;
-            cam.orthographicSize = 5f;
+            cam.orthographicSize = 9f;
 
             // 占位背景（正式版换成 Sprite）
             var bg  = new GameObject("Background");
@@ -380,7 +388,7 @@ namespace CutRope.Editor
             cam.clearFlags       = CameraClearFlags.SolidColor;
             cam.backgroundColor  = new Color(0.15f, 0.15f, 0.25f);
             cam.orthographic     = true;
-            cam.orthographicSize = 5f;
+            cam.orthographicSize = 9f;
 
             // LevelController
             var lcGo     = new GameObject("LevelController");
@@ -396,7 +404,7 @@ namespace CutRope.Editor
             var monster       = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             monster.name      = "Monster";
             monster.tag       = "Monster";
-            monster.transform.position = new Vector3(0f, -3.5f, 0f);
+            monster.transform.position = new Vector3(0f, -6f, 0f);
             monster.transform.localScale = Vector3.one * 1.2f;
             var mr = monster.GetComponent<MeshRenderer>();
             if (mr) mr.material = new Material(Shader.Find("Sprites/Default")) { color = new Color(0.3f, 0.8f, 0.3f) };
@@ -406,7 +414,7 @@ namespace CutRope.Editor
 
             // 绳子挂点（天花板钉子）
             var anchor       = new GameObject("RopeAnchor");
-            anchor.transform.position = new Vector3(0f, 4f, 0f);
+            anchor.transform.position = new Vector3(0f, 7f, 0f);
             var anchorSr     = anchor.AddComponent<SpriteRenderer>();
             anchorSr.sprite  = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
             anchorSr.color   = Color.gray;
@@ -457,7 +465,7 @@ namespace CutRope.Editor
 
         // ── Build Settings ────────────────────────────────────────────
 
-        static void AddScenesToBuildSettings()
+        public static void AddScenesToBuildSettings()
         {
             var scenePaths = new[]
             {

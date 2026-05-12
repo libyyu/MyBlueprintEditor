@@ -45,6 +45,13 @@ jobs:
           ctest --test-dir build -C Release --output-on-failure
         shell: pwsh
 
+      - name: Upload BlueprintRuntime.dll as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlueprintRuntime-dll-windows-x64
+          path: build\bin\Release\BlueprintRuntime.dll
+          if-no-files-found: error
+
   # ── Windows / MSVC static ────────────────────────────────────────────────────
   windows-static:
     name: Windows (MSVC x64 static)
@@ -322,10 +329,22 @@ jobs:
     name: Unity (Windows, StandaloneWindows64)
     runs-on: ubuntu-latest
     environment: UNITY_LICENSE
+    needs: windows   # 等待 windows job 编译出 BlueprintRuntime.dll
     steps:
       - uses: actions/checkout@v4
         with:
           lfs: true
+
+      - name: Download BlueprintRuntime.dll
+        uses: actions/download-artifact@v4
+        with:
+          name: BlueprintRuntime-dll-windows-x64
+          path: UnityProj/Assets/Plugins/Windows/x86_64
+
+      - name: Verify DLL
+        run: |
+          ls -lh UnityProj/Assets/Plugins/Windows/x86_64/BlueprintRuntime.dll
+          echo "BlueprintRuntime.dll ready"
 
       - name: Cache Unity Library
         uses: actions/cache@v4
@@ -345,10 +364,13 @@ jobs:
           projectPath: UnityProj
           targetPlatform: StandaloneWindows64
           unityVersion: 2022.3.62f1
+          buildMethod: CutRope.Editor.BuildScript.BuildWindows
+          allowDirtyBuild: true
+          versioning: None
 
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
           name: Unity-Windows-Build
-          path: build
+          path: UnityProj/build
           if-no-files-found: warn

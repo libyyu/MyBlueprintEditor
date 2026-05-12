@@ -184,8 +184,12 @@ BLUEPRINT_CAPI_EXPORT BP_Runner BLUEPRINT_CAPI_CALL BP_CreateRunner(void)
 {
     RunnerWrapper* w = new (std::nothrow) RunnerWrapper();
     if (!w) return nullptr;
-    // Register all built-in node handlers
+    // 注册内置节点处理器
     RegisterBuiltinHandlers(w->runner);
+#ifdef BLUEPRINT_HAS_LUA
+    // 立即初始化 Lua VM，不依赖脚本文件存在；脚本文件仍为懒加载
+    w->runner.EnsureLuaEngine();
+#endif
     return static_cast<BP_Runner>(w);
 }
 

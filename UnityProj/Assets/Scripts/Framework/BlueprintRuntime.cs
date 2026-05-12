@@ -72,14 +72,15 @@ namespace CutRope.Framework
         // ── 公共 API ─────────────────────────────────────────────────
 
         /// <summary>
-        /// 初始化 Blueprint Runtime，并将 Runtime 内部的 lua_State 共享给 xLua LuaEnv。
-        /// 必须在 LuaEnv 创建前调用：先 Init()，再 new LuaEnv(BlueprintRuntime.Instance.LuaState)。
+        /// 初始化 Blueprint Runtime。
+        /// BP_CreateRunner 内部会立即初始化 Lua VM，
+        /// 完成后 C# 就能通过 LuaState 取得 lua_State*，
+        /// 传给 new LuaEnv(externalL) 共享同一个 VM。
         /// </summary>
         public bool Init()
         {
             try
             {
-                // 1. 创建 Runner — Runtime 会自建 Lua VM 并注入 Blueprint 全局对象
                 _runner = BP_CreateRunner();
                 if (_runner == IntPtr.Zero)
                 {
@@ -87,10 +88,6 @@ namespace CutRope.Framework
                     return false;
                 }
 
-                // 2. 加载 BlueprintEntry（注册内置节点到 Runtime VM）
-                BP_LoadGlobalLuaEntry(_runner);
-
-                // 3. 获取 Runtime 内部的 lua_State
                 _luaState = BP_GetLuaState(_runner);
                 if (_luaState == IntPtr.Zero)
                 {
