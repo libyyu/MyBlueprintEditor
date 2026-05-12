@@ -30,8 +30,24 @@ MonoBehaviour:
       AssetTags: 
       ActiveRuleName: EnableGroup
       Collectors:
-      - CollectPath: Assets/DefaultPackage
-        CollectorGUID: cc50af7ccc4765844ada4b591a36aeff
+      - CollectPath: Assets/DefaultPackage/Scenes
+        CollectorGUID: cC8e8Fb9CFbBFB94888cDe906E3A5ea1
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackSeparately
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+      - CollectPath: Assets/DefaultPackage/Prefabs
+        CollectorGUID: cC8e8Fb9CFbBFB94888cDe906E3A5ea2
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackCollector
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+      - CollectPath: Assets/DefaultPackage/UI
+        CollectorGUID: cC8e8Fb9CFbBFB94888cDe906E3A5ea3
         CollectorType: 0
         AddressRuleName: AddressByFileName
         PackRuleName: PackCollector
