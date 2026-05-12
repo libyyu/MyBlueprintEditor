@@ -8,6 +8,7 @@
 //   4. BuildPlayer
 
 using System;
+using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -154,8 +155,7 @@ namespace CutRope.Editor
                 VerifyBuildingResult = true,
                 EnableSharePackRule  = true,
                 ClearBuildCacheFiles = false,   // 增量打包
-                // 让 YooAsset 自动把内置包（含 BuiltinCategory）拷贝到 StreamingAssets
-                CopyBuiltinFileOption = ECopyBuildinFileOption.ClearAndCopyAll,
+                BuildinFileCopyOption = EBuildinFileCopyOption.ClearAndCopyAll,
             };
 
             var pipeline = new BuiltinBuildPipeline();
