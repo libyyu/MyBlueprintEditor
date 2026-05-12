@@ -137,7 +137,7 @@ namespace CutRope.Editor
             Debug.Log($"[BuildScript] Step 2: YooAsset build — package={PackageName} ver={PackageVersion} target={target}");
 
             // 输出目录：项目根/YooAssetBundles
-            string buildOutputRoot  = Path.Combine(Application.dataPath, "../YooAssetBundles");
+            string buildOutputRoot  = Path.Combine(Application.dataPath, "../Bundles");
             // 内置包目录：StreamingAssets（Unity 会自动打进包体）
             string buildinFileRoot  = Application.streamingAssetsPath;
 
@@ -151,7 +151,6 @@ namespace CutRope.Editor
                 PackageName          = PackageName,
                 PackageVersion       = PackageVersion,
                 CompressOption       = ECompressOption.LZ4,
-                BuildinFileCopyOption = EBuildinFileCopyOption.ClearAndCopyAll,
                 VerifyBuildingResult = true,
                 EnableSharePackRule  = true,
                 ClearBuildCacheFiles = false,   // 增量打包

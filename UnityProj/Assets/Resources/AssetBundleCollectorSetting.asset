@@ -30,12 +30,12 @@ MonoBehaviour:
       AssetTags: 
       ActiveRuleName: EnableGroup
       Collectors:
-      - CollectPath: Assets/DefaultPackage/UI/Prefab/New Prefab.prefab
-        CollectorGUID: 22d75932f11abd24099f3ce0afc05841
+      - CollectPath: Assets/DefaultPackage
+        CollectorGUID: cc50af7ccc4765844ada4b591a36aeff
         CollectorType: 0
         AddressRuleName: AddressByFileName
         PackRuleName: PackCollector
-        FilterRuleName: CollectPrefab
+        FilterRuleName: CollectAll
         AssetTags: 
         UserData: 
     - GroupName: Lua Group
