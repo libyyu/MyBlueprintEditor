@@ -25,6 +25,7 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Networking;
 using YooAsset;
 
 namespace CutRope.Framework
@@ -101,6 +102,7 @@ namespace CutRope.Framework
         // ── Phase 1：本地初始化协程 ───────────────────────────────────
         private IEnumerator InitLocalCoroutine(string packageName)
         {
+            Debug.Log($"[YooAsset] Initializing package '{packageName}' (Phase 1: Local Init)");
             // 1. 获取或创建 Package
             ResourcePackage package;
             if (YooAssets.ContainsPackage(packageName))
@@ -155,6 +157,26 @@ namespace CutRope.Framework
 
             // 激活本地 Manifest（InitializeAsync 只初始化文件系统，不激活 Manifest）
             // 无论何种平台，必须先 UpdatePackageManifestAsync 才能加载任何资源
+#if !UNITY_WEBGL && !UNITY_EDITOR
+            string rootDirectory = YooAssetSettingsData.GetYooDefaultBuildinRoot();
+            var BuildinPackageRootPath = String.Format("{0}/{1}", rootDirectory, packageName);
+            string fileName = YooAssetSettingsData.GetPackageVersionFileName(packageName);
+            var BuildinPackageVersionFilePath = String.Format("{0}/{1}", BuildinPackageRootPath, fileName);
+            Debug.Log($"[YooAsset] Reading local version from: {BuildinPackageVersionFilePath}");
+            string packageLocalVersion = null;
+            using (UnityWebRequest request = UnityWebRequest.Get(BuildinPackageVersionFilePath))
+            {
+                yield return request.SendWebRequest();
+                if (request.result != UnityWebRequest.Result.Success)
+                {
+                    string err = $"[YooAsset] Phase1 read local version failed: {request.error}";
+                    Debug.LogError(err);
+                    OnInitFailed?.Invoke(err);
+                    yield break;
+                }
+                packageLocalVersion = request.downloadHandler.text.Trim();
+            }
+#else
             var packageVersionOperation = package.RequestPackageVersionAsync();
             yield return packageVersionOperation;
 
@@ -166,6 +188,8 @@ namespace CutRope.Framework
                 yield break;
             }
             string packageLocalVersion = packageVersionOperation.PackageVersion;
+#endif
+
             Debug.Log($"Package `{packageName}` version is {packageLocalVersion}");
             //var localVersion = package.GetPackageVersion();
             var localManifestOp = package.UpdatePackageManifestAsync(packageLocalVersion);
@@ -226,6 +250,9 @@ namespace CutRope.Framework
             string packageVersion = versionOp.Status == EOperationStatus.Succeed
                 ? versionOp.PackageVersion
                 : package.GetPackageVersion();
+
+            var unloadOp = package.UnloadAllAssetsAsync();
+            yield return unloadOp;
 
             var manifestOp = package.UpdatePackageManifestAsync(packageVersion);
             yield return manifestOp;

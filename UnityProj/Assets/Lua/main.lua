@@ -15,13 +15,20 @@ local LM = require 'game.level_manager'
 -- ── 全局钩子（供 LuaManager 调用）────────────────────────────────────
 
 --- 每帧调用（由 LuaManager.Update 驱动）
-function update()
+function onAppTick(deltaTime)
     -- 后续游戏逻辑挂在这里
 end
 
 --- 销毁时调用
-function on_destroy()
+function onAppDestroy()
     print("on_destroy called")
+end
+
+function onAppStart()
+    print("on app start called")
+    -- ── 启动：跳转主菜单 ──────────────────────────────────────────────────
+    print('[main] current scene: ' .. SM.current())
+    SM.goto_main_menu()  -- 加载主菜单场景，场景就绪后由 ui/main_menu.lua 打开面板
 end
 
 -- ── 注入关卡事件钩子 ──────────────────────────────────────────────────
@@ -40,7 +47,3 @@ LM.on_level_failed = function(levelId)
     print('[main] level failed: ' .. levelId)
     -- TODO: 显示失败面板
 end
-
--- ── 启动：跳转主菜单 ──────────────────────────────────────────────────
-print('[main] current scene: ' .. SM.current())
-SM.goto_main_menu()  -- 加载主菜单场景，场景就绪后由 ui/main_menu.lua 打开面板

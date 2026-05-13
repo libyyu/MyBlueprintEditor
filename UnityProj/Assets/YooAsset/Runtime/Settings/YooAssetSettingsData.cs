@@ -191,7 +191,7 @@ namespace YooAsset
         /// <summary>
         /// 获取YOO默认的内置文件根目录
         /// </summary>
-        internal static string GetYooDefaultBuildinRoot()
+        public static string GetYooDefaultBuildinRoot()
         {
             if (string.IsNullOrEmpty(Setting.DefaultYooFolderName))
                 return Application.streamingAssetsPath;

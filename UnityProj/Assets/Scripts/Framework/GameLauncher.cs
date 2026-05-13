@@ -28,6 +28,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using XLua;
 using YooAsset;
 
 namespace CutRope.Framework
@@ -44,14 +45,6 @@ namespace CutRope.Framework
         [Header("Loading UI")]
         [Tooltip("LoadingUI prefab 在主包中的地址（YooAsset address）")]
         public string loadingUiAddress = "Assets/UI/LoadingUI.prefab";
-
-        [Header("场景")]
-        [Tooltip("所有资源就绪后跳转的游戏场景")]
-        public string mainSceneName = "Main";
-
-        [Header("调试")]
-        [Tooltip("勾选后跳过场景跳转，方便在 Bootstrap 场景直接测试")]
-        public bool skipSceneLoad = false;
 
         // ── 私有引用 ─────────────────────────────────────────────────
         private YooAssetInitializer _yooInit;
@@ -234,10 +227,11 @@ namespace CutRope.Framework
             yield return new WaitForSeconds(0.2f);
             ActiveUI?.Hide();
 
-            if (!skipSceneLoad && !string.IsNullOrEmpty(mainSceneName))
+            LuaFunction fn = _luaMgr.LuaEnv.Global.Get<LuaFunction>("onAppStart");
+            if (fn != null)
             {
-                Debug.Log($"[GameLauncher] Loading scene: {mainSceneName}");
-                SceneManager.LoadScene(mainSceneName);
+                fn.Call();
+                fn.Dispose();
             }
         }
 

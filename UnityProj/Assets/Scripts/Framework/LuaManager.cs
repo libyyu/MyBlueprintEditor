@@ -102,8 +102,8 @@ namespace CutRope.Framework
             LuaEnv.DoString($"require '{mainLuaAddress}'");
 
             // 3. 取出 Lua 钩子
-            _luaUpdate    = LuaEnv.Global.Get<LuaFunction>("update");
-            _luaOnDestroy = LuaEnv.Global.Get<LuaFunction>("on_destroy");
+            _luaUpdate    = LuaEnv.Global.Get<LuaFunction>("onAppTick");
+            _luaOnDestroy = LuaEnv.Global.Get<LuaFunction>("onAppDestroy");
 
             Debug.Log($"[LuaManager] Lua started. {_luaCache.Count} files cached.");
         }
@@ -137,7 +137,7 @@ namespace CutRope.Framework
                 var assetPath = info.AssetPath.ToLower();
                 if (!assetPath.EndsWith(".lua"))
                 {
-                    Debug.LogWarning($"`{assetPath}` is not a valid lua script");
+                    //Debug.LogWarning($"`{assetPath}` is not a valid lua script");
                     continue;
                 }
                 assetPath = assetPath.Replace(".lua", "").Replace("\\", "/").Replace(prefix, "");
@@ -187,7 +187,7 @@ namespace CutRope.Framework
         // ── Update / Destroy ─────────────────────────────────────────
         private void Update()
         {
-            _luaUpdate?.Call();
+            _luaUpdate?.Call(Time.deltaTime);
 
             _gcTimer += Time.deltaTime;
             if (_gcTimer >= gcInterval)

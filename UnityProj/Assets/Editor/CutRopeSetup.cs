@@ -75,8 +75,8 @@ namespace CutRope.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             // 强制同步导入，确保后续 LoadAssetAtPath 能立即获取
-            AssetDatabase.ImportAsset("Assets/Prefabs/Rope/RopeSegment.prefab", ImportAssetOptions.ForceUpdate);
-            AssetDatabase.ImportAsset("Assets/Prefabs/Game/Candy.prefab",       ImportAssetOptions.ForceUpdate);
+            AssetDatabase.ImportAsset("Assets/DefaultPackage/Prefabs/Rope/RopeSegment.prefab", ImportAssetOptions.ForceUpdate);
+            AssetDatabase.ImportAsset("Assets/DefaultPackage/Prefabs/Game/Candy.prefab",       ImportAssetOptions.ForceUpdate);
             Debug.Log("[CutRopeSetup] Prefabs created.");
         }
 
@@ -136,7 +136,7 @@ namespace CutRope.Editor
 
         static void CreateRopeSegmentPrefab()
         {
-            const string path = "Assets/Prefabs/Rope/RopeSegment.prefab";
+            const string path = "Assets/DefaultPackage/Prefabs/Rope/RopeSegment.prefab";
             if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null) return;
 
             var go = new GameObject("RopeSegment");
@@ -167,7 +167,7 @@ namespace CutRope.Editor
 
         static void CreateCandyPrefab()
         {
-            const string path = "Assets/Prefabs/Game/Candy.prefab";
+            const string path = "Assets/DefaultPackage/Prefabs/Game/Candy.prefab";
             if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null) return;
 
             var go = new GameObject("Candy");
@@ -195,7 +195,7 @@ namespace CutRope.Editor
 
         static void CreateLoadingUIPrefab()
         {
-            const string path = "Assets/UI/LoadingUI.prefab";
+            const string path = "Assets/DefaultPackage/UI/Prefab/LoadingUI.prefab";
             if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null) return;
 
             // Canvas
@@ -254,7 +254,7 @@ namespace CutRope.Editor
 
         static void CreateMainMenuCanvasPrefab()
         {
-            const string path = "Assets/UI/MainMenu.prefab";
+            const string path = "Assets/DefaultPackage/UI/Prefab/MainMenu.prefab";
             if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null) return;
 
             var canvasGo = new GameObject("MainMenu");
@@ -349,8 +349,8 @@ namespace CutRope.Editor
 
         static void CreateMainMenuScene()
         {
-            const string path = "Assets/Scenes/MainMenu.unity";
-            EnsureDir("Assets/Scenes");
+            const string path = "Assets/DefaultPackage/Scenes/MainMenu.unity";
+            EnsureDir("Assets/DefaultPackage/Scenes");
             if (File.Exists(path)) return;
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
@@ -375,8 +375,8 @@ namespace CutRope.Editor
 
         static void CreateLevel1_1Scene()
         {
-            const string path = "Assets/Scenes/Level_1_1.unity";
-            EnsureDir("Assets/Scenes");
+            const string path = "Assets/DefaultPackage/Scenes/Level_1_1.unity";
+            EnsureDir("Assets/DefaultPackage/Scenes");
             if (File.Exists(path)) return;
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
@@ -421,7 +421,7 @@ namespace CutRope.Editor
             anchor.transform.localScale = Vector3.one * 0.3f;
 
             // Candy GameObject（放在绳子末端起始位置，由 Lua/RopeSpawner.Spawn(candy) 连接）
-            var candyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Game/Candy.prefab");
+            var candyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/DefaultPackage/Prefabs/Game/Candy.prefab");
             GameObject candyGo;
             if (candyPrefab != null)
                 candyGo = (GameObject)PrefabUtility.InstantiatePrefab(candyPrefab);
@@ -447,7 +447,7 @@ namespace CutRope.Editor
                 var rs = rsGo.AddComponent(rsType) as MonoBehaviour;
                 rsGo.transform.position = anchor.transform.position;
 
-                var segPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Rope/RopeSegment.prefab");
+                var segPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/DefaultPackage/Prefabs/Rope/RopeSegment.prefab");
                 if (rs != null && segPrefab != null)
                 {
                     var so = new SerializedObject(rs);
@@ -469,9 +469,7 @@ namespace CutRope.Editor
         {
             var scenePaths = new[]
             {
-                "Assets/Scenes/GameLauncher.unity",
-                "Assets/Scenes/MainMenu.unity",
-                "Assets/Scenes/Level_1_1.unity",
+                "Assets/Scenes/GameLauncher.unity",  //启动场景，其他场景通过YooAsset打包
             };
 
             var existing = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);

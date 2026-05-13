@@ -54,7 +54,7 @@ end
 
 --- 便捷：加载主菜单
 function M.goto_main_menu()
-    M.load('MainMenu', nil, function()
+    M.load('Assets/DefaultPackage/Scenes/MainMenu', nil, function()
         print('[scene_manager] MainMenu loaded')
     end)
 end
