@@ -3,27 +3,32 @@
 //
 // 初始化分两阶段，支持"先显示 Loading UI 再检查更新"的流程：
 //
-//   Phase 1 — InitLocalAsync()
-//     初始化本地文件系统（内置包 or 缓存），让资源立即可加载。
-//     此阶段不访问网络，完成后可加载 LoadingUI prefab 等本地资源。
+//   Phase 1 — InitLocal()  【零网络依赖】
+//     原生平台（方案 D）：
+//       ① OfflinePlayMode 初始化（只含 BuildinFileSystem）
+//       ② RequestPackageVersionAsync → BuildinFS → StreamingAssets 版本文件（纯本地）
+//       ③ UpdatePackageManifestAsync → BuildinFS → StreamingAssets manifest（纯本地）
+//       Phase1 结束，Package 保持 OfflineMode，资源正常加载（走 BuildinFS）
 //     触发事件：OnLocalReady / OnInitFailed
 //
-//   Phase 2 — CheckAndDownloadAsync()
-//     请求远端版本号 → 更新 Manifest → 下载缺失 bundle。
-//     完成后触发：OnDefaultPackageReady（主包）或 onReady 回调（DLC 包）
-//     下载进度：OnDownloadProgress (0~1)
+//   Phase 2 — CheckAndDownload()  【弱联网】
+//     原生平台：
+//       ① 将 Package 从 OfflineMode 切换为 HostPlayMode（RemovePackage + 重建）
+//       ② RequestPackageVersionAsync → CDN
+//          · 成功 → UpdatePackageManifestAsync + 下载增量 bundle
+//          · 失败 → 读本地 .version 文件 → UpdatePackageManifestAsync(内置版本)
+//                   → CacheFS 无缓存时会去 CDN，若仍不通则 Warning 继续
+//                   → 游戏用 BuildinFS 资源正常运行
+//     触发事件：OnDefaultPackageReady
 //
 // 平台分流：
 //   UNITY_EDITOR              → EditorSimulate（跳过网络，两阶段均立即完成）
-//   UNITY_WEBGL && !UNITY_EDITOR → WebPlay（纯远端，Phase 1 仅初始化远端FS，
-//                                            Phase 2 拉版本+下载）
-//   其他（iOS / Android / PC）  → HostPlay（Phase 1 读内置/缓存，Phase 2 增量更新）
-//
-// DLC 包（DlcChapterXX）：按需调用 InitDlcPackage，内部同样走两阶段。
-// 主包（DefaultPackage）：游戏启动时必须完成，包含 Loading UI、主菜单、第1章前2关
+//   UNITY_WEBGL && !UNITY_EDITOR → WebPlay（纯远端，Phase 1 初始化远端 FS）
+//   其他（iOS / Android / PC）  → OfflinePlay(Phase1) + HostPlay(Phase2)
 
 using System;
 using System.Collections;
+using System.IO;
 using UnityEngine;
 using UnityEngine.Networking;
 using YooAsset;
@@ -35,7 +40,7 @@ namespace CutRope.Framework
         // ── Inspector 配置 ────────────────────────────────────────────
         [Header("CDN 地址（真机/发布用）")]
         [Tooltip("主 CDN，如 https://cdn.example.com/res")]
-        public string cdnBaseUrl    = "https://cdn.example.com/res";
+        public string cdnBaseUrl     = "https://cdn.example.com/res";
         [Tooltip("备用 CDN，留空则同主 CDN")]
         public string cdnFallbackUrl = "";
 
@@ -43,11 +48,11 @@ namespace CutRope.Framework
         public string defaultPackageName = "DefaultPackage";
 
         // ── 事件 ─────────────────────────────────────────────────────
-        /// <summary>Phase 1 完成：本地资源可访问（内置包或缓存已就绪）</summary>
+        /// <summary>Phase 1 完成：内置资源可访问（零网络依赖）</summary>
         public event Action OnLocalReady;
-        /// <summary>Phase 2 完成：主包所有资源下载完毕</summary>
+        /// <summary>Phase 2 完成：主包就绪（CDN 可达则含最新资源，否则用内置）</summary>
         public event Action OnDefaultPackageReady;
-        /// <summary>初始化失败（Phase 1 或 Phase 2 均可触发）</summary>
+        /// <summary>初始化失败（仅在真正不可恢复时触发）</summary>
         public event Action<string> OnInitFailed;
         /// <summary>Phase 2 下载进度 0~1</summary>
         public event Action<float> OnDownloadProgress;
@@ -64,21 +69,13 @@ namespace CutRope.Framework
 
         // ── 公共 API ─────────────────────────────────────────────────
 
-        /// <summary>
-        /// Phase 1：初始化本地文件系统。
-        /// 完成后触发 OnLocalReady，此时可加载内置/缓存资源（如 LoadingUI prefab）。
-        /// 由 GameLauncher 在 Start 中调用。
-        /// </summary>
+        /// <summary>Phase 1：纯本地初始化，零网络依赖。</summary>
         public void InitLocal()
         {
             StartCoroutine(InitLocalCoroutine(defaultPackageName));
         }
 
-        /// <summary>
-        /// Phase 2：检查远端版本并下载缺失资源。
-        /// 必须在 InitLocal 完成（OnLocalReady 触发）之后调用。
-        /// 完成后触发 OnDefaultPackageReady。
-        /// </summary>
+        /// <summary>Phase 2：弱联网检查更新。必须在 OnLocalReady 后调用。</summary>
         public void CheckAndDownload()
         {
             var package = YooAssets.GetPackage(defaultPackageName);
@@ -90,30 +87,28 @@ namespace CutRope.Framework
             StartCoroutine(CheckAndDownloadCoroutine(package, defaultPackageName, isDefault: true));
         }
 
-        /// <summary>
-        /// 按需初始化 DLC 分包（章节资源包），内部完成 Phase 1 + Phase 2。
-        /// 例：InitDlcPackage("DlcChapter1", onReady, onFailed)
-        /// </summary>
+        /// <summary>按需初始化 DLC 分包，内部完成 Phase 1 + Phase 2。</summary>
         public void InitDlcPackage(string packageName, Action onReady, Action<string> onFailed = null)
         {
             StartCoroutine(InitDlcCoroutine(packageName, onReady, onFailed));
         }
 
-        // ── Phase 1：本地初始化协程 ───────────────────────────────────
+        // ════════════════════════════════════════════════════════════
+        // Phase 1：本地初始化（零网络）
+        // ════════════════════════════════════════════════════════════
         private IEnumerator InitLocalCoroutine(string packageName)
         {
-            Debug.Log($"[YooAsset] Initializing package '{packageName}' (Phase 1: Local Init)");
-            // 1. 获取或创建 Package
-            ResourcePackage package;
+            Debug.Log($"[YooAsset] Phase1 begin: '{packageName}'");
+
+            // 先清理可能残留的旧 Package（重试场景）
             if (YooAssets.ContainsPackage(packageName))
-                package = YooAssets.GetPackage(packageName);
-            else
-                package = YooAssets.CreatePackage(packageName);
+                YooAssets.RemovePackage(packageName);
 
-            YooAssets.SetDefaultPackage(package);
-
-            // 2. 初始化参数
 #if UNITY_EDITOR
+            // ── Editor：EditorSimulate ───────────────────────────────
+            var pkg = YooAssets.CreatePackage(packageName);
+            YooAssets.SetDefaultPackage(pkg);
+
             var buildResult = EditorSimulateModeHelper.SimulateBuild(packageName);
             var editorParam = new EditorSimulateModeParameters
             {
@@ -121,19 +116,138 @@ namespace CutRope.Framework
                 EditorFileSystemParameters =
                     FileSystemParameters.CreateDefaultEditorFileSystemParameters(buildResult.PackageRootDirectory)
             };
-            var initOp = package.InitializeAsync(editorParam);
+            var initOp = pkg.InitializeAsync(editorParam);
+            yield return initOp;
+            if (initOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 Editor init failed: {initOp.Error}";
+                Debug.LogError(e); OnInitFailed?.Invoke(e); yield break;
+            }
+
+            var verOp = pkg.RequestPackageVersionAsync();
+            yield return verOp;
+            if (verOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 Editor version failed: {verOp.Error}";
+                Debug.LogError(e); OnInitFailed?.Invoke(e); yield break;
+            }
+
+            var mfOp = pkg.UpdatePackageManifestAsync(verOp.PackageVersion);
+            yield return mfOp;
+            if (mfOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 Editor manifest failed: {mfOp.Error}";
+                Debug.LogError(e); OnInitFailed?.Invoke(e); yield break;
+            }
+
+            Debug.Log($"[YooAsset] '{packageName}' ready (Editor Simulate)");
+            IsLocalReady = IsDefaultPackageReady = true;
+            OnLocalReady?.Invoke();
+            OnDefaultPackageReady?.Invoke();
+
 #elif UNITY_WEBGL
-            // WebGL：无本地文件系统，Phase 1 直接初始化远端 FS
-            // 首次启动没有本地缓存，资源全部来自 CDN
+            // ── WebGL：WebPlay ───────────────────────────────────────
+            var pkg = YooAssets.CreatePackage(packageName);
+            YooAssets.SetDefaultPackage(pkg);
+
             var webRemote = new RemoteServices(cdnBaseUrl, cdnFallbackUrl);
             var webParam  = new WebPlayModeParameters
             {
                 WebFileSystemParameters =
                     FileSystemParameters.CreateDefaultWebFileSystemParameters(webRemote)
             };
-            var initOp = package.InitializeAsync(webParam);
+            var initOp = pkg.InitializeAsync(webParam);
+            yield return initOp;
+            if (initOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 WebGL init failed: {initOp.Error}";
+                Debug.LogError(e); OnInitFailed?.Invoke(e); yield break;
+            }
+
+            var verOp = pkg.RequestPackageVersionAsync();
+            yield return verOp;
+            if (verOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 WebGL version failed: {verOp.Error}";
+                Debug.LogError(e); OnInitFailed?.Invoke(e); yield break;
+            }
+
+            var mfOp = pkg.UpdatePackageManifestAsync(verOp.PackageVersion);
+            yield return mfOp;
+            if (mfOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 WebGL manifest failed: {mfOp.Error}";
+                Debug.LogError(e); OnInitFailed?.Invoke(e); yield break;
+            }
+
+            Debug.Log($"[YooAsset] '{packageName}' local ready (WebGL)");
+            IsLocalReady = true;
+            OnLocalReady?.Invoke();
+
 #else
-            // 原生平台：内置包 + 缓存，不访问网络
+            // ── 原生平台：OfflinePlayMode（只含 BuildinFileSystem，零网络）────
+            // UpdatePackageManifestAsync 在 OfflineMode 下走 BuildinFS，
+            // BuildinFS 只读 StreamingAssets，完全不访问 CDN。
+            var offlinePkg = YooAssets.CreatePackage(packageName);
+            YooAssets.SetDefaultPackage(offlinePkg);
+
+            var offlineParam = new OfflinePlayModeParameters
+            {
+                BuildinFileSystemParameters =
+                    FileSystemParameters.CreateDefaultBuildinFileSystemParameters()
+            };
+            var offlineInitOp = offlinePkg.InitializeAsync(offlineParam);
+            yield return offlineInitOp;
+            if (offlineInitOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 Offline init failed: {offlineInitOp.Error}";
+                Debug.LogError(e); OnInitFailed?.Invoke(e); yield break;
+            }
+
+            // RequestPackageVersionAsync → BuildinFS → StreamingAssets（纯本地）
+            var buildinVerOp = offlinePkg.RequestPackageVersionAsync();
+            yield return buildinVerOp;
+            if (buildinVerOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 buildin version failed: {buildinVerOp.Error}";
+                Debug.LogError(e); OnInitFailed?.Invoke(e); yield break;
+            }
+            string buildinVersion = buildinVerOp.PackageVersion;
+            Debug.Log($"[YooAsset] Phase1: '{packageName}' buildinVersion = {buildinVersion}");
+
+            // UpdatePackageManifestAsync → BuildinFS → StreamingAssets（纯本地）
+            var buildinMfOp = offlinePkg.UpdatePackageManifestAsync(buildinVersion);
+            yield return buildinMfOp;
+            if (buildinMfOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 buildin manifest failed: {buildinMfOp.Error}";
+                Debug.LogError(e); OnInitFailed?.Invoke(e); yield break;
+            }
+
+            // Phase1 完成：Package 保持 OfflineMode，ActiveManifest 已激活，资源可正常加载。
+            // Phase2 会负责切换到 HostMode 并处理弱联网更新。
+            Debug.Log($"[YooAsset] '{packageName}' local ready (OfflineMode, version={buildinVersion})");
+            IsLocalReady = true;
+            OnLocalReady?.Invoke();
+#endif
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // Phase 2：弱联网检查更新 + 下载
+        // ════════════════════════════════════════════════════════════
+        private IEnumerator CheckAndDownloadCoroutine(
+            ResourcePackage package,
+            string packageName,
+            bool   isDefault,
+            Action onReady          = null,
+            Action<string> onFailed = null)
+        {
+#if !UNITY_WEBGL && !UNITY_EDITOR
+            // 原生平台：Phase1 用的是 OfflineMode，先切换到 HostMode
+            // HostMode 含 CacheFileSystem，支持增量下载和缓存
+            Debug.Log($"[YooAsset] Phase2: '{packageName}' OfflineMode → HostMode");
+            YooAssets.RemovePackage(package);
+
             var hostRemote = new RemoteServices(cdnBaseUrl, cdnFallbackUrl);
             var hostParam  = new HostPlayModeParameters
             {
@@ -142,131 +256,84 @@ namespace CutRope.Framework
                 CacheFileSystemParameters   =
                     FileSystemParameters.CreateDefaultCacheFileSystemParameters(hostRemote)
             };
-            var initOp = package.InitializeAsync(hostParam);
-#endif
+            package = YooAssets.CreatePackage(packageName);
+            if (isDefault) YooAssets.SetDefaultPackage(package);
 
-            yield return initOp;
-
-            if (initOp.Status != EOperationStatus.Succeed)
+            var hostInitOp = package.InitializeAsync(hostParam);
+            yield return hostInitOp;
+            if (hostInitOp.Status != EOperationStatus.Succeed)
             {
-                string err = $"[YooAsset] Phase1 init failed: {initOp.Error}";
-                Debug.LogError(err);
-                OnInitFailed?.Invoke(err);
+                string e = $"[YooAsset] Phase2 Host init failed: {hostInitOp.Error}";
+                Debug.LogError(e);
+                if (isDefault) OnInitFailed?.Invoke(e);
+                onFailed?.Invoke(e);
                 yield break;
             }
-
-            // 激活本地 Manifest（InitializeAsync 只初始化文件系统，不激活 Manifest）
-            // 无论何种平台，必须先 UpdatePackageManifestAsync 才能加载任何资源
-#if !UNITY_WEBGL && !UNITY_EDITOR
-            string rootDirectory = YooAssetSettingsData.GetYooDefaultBuildinRoot();
-            var BuildinPackageRootPath = String.Format("{0}/{1}", rootDirectory, packageName);
-            string fileName = YooAssetSettingsData.GetPackageVersionFileName(packageName);
-            var BuildinPackageVersionFilePath = String.Format("{0}/{1}", BuildinPackageRootPath, fileName);
-            Debug.Log($"[YooAsset] Reading local version from: {BuildinPackageVersionFilePath}");
-            string packageLocalVersion = null;
-            using (UnityWebRequest request = UnityWebRequest.Get(BuildinPackageVersionFilePath))
-            {
-                yield return request.SendWebRequest();
-                if (request.result != UnityWebRequest.Result.Success)
-                {
-                    string err = $"[YooAsset] Phase1 read local version failed: {request.error}";
-                    Debug.LogError(err);
-                    OnInitFailed?.Invoke(err);
-                    yield break;
-                }
-                packageLocalVersion = request.downloadHandler.text.Trim();
-            }
-#else
-            var packageVersionOperation = package.RequestPackageVersionAsync();
-            yield return packageVersionOperation;
-
-            if (packageVersionOperation.Status != EOperationStatus.Succeed)
-            {
-                string err = $"[YooAsset] Phase1 RequestPackageVersionAsync failed: {packageVersionOperation.Error}";
-                Debug.LogError(err);
-                OnInitFailed?.Invoke(err);
-                yield break;
-            }
-            string packageLocalVersion = packageVersionOperation.PackageVersion;
 #endif
 
-            Debug.Log($"Package `{packageName}` version is {packageLocalVersion}");
-            //var localVersion = package.GetPackageVersion();
-            var localManifestOp = package.UpdatePackageManifestAsync(packageLocalVersion);
-            yield return localManifestOp;
+            bool networkAvailable = true;
 
-            if (localManifestOp.Status != EOperationStatus.Succeed)
-            {
-                string err = $"[YooAsset] Phase1 activate manifest failed: {localManifestOp.Error}";
-                Debug.LogError(err);
-                OnInitFailed?.Invoke(err);
-                yield break;
-            }
-
-#if UNITY_EDITOR
-            // Editor：跳过网络，Phase 1 = Phase 2，直接全部就绪
-            Debug.Log($"[YooAsset] '{packageName}' ready (Editor Simulate)");
-            IsLocalReady          = true;
-            IsDefaultPackageReady = true;
-            OnLocalReady?.Invoke();
-            OnDefaultPackageReady?.Invoke();
-#else
-            Debug.Log($"[YooAsset] '{packageName}' local ready");
-            IsLocalReady = true;
-            OnLocalReady?.Invoke();
-            // Phase 2 由 GameLauncher 在加载完 LoadingUI 后显式调用 CheckAndDownload()
-            // Phase 2 的 UpdatePackageManifestAsync 会用远端版本覆盖此处的本地版本
-#endif
-        }
-
-        // ── Phase 2：检查更新 + 下载协程 ─────────────────────────────
-        private IEnumerator CheckAndDownloadCoroutine(
-            ResourcePackage package,
-            string packageName,
-            bool   isDefault,
-            Action onReady   = null,
-            Action<string> onFailed = null)
-        {
-            // 3. 请求远端版本
+            // 1. 请求远端版本
             var versionOp = package.RequestPackageVersionAsync();
             yield return versionOp;
 
             if (versionOp.Status != EOperationStatus.Succeed)
             {
 #if UNITY_WEBGL
-                // WebGL 无缓存回退，直接报错
-                string verErr = $"[YooAsset] RequestVersion failed: {versionOp.Error}";
+                string verErr = $"[YooAsset] Phase2 RequestVersion failed: {versionOp.Error}";
                 Debug.LogError(verErr);
-                onFailed?.Invoke(verErr);
                 if (isDefault) OnInitFailed?.Invoke(verErr);
+                onFailed?.Invoke(verErr);
                 yield break;
 #else
-                // 原生平台：离线容错，用本地版本继续
-                Debug.LogWarning($"[YooAsset] RequestVersion failed, using cached version. Error: {versionOp.Error}");
+                // CDN 不通：读本地内置版本，激活 HostMode 的 Manifest（用于资源路由）
+                networkAvailable = false;
+                Debug.LogWarning($"[YooAsset] Phase2: CDN 不可达，尝试内置版本。Error: {versionOp.Error}");
+
+                string buildinVer = ReadBuildinVersion(packageName);
+                if (string.IsNullOrEmpty(buildinVer))
+                {
+                    string e = $"[YooAsset] Phase2: CDN 不可达且无内置版本文件，无法启动";
+                    Debug.LogError(e);
+                    if (isDefault) OnInitFailed?.Invoke(e);
+                    onFailed?.Invoke(e);
+                    yield break;
+                }
+
+                // 尝试激活 HostMode Manifest（CacheFS 无缓存时去 CDN，CDN 不通则失败）
+                // 失败时 Warning 继续——bundle 加载会路由到 BuildinFS，资源仍可用
+                var fallbackMfOp = package.UpdatePackageManifestAsync(buildinVer);
+                yield return fallbackMfOp;
+                if (fallbackMfOp.Status != EOperationStatus.Succeed)
+                    Debug.LogWarning($"[YooAsset] Phase2: 内置 Manifest 激活失败（CDN 不通且无缓存），" +
+                                     $"资源加载将尝试走 BuildinFS。Error: {fallbackMfOp.Error}");
+
+                goto PackageReady;
 #endif
             }
 
-            // 4. 更新 Manifest
-            string packageVersion = versionOp.Status == EOperationStatus.Succeed
-                ? versionOp.PackageVersion
-                : package.GetPackageVersion();
+            // 2. 更新 Manifest（有新版本）
+            string packageVersion = versionOp.PackageVersion;
 
             var unloadOp = package.UnloadAllAssetsAsync();
             yield return unloadOp;
 
             var manifestOp = package.UpdatePackageManifestAsync(packageVersion);
             yield return manifestOp;
-
             if (manifestOp.Status != EOperationStatus.Succeed)
             {
-                // Manifest 更新失败：继续用旧版本，不中断游戏
-                Debug.LogWarning($"[YooAsset] UpdateManifest failed: {manifestOp.Error}");
+                networkAvailable = false;
+                Debug.LogWarning($"[YooAsset] Phase2: UpdateManifest 失败，使用本地 Manifest。Error: {manifestOp.Error}");
             }
 
-            // 5. 下载缺失 bundle
-            yield return DownloadMissingBundles(package, packageName);
+            // 3. 下载缺失 bundle（弱联网：失败只 Warning）
+            if (networkAvailable)
+                yield return DownloadMissingBundles(package, packageName);
+            else
+                Debug.LogWarning($"[YooAsset] Phase2: 跳过下载，使用内置/缓存资源");
 
-            Debug.Log($"[YooAsset] '{packageName}' download complete");
+            PackageReady:
+            Debug.Log($"[YooAsset] '{packageName}' Phase2 complete (network={networkAvailable})");
             if (isDefault)
             {
                 IsDefaultPackageReady = true;
@@ -275,103 +342,136 @@ namespace CutRope.Framework
             onReady?.Invoke();
         }
 
-        // ── DLC 包（两阶段合并） ──────────────────────────────────────
+        // ════════════════════════════════════════════════════════════
+        // DLC 包初始化（Phase1 + Phase2 合并）
+        // ════════════════════════════════════════════════════════════
         private IEnumerator InitDlcCoroutine(
             string packageName,
             Action onReady,
             Action<string> onFailed)
         {
-            ResourcePackage package;
             if (YooAssets.ContainsPackage(packageName))
-                package = YooAssets.GetPackage(packageName);
-            else
-                package = YooAssets.CreatePackage(packageName);
+                YooAssets.RemovePackage(packageName);
 
 #if UNITY_EDITOR
+            var pkg = YooAssets.CreatePackage(packageName);
             var buildResult = EditorSimulateModeHelper.SimulateBuild(packageName);
             var editorParam = new EditorSimulateModeParameters
             {
                 EditorFileSystemParameters =
                     FileSystemParameters.CreateDefaultEditorFileSystemParameters(buildResult.PackageRootDirectory)
             };
-            var initOp = package.InitializeAsync(editorParam);
+            var initOp = pkg.InitializeAsync(editorParam);
+            yield return initOp;
+            if (initOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] DLC '{packageName}' Editor init failed: {initOp.Error}";
+                Debug.LogError(e); onFailed?.Invoke(e); yield break;
+            }
+            Debug.Log($"[YooAsset] DLC '{packageName}' ready (Editor)");
+            onReady?.Invoke();
+
 #elif UNITY_WEBGL
+            var pkg = YooAssets.CreatePackage(packageName);
             var webRemote = new RemoteServices(cdnBaseUrl, cdnFallbackUrl);
             var webParam  = new WebPlayModeParameters
             {
                 WebFileSystemParameters =
                     FileSystemParameters.CreateDefaultWebFileSystemParameters(webRemote)
             };
-            var initOp = package.InitializeAsync(webParam);
-#else
-            var hostRemote = new RemoteServices(cdnBaseUrl, cdnFallbackUrl);
-            var hostParam  = new HostPlayModeParameters
-            {
-                BuildinFileSystemParameters =
-                    FileSystemParameters.CreateDefaultBuildinFileSystemParameters(),
-                CacheFileSystemParameters   =
-                    FileSystemParameters.CreateDefaultCacheFileSystemParameters(hostRemote)
-            };
-            var initOp = package.InitializeAsync(hostParam);
-#endif
-
+            var initOp = pkg.InitializeAsync(webParam);
             yield return initOp;
-
             if (initOp.Status != EOperationStatus.Succeed)
             {
-                string err = $"[YooAsset] DLC '{packageName}' init failed: {initOp.Error}";
-                Debug.LogError(err);
-                onFailed?.Invoke(err);
-                yield break;
+                string e = $"[YooAsset] DLC '{packageName}' WebGL init failed: {initOp.Error}";
+                Debug.LogError(e); onFailed?.Invoke(e); yield break;
             }
+            yield return CheckAndDownloadCoroutine(pkg, packageName,
+                isDefault: false, onReady: onReady, onFailed: onFailed);
 
-            // 激活本地 Manifest（同主包逻辑）
-            var dlcLocalVersion = package.GetPackageVersion();
-            var dlcLocalManifestOp = package.UpdatePackageManifestAsync(dlcLocalVersion);
-            yield return dlcLocalManifestOp;
-
-            if (dlcLocalManifestOp.Status != EOperationStatus.Succeed)
-            {
-                string err = $"[YooAsset] DLC '{packageName}' activate manifest failed: {dlcLocalManifestOp.Error}";
-                Debug.LogError(err);
-                onFailed?.Invoke(err);
-                yield break;
-            }
-
-#if UNITY_EDITOR
-            Debug.Log($"[YooAsset] DLC '{packageName}' ready (Editor Simulate)");
-            onReady?.Invoke();
 #else
-            yield return CheckAndDownloadCoroutine(package, packageName,
+            // 原生平台：同主包，先 OfflineMode 读内置，再由 CheckAndDownload 切 HostMode
+            var offlinePkg = YooAssets.CreatePackage(packageName);
+            var offlineParam = new OfflinePlayModeParameters
+            {
+                BuildinFileSystemParameters =
+                    FileSystemParameters.CreateDefaultBuildinFileSystemParameters()
+            };
+            var offlineInitOp = offlinePkg.InitializeAsync(offlineParam);
+            yield return offlineInitOp;
+            if (offlineInitOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] DLC '{packageName}' Offline init failed: {offlineInitOp.Error}";
+                Debug.LogError(e); onFailed?.Invoke(e); yield break;
+            }
+
+            var verOp = offlinePkg.RequestPackageVersionAsync();
+            yield return verOp;
+            if (verOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] DLC '{packageName}' buildin version failed: {verOp.Error}";
+                Debug.LogError(e); onFailed?.Invoke(e); yield break;
+            }
+
+            var mfOp = offlinePkg.UpdatePackageManifestAsync(verOp.PackageVersion);
+            yield return mfOp;
+            if (mfOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] DLC '{packageName}' buildin manifest failed: {mfOp.Error}";
+                Debug.LogError(e); onFailed?.Invoke(e); yield break;
+            }
+
+            // 切 HostMode + Phase2 弱联网更新
+            yield return CheckAndDownloadCoroutine(offlinePkg, packageName,
                 isDefault: false, onReady: onReady, onFailed: onFailed);
 #endif
         }
 
-        // ── 下载缺失 bundle ───────────────────────────────────────────
+        // ════════════════════════════════════════════════════════════
+        // 下载缺失 bundle（弱联网：失败只 Warning，不中断游戏）
+        // ════════════════════════════════════════════════════════════
         private IEnumerator DownloadMissingBundles(ResourcePackage package, string packageName)
         {
             var downloader = package.CreateResourceDownloader(
-                downloadingMaxNumber: 10, failedTryAgain: 3);
+                downloadingMaxNumber: 10, failedTryAgain: 1);  // 弱联网只重试1次
 
             if (downloader.TotalDownloadCount == 0)
             {
-                Debug.Log($"[YooAsset] '{packageName}': no bundles to download");
+                Debug.Log($"[YooAsset] '{packageName}': 无需下载");
                 yield break;
             }
 
-            Debug.Log($"[YooAsset] '{packageName}': {downloader.TotalDownloadCount} bundles " +
+            Debug.Log($"[YooAsset] '{packageName}': 下载 {downloader.TotalDownloadCount} 个 bundle " +
                       $"({downloader.TotalDownloadBytes / 1024f / 1024f:F1} MB)");
 
-            downloader.DownloadUpdateCallback = (data) =>
-            {
-                OnDownloadProgress?.Invoke(data.Progress);
-            };
-
+            downloader.DownloadUpdateCallback = data => OnDownloadProgress?.Invoke(data.Progress);
             downloader.BeginDownload();
             yield return downloader;
 
             if (downloader.Status != EOperationStatus.Succeed)
-                Debug.LogError($"[YooAsset] Download failed for '{packageName}': {downloader.Error}");
+                Debug.LogWarning($"[YooAsset] 部分资源下载失败，将使用内置/缓存资源。Error: {downloader.Error}");
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // 工具：直接读 StreamingAssets 内置版本号（不依赖网络）
+        // ════════════════════════════════════════════════════════════
+        private string ReadBuildinVersion(string packageName)
+        {
+            // 路径：StreamingAssets/yoo/{packageName}/{packageName}.version
+            // 对应项目中 YooAssetSettings.DefaultYooFolderName = "yoo"
+            string path = Path.Combine(Application.streamingAssetsPath,
+                                       "yoo", packageName, $"{packageName}.version");
+            if (!File.Exists(path))
+            {
+                Debug.LogWarning($"[YooAsset] 内置版本文件不存在: {path}");
+                return null;
+            }
+            try   { return File.ReadAllText(path).Trim(); }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[YooAsset] 读取内置版本文件失败: {ex.Message}");
+                return null;
+            }
         }
     }
 }
