@@ -30,7 +30,7 @@ using System;
 using System.Collections;
 using System.IO;
 using UnityEngine;
-using UnityEngine.Networking;
+using Cysharp.Threading.Tasks;
 using YooAsset;
 
 namespace CutRope.Framework
@@ -472,6 +472,129 @@ namespace CutRope.Framework
                 Debug.LogWarning($"[YooAsset] 读取内置版本文件失败: {ex.Message}");
                 return null;
             }
+        }
+
+        public async UniTask<bool> LaunchInitUpdateStage(string packageName = "DefaultPackage")
+        {
+            if (YooAssets.ContainsPackage(packageName))
+                YooAssets.RemovePackage(packageName);
+
+#if UNITY_EDITOR
+            // ── Editor：EditorSimulate ───────────────────────────────
+            var pkg = YooAssets.CreatePackage(packageName);
+            YooAssets.SetDefaultPackage(pkg);
+
+            var buildResult = EditorSimulateModeHelper.SimulateBuild(packageName);
+            var editorParam = new EditorSimulateModeParameters
+            {
+                AutoUnloadBundleWhenUnused = true,
+                EditorFileSystemParameters =
+                    FileSystemParameters.CreateDefaultEditorFileSystemParameters(buildResult.PackageRootDirectory)
+            };
+            var initOp = pkg.InitializeAsync(editorParam);
+            await initOp;
+            if (initOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 Editor init failed: {initOp.Error}";
+                Debug.LogError(e); return false;
+            }
+
+            var verOp = pkg.RequestPackageVersionAsync();
+            await verOp;
+            if (verOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 Editor version failed: {verOp.Error}";
+                Debug.LogError(e); return false;
+            }
+
+            var mfOp = pkg.UpdatePackageManifestAsync(verOp.PackageVersion);
+            await mfOp;
+            if (mfOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 Editor manifest failed: {mfOp.Error}";
+                Debug.LogError(e); return false;
+            }
+
+            Debug.Log($"[YooAsset] '{packageName}' ready (Editor Simulate)");
+            return true;
+#elif UNITY_WEBGL
+            // ── WebGL：WebPlay ───────────────────────────────────────
+            var pkg = YooAssets.CreatePackage(packageName);
+            YooAssets.SetDefaultPackage(pkg);
+
+            var webRemote = new RemoteServices(cdnBaseUrl, cdnFallbackUrl);
+            var webParam = new WebPlayModeParameters
+            {
+                WebRemoteFileSystemParameters =
+                    FileSystemParameters.CreateDefaultWebRemoteFileSystemParameters(webRemote)
+            };
+            var initOp = pkg.InitializeAsync(webParam);
+            await initOp;
+            if (initOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 WebGL init failed: {initOp.Error}";
+                Debug.LogError(e); return false;
+            }
+
+            var verOp = pkg.RequestPackageVersionAsync();
+            await verOp;
+            if (verOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 WebGL version failed: {verOp.Error}";
+                Debug.LogError(e); return false;
+            }
+
+            var mfOp = pkg.UpdatePackageManifestAsync(verOp.PackageVersion);
+            await mfOp;
+            if (mfOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 WebGL manifest failed: {mfOp.Error}";
+                Debug.LogError(e); return false;
+            }
+
+            Debug.Log($"[YooAsset] '{packageName}' local ready (WebGL)");
+            return true;
+#else
+            var offlinePkg = YooAssets.CreatePackage(packageName);
+            YooAssets.SetDefaultPackage(offlinePkg);
+
+            var offlineParam = new OfflinePlayModeParameters
+            {
+                BuildinFileSystemParameters =
+                    FileSystemParameters.CreateDefaultBuildinFileSystemParameters()
+            };
+            var offlineInitOp = offlinePkg.InitializeAsync(offlineParam);
+            await offlineInitOp;
+            if (offlineInitOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 Offline init failed: {offlineInitOp.Error}";
+                Debug.LogError(e); return false;
+            }
+
+            // RequestPackageVersionAsync → BuildinFS → StreamingAssets（纯本地）
+            var buildinVerOp = offlinePkg.RequestPackageVersionAsync();
+            await buildinVerOp;
+            if (buildinVerOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 buildin version failed: {buildinVerOp.Error}";
+                Debug.LogError(e); return false;
+            }
+            string buildinVersion = buildinVerOp.PackageVersion;
+            Debug.Log($"[YooAsset] Phase1: '{packageName}' buildinVersion = {buildinVersion}");
+
+            // UpdatePackageManifestAsync → BuildinFS → StreamingAssets（纯本地）
+            var buildinMfOp = offlinePkg.UpdatePackageManifestAsync(buildinVersion);
+            await buildinMfOp;
+            if (buildinMfOp.Status != EOperationStatus.Succeed)
+            {
+                string e = $"[YooAsset] Phase1 buildin manifest failed: {buildinMfOp.Error}";
+                Debug.LogError(e); return false;
+            }
+
+            Debug.Log($"[YooAsset] '{packageName}' local ready (OfflineMode, version={buildinVersion})");
+            return true;
+#endif
+
         }
     }
 }

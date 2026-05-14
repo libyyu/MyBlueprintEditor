@@ -36,6 +36,33 @@ public static class YooAssetsLuaBridge
         YooAssets.Initialize();
     }
 
+    public static bool HasPackage(string packageName)
+    {
+        return YooAssets.ContainsPackage(packageName);
+    }
+
+    public static bool RemovePackage(string packageName)
+    {
+        if (YooAssets.ContainsPackage(packageName))
+            return YooAssets.RemovePackage(packageName);
+        return false;
+    }
+    public static bool CreatePackage(string packageName)
+    {
+        if (YooAssets.ContainsPackage(packageName))
+        {
+            Debug.LogError($"Package {packageName} already exists!");
+            return false;
+        }
+        YooAssets.CreatePackage(packageName);
+        return true;
+    }
+    public static void SetDefaultPackage(string packageName)
+    {
+        YooAssets.SetDefaultPackage(YooAssets.GetPackage(packageName));
+    }
+
+
     // ─────────────────────────────────────────────────────────────────────────
     // 2. 包裹初始化
     // ─────────────────────────────────────────────────────────────────────────
