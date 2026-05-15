@@ -215,12 +215,8 @@ GameObject:
   m_Component:
   - component: {fileID: 299405869}
   - component: {fileID: 299405868}
-  - component: {fileID: 299405867}
-  - component: {fileID: 299405866}
-  - component: {fileID: 299405865}
-  - component: {fileID: 299405864}
-  - component: {fileID: 299405863}
-  - component: {fileID: 299405862}
+  - component: {fileID: 299405872}
+  - component: {fileID: 299405871}
   m_Layer: 0
   m_Name: GameLauncher
   m_TagString: Untagged
@@ -228,86 +224,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &299405862
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 299405861}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7f34447509d4822458b89673e5c6f099, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &299405863
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 299405861}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2da67cd8c31b4ab48a4aecd03874c816, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  loadingUiAddress: Assets/DefaultPackage/UI/Prefab/LoadingUI.prefab
---- !u!114 &299405864
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 299405861}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8f782f25d02b9cb43bafd6e0cc7cbd10, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  uiRoot: {fileID: 0}
---- !u!114 &299405865
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 299405861}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5a31014a1ba07f2438f6d6e220b53d66, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &299405866
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 299405861}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b069cc0e1c6b551429793ee99d50c211, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  gcInterval: 1
-  mainLuaAddress: main
-  luaAddressPrefix: Lua/
---- !u!114 &299405867
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 299405861}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 90ed878d32748014c9833e22614f3986, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  cdnBaseUrl: https://cdn.example.com/res
-  cdnFallbackUrl: 
-  defaultPackageName: DefaultPackage
 --- !u!114 &299405868
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -335,6 +251,35 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &299405871
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 299405861}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5bc1dde827450c4083d786af916d35b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gcInterval: 1
+  luaAddressPrefix: Assets/Lua/
+--- !u!114 &299405872
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 299405861}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 18dab383bae708f49b508bcae6b55432, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cdnBaseUrl: https://cdn.example.com/res
+  cdnFallbackUrl: 
+  defaultPackageName: DefaultPackage
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

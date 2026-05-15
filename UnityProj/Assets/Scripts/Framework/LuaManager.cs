@@ -1,20 +1,22 @@
-// LuaManager.cs
-// xLua 生命周期管理器
+// LuaManagerNew.cs
+// xLua 双 VM 调度器（精简版）：
 //
-// WebGL 兼容方案：
-//   - 启动时异步批量预加载所有 Lua 文件到内存字典
-//   - xLua Loader 从字典同步读取（无 IO，WebGL 安全）
+//   RunUpdateLuaVM(entry)：起一个临时 LuaEnv 跑更新逻辑（如 UpdateLogic.lua）
+//                          脚本设置 _G.UpdateLogicDone = true 或超时（60s）后销毁 VM
 //
-// Lua 文件地址约定（YooAsset）：
-//   Assets/Lua/main.lua          → 字典 key: "main"
-//   Assets/Lua/game/util.lua     → 字典 key: "game/util"
-//   xLua require "game/util"     → 查字典 key "game/util"
+//   RunGameLuaVM(entry)：起正式游戏 LuaEnv，跑 main.lua / GameLogic.lua
+//                        VM 在 OnDestroy 时销毁，Update() 调 _G.onAppTick(dt)
+//
+// 两个 VM 完全独立：内存隔离、global 隔离、loader 各自管理。
+//
+// Lua 文件加载：从 YooAsset DefaultPackage 同步加载 TextAsset，路径形如
+//   require "main"        → Assets/Lua/main.lua
+//   require "game/util"   → Assets/Lua/game/util.lua
 
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using Cysharp.Threading.Tasks;
 using XLua;
 using YooAsset;
 
@@ -23,26 +25,22 @@ namespace CutRope.Framework
     public class LuaManager : MonoBehaviour
     {
         [Header("Lua 配置")]
-        [Tooltip("GC 间隔（秒），建议 1~3")]
+        [Tooltip("GC 间隔（秒）")]
         public float gcInterval = 1f;
 
-        [Tooltip("Lua 入口文件的 YooAsset 地址（不含 Lua/ 前缀），如 main")]
-        public string mainLuaAddress = "main";
-
-        [Tooltip("Lua 文件在 YooAsset 中的公共前缀，用于批量加载")]
-        public string luaAddressPrefix = "Lua/";
+        [Tooltip("Lua 文件在 YooAsset 中的公共前缀，用于 require 路径解析")]
+        public string luaAddressPrefix = "Assets/Lua/";
 
         // ── 公共访问 ─────────────────────────────────────────────────
         public static LuaManager Instance { get; private set; }
-        public LuaEnv LuaEnv { get; private set; }
+
+        /// <summary>当前活跃的 LuaEnv（更新阶段或游戏阶段）。同一时刻只有一个。</summary>
+        public LuaEnv ActiveLuaEnv { get; private set; }
 
         // ── 私有 ─────────────────────────────────────────────────────
-        private float  _gcTimer;
+        private float       _gcTimer;
         private LuaFunction _luaUpdate;
         private LuaFunction _luaOnDestroy;
-
-        // 预加载缓存：key = lua模块路径（如 "main", "game/util"）
-        private readonly Dictionary<string, string> _luaCache = new Dictionary<string, string>();
 
         // ── 生命周期 ─────────────────────────────────────────────────
         private void Awake()
@@ -55,159 +53,232 @@ namespace CutRope.Framework
             Instance = this;
             DontDestroyOnLoad(gameObject);
 
-            // 1. 初始化 Blueprint Runtime（内部立即创建 Lua VM）
-            var bpRuntime = BlueprintRuntime.Instance
-                         ?? gameObject.AddComponent<BlueprintRuntime>();
-            bpRuntime.Init();
-
-            // 2. 用 Runtime 的 lua_State 创建 LuaEnv（共享同一 VM）
-            //    Blueprint 全局对象已在 VM 里，BlueprintEntry.lua 的注册能正常工作
-            if (bpRuntime.LuaState != System.IntPtr.Zero)
-            {
-                LuaEnv = new LuaEnv(bpRuntime.LuaState);
-                Debug.Log("[LuaManager] Using Blueprint Runtime lua_State");
-            }
-            else
-            {
-                Debug.LogWarning("[LuaManager] Blueprint Runtime unavailable, using standalone LuaEnv");
-                LuaEnv = new LuaEnv();
-            }
-
-            // Loader：从内存缓存同步返回（WebGL 安全）
-            LuaEnv.AddLoader(CachedLuaLoader);
-
-            StaticLuaCallbacks.lua_Print   = s => Debug.Log("[Lua]" + s);
+            StaticLuaCallbacks.lua_Print = s => Debug.Log("[Lua]" + s);
             StaticLuaCallbacks.lua_Warning = s => Debug.LogWarning("[Lua]" + s);
-            StaticLuaCallbacks.lua_Error   = s => Debug.LogError("[Lua]" + s);
+            StaticLuaCallbacks.lua_Error = s => Debug.LogError("[Lua]" + s);
         }
 
-        /// <summary>
-        /// 异步启动 Lua：
-        ///   1. 批量预加载所有 Lua 文件到缓存
-        ///   2. 执行 main.lua
-        /// 由 GameLauncher 在 YooAsset 就绪后调用。
-        /// </summary>
-        public IEnumerator StartLuaAsync()
-        {
-            // 1. 批量预加载所有 Lua 资源
-            yield return PreloadAllLuaFiles();
-
-            // 2. 执行入口
-            if (!_luaCache.ContainsKey(mainLuaAddress))
-            {
-                Debug.LogError($"[LuaManager] Entry lua not found in cache: '{mainLuaAddress}'");
-                yield break;
-            }
-
-            LuaEnv.DoString($"require '{mainLuaAddress}'");
-
-            // 3. 取出 Lua 钩子
-            _luaUpdate    = LuaEnv.Global.Get<LuaFunction>("onAppTick");
-            _luaOnDestroy = LuaEnv.Global.Get<LuaFunction>("onAppDestroy");
-
-            Debug.Log($"[LuaManager] Lua started. {_luaCache.Count} files cached.");
-        }
-
-        // ── 批量预加载 ────────────────────────────────────────────────
-        private IEnumerator PreloadAllLuaFiles()
-        {
-            // 获取 DefaultPackage 中所有以 luaAddressPrefix 开头的资源
-            var package = YooAssets.GetPackage("DefaultPackage");
-            if (package == null)
-            {
-                Debug.LogError("[LuaManager] DefaultPackage not found!");
-                yield break;
-            }
-
-            // 通过 AssetInfo 枚举所有 Lua 资产
-            var assetInfos = package.GetAssetInfos(luaAddressPrefix);
-            if (assetInfos == null || assetInfos.Length == 0)
-            {
-                Debug.LogWarning($"[LuaManager] No lua files found with tag/prefix: {luaAddressPrefix}");
-                yield break;
-            }
-
-            Debug.Log($"[LuaManager] Preloading {assetInfos.Length} lua files...");
-
-            // 并发加载所有 Lua 文件
-            var handles = new List<AssetHandle>();
-            var prefix = ("assets/" + luaAddressPrefix).ToLower();
-            foreach (var info in assetInfos)
-            {
-                var assetPath = info.AssetPath.ToLower();
-                if (!assetPath.EndsWith(".lua"))
-                {
-                    //Debug.LogWarning($"`{assetPath}` is not a valid lua script");
-                    continue;
-                }
-                assetPath = assetPath.Replace(".lua", "").Replace("\\", "/").Replace(prefix, "");
-                _luaCache.Add(assetPath, info.AssetPath);
-                handles.Add(package.LoadAssetAsync<TextAsset>(info.AssetPath));
-            }
-
-            // 等待全部完成
-            foreach (var handle in handles)
-                yield return handle;
-
-            Debug.Log($"[LuaManager] Lua preload done. {_luaCache.Count} files ready.");
-        }
-
-        // ── 内存缓存 Loader（同步，WebGL 安全）──────────────────────
-        private byte[] CachedLuaLoader(ref string luaPath)
-        {
-            var package = YooAssets.GetPackage("DefaultPackage");
-            if (package == null) return null;
-           
-            var matchluaPath = luaPath.Replace(".lua", "").Replace(".", "/").ToLower();
-            string packageAssetPath;
-            // xLua 传入 "main" 或 "game/util" 或 "game.util"
-            if (_luaCache.TryGetValue(matchluaPath, out packageAssetPath) && !string.IsNullOrEmpty(packageAssetPath))
-            {
-                luaPath = packageAssetPath;
-                Debug.Log($"CustomLoader: {packageAssetPath}");
-                var handle = package.LoadAssetSync<TextAsset>(packageAssetPath);
-                if (null != handle)
-                {
-                    var textAsset = handle.AssetObject as TextAsset;
-                    var result = textAsset.bytes;
-                    handle.Release();
-                    return result;
-                }
-                else
-                {
-                    Debug.LogWarning($"lua script load failed. {packageAssetPath}");
-                    return null;
-                }
-            }
-
-            Debug.LogWarning($"[LuaManager] Lua not in cache: '{luaPath}'. Did you preload?");
-            return null;
-        }
-
-        // ── Update / Destroy ─────────────────────────────────────────
         private void Update()
         {
+            if (ActiveLuaEnv == null) return;
+
             _luaUpdate?.Call(Time.deltaTime);
 
             _gcTimer += Time.deltaTime;
             if (_gcTimer >= gcInterval)
             {
                 _gcTimer = 0f;
-                LuaEnv.Tick();
+                ActiveLuaEnv.Tick();
             }
         }
 
         private void OnDestroy()
         {
-            _luaOnDestroy?.Call();
-            _luaOnDestroy?.Dispose();
-            _luaOnDestroy = null;
-            _luaUpdate?.Dispose();
-            _luaUpdate = null;
-            _luaCache.Clear();
-            LuaEnv?.Dispose();
-            LuaEnv = null;
+            DisposeActiveVM();
             if (Instance == this) Instance = null;
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // 公共 API
+        // ════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// 起一个 LuaVM 跑更新逻辑（如 UpdateLogic.lua）。
+        /// 脚本执行完成 / 设置 _G.UpdateLogicDone = true / 异常时返回。
+        /// VM 退出后立即销毁，释放内存。
+        /// </summary>
+        public async UniTask<bool> RunUpdateLuaVM(string entryLua = "UpdateLogic")
+        {
+            Debug.Log($"[LuaManagerNew] === Update VM start: {entryLua} ===");
+
+            DisposeActiveVM();
+            var env = CreateLuaEnv("update");
+            ActiveLuaEnv = env;
+
+            try
+            {
+                env.DoString($"require '{entryLua}'");
+                // 取出生命周期钩子供 Update / OnDestroy 调用
+                _luaUpdate = env.Global.Get<LuaFunction>("onAppTick");
+                _luaOnDestroy = env.Global.Get<LuaFunction>("onAppDestroy");
+                if(!env.Global.ContainsKey("UpdateLogicDone"))
+                {
+                    env.Global.Set("UpdateLogicDone", false);
+                }
+                if (!env.Global.ContainsKey("UpdateLogicResult"))
+                {
+                    env.Global.Set("UpdateLogicResult", false);
+                }
+                var begin = Time.realtimeSinceStartup;
+                var done = env.Global.Get<bool>("UpdateLogicDone");
+                if (!done) await UniTask.Yield();
+                var UpdateLogicResult = env.Global.Get<bool>("UpdateLogicResult");
+                var cost = Time.realtimeSinceStartup - begin;
+                Debug.Log($"[LuaManagerNew] Update VM done, result={UpdateLogicResult} (t={cost:F1}s)");
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[LuaManagerNew] Update VM exception: {e}");
+                return false;
+            }
+            finally
+            {
+                DisposeActiveVM();
+            }
+        }
+
+        /// <summary>
+        /// 起正式游戏 LuaVM 跑入口脚本（如 main.lua）。
+        /// VM 持续存活直到 GameObject 销毁，Update() 会调用 _G.onAppTick。
+        /// </summary>
+        public async UniTask<bool> RunGameLuaVM(string entryLua = "main")
+        {
+            Debug.Log($"[LuaManagerNew] === Game VM start: {entryLua} ===");
+
+            DisposeActiveVM();
+            var env = CreateLuaEnv("game");
+            ActiveLuaEnv = env;
+
+            try
+            {
+                env.DoString($"require '{entryLua}'");
+
+                // 取出生命周期钩子供 Update / OnDestroy 调用
+                _luaUpdate    = env.Global.Get<LuaFunction>("onAppTick");
+                _luaOnDestroy = env.Global.Get<LuaFunction>("onAppDestroy");
+
+                Debug.Log("[LuaManagerNew] Game VM running");
+                await UniTask.Yield();   // 让控制权交还给调用者
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[LuaManagerNew] Game VM exception: {e}");
+                DisposeActiveVM();
+                return false;
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // 内部：创建/销毁 VM
+        // ════════════════════════════════════════════════════════════
+
+        private LuaEnv CreateLuaEnv(string tag)
+        {
+            // 每个 VM 都尝试与 BlueprintRuntime 共享 lua_State（如果存在），
+            // 否则起一个独立 VM。两个阶段的 VM 是完全独立的实例。
+            LuaEnv env;
+            var bpRuntime = BlueprintRuntime.Instance;
+            if (bpRuntime != null && bpRuntime.LuaState != IntPtr.Zero)
+            {
+                env = new LuaEnv(bpRuntime.LuaState);
+                Debug.Log($"[LuaManagerNew:{tag}] LuaEnv created (shared with BlueprintRuntime)");
+            }
+            else
+            {
+                env = new LuaEnv();
+                Debug.Log($"[LuaManagerNew:{tag}] LuaEnv created (standalone)");
+            }
+
+            env.AddLoader(YooAssetLuaLoader);
+
+            return env;
+        }
+
+        private void DisposeActiveVM()
+        {
+            if (ActiveLuaEnv == null) return;
+
+            try { _luaOnDestroy?.Call(); } catch (Exception e) { Debug.LogWarning($"[LuaManagerNew] onAppDestroy: {e.Message}"); }
+
+            _luaOnDestroy?.Dispose(); _luaOnDestroy = null;
+            _luaUpdate?.Dispose();    _luaUpdate    = null;
+
+            try { ActiveLuaEnv.Dispose(); }
+            catch (Exception e) { Debug.LogWarning($"[LuaManagerNew] Dispose: {e.Message}"); }
+
+            ActiveLuaEnv = null;
+            _gcTimer = 0f;
+            Debug.Log("[LuaManagerNew] LuaEnv disposed");
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // YooAsset Loader（同步，WebGL 安全）
+        // ════════════════════════════════════════════════════════════
+
+        // require "main"      → Assets/Lua/main.lua
+        // require "game.util" → Assets/Lua/game/util.lua
+        private byte[] YooAssetLuaLoader(ref string luaPath)
+        {
+#if UNITY_EDITOR || !UNITY_WEBGL
+            // Editor 和非 WebGL 平台直接从 StreamingAssets 同步加载（不走 YooAsset 包管理，方便开发）
+            string relativePath = luaAddressPrefix + luaPath.Replace('.', '/') + ".lua";
+
+            var package = YooAssets.GetPackage("DefaultPackage");
+            if (null == package) return null;
+
+            var handle = package.LoadAssetSync<TextAsset>(relativePath);
+            if (null == handle) return null;
+
+            var textAsset = handle.AssetObject as TextAsset;
+            if (null == textAsset) return null;
+            handle.Release();
+            return textAsset.bytes;
+#else
+            if (!YooAssetsLuaBridge.HasLuaFile(luaPath))
+            {
+                return null;
+            }
+
+            var handle = YooAssetsLuaBridge.GetLuaAssetHandle(luaPath);
+            if (handle == null)
+            {
+                Debug.LogWarning($"[LuaManagerNew] Lua bundle not init; {luaPath}");
+                return null;
+            }
+
+            string assetPath  = YooAssetsLuaBridge.GetLuaAssetPath(luaPath);
+            if(string.IsNullOrEmpty(assetPath))
+            {
+                Debug.LogWarning($"[LuaManagerNew] Lua not found: '{luaPath}'");
+                return null;
+            }
+
+            var textAsset = handle.AssetObject as TextAsset;
+            var bytes = textAsset?.bytes;
+            if (bytes == null)
+            {
+                Debug.LogWarning($"[LuaManagerNew] Lua not found: '{assetPath}' (require '{luaPath}')");
+                return null;
+            }
+
+            YooAssetsLuaBridge.ReleaseLuaAssetHandle(luaPath);
+
+            // 把实际加载到的路径回写给 xLua（用于错误堆栈）
+            luaPath = assetPath;
+            return bytes;
+#endif
+        }
+
+        public async UniTask<bool> PreloadAllScript(string packageName)
+        {
+            var result = new ReturnTuple<bool, bool>();
+            YooAssetsLuaBridge.LoadAllLuaFiles(packageName, luaAddressPrefix, null, (bool bSuccessed, string[] f, bool[] s, string e) =>
+            {
+                result.value_0 = true;
+                result.value_1 = bSuccessed;
+            });
+
+            while (!result.value_0) await UniTask.Yield();
+            if (!result.value_1)
+            {
+                Debug.LogError("[GameLauncher] Failed to load Lua files, abort.");
+                return false;
+            }
+
+            Debug.Log("[GameLauncher] All Lua files loaded ✓");
+            return true;
         }
     }
 }

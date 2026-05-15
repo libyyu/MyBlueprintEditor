@@ -56,7 +56,7 @@ MonoBehaviour:
         UserData: 
     - GroupName: Lua Group
       GroupDesc: 
-      AssetTags: Lua/
+      AssetTags: Assets/Lua/
       ActiveRuleName: EnableGroup
       Collectors:
       - CollectPath: Assets/Lua
