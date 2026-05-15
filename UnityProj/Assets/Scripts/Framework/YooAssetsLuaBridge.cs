@@ -27,6 +27,91 @@ using CutRope.Framework;
 public static class YooAssetsLuaBridge
 {
     // ─────────────────────────────────────────────────────────────────────────
+    // 0. Lua 文件索引（require 路径 → YooAsset AssetPath）
+    //    由 LoadAllLuaFiles 填充，供 Lua loader 同步查询
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static readonly System.Collections.Generic.Dictionary<string, string> _luaIndex
+        = new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>同步查询 lua 文件是否存在（require 名，如 "main"、"game/util"）</summary>
+    public static bool HasLuaFile(string requireName)
+    {
+        if (string.IsNullOrEmpty(requireName)) return false;
+        return _luaIndex.ContainsKey(NormalizeRequireName(requireName));
+    }
+
+    /// <summary>查询 lua 文件对应的 YooAsset AssetPath，不存在返回 null</summary>
+    public static string GetLuaAssetPath(string requireName)
+    {
+        if (string.IsNullOrEmpty(requireName)) return null;
+        _luaIndex.TryGetValue(NormalizeRequireName(requireName), out var path);
+        return path;
+    }
+
+    /// <summary>已索引的 lua 文件总数</summary>
+    public static int LuaFileCount => _luaIndex.Count;
+
+    /// <summary>返回所有已索引的 require 名（数组），供 Lua 遍历用</summary>
+    public static string[] GetAllLuaNames()
+    {
+        var arr = new string[_luaIndex.Count];
+        int i = 0;
+        foreach (var k in _luaIndex.Keys) arr[i++] = k;
+        return arr;
+    }
+
+    /// <summary>清空索引（重新初始化资源系统时用）</summary>
+    public static void ClearLuaIndex()
+    {
+        _luaIndex.Clear();
+    }
+
+    // require 名规范化：统一小写、把 . 和 \ 都转成 /
+    private static string NormalizeRequireName(string name)
+    {
+        return name.Replace('.', '/').Replace('\\', '/').ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// 同步加载单个 lua 文件的源码（require loader 调用）。
+    ///
+    /// 走索引：先 GetLuaAssetPath 拿到 AssetPath，再用 LoadAssetSync。
+    /// 注意：底层 YooAsset bundle 必须已经在缓存中（启动时通过 LoadAllLuaFiles
+    /// 触发过加载，bundle 会驻留），否则同步加载可能阻塞或失败。
+    ///
+    /// 找不到或加载失败返回 null。
+    /// </summary>
+    public static string LoadLuaSourceSync(string requireName, string packageName = null)
+    {
+        if (string.IsNullOrEmpty(requireName)) return null;
+
+        var assetPath = GetLuaAssetPath(requireName);
+        if (string.IsNullOrEmpty(assetPath))
+        {
+            Debug.LogWarning($"[YooAssetsLuaBridge] Lua not in index: '{requireName}'");
+            return null;
+        }
+
+        ResourcePackage package = string.IsNullOrEmpty(packageName)
+            ? YooAssets.GetPackage("DefaultPackage")
+            : YooAssets.GetPackage(packageName);
+        if (package == null) return null;
+
+        var handle = package.LoadAssetSync<TextAsset>(assetPath);
+        if (handle == null || handle.AssetObject == null)
+        {
+            Debug.LogWarning($"[YooAssetsLuaBridge] LoadAssetSync failed: '{assetPath}'");
+            handle?.Release();
+            return null;
+        }
+
+        var text = (handle.AssetObject as TextAsset)?.text;
+        handle.Release();
+        return text;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // 1. 全局初始化
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -391,6 +476,176 @@ public static class YooAssetsLuaBridge
         }
         handle.Release();
     }
+
+    /// <summary>
+    /// 批量异步加载指定前缀下所有 .lua 文件。
+    ///
+    /// onProgress(int loadedCount, int totalCount) — 每加载完一个回调一次（可空）
+    /// onComplete(bool ok, string[] requirePaths, string[] sources, string error)
+    ///   · requirePaths：去掉前缀和 .lua 后缀的路径，斜杠形式（直接可作 require 名）
+    ///                   如 "main"、"game/util"
+    ///   · sources：对应的 lua 源码字符串（UTF-8 解码后），与 requirePaths 一一对应
+    ///   · 失败时 ok=false，其余参数可能为 null
+    ///
+    /// Lua 用法：
+    ///   Bridge.LoadAllLuaFiles("DefaultPackage", "Assets/Lua/", nil,
+    ///       function(ok, paths, sources, err)
+    ///           if not ok then print(err) return end
+    ///           for i = 0, paths.Length - 1 do
+    ///               package.preload[paths[i]] = function() return assert(load(sources[i], paths[i]))() end
+    ///           end
+    ///       end)
+    /// </summary>
+    /// <summary>
+    /// 仅扫描并建立 lua 文件索引（不加载文件内容），同步完成。
+    ///
+    /// 调用后即可用 HasLuaFile / GetLuaAssetPath / GetAllLuaNames 同步查询。
+    /// 适合在 require 之前快速建立索引，由自定义 loader 按需加载。
+    ///
+    /// 返回索引到的 lua 文件数量；包不存在或前缀下无 .lua 时返回 0。
+    /// </summary>
+    public static int BuildLuaIndex(string packageName, string assetPrefix)
+    {
+        var package = YooAssets.GetPackage(packageName);
+        if (package == null)
+        {
+            Debug.LogWarning($"[YooAssetsLuaBridge] BuildLuaIndex: package '{packageName}' not found");
+            return 0;
+        }
+
+        var assetInfos = package.GetAssetInfos(assetPrefix);
+        if (assetInfos == null || assetInfos.Length == 0)
+            return 0;
+
+        // 标准化前缀
+        string normPrefix = assetPrefix.Replace('\\', '/').ToLowerInvariant();
+        if (!normPrefix.EndsWith("/")) normPrefix += "/";
+
+        int added = 0;
+        foreach (var info in assetInfos)
+        {
+            string path = info.AssetPath.Replace('\\', '/');
+            string lower = path.ToLowerInvariant();
+            if (!lower.EndsWith(".lua")) continue;
+
+            string trimmed = lower;
+            int prefixIdx = trimmed.IndexOf(normPrefix, StringComparison.Ordinal);
+            if (prefixIdx >= 0)
+                trimmed = trimmed.Substring(prefixIdx + normPrefix.Length);
+            trimmed = trimmed.Substring(0, trimmed.Length - 4);   // 去 .lua
+
+            // require 名 → 原始 AssetPath（保留大小写，YooAsset 加载需要）
+            _luaIndex[trimmed] = info.AssetPath;
+            added++;
+        }
+
+        Debug.Log($"[YooAssetsLuaBridge] BuildLuaIndex: indexed {added} lua files (prefix='{assetPrefix}')");
+        return added;
+    }
+
+    public static void LoadAllLuaFiles(
+        string packageName,
+        string assetPrefix,
+        Action<int, int> onProgress,
+        Action<bool, string[], string[], string> onComplete)
+    {
+        CoroutineRunner.Instance.StartCoroutine(
+            Co_LoadAllLuaFiles(packageName, assetPrefix, onProgress, onComplete));
+    }
+
+    private static IEnumerator Co_LoadAllLuaFiles(
+        string packageName,
+        string assetPrefix,
+        Action<int, int> onProgress,
+        Action<bool, string[], string[], string> onComplete)
+    {
+        var package = YooAssets.GetPackage(packageName);
+        if (package == null)
+        {
+            onComplete?.Invoke(false, null, null, $"package '{packageName}' not found");
+            yield break;
+        }
+
+        // 1. 枚举所有 .lua 资源
+        var assetInfos = package.GetAssetInfos(assetPrefix);
+        if (assetInfos == null || assetInfos.Length == 0)
+        {
+            Debug.LogWarning($"[YooAssetsLuaBridge] No assets under prefix '{assetPrefix}'");
+            onComplete?.Invoke(true, new string[0], new string[0], null);
+            yield break;
+        }
+
+        // 2. 过滤出 .lua 文件，预生成 require 路径，同步填充全局索引
+        var luaInfos = new System.Collections.Generic.List<AssetInfo>();
+        var requirePaths = new System.Collections.Generic.List<string>();
+
+        string normPrefix = assetPrefix.Replace('\\', '/').ToLowerInvariant();
+        if (!normPrefix.EndsWith("/")) normPrefix += "/";
+
+        foreach (var info in assetInfos)
+        {
+            string path = info.AssetPath.Replace('\\', '/');
+            string lower = path.ToLowerInvariant();
+
+            if (!lower.EndsWith(".lua")) continue;
+
+            string trimmed = lower;
+            int prefixIdx = trimmed.IndexOf(normPrefix, StringComparison.Ordinal);
+            if (prefixIdx >= 0)
+                trimmed = trimmed.Substring(prefixIdx + normPrefix.Length);
+            trimmed = trimmed.Substring(0, trimmed.Length - 4);   // 去 .lua
+
+            luaInfos.Add(info);
+            requirePaths.Add(trimmed);
+
+            // 立即填充索引：Lua 侧此时已可同步查询是否存在
+            _luaIndex[trimmed] = info.AssetPath;
+        }
+
+        int total = luaInfos.Count;
+        if (total == 0)
+        {
+            Debug.LogWarning($"[YooAssetsLuaBridge] No .lua files under '{assetPrefix}'");
+            onComplete?.Invoke(true, new string[0], new string[0], null);
+            yield break;
+        }
+
+        // 3. 并发发起所有加载请求
+        var handles = new AssetHandle[total];
+        for (int i = 0; i < total; i++)
+            handles[i] = package.LoadAssetAsync<TextAsset>(luaInfos[i].AssetPath);
+
+        // 4. 顺序等待 + 进度回调
+        var sources = new string[total];
+        int loaded = 0;
+        string firstError = null;
+
+        for (int i = 0; i < total; i++)
+        {
+            yield return handles[i];
+
+            if (handles[i].Status == EOperationStatus.Succeed && handles[i].AssetObject is TextAsset ta)
+            {
+                sources[i] = ta.text;
+            }
+            else
+            {
+                sources[i] = null;
+                if (firstError == null)
+                    firstError = $"load '{luaInfos[i].AssetPath}' failed: {handles[i].LastError}";
+                Debug.LogWarning($"[YooAssetsLuaBridge] {firstError}");
+            }
+
+            handles[i].Release();
+            loaded++;
+            try { onProgress?.Invoke(loaded, total); }
+            catch (Exception e) { Debug.LogWarning($"[YooAssetsLuaBridge] onProgress: {e.Message}"); }
+        }
+
+        Debug.Log($"[YooAssetsLuaBridge] LoadAllLuaFiles: {loaded}/{total} files (prefix='{assetPrefix}')");
+        onComplete?.Invoke(firstError == null, requirePaths.ToArray(), sources, firstError);
+    }
+
 
     // ─────────────────────────────────────────────────────────────────────────
     // 6. 内存管理
