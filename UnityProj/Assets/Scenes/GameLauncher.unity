@@ -217,6 +217,7 @@ GameObject:
   - component: {fileID: 299405868}
   - component: {fileID: 299405872}
   - component: {fileID: 299405871}
+  - component: {fileID: 299405873}
   m_Layer: 0
   m_Name: GameLauncher
   m_TagString: Untagged
@@ -280,6 +281,21 @@ MonoBehaviour:
   cdnBaseUrl: https://cdn.example.com/res
   cdnFallbackUrl: 
   defaultPackageName: DefaultPackage
+--- !u!114 &299405873
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 299405861}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9df4d5164ab94e94fbab2ff6e48f538b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  packageName: DefaultPackage
+  updateLuaEntry: UpdateLogic
+  gameLuaEntry: GameLogic
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
