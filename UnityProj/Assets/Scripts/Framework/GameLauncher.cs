@@ -14,6 +14,8 @@ namespace CutRope.Framework
     [DefaultExecutionOrder(-100)]
     [RequireComponent(typeof(YooAssetInitializer))]
     [RequireComponent(typeof(LuaManager))]
+    [RequireComponent(typeof(SceneLoader))]
+    [RequireComponent(typeof(FTimerListBehavior))]
     public class GameLauncher : MonoBehaviour
     {
         [Header("配置")]
