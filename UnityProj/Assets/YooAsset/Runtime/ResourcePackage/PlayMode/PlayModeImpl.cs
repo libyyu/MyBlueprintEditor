@@ -222,6 +222,19 @@ namespace YooAsset
         }
 
         /// <summary>
+        /// 获取内置文件系统（Buildin）
+        /// 说明：多 FS 模式下（HostPlayMode），BuildinFS 是第一个；
+        ///       单 FS 模式下与主 FS 相同。
+        /// 用途：弱联网 fallback — 主 FS（CacheFS）拉版本失败时回退读内置版本。
+        /// </summary>
+        public IFileSystem GetBuildinFileSystem()
+        {
+            if (FileSystems.Count == 0)
+                return null;
+            return FileSystems[0];
+        }
+
+        /// <summary>
         /// 获取资源包所属文件系统
         /// </summary>
         public IFileSystem GetBelongFileSystem(PackageBundle packageBundle)
