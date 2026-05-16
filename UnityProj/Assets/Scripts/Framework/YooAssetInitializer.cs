@@ -10,6 +10,7 @@
 
 using System;
 using UnityEngine;
+using UnityEngine.Networking;
 using Cysharp.Threading.Tasks;
 using YooAsset;
 
@@ -104,31 +105,36 @@ namespace CutRope.Framework
             return true;
 
 #else
-            // ── 真机：OfflinePlayMode（只读 BuildinFS，零网络）────────
-            var offlinePkg = YooAssets.CreatePackage(packageName);
-            YooAssets.SetDefaultPackage(offlinePkg);
+            // ── 真机：HostPlayMode（BuildinFS + CacheFS，支持弱联网热更）────
+            // Phase1 只做「零网络」内置包激活，UpdateLogic.lua 再做联网检查 + 下载
+            var hostPkg = YooAssets.CreatePackage(packageName);
+            YooAssets.SetDefaultPackage(hostPkg);
 
-            var offlineParam = new OfflinePlayModeParameters
+            var remote    = new RemoteServices(cdnBaseUrl,
+                                string.IsNullOrEmpty(cdnFallbackUrl) ? cdnBaseUrl : cdnFallbackUrl);
+            var hostParam = new HostPlayModeParameters
             {
                 BuildinFileSystemParameters =
-                    FileSystemParameters.CreateDefaultBuildinFileSystemParameters()
+                    FileSystemParameters.CreateDefaultBuildinFileSystemParameters(),
+                CacheFileSystemParameters =
+                    FileSystemParameters.CreateDefaultCacheFileSystemParameters(remote)
             };
-            if (!await Op(offlinePkg.InitializeAsync(offlineParam), "Phase1 Offline init")) return false;
+            if (!await Op(hostPkg.InitializeAsync(hostParam), "Phase1 Host init")) return false;
 
-            var buildinVerOp = offlinePkg.RequestPackageVersionAsync();
-            await buildinVerOp;
-            if (buildinVerOp.Status != EOperationStatus.Succeed)
+            // 用内置版本先激活，让游戏能跑起来；UpdateLogic.lua 会尝试换到更新版本
+            // 直接读 StreamingAssets 内置版本文件（零网络，不走 MainFileSystem API）
+            string buildinVersion = await ReadBuildinPackageVersion(packageName);
+            if (string.IsNullOrEmpty(buildinVersion))
             {
-                Debug.LogError($"[YooAssetNew] Phase1 buildin version failed: {buildinVerOp.Error}");
+                Debug.LogError($"[YooAssetNew] Phase1: cannot read buildin version for '{packageName}'");
                 return false;
             }
-            string buildinVersion = buildinVerOp.PackageVersion;
             Debug.Log($"[YooAssetNew] Phase1: '{packageName}' buildinVersion = {buildinVersion}");
 
-            if (!await Op(offlinePkg.UpdatePackageManifestAsync(buildinVersion),
+            if (!await Op(hostPkg.UpdatePackageManifestAsync(buildinVersion),
                           "Phase1 buildin manifest")) return false;
 
-            Debug.Log($"[YooAssetNew] '{packageName}' local ready (OfflineMode, version={buildinVersion})");
+            Debug.Log($"[YooAssetNew] '{packageName}' local ready (HostMode, buildin={buildinVersion})");
             IsLocalReady = true;
             return true;
 #endif
@@ -148,6 +154,44 @@ namespace CutRope.Framework
                 return false;
             }
             return true;
+        }
+
+        /// <summary>
+        /// 直接读 StreamingAssets 内置版本文件，零网络，无需 YooAsset API。
+        /// 路径：{StreamingAssets}/yoo/{packageName}/{packageName}.version
+        /// </summary>
+        private static async UniTask<string> ReadBuildinPackageVersion(string packageName)
+        {
+            // YooAsset 默认 folder = "yoo"，版本文件名 = "{packageName}.version"
+            string yooFolder    = YooAsset.YooAssetSettingsData.GetDefaultYooFolderName();
+            string versionFile  = $"{packageName}.version";
+            string streamingDir = string.IsNullOrEmpty(yooFolder)
+                ? Application.streamingAssetsPath
+                : System.IO.Path.Combine(Application.streamingAssetsPath, yooFolder);
+            string fullPath = System.IO.Path.Combine(streamingDir, packageName, versionFile);
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            // Android 的 StreamingAssets 在 APK 内，需要 UnityWebRequest 读取
+            using var req = UnityEngine.Networking.UnityWebRequest.Get(fullPath);
+            var op = req.SendWebRequest();
+            while (!op.isDone) await UniTask.Yield();
+            if (req.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
+            {
+                Debug.LogError($"[YooAssetNew] ReadBuildinVersion failed: {req.error} path={fullPath}");
+                return null;
+            }
+            return req.downloadHandler.text.Trim();
+#else
+            if (!System.IO.File.Exists(fullPath))
+            {
+                Debug.LogError($"[YooAssetNew] ReadBuildinVersion: file not found: {fullPath}");
+                return null;
+            }
+            await UniTask.SwitchToThreadPool();
+            var text = System.IO.File.ReadAllText(fullPath).Trim();
+            await UniTask.SwitchToMainThread();
+            return text;
+#endif
         }
     }
 }
