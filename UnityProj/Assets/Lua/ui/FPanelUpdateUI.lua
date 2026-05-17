@@ -27,13 +27,17 @@ do
         return l_instance
     end
 
+    function FPanelUpdateUI:__constructor()
+		self.m_slider = nil
+	end
+
     function FPanelUpdateUI:GetResPath()
         return PREFAB_PATH
     end
 
     function FPanelUpdateUI:OnCreate()
         -- 找 Slider 组件（路径：UILoading/Slider）
-        local sliderTr = self.m_panel.transform:Find("Slider")
+        local sliderTr = self.m_panel.transform:Find("bg/Slider")
         self.m_slider = sliderTr and sliderTr:GetComponent(typeof(UnityEngine.UI.Slider)) or nil
         if not self.m_slider then
             print("[FPanelUpdateUI] Warning: Slider not found")
