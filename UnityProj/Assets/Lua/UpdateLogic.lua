@@ -165,7 +165,7 @@ if initializer then
     cdnUrl = initializer.cdnBaseUrl or ""
 end
 
-if cdnUrl == "" or cdnUrl == "https://cdn.example.com/res" then
+if cdnUrl == "" then
     -- 未配置 CDN，跳过网络检查
     print("[UpdateLogic] No CDN configured — skip update check")
     finish(true, "no_cdn")

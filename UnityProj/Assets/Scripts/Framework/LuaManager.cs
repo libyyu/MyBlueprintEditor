@@ -263,9 +263,6 @@ namespace CutRope.Framework
 
         public async UniTask<bool> PreloadAllScript(string packageName)
         {
-#if !UNITY_EDITOR && UNITY_WEBGL
-            return true;
-#else
             var result = new ReturnTuple<bool, bool>();
             YooAssetsLuaBridge.LoadAllLuaFiles(packageName, luaAddressPrefix, null, (bool bSuccessed, string[] f, bool[] s, string e) =>
             {
@@ -282,7 +279,6 @@ namespace CutRope.Framework
 
             Debug.Log("[GameLauncher] All Lua files loaded ✓");
             return true;
-#endif
         }
     }
 }
