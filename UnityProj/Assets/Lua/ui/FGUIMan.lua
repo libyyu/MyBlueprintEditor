@@ -53,7 +53,7 @@ do
 	    goCanvas.transform.localPosition = Vector3(0, 0, 0)
 	    goCanvas.transform.localScale = Vector3(1, 1, 1)
 	    local canvas = goCanvas:AddComponent(typeof(UnityEngine.Canvas))
-	    canvas.renderMode = 1--UnityEngine.RenderMode.ScreenSpaceCamera
+	    canvas.renderMode = UnityEngine.RenderMode.ScreenSpaceCamera
 	    canvas.pixelPerfect = true
 	    canvas.worldCamera = cam
 

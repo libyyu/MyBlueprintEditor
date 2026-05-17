@@ -497,7 +497,12 @@ function FPanelBaseUI:_SetPanelToLayerMaxDepth()
 			self:_AddPanelToLayerDepth(real_depth)
 		end
 	else
-
+		local canvas = self.m_panel:GetComponent(typeof(UnityEngine.Canvas))
+		if IsValidObject(canvas) then
+			canvas.overrideSorting = true
+			canvas.sortingOrder = real_depth
+			self:_AddPanelToLayerDepth(real_depth)
+		end
 	end
 end
 
@@ -516,7 +521,12 @@ function FPanelBaseUI:_SetPanelToLayerMinDepth()
 			self:_AddPanelToLayerDepth(real_depth)
 		end
 	else
-
+		local canvas = self.m_panel:GetComponent(typeof(UnityEngine.Canvas))
+		if IsValidObject(canvas) then
+			canvas.overrideSorting = true
+			canvas.sortingOrder = real_depth
+			self:_AddPanelToLayerDepth(real_depth)
+		end
 	end
 end
 

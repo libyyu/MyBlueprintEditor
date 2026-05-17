@@ -154,7 +154,7 @@ end
 local FGUIMan = require "ui.FGUIMan"
 FGUIMan.Instance():InitUIRoot()
 --测试显示UI
-FGUIMan.Instance():CreateSimpleUI("Assets/DefaultPackage/UI/Prefab/LoadingUI.prefab")
+FGUIMan.Instance():CreateSimpleUI("Assets/DefaultPackage/UI/Prefab/UILoading.prefab")
 
 -- 没有配置 CDN 地址时跳过网络检查
 local cdnUrl = CS.CutRope.Framework.YooAssetInitializer and "" or ""
