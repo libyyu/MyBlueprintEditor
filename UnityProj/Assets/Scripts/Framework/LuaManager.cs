@@ -110,8 +110,7 @@ namespace CutRope.Framework
                     env.Global.Set("UpdateLogicResult", false);
                 }
                 var begin = Time.realtimeSinceStartup;
-                var done = env.Global.Get<bool>("UpdateLogicDone");
-                while (!done) await UniTask.Yield();
+                while (!env.Global.Get<bool>("UpdateLogicDone")) await UniTask.Yield();
                 var UpdateLogicResult = env.Global.Get<bool>("UpdateLogicResult");
                 var cost = Time.realtimeSinceStartup - begin;
                 Debug.Log($"[LuaManager] Update VM done, result={UpdateLogicResult} (t={cost:F1}s)");
