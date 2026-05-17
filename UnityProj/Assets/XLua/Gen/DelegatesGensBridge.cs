@@ -204,7 +204,31 @@ namespace XLua
 #endif
 		}
         
-		public void __Gen_Delegate_Imp8(int p0, int p1)
+		public void __Gen_Delegate_Imp8(bool p0, byte[] p1, string p2)
+		{
+#if THREAD_SAFE || HOTFIX_ENABLE
+            lock (luaEnv.luaEnvLock)
+            {
+#endif
+                RealStatePtr L = luaEnv.L;
+                int errFunc = LuaAPI.pcall_prepare(L, errorFuncRef, luaReference);
+                
+                LuaAPI.lua_pushboolean(L, p0);
+                LuaAPI.lua_pushstring(L, p1);
+                LuaAPI.lua_pushstring(L, p2);
+                
+                PCall(L, 3, 0, errFunc);
+                
+                
+                
+                LuaAPI.lua_settop(L, errFunc - 1);
+                
+#if THREAD_SAFE || HOTFIX_ENABLE
+            }
+#endif
+		}
+        
+		public void __Gen_Delegate_Imp9(int p0, int p1)
 		{
 #if THREAD_SAFE || HOTFIX_ENABLE
             lock (luaEnv.luaEnvLock)
@@ -227,7 +251,7 @@ namespace XLua
 #endif
 		}
         
-		public void __Gen_Delegate_Imp9(bool p0, string[] p1, bool[] p2, string p3)
+		public void __Gen_Delegate_Imp10(bool p0, string[] p1, bool[] p2, string p3)
 		{
 #if THREAD_SAFE || HOTFIX_ENABLE
             lock (luaEnv.luaEnvLock)
@@ -252,7 +276,7 @@ namespace XLua
 #endif
 		}
         
-		public void __Gen_Delegate_Imp10(CutRope.Framework.IView p0)
+		public void __Gen_Delegate_Imp11(CutRope.Framework.IView p0)
 		{
 #if THREAD_SAFE || HOTFIX_ENABLE
             lock (luaEnv.luaEnvLock)
@@ -298,54 +322,59 @@ namespace XLua
 			    return new CutRope.Game.LevelController.LuaVoidDelegate(__Gen_Delegate_Imp2);
 			}
 		
-		    if (type == typeof(FTimerList.TimerCallback))
-			{
-			    return new FTimerList.TimerCallback(__Gen_Delegate_Imp2);
-			}
-		
 		    if (type == typeof(CutRope.Framework.SceneLoader.LuaCompleteCallback))
 			{
 			    return new CutRope.Framework.SceneLoader.LuaCompleteCallback(__Gen_Delegate_Imp2);
 			}
 		
-		    if (type == typeof(System.Action<bool, string>))
+		    if (type == typeof(FTimerList.TimerCallback))
 			{
-			    return new System.Action<bool, string>(__Gen_Delegate_Imp3);
+			    return new FTimerList.TimerCallback(__Gen_Delegate_Imp2);
 			}
 		
-		    if (type == typeof(System.Action<bool, string, string>))
+		    if (type == typeof(YooAssetsLuaBridge.LuaBoolStringCallback))
 			{
-			    return new System.Action<bool, string, string>(__Gen_Delegate_Imp4);
+			    return new YooAssetsLuaBridge.LuaBoolStringCallback(__Gen_Delegate_Imp3);
 			}
 		
-		    if (type == typeof(System.Action<int, int, long, long>))
+		    if (type == typeof(YooAssetsLuaBridge.LuaBoolStringStringCallback))
 			{
-			    return new System.Action<int, int, long, long>(__Gen_Delegate_Imp5);
+			    return new YooAssetsLuaBridge.LuaBoolStringStringCallback(__Gen_Delegate_Imp4);
 			}
 		
-		    if (type == typeof(System.Action<bool, UnityEngine.Object, string>))
+		    if (type == typeof(YooAssetsLuaBridge.LuaResourceDownloadProgressCallback))
 			{
-			    return new System.Action<bool, UnityEngine.Object, string>(__Gen_Delegate_Imp6);
+			    return new YooAssetsLuaBridge.LuaResourceDownloadProgressCallback(__Gen_Delegate_Imp5);
 			}
 		
-		    if (type == typeof(System.Action<bool, UnityEngine.GameObject, string>))
+		    if (type == typeof(YooAssetsLuaBridge.LuaLoadAssetCallback))
 			{
-			    return new System.Action<bool, UnityEngine.GameObject, string>(__Gen_Delegate_Imp7);
+			    return new YooAssetsLuaBridge.LuaLoadAssetCallback(__Gen_Delegate_Imp6);
 			}
 		
-		    if (type == typeof(System.Action<int, int>))
+		    if (type == typeof(YooAssetsLuaBridge.LuaInstantiateCallback))
 			{
-			    return new System.Action<int, int>(__Gen_Delegate_Imp8);
+			    return new YooAssetsLuaBridge.LuaInstantiateCallback(__Gen_Delegate_Imp7);
 			}
 		
-		    if (type == typeof(System.Action<bool, string[], bool[], string>))
+		    if (type == typeof(YooAssetsLuaBridge.LuaLoadRawFileCallback))
 			{
-			    return new System.Action<bool, string[], bool[], string>(__Gen_Delegate_Imp9);
+			    return new YooAssetsLuaBridge.LuaLoadRawFileCallback(__Gen_Delegate_Imp8);
+			}
+		
+		    if (type == typeof(YooAssetsLuaBridge.LuaLoadAllLuaFilesProgressCallback))
+			{
+			    return new YooAssetsLuaBridge.LuaLoadAllLuaFilesProgressCallback(__Gen_Delegate_Imp9);
+			}
+		
+		    if (type == typeof(YooAssetsLuaBridge.LuaLoadAllLuaFilesCompleteCallback))
+			{
+			    return new YooAssetsLuaBridge.LuaLoadAllLuaFilesCompleteCallback(__Gen_Delegate_Imp10);
 			}
 		
 		    if (type == typeof(CutRope.Framework.UIManager.LuaViewCallback))
 			{
-			    return new CutRope.Framework.UIManager.LuaViewCallback(__Gen_Delegate_Imp10);
+			    return new CutRope.Framework.UIManager.LuaViewCallback(__Gen_Delegate_Imp11);
 			}
 		
 		    return null;

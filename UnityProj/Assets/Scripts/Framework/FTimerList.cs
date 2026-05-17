@@ -20,8 +20,9 @@ using LuaCSFunction = XLua.LuaDLL.lua_CSFunction;
 /// </summary>
 public class FTimerList
 {
+    [CSharpCallLua]
     public delegate void TimerCallback();
-
+    
     static int _uniqueid = 1;
     public int total_count = 0;
 

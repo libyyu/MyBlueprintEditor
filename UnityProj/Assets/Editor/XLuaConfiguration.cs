@@ -2,19 +2,28 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using XLua;
+using static CutRope.Framework.SceneLoader;
+using static YooAssetsLuaBridge;
 
 public static class XLuaConfig
 {
     [CSharpCallLua]
     public static List<Type> CSharpCallLua = new List<Type>()
     {
-        typeof(Action<bool, string>),
-        typeof(Action<bool, string, string>),
-        typeof(Action<int, int, long, long>),
-        typeof(Action<bool, UnityEngine.Object, string>),
-        typeof(Action<bool, GameObject, string>),
-        typeof(Action<int, int>),
-        typeof(Action<bool, string[], bool[], string>),
+
+        //SceneLoader
+        typeof(LuaProgressCallback),
+        typeof(LuaCompleteCallback),
+        //YooAssetsLuaBridge
+        typeof(YooAssetsLuaBridge.LuaBoolStringCallback),
+        typeof(YooAssetsLuaBridge.LuaBoolStringStringCallback),
+        typeof(YooAssetsLuaBridge.LuaResourceDownloadProgressCallback),
+        typeof(YooAssetsLuaBridge.LuaLoadAssetCallback),
+        typeof(YooAssetsLuaBridge.LuaInstantiateCallback),
+        typeof(YooAssetsLuaBridge.LuaLoadRawFileCallback),
+        typeof(YooAssetsLuaBridge.LuaLoadAllLuaFilesProgressCallback),
+        typeof(YooAssetsLuaBridge.LuaLoadAllLuaFilesCompleteCallback),
+        //FTimerList
         typeof(FTimerList.TimerCallback)
     };
 }

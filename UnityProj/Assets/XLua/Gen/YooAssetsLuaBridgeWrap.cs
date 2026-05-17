@@ -366,7 +366,7 @@ namespace XLua.CSObjectWrap
                 
                 {
                     string _packageName = LuaAPI.lua_tostring(L, 1);
-                    System.Action<bool, string> _callback = translator.GetDelegate<System.Action<bool, string>>(L, 2);
+                    YooAssetsLuaBridge.LuaBoolStringCallback _callback = translator.GetDelegate<YooAssetsLuaBridge.LuaBoolStringCallback>(L, 2);
                     
                     YooAssetsLuaBridge.InitializeOffline( _packageName, _callback );
                     
@@ -395,7 +395,7 @@ namespace XLua.CSObjectWrap
                     string _packageName = LuaAPI.lua_tostring(L, 1);
                     string _mainCdnUrl = LuaAPI.lua_tostring(L, 2);
                     string _fallbackCdnUrl = LuaAPI.lua_tostring(L, 3);
-                    System.Action<bool, string> _callback = translator.GetDelegate<System.Action<bool, string>>(L, 4);
+                    YooAssetsLuaBridge.LuaBoolStringCallback _callback = translator.GetDelegate<YooAssetsLuaBridge.LuaBoolStringCallback>(L, 4);
                     
                     YooAssetsLuaBridge.InitializeHostPlay( _packageName, _mainCdnUrl, _fallbackCdnUrl, _callback );
                     
@@ -422,7 +422,7 @@ namespace XLua.CSObjectWrap
                 
                 {
                     string _packageName = LuaAPI.lua_tostring(L, 1);
-                    System.Action<bool, string, string> _callback = translator.GetDelegate<System.Action<bool, string, string>>(L, 2);
+                    YooAssetsLuaBridge.LuaBoolStringStringCallback _callback = translator.GetDelegate<YooAssetsLuaBridge.LuaBoolStringStringCallback>(L, 2);
                     
                     YooAssetsLuaBridge.RequestVersion( _packageName, _callback );
                     
@@ -475,7 +475,7 @@ namespace XLua.CSObjectWrap
                 {
                     string _packageName = LuaAPI.lua_tostring(L, 1);
                     string _version = LuaAPI.lua_tostring(L, 2);
-                    System.Action<bool, string> _callback = translator.GetDelegate<System.Action<bool, string>>(L, 3);
+                    YooAssetsLuaBridge.LuaBoolStringCallback _callback = translator.GetDelegate<YooAssetsLuaBridge.LuaBoolStringCallback>(L, 3);
                     
                     YooAssetsLuaBridge.UpdateManifest( _packageName, _version, _callback );
                     
@@ -558,8 +558,8 @@ namespace XLua.CSObjectWrap
                     string _packageName = LuaAPI.lua_tostring(L, 1);
                     int _maxConcurrent = LuaAPI.xlua_tointeger(L, 2);
                     int _failedRetryCount = LuaAPI.xlua_tointeger(L, 3);
-                    System.Action<int, int, long, long> _onProgress = translator.GetDelegate<System.Action<int, int, long, long>>(L, 4);
-                    System.Action<bool, string> _onComplete = translator.GetDelegate<System.Action<bool, string>>(L, 5);
+                    YooAssetsLuaBridge.LuaResourceDownloadProgressCallback _onProgress = translator.GetDelegate<YooAssetsLuaBridge.LuaResourceDownloadProgressCallback>(L, 4);
+                    YooAssetsLuaBridge.LuaBoolStringCallback _onComplete = translator.GetDelegate<YooAssetsLuaBridge.LuaBoolStringCallback>(L, 5);
                     
                     YooAssetsLuaBridge.StartDownload( _packageName, _maxConcurrent, _failedRetryCount, _onProgress, _onComplete );
                     
@@ -587,7 +587,7 @@ namespace XLua.CSObjectWrap
                 {
                     string _packageName = LuaAPI.lua_tostring(L, 1);
                     string _location = LuaAPI.lua_tostring(L, 2);
-                    System.Action<bool, UnityEngine.Object, string> _callback = translator.GetDelegate<System.Action<bool, UnityEngine.Object, string>>(L, 3);
+                    YooAssetsLuaBridge.LuaLoadAssetCallback _callback = translator.GetDelegate<YooAssetsLuaBridge.LuaLoadAssetCallback>(L, 3);
                     
                     YooAssetsLuaBridge.LoadAsset( _packageName, _location, _callback );
                     
@@ -613,11 +613,11 @@ namespace XLua.CSObjectWrap
             
 			    int gen_param_count = LuaAPI.lua_gettop(L);
             
-                if(gen_param_count == 4&& (LuaAPI.lua_isnil(L, 1) || LuaAPI.lua_type(L, 1) == LuaTypes.LUA_TSTRING)&& (LuaAPI.lua_isnil(L, 2) || LuaAPI.lua_type(L, 2) == LuaTypes.LUA_TSTRING)&& translator.Assignable<System.Action<bool, UnityEngine.GameObject, string>>(L, 3)&& translator.Assignable<UnityEngine.Transform>(L, 4)) 
+                if(gen_param_count == 4&& (LuaAPI.lua_isnil(L, 1) || LuaAPI.lua_type(L, 1) == LuaTypes.LUA_TSTRING)&& (LuaAPI.lua_isnil(L, 2) || LuaAPI.lua_type(L, 2) == LuaTypes.LUA_TSTRING)&& translator.Assignable<YooAssetsLuaBridge.LuaInstantiateCallback>(L, 3)&& translator.Assignable<UnityEngine.Transform>(L, 4)) 
                 {
                     string _packageName = LuaAPI.lua_tostring(L, 1);
                     string _location = LuaAPI.lua_tostring(L, 2);
-                    System.Action<bool, UnityEngine.GameObject, string> _callback = translator.GetDelegate<System.Action<bool, UnityEngine.GameObject, string>>(L, 3);
+                    YooAssetsLuaBridge.LuaInstantiateCallback _callback = translator.GetDelegate<YooAssetsLuaBridge.LuaInstantiateCallback>(L, 3);
                     UnityEngine.Transform _parent = (UnityEngine.Transform)translator.GetObject(L, 4, typeof(UnityEngine.Transform));
                     
                     YooAssetsLuaBridge.InstantiateAsync( _packageName, _location, _callback, _parent );
@@ -626,11 +626,11 @@ namespace XLua.CSObjectWrap
                     
                     return 0;
                 }
-                if(gen_param_count == 3&& (LuaAPI.lua_isnil(L, 1) || LuaAPI.lua_type(L, 1) == LuaTypes.LUA_TSTRING)&& (LuaAPI.lua_isnil(L, 2) || LuaAPI.lua_type(L, 2) == LuaTypes.LUA_TSTRING)&& translator.Assignable<System.Action<bool, UnityEngine.GameObject, string>>(L, 3)) 
+                if(gen_param_count == 3&& (LuaAPI.lua_isnil(L, 1) || LuaAPI.lua_type(L, 1) == LuaTypes.LUA_TSTRING)&& (LuaAPI.lua_isnil(L, 2) || LuaAPI.lua_type(L, 2) == LuaTypes.LUA_TSTRING)&& translator.Assignable<YooAssetsLuaBridge.LuaInstantiateCallback>(L, 3)) 
                 {
                     string _packageName = LuaAPI.lua_tostring(L, 1);
                     string _location = LuaAPI.lua_tostring(L, 2);
-                    System.Action<bool, UnityEngine.GameObject, string> _callback = translator.GetDelegate<System.Action<bool, UnityEngine.GameObject, string>>(L, 3);
+                    YooAssetsLuaBridge.LuaInstantiateCallback _callback = translator.GetDelegate<YooAssetsLuaBridge.LuaInstantiateCallback>(L, 3);
                     
                     YooAssetsLuaBridge.InstantiateAsync( _packageName, _location, _callback );
                     
@@ -661,7 +661,7 @@ namespace XLua.CSObjectWrap
                     string _packageName = LuaAPI.lua_tostring(L, 1);
                     string _location = LuaAPI.lua_tostring(L, 2);
                     bool _additive = LuaAPI.lua_toboolean(L, 3);
-                    System.Action<bool, string> _callback = translator.GetDelegate<System.Action<bool, string>>(L, 4);
+                    YooAssetsLuaBridge.LuaBoolStringCallback _callback = translator.GetDelegate<YooAssetsLuaBridge.LuaBoolStringCallback>(L, 4);
                     
                     YooAssetsLuaBridge.LoadScene( _packageName, _location, _additive, _callback );
                     
@@ -689,7 +689,7 @@ namespace XLua.CSObjectWrap
                 {
                     string _packageName = LuaAPI.lua_tostring(L, 1);
                     string _location = LuaAPI.lua_tostring(L, 2);
-                    System.Action<bool, byte[], string> _callback = translator.GetDelegate<System.Action<bool, byte[], string>>(L, 3);
+                    YooAssetsLuaBridge.LuaLoadRawFileCallback _callback = translator.GetDelegate<YooAssetsLuaBridge.LuaLoadRawFileCallback>(L, 3);
                     
                     YooAssetsLuaBridge.LoadRawFile( _packageName, _location, _callback );
                     
@@ -717,8 +717,8 @@ namespace XLua.CSObjectWrap
                 {
                     string _packageName = LuaAPI.lua_tostring(L, 1);
                     string _assetPrefix = LuaAPI.lua_tostring(L, 2);
-                    System.Action<int, int> _onProgress = translator.GetDelegate<System.Action<int, int>>(L, 3);
-                    System.Action<bool, string[], bool[], string> _onComplete = translator.GetDelegate<System.Action<bool, string[], bool[], string>>(L, 4);
+                    YooAssetsLuaBridge.LuaLoadAllLuaFilesProgressCallback _onProgress = translator.GetDelegate<YooAssetsLuaBridge.LuaLoadAllLuaFilesProgressCallback>(L, 3);
+                    YooAssetsLuaBridge.LuaLoadAllLuaFilesCompleteCallback _onComplete = translator.GetDelegate<YooAssetsLuaBridge.LuaLoadAllLuaFilesCompleteCallback>(L, 4);
                     
                     YooAssetsLuaBridge.LoadAllLuaFiles( _packageName, _assetPrefix, _onProgress, _onComplete );
                     
@@ -769,10 +769,10 @@ namespace XLua.CSObjectWrap
             
 			    int gen_param_count = LuaAPI.lua_gettop(L);
             
-                if(gen_param_count == 2&& (LuaAPI.lua_isnil(L, 1) || LuaAPI.lua_type(L, 1) == LuaTypes.LUA_TSTRING)&& translator.Assignable<System.Action<bool, string>>(L, 2)) 
+                if(gen_param_count == 2&& (LuaAPI.lua_isnil(L, 1) || LuaAPI.lua_type(L, 1) == LuaTypes.LUA_TSTRING)&& translator.Assignable<YooAssetsLuaBridge.LuaBoolStringCallback>(L, 2)) 
                 {
                     string _packageName = LuaAPI.lua_tostring(L, 1);
-                    System.Action<bool, string> _callback = translator.GetDelegate<System.Action<bool, string>>(L, 2);
+                    YooAssetsLuaBridge.LuaBoolStringCallback _callback = translator.GetDelegate<YooAssetsLuaBridge.LuaBoolStringCallback>(L, 2);
                     
                     YooAssetsLuaBridge.UnloadUnusedAssets( _packageName, _callback );
                     
@@ -810,10 +810,10 @@ namespace XLua.CSObjectWrap
             
 			    int gen_param_count = LuaAPI.lua_gettop(L);
             
-                if(gen_param_count == 2&& (LuaAPI.lua_isnil(L, 1) || LuaAPI.lua_type(L, 1) == LuaTypes.LUA_TSTRING)&& translator.Assignable<System.Action<bool, string>>(L, 2)) 
+                if(gen_param_count == 2&& (LuaAPI.lua_isnil(L, 1) || LuaAPI.lua_type(L, 1) == LuaTypes.LUA_TSTRING)&& translator.Assignable<YooAssetsLuaBridge.LuaBoolStringCallback>(L, 2)) 
                 {
                     string _packageName = LuaAPI.lua_tostring(L, 1);
-                    System.Action<bool, string> _callback = translator.GetDelegate<System.Action<bool, string>>(L, 2);
+                    YooAssetsLuaBridge.LuaBoolStringCallback _callback = translator.GetDelegate<YooAssetsLuaBridge.LuaBoolStringCallback>(L, 2);
                     
                     YooAssetsLuaBridge.UnloadAllAssets( _packageName, _callback );
                     
@@ -851,10 +851,10 @@ namespace XLua.CSObjectWrap
             
 			    int gen_param_count = LuaAPI.lua_gettop(L);
             
-                if(gen_param_count == 2&& (LuaAPI.lua_isnil(L, 1) || LuaAPI.lua_type(L, 1) == LuaTypes.LUA_TSTRING)&& translator.Assignable<System.Action<bool, string>>(L, 2)) 
+                if(gen_param_count == 2&& (LuaAPI.lua_isnil(L, 1) || LuaAPI.lua_type(L, 1) == LuaTypes.LUA_TSTRING)&& translator.Assignable<YooAssetsLuaBridge.LuaBoolStringCallback>(L, 2)) 
                 {
                     string _packageName = LuaAPI.lua_tostring(L, 1);
-                    System.Action<bool, string> _callback = translator.GetDelegate<System.Action<bool, string>>(L, 2);
+                    YooAssetsLuaBridge.LuaBoolStringCallback _callback = translator.GetDelegate<YooAssetsLuaBridge.LuaBoolStringCallback>(L, 2);
                     
                     YooAssetsLuaBridge.ClearCache( _packageName, _callback );
                     

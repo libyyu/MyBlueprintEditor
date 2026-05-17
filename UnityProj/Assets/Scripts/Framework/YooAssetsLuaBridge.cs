@@ -133,21 +133,24 @@ public static class YooAssetsLuaBridge
         YooAssets.SetDefaultPackage(YooAssets.GetPackage(packageName));
     }
 
+    [CSharpCallLua]
+    public delegate void LuaBoolStringCallback(bool success, string err);
+    [CSharpCallLua]
+    public delegate void LuaBoolStringStringCallback(bool success, string value, string err);
 
     // ─────────────────────────────────────────────────────────────────────────
     // 2. 包裹初始化
     // ─────────────────────────────────────────────────────────────────────────
-
     /// <summary>
     /// 离线模式初始化（仅内置资源，零网络依赖）
     /// callback(bool ok, string error)
     /// </summary>
-    public static void InitializeOffline(string packageName, Action<bool, string> callback)
+    public static void InitializeOffline(string packageName, LuaBoolStringCallback callback)
     {
         CoroutineRunner.Instance.StartCoroutine(Co_InitOffline(packageName, callback));
     }
 
-    private static IEnumerator Co_InitOffline(string packageName, Action<bool, string> callback)
+    private static IEnumerator Co_InitOffline(string packageName, LuaBoolStringCallback callback)
     {
         if (YooAssets.ContainsPackage(packageName))
             YooAssets.RemovePackage(packageName);
@@ -178,7 +181,7 @@ public static class YooAssetsLuaBridge
         string packageName,
         string mainCdnUrl,
         string fallbackCdnUrl,
-        Action<bool, string> callback)
+        LuaBoolStringCallback callback)
     {
         CoroutineRunner.Instance.StartCoroutine(
             Co_InitHostPlay(packageName, mainCdnUrl, fallbackCdnUrl, callback));
@@ -188,7 +191,7 @@ public static class YooAssetsLuaBridge
         string packageName,
         string mainCdnUrl,
         string fallbackCdnUrl,
-        Action<bool, string> callback)
+        LuaBoolStringCallback callback)
     {
         if (YooAssets.ContainsPackage(packageName))
             YooAssets.RemovePackage(packageName);
@@ -217,17 +220,16 @@ public static class YooAssetsLuaBridge
     // ─────────────────────────────────────────────────────────────────────────
     // 3. 版本 & 清单
     // ─────────────────────────────────────────────────────────────────────────
-
     /// <summary>
     /// 请求最新包裹版本（需联网）
     /// callback(bool ok, string version, string error)
     /// </summary>
-    public static void RequestVersion(string packageName, Action<bool, string, string> callback)
+    public static void RequestVersion(string packageName, LuaBoolStringStringCallback callback)
     {
         CoroutineRunner.Instance.StartCoroutine(Co_RequestVersion(packageName, callback));
     }
 
-    private static IEnumerator Co_RequestVersion(string packageName, Action<bool, string, string> callback)
+    private static IEnumerator Co_RequestVersion(string packageName, LuaBoolStringStringCallback callback)
     {
         var package = YooAssets.GetPackage(packageName);
         var op = package.RequestPackageVersionAsync();
@@ -253,12 +255,12 @@ public static class YooAssetsLuaBridge
     /// 更新并加载指定版本的资源清单
     /// callback(bool ok, string error)
     /// </summary>
-    public static void UpdateManifest(string packageName, string version, Action<bool, string> callback)
+    public static void UpdateManifest(string packageName, string version, LuaBoolStringCallback callback)
     {
         CoroutineRunner.Instance.StartCoroutine(Co_UpdateManifest(packageName, version, callback));
     }
 
-    private static IEnumerator Co_UpdateManifest(string packageName, string version, Action<bool, string> callback)
+    private static IEnumerator Co_UpdateManifest(string packageName, string version, LuaBoolStringCallback callback)
     {
         var package = YooAssets.GetPackage(packageName);
         var op = package.UpdatePackageManifestAsync(version);
@@ -283,6 +285,8 @@ public static class YooAssetsLuaBridge
         var downloader = package.CreateResourceDownloader(maxConcurrent, retryCount);
         return downloader.TotalDownloadCount;
     }
+    [CSharpCallLua]
+    public delegate void LuaResourceDownloadProgressCallback(int TotalDownloadCount, int CurrentDownloadCount, long TotalDownloadBytes, long CurrentDownloadBytes);
 
     /// <summary>
     /// 开始下载缺失资源
@@ -293,8 +297,8 @@ public static class YooAssetsLuaBridge
         string packageName,
         int maxConcurrent,
         int failedRetryCount,
-        Action<int, int, long, long> onProgress,
-        Action<bool, string> onComplete)
+        LuaResourceDownloadProgressCallback onProgress,
+        LuaBoolStringCallback onComplete)
     {
         CoroutineRunner.Instance.StartCoroutine(
             Co_Download(packageName, maxConcurrent, failedRetryCount, onProgress, onComplete));
@@ -304,8 +308,8 @@ public static class YooAssetsLuaBridge
         string packageName,
         int maxConcurrent,
         int failedRetryCount,
-        Action<int, int, long, long> onProgress,
-        Action<bool, string> onComplete)
+        LuaResourceDownloadProgressCallback onProgress,
+        LuaBoolStringCallback onComplete)
     {
         var package = YooAssets.GetPackage(packageName);
         var downloader = package.CreateResourceDownloader(maxConcurrent, failedRetryCount);
@@ -338,18 +342,19 @@ public static class YooAssetsLuaBridge
     // ─────────────────────────────────────────────────────────────────────────
     // 5. 资源加载
     // ─────────────────────────────────────────────────────────────────────────
-
+    [CSharpCallLua]
+    public delegate void LuaLoadAssetCallback(bool success, UnityEngine.Object obj, string err);
     /// <summary>
     /// 异步加载 UnityEngine.Object 资源
     /// callback(bool ok, UnityEngine.Object asset, string error)
     /// 注意：asset 不再使用时请调用 TryUnloadUnusedAsset(packageName, location)
     /// </summary>
-    public static void LoadAsset(string packageName, string location, Action<bool, UnityEngine.Object, string> callback)
+    public static void LoadAsset(string packageName, string location, LuaLoadAssetCallback callback)
     {
         CoroutineRunner.Instance.StartCoroutine(Co_LoadAsset(packageName, location, callback));
     }
 
-    private static IEnumerator Co_LoadAsset(string packageName, string location, Action<bool, UnityEngine.Object, string> callback)
+    private static IEnumerator Co_LoadAsset(string packageName, string location, LuaLoadAssetCallback callback)
     {
         var package = YooAssets.GetPackage(packageName);
         var handle = package.LoadAssetAsync(location, typeof(UnityEngine.Object));
@@ -368,6 +373,8 @@ public static class YooAssetsLuaBridge
         }
     }
 
+    [CSharpCallLua]
+    public delegate void LuaInstantiateCallback(bool success, GameObject obj, string err);
     /// <summary>
     /// 异步加载 GameObject 并实例化（handle 自动 Release）
     /// callback(bool ok, GameObject instance, string error)
@@ -375,7 +382,7 @@ public static class YooAssetsLuaBridge
     public static void InstantiateAsync(
         string packageName,
         string location,
-        Action<bool, GameObject, string> callback,
+        LuaInstantiateCallback callback,
         Transform parent = null)
     {
         CoroutineRunner.Instance.StartCoroutine(Co_Instantiate(packageName, location, parent, callback));
@@ -385,7 +392,7 @@ public static class YooAssetsLuaBridge
         string packageName,
         string location,
         Transform parent,
-        Action<bool, GameObject, string> callback)
+        LuaInstantiateCallback callback)
     {
         var package = YooAssets.GetPackage(packageName);
         var handle = package.LoadAssetAsync<GameObject>(location);
@@ -415,7 +422,7 @@ public static class YooAssetsLuaBridge
         string packageName,
         string location,
         bool additive,
-        Action<bool, string> callback)
+        LuaBoolStringCallback callback)
     {
         CoroutineRunner.Instance.StartCoroutine(Co_LoadScene(packageName, location, additive, callback));
     }
@@ -424,7 +431,7 @@ public static class YooAssetsLuaBridge
         string packageName,
         string location,
         bool additive,
-        Action<bool, string> callback)
+        LuaBoolStringCallback callback)
     {
         var package = YooAssets.GetPackage(packageName);
         var loadMode = additive ? LoadSceneMode.Additive : LoadSceneMode.Single;
@@ -437,16 +444,18 @@ public static class YooAssetsLuaBridge
             callback?.Invoke(false, handle.LastError);
     }
 
+    [CSharpCallLua]
+    public delegate void LuaLoadRawFileCallback(bool success, byte[] bytes, string err);
     /// <summary>
     /// 异步加载原生文件（如 JSON/二进制配置）
     /// callback(bool ok, byte[] data, string error)
     /// </summary>
-    public static void LoadRawFile(string packageName, string location, Action<bool, byte[], string> callback)
+    public static void LoadRawFile(string packageName, string location, LuaLoadRawFileCallback callback)
     {
         CoroutineRunner.Instance.StartCoroutine(Co_LoadRawFile(packageName, location, callback));
     }
 
-    private static IEnumerator Co_LoadRawFile(string packageName, string location, Action<bool, byte[], string> callback)
+    private static IEnumerator Co_LoadRawFile(string packageName, string location, LuaLoadRawFileCallback callback)
     {
         var package = YooAssets.GetPackage(packageName);
         var handle = package.LoadRawFileAsync(location);
@@ -484,11 +493,15 @@ public static class YooAssetsLuaBridge
     /// </summary>
     /// <summary>
 
+    [CSharpCallLua]
+    public delegate void LuaLoadAllLuaFilesProgressCallback(int loaded, int total);
+    [CSharpCallLua]
+    public delegate void LuaLoadAllLuaFilesCompleteCallback(bool success, string[] requirePaths, bool[] successMap, string err);
     public static void LoadAllLuaFiles(
         string packageName,
         string assetPrefix,
-        Action<int, int> onProgress,
-        Action<bool, string[], bool[], string> onComplete)
+        LuaLoadAllLuaFilesProgressCallback onProgress,
+        LuaLoadAllLuaFilesCompleteCallback onComplete)
     {
         CoroutineRunner.Instance.StartCoroutine(
             Co_LoadAllLuaFiles(packageName, assetPrefix, onProgress, onComplete));
@@ -497,8 +510,8 @@ public static class YooAssetsLuaBridge
     private static IEnumerator Co_LoadAllLuaFiles(
         string packageName,
         string assetPrefix,
-        Action<int, int> onProgress,
-        Action<bool, string[], bool[], string> onComplete)
+        LuaLoadAllLuaFilesProgressCallback onProgress,
+        LuaLoadAllLuaFilesCompleteCallback onComplete)
     {
         var package = YooAssets.GetPackage(packageName);
         if (package == null)
@@ -602,12 +615,12 @@ public static class YooAssetsLuaBridge
     /// 回收不再使用的资源（引用计数 = 0 的全部卸载）
     /// callback(bool ok, string error)
     /// </summary>
-    public static void UnloadUnusedAssets(string packageName, Action<bool, string> callback = null)
+    public static void UnloadUnusedAssets(string packageName, LuaBoolStringCallback callback = null)
     {
         CoroutineRunner.Instance.StartCoroutine(Co_UnloadUnused(packageName, callback));
     }
 
-    private static IEnumerator Co_UnloadUnused(string packageName, Action<bool, string> callback)
+    private static IEnumerator Co_UnloadUnused(string packageName, LuaBoolStringCallback callback)
     {
         var package = YooAssets.GetPackage(packageName);
         var op = package.UnloadUnusedAssetsAsync();
@@ -622,12 +635,12 @@ public static class YooAssetsLuaBridge
     /// 强制卸载所有资源（切大版本 / 退出时用）
     /// callback(bool ok, string error)
     /// </summary>
-    public static void UnloadAllAssets(string packageName, Action<bool, string> callback = null)
+    public static void UnloadAllAssets(string packageName, LuaBoolStringCallback callback = null)
     {
         CoroutineRunner.Instance.StartCoroutine(Co_UnloadAll(packageName, callback));
     }
 
-    private static IEnumerator Co_UnloadAll(string packageName, Action<bool, string> callback)
+    private static IEnumerator Co_UnloadAll(string packageName, LuaBoolStringCallback callback)
     {
         var package = YooAssets.GetPackage(packageName);
         var op = package.UnloadAllAssetsAsync();
@@ -642,12 +655,12 @@ public static class YooAssetsLuaBridge
     /// 清理磁盘缓存（保留当前版本，清理超量旧文件）
     /// callback(bool ok, string error)
     /// </summary>
-    public static void ClearCache(string packageName, Action<bool, string> callback = null)
+    public static void ClearCache(string packageName, LuaBoolStringCallback callback = null)
     {
         CoroutineRunner.Instance.StartCoroutine(Co_ClearCache(packageName, callback));
     }
 
-    private static IEnumerator Co_ClearCache(string packageName, Action<bool, string> callback)
+    private static IEnumerator Co_ClearCache(string packageName, LuaBoolStringCallback callback)
     {
         var package = YooAssets.GetPackage(packageName);
         var op = package.ClearCacheFilesAsync(EFileClearMode.ClearUnusedBundleFiles);
