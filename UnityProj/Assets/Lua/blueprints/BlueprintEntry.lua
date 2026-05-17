@@ -7,13 +7,13 @@
 --   2. game_nodes.lua      — UI/Scene/Level/Rope/Candy 游戏专用节点
 
 -- ── 加载通用游戏扩展节点 ─────────────────────────────────────────────────────
-local ok, err = pcall(require, 'game_extensions')
+local ok, err = pcall(require, 'blueprints.game_extensions')
 if not ok then
     print('[BlueprintEntry] Warning: game_extensions load failed: ' .. tostring(err))
 end
 
 -- ── 加载游戏专用节点 ─────────────────────────────────────────────────────────
-ok, err = pcall(require, 'game_nodes')
+ok, err = pcall(require, 'blueprints.game_nodes')
 if not ok then
     print('[BlueprintEntry] Warning: game_nodes load failed: ' .. tostring(err))
 end

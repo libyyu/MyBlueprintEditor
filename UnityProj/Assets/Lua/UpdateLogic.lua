@@ -21,27 +21,21 @@
 --   Bridge.StartDownload(pkg, concurrent, retry, onProgress, onComplete)
 
 print("[UpdateLogic] *** Update phase start ***")
+require "preload"
 
-local PACKAGE       = "DefaultPackage"
 local VERSION_TIMEOUT = 5   -- 拉版本号超时秒数
 local Bridge = CS.YooAssetsLuaBridge
 
--- ── 工具：等待指定秒数（轮询计时，依赖 onAppTick 驱动）──────────────────
--- UpdateLogic VM 的 onAppTick 由 LuaManager.Update 驱动
-local _wait_until = 0
-local _wait_done  = false
-local function wait_seconds(sec, cb)
-    -- 用协程替代：通过 _wait_elapsed 自增
-    -- 注意：这里我们用简单的时间戳轮询，不需要真协程
-    _wait_done = false
-    local deadline = os.clock() + sec
-    local function poll()
-        if os.clock() >= deadline then
-            _wait_done = true
-            cb()
-        end
-    end
-    return poll
+
+function onAppTick(deltaTime)
+    -- 后续游戏逻辑挂在这里
+    TickCoroutine(deltaTime)
+end
+
+--- 销毁时调用
+function onAppDestroy()
+    print("on_destroy called")
+    coro.clear()
 end
 
 -- ── 主更新逻辑 ──────────────────────────────────────────────────────────
@@ -49,13 +43,13 @@ end
 local function finish(success, reason)
     print(string.format("[UpdateLogic] done: success=%s reason=%s",
           tostring(success), tostring(reason or "")))
-    UpdateLogicDone   = true
-    UpdateLogicResult = success
+    --UpdateLogicDone   = true
+    --UpdateLogicResult = success
 end
 
 -- Step 3：下载
 local function do_download(version)
-    local count = Bridge.GetDownloadCount(PACKAGE, 10, 3)
+    local count = Bridge.GetDownloadCount(DefaultPackageName, 10, 3)
     if count == 0 then
         print("[UpdateLogic] No files to download, up to date: " .. version)
         return finish(true, "no_download")
@@ -64,7 +58,7 @@ local function do_download(version)
     print(string.format("[UpdateLogic] Downloading %d files for version %s ...", count, version))
     -- TODO: 这里可以打开 UI 进度条：CS.CutRope.Framework.UIManager.ShowUpdateProgress()
 
-    Bridge.StartDownload(PACKAGE, 10, 3,
+    Bridge.StartDownload(DefaultPackageName, 10, 3,
         function(total, downloaded, totalBytes, downloadedBytes)
             local pct = total > 0 and math.floor(downloaded / total * 100) or 0
             print(string.format("[UpdateLogic] Download %d/%d (%d%%)", downloaded, total, pct))
@@ -85,7 +79,7 @@ end
 -- Step 2：拉到新版本号后更新 Manifest
 local function do_update_manifest(remoteVersion)
     print("[UpdateLogic] Remote version: " .. remoteVersion .. " — updating manifest...")
-    Bridge.UpdateManifest(PACKAGE, remoteVersion,
+    Bridge.UpdateManifest(DefaultPackageName, remoteVersion,
         function(ok, err)
             if ok then
                 print("[UpdateLogic] Manifest updated to: " .. remoteVersion)
@@ -101,49 +95,66 @@ end
 
 -- Step 1：尝试拉远端版本号（弱联网）
 local function check_remote_version()
-    local responded = false
+    local bTimeout = false
+    local bFinished = false
+    local bResponded = false
+    local RemoteVersion = nil
 
-    Bridge.RequestVersion(PACKAGE,
+    Bridge.RequestVersion(DefaultPackageName,
         function(ok, remoteVersion, err)
-            if responded then return end   -- 超时已触发，忽略迟到回调
-            responded = true
-
-            if not ok then
-                print("[UpdateLogic] RequestVersion failed: " .. tostring(err) .. " — using buildin")
-                return finish(true, "offline_fallback")
-            end
-
-            local localVersion = Bridge.GetPackageVersion(PACKAGE)
-            print(string.format("[UpdateLogic] local=%s  remote=%s",
-                  tostring(localVersion), tostring(remoteVersion)))
-
-            if remoteVersion == localVersion then
-                print("[UpdateLogic] Already up to date: " .. localVersion)
-                return finish(true, "up_to_date")
-            end
-
-            do_update_manifest(remoteVersion)
+            if bTimeout then return end   -- 超时已触发，忽略迟到回调
+            bResponded = ok
+            RemoteVersion = remoteVersion
+            bFinished = true
         end
     )
 
-    -- 超时保护：VERSION_TIMEOUT 秒后如果还没回调，直接跳过
-    local deadline = os.clock() + VERSION_TIMEOUT
-    local function timeout_poll()
-        if responded then return end
-        if os.clock() >= deadline then
-            responded = true
-            print("[UpdateLogic] RequestVersion timeout — using buildin")
-            finish(true, "timeout_fallback")
+    local startTime = CS.UnityEngine.Time.realtimeSinceStartup
+    local function check_timeout()
+        if bFinished then return false end
+        return CS.UnityEngine.Time.realtimeSinceStartup - startTime >= VERSION_TIMEOUT
+    end
+    
+    --等等结束或者超时
+    while not bFinished do
+        if check_timeout() then
+            bTimeout = true
+            bFinished = true
         end
+
+        coro.yield()
     end
 
-    -- 挂载到 onAppTick 里轮询超时
-    local _prev_tick = onAppTick
-    function onAppTick(dt)
-        if _prev_tick then _prev_tick(dt) end
-        timeout_poll()
+    if bTimeout then
+        print("[UpdateLogic] RequestVersion timeout — using buildin")
+        finish(true, "timeout_fallback")
+        return
     end
+
+    if not bResponded then
+        print("[UpdateLogic] RequestVersion failed without response — using buildin")
+        finish(true, "no_response_fallback")
+        return
+    end
+
+    local localVersion = Bridge.GetPackageVersion(DefaultPackageName)
+    print(string.format("[UpdateLogic] local=%s  remote=%s",
+          tostring(localVersion), tostring(RemoteVersion)))
+
+    if RemoteVersion == localVersion then
+        print("[UpdateLogic] Already up to date: " .. localVersion)
+        finish(true, "up_to_date")
+        return
+    end
+
+    do_update_manifest(RemoteVersion)
 end
+
+
+local FGUIMan = require "ui.FGUIMan"
+FGUIMan.Instance():InitUIRoot()
+--测试显示UI
+FGUIMan.Instance():CreateSimpleUI("Assets/DefaultPackage/UI/Prefab/LoadingUI.prefab")
 
 -- 没有配置 CDN 地址时跳过网络检查
 local cdnUrl = CS.CutRope.Framework.YooAssetInitializer and "" or ""
@@ -159,5 +170,7 @@ if cdnUrl == "" or cdnUrl == "https://cdn.example.com/res" then
     print("[UpdateLogic] No CDN configured — skip update check")
     finish(true, "no_cdn")
 else
-    check_remote_version()
+    coro.start(function()
+        check_remote_version()
+    end)
 end

@@ -5,7 +5,9 @@
         "CutRope.Framework",
         "Unity.TextMeshPro",
         "YooAsset",
-        "YooAsset.Editor"
+        "YooAsset.Editor",
+        "XLua.Runtime",
+        "XLua.Editor"
     ],
     "includePlatforms": [
         "Editor"

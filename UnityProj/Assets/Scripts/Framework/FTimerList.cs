@@ -20,6 +20,8 @@ using LuaCSFunction = XLua.LuaDLL.lua_CSFunction;
 /// </summary>
 public class FTimerList
 {
+    public delegate void TimerCallback();
+
     static int _uniqueid = 1;
     public int total_count = 0;
 
@@ -28,8 +30,7 @@ public class FTimerList
         public int id;
         public float ttl;
         public float end_time;
-        public LuaFunction callback;
-        public LuaTable cbparam;    // 可选的 Lua 参数表，为 null 时以无参方式回调
+        public TimerCallback callback;
         public bool bOnce;
     }
 
@@ -50,8 +51,7 @@ public class FTimerList
     // ── 释放单个 Timer 持有的 Lua 引用 ────────────────────────────────────
     static void DisposeTimer(ref Timer tm)
     {
-        if (tm.callback != null) { tm.callback.Dispose(); tm.callback = null; }
-        if (tm.cbparam  != null) { tm.cbparam.Dispose();  tm.cbparam  = null; }
+        //if (tm.callback != null) { tm.callback.Dispose(); tm.callback = null; }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -66,7 +66,7 @@ public class FTimerList
     /// <param name="callback">Lua 回调函数（不能为 null）</param>
     /// <param name="cbparam">透传给回调的 Lua Table 参数，null 表示无参</param>
     /// <returns>计时器 ID，可用于 RemoveTimer / ResetTimer</returns>
-    public int AddTimer(float ttl, bool bOnce, LuaFunction callback, LuaTable cbparam = null)
+    public int AddTimer(float ttl, bool bOnce, TimerCallback callback)
     {
         if (callback == null)
             throw new ArgumentNullException("callback", "AddTimer: callback is null");
@@ -76,7 +76,6 @@ public class FTimerList
         tm.ttl      = ttl;
         tm.end_time = Time.time + ttl;
         tm.callback = callback;
-        tm.cbparam  = cbparam;
         tm.bOnce    = bOnce;
 
         if (m_bTick)
@@ -141,10 +140,7 @@ public class FTimerList
                 // 触发回调：有参数则传入 LuaTable，否则无参调用
                 if (tm.callback != null)
                 {
-                    if (tm.cbparam != null)
-                        tm.callback.Call(tm.cbparam);
-                    else
-                        tm.callback.Call();
+                    tm.callback?.Invoke();
                 }
 
                 if (tm.bOnce)
@@ -230,8 +226,17 @@ public class FTimerListBehavior : MonoBehaviour
     public int timer_num = 0;
 #endif
 
+    public static FTimerListBehavior Instance { get; private set; }
+
     void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
         FTimerList.RegisterTimerList(m_TimerList,     gameObject);
         FTimerList.RegisterTimerList(m_LateTimerList, gameObject);
     }
@@ -243,6 +248,8 @@ public class FTimerListBehavior : MonoBehaviour
 
         m_TimerList.Clear();
         m_LateTimerList.Clear();
+
+        if (Instance == this) Instance = null;
     }
 
     void Update()
@@ -271,12 +278,12 @@ public class FTimerListBehavior : MonoBehaviour
     /// <param name="cbparam">透传给回调的 Lua Table（可为 nil）</param>
     /// <param name="bLateUpdate">true = 在 LateUpdate 触发；false = 在 Update 触发</param>
     /// <returns>计时器 ID</returns>
-    public int AddTimer(float ttl, bool bOnce, LuaFunction callback, LuaTable cbparam, bool bLateUpdate)
+    public int AddTimer(float ttl, bool bOnce, FTimerList.TimerCallback callback, bool bLateUpdate)
     {
         if (bLateUpdate)
-            return m_LateTimerList.AddTimer(ttl, bOnce, callback, cbparam);
+            return m_LateTimerList.AddTimer(ttl, bOnce, callback);
         else
-            return m_TimerList.AddTimer(ttl, bOnce, callback, cbparam);
+            return m_TimerList.AddTimer(ttl, bOnce, callback);
     }
 
     public void RemoveTimer(int id)

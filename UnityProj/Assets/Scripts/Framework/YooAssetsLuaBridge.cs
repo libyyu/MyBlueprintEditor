@@ -16,15 +16,17 @@
 //   Bridge.LoadAsset("DefaultPackage", "Assets/Prefabs/Hero.prefab",
 //       function(ok, asset, err) ... end)
 
+using CutRope.Framework;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using XLua;
 using YooAsset;
-using CutRope.Framework;
 
+[LuaCallCSharp]
 public static class YooAssetsLuaBridge
 {
     // ─────────────────────────────────────────────────────────────────────────

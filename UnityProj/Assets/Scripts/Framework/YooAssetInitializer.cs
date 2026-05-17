@@ -64,14 +64,14 @@ namespace CutRope.Framework
             await verOp;
             if (verOp.Status != EOperationStatus.Succeed)
             {
-                Debug.LogError($"[YooAssetNew] Phase1 Editor version failed: {verOp.Error}");
+                Debug.LogError($"[YooAsset] Phase1 Editor version failed: {verOp.Error}");
                 return false;
             }
 
             if (!await Op(pkg.UpdatePackageManifestAsync(verOp.PackageVersion),
                           "Phase1 Editor manifest")) return false;
 
-            Debug.Log($"[YooAssetNew] '{packageName}' ready (Editor Simulate)");
+            Debug.Log($"[YooAsset] '{packageName}' ready (Editor Simulate)");
             IsLocalReady = true;
             return true;
 
@@ -92,14 +92,14 @@ namespace CutRope.Framework
             await verOp;
             if (verOp.Status != EOperationStatus.Succeed)
             {
-                Debug.LogError($"[YooAssetNew] Phase1 WebGL version failed: {verOp.Error}");
+                Debug.LogError($"[YooAsset] Phase1 WebGL version failed: {verOp.Error}");
                 return false;
             }
 
             if (!await Op(pkg.UpdatePackageManifestAsync(verOp.PackageVersion),
                           "Phase1 WebGL manifest")) return false;
 
-            Debug.Log($"[YooAssetNew] '{packageName}' ready (WebGL)");
+            Debug.Log($"[YooAsset] '{packageName}' ready (WebGL)");
             IsLocalReady = true;
             return true;
 
@@ -131,16 +131,16 @@ namespace CutRope.Framework
             if (verOp.Status != EOperationStatus.Succeed)
             {
                 // 正常不应到这里（fallback 也失败，说明内置包完整性问题）
-                Debug.LogError($"[YooAssetNew] Phase1 version failed: {verOp.Error}");
+                Debug.LogError($"[YooAsset] Phase1 version failed: {verOp.Error}");
                 return false;
             }
             string activeVersion = verOp.PackageVersion;
-            Debug.Log($"[YooAssetNew] Phase1: '{packageName}' activeVersion = {activeVersion}");
+            Debug.Log($"[YooAsset] Phase1: '{packageName}' activeVersion = {activeVersion}");
 
             if (!await Op(hostPkg.UpdatePackageManifestAsync(activeVersion),
                           "Phase1 manifest")) return false;
 
-            Debug.Log($"[YooAssetNew] '{packageName}' local ready (HostMode, version={activeVersion})");
+            Debug.Log($"[YooAsset] '{packageName}' local ready (HostMode, version={activeVersion})");
             IsLocalReady = true;
             return true;
 #endif
@@ -156,7 +156,7 @@ namespace CutRope.Framework
             await op;
             if (op.Status != EOperationStatus.Succeed)
             {
-                Debug.LogError($"[YooAssetNew] {tag} failed: {op.Error}");
+                Debug.LogError($"[YooAsset] {tag} failed: {op.Error}");
                 return false;
             }
             return true;

@@ -89,7 +89,7 @@ namespace CutRope.Framework
         /// </summary>
         public async UniTask<bool> RunUpdateLuaVM(string entryLua = "UpdateLogic")
         {
-            Debug.Log($"[LuaManagerNew] === Update VM start: {entryLua} ===");
+            Debug.Log($"[LuaManager] === Update VM start: {entryLua} ===");
 
             DisposeActiveVM();
             var env = CreateLuaEnv("update");
@@ -111,15 +111,15 @@ namespace CutRope.Framework
                 }
                 var begin = Time.realtimeSinceStartup;
                 var done = env.Global.Get<bool>("UpdateLogicDone");
-                if (!done) await UniTask.Yield();
+                while (!done) await UniTask.Yield();
                 var UpdateLogicResult = env.Global.Get<bool>("UpdateLogicResult");
                 var cost = Time.realtimeSinceStartup - begin;
-                Debug.Log($"[LuaManagerNew] Update VM done, result={UpdateLogicResult} (t={cost:F1}s)");
+                Debug.Log($"[LuaManager] Update VM done, result={UpdateLogicResult} (t={cost:F1}s)");
                 return true;
             }
             catch (Exception e)
             {
-                Debug.LogError($"[LuaManagerNew] Update VM exception: {e}");
+                Debug.LogError($"[LuaManager] Update VM exception: {e}");
                 return false;
             }
             finally
@@ -134,7 +134,7 @@ namespace CutRope.Framework
         /// </summary>
         public async UniTask<bool> RunGameLuaVM(string entryLua = "main")
         {
-            Debug.Log($"[LuaManagerNew] === Game VM start: {entryLua} ===");
+            Debug.Log($"[LuaManager] === Game VM start: {entryLua} ===");
 
             DisposeActiveVM();
             var env = CreateLuaEnv("game");
@@ -148,13 +148,13 @@ namespace CutRope.Framework
                 _luaUpdate    = env.Global.Get<LuaFunction>("onAppTick");
                 _luaOnDestroy = env.Global.Get<LuaFunction>("onAppDestroy");
 
-                Debug.Log("[LuaManagerNew] Game VM running");
+                Debug.Log("[LuaManager] Game VM running");
                 await UniTask.Yield();   // 让控制权交还给调用者
                 return true;
             }
             catch (Exception e)
             {
-                Debug.LogError($"[LuaManagerNew] Game VM exception: {e}");
+                Debug.LogError($"[LuaManager] Game VM exception: {e}");
                 DisposeActiveVM();
                 return false;
             }
@@ -173,12 +173,12 @@ namespace CutRope.Framework
             if (bpRuntime != null && bpRuntime.LuaState != IntPtr.Zero)
             {
                 env = new LuaEnv(bpRuntime.LuaState);
-                Debug.Log($"[LuaManagerNew:{tag}] LuaEnv created (shared with BlueprintRuntime)");
+                Debug.Log($"[LuaManager:{tag}] LuaEnv created (shared with BlueprintRuntime)");
             }
             else
             {
                 env = new LuaEnv();
-                Debug.Log($"[LuaManagerNew:{tag}] LuaEnv created (standalone)");
+                Debug.Log($"[LuaManager:{tag}] LuaEnv created (standalone)");
             }
 
             env.AddLoader(YooAssetLuaLoader);
@@ -190,17 +190,17 @@ namespace CutRope.Framework
         {
             if (ActiveLuaEnv == null) return;
 
-            try { _luaOnDestroy?.Call(); } catch (Exception e) { Debug.LogWarning($"[LuaManagerNew] onAppDestroy: {e.Message}"); }
+            try { _luaOnDestroy?.Call(); } catch (Exception e) { Debug.LogWarning($"[LuaManager] onAppDestroy: {e.Message}"); }
 
             _luaOnDestroy?.Dispose(); _luaOnDestroy = null;
             _luaUpdate?.Dispose();    _luaUpdate    = null;
 
             try { ActiveLuaEnv.Dispose(); }
-            catch (Exception e) { Debug.LogWarning($"[LuaManagerNew] Dispose: {e.Message}"); }
+            catch (Exception e) { Debug.LogWarning($"[LuaManager] Dispose: {e.Message}"); }
 
             ActiveLuaEnv = null;
             _gcTimer = 0f;
-            Debug.Log("[LuaManagerNew] LuaEnv disposed");
+            Debug.Log("[LuaManager] LuaEnv disposed");
         }
 
         // ════════════════════════════════════════════════════════════
@@ -234,14 +234,14 @@ namespace CutRope.Framework
             var handle = YooAssetsLuaBridge.GetLuaAssetHandle(luaPath);
             if (handle == null)
             {
-                Debug.LogWarning($"[LuaManagerNew] Lua bundle not init; {luaPath}");
+                Debug.LogWarning($"[LuaManager] Lua bundle not init; {luaPath}");
                 return null;
             }
 
             string assetPath  = YooAssetsLuaBridge.GetLuaAssetPath(luaPath);
             if(string.IsNullOrEmpty(assetPath))
             {
-                Debug.LogWarning($"[LuaManagerNew] Lua not found: '{luaPath}'");
+                Debug.LogWarning($"[LuaManager] Lua not found: '{luaPath}'");
                 return null;
             }
 
@@ -249,7 +249,7 @@ namespace CutRope.Framework
             var bytes = textAsset?.bytes;
             if (bytes == null)
             {
-                Debug.LogWarning($"[LuaManagerNew] Lua not found: '{assetPath}' (require '{luaPath}')");
+                Debug.LogWarning($"[LuaManager] Lua not found: '{assetPath}' (require '{luaPath}')");
                 return null;
             }
 
@@ -263,6 +263,9 @@ namespace CutRope.Framework
 
         public async UniTask<bool> PreloadAllScript(string packageName)
         {
+#if !UNITY_EDITOR && UNITY_WEBGL
+            return true;
+#else
             var result = new ReturnTuple<bool, bool>();
             YooAssetsLuaBridge.LoadAllLuaFiles(packageName, luaAddressPrefix, null, (bool bSuccessed, string[] f, bool[] s, string e) =>
             {
@@ -279,6 +282,7 @@ namespace CutRope.Framework
 
             Debug.Log("[GameLauncher] All Lua files loaded ✓");
             return true;
+#endif
         }
     }
 }

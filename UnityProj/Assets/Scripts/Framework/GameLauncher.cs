@@ -48,13 +48,11 @@ namespace CutRope.Framework
             }
 
             Debug.Log("[GameLauncher] === Phase 2: preload lua ===");
-#if !UNITY_EDITOR && UNITY_WEBGL
             if (!await _lua.PreloadAllScript(packageName))
             {
                 Debug.LogError("[GameLauncher] Phase 2 failed, abort.");
                 return;
             }
-#endif
 
             // ── Phase 3：UpdateLogic.lua 启动（Lua 内部检查更新+下载）
             Debug.Log("[GameLauncher] === Phase 3: UpdateLogic VM ===");

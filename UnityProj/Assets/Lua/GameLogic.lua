@@ -9,16 +9,18 @@
 --   4. 暴露 onAppTick / onAppDestroy 供 LuaManager 驱动
 
 print("[GameLogic] *** Game phase start ***")
+require "preload"
+
 
 -- ── 1. 注册蓝图节点 ──────────────────────────────────────────────────────
-local ok, err = pcall(require, 'BlueprintEntry')
+local ok, err = pcall(require, 'blueprints.BlueprintEntry')
 if not ok then
     print('[GameLogic] Warning: BlueprintEntry load failed: ' .. tostring(err))
 end
 
 -- ── 2. 引入核心模块 ──────────────────────────────────────────────────────
-local SM = require 'game/scene_manager'
-local LM = require 'game/level_manager'
+local SM = require 'game.scene_manager'
+local LM = require 'game.level_manager'
 
 -- ── 3. 注入关卡生命周期钩子 ──────────────────────────────────────────────
 
