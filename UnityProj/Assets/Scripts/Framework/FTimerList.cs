@@ -223,6 +223,7 @@ public class FTimerListBehavior : MonoBehaviour
     FTimerList m_LateTimerList = new FTimerList();
 
 #if UNITY_EDITOR
+    [BlackList]
     public int timer_num = 0;
 #endif
 

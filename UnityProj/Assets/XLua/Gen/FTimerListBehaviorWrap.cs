@@ -21,17 +21,15 @@ namespace XLua.CSObjectWrap
         {
 			ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
 			System.Type type = typeof(FTimerListBehavior);
-			Utils.BeginObjectRegister(type, L, translator, 0, 3, 1, 1);
+			Utils.BeginObjectRegister(type, L, translator, 0, 3, 0, 0);
 			
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "AddTimer", _m_AddTimer);
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "RemoveTimer", _m_RemoveTimer);
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "ResetTimer", _m_ResetTimer);
 			
 			
-			Utils.RegisterFunc(L, Utils.GETTER_IDX, "timer_num", _g_get_timer_num);
-            
-			Utils.RegisterFunc(L, Utils.SETTER_IDX, "timer_num", _s_set_timer_num);
-            
+			
+			
 			
 			Utils.EndObjectRegister(type, L, translator, null, null,
 			    null, null, null);
@@ -180,36 +178,7 @@ namespace XLua.CSObjectWrap
             return 1;
         }
         
-        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
-        static int _g_get_timer_num(RealStatePtr L)
-        {
-		    try {
-                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
-			
-                FTimerListBehavior gen_to_be_invoked = (FTimerListBehavior)translator.FastGetCSObj(L, 1);
-                LuaAPI.xlua_pushinteger(L, gen_to_be_invoked.timer_num);
-            } catch(System.Exception gen_e) {
-                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
-            }
-            return 1;
-        }
         
-        
-        
-        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
-        static int _s_set_timer_num(RealStatePtr L)
-        {
-		    try {
-                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
-			
-                FTimerListBehavior gen_to_be_invoked = (FTimerListBehavior)translator.FastGetCSObj(L, 1);
-                gen_to_be_invoked.timer_num = LuaAPI.xlua_tointeger(L, 2);
-            
-            } catch(System.Exception gen_e) {
-                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
-            }
-            return 0;
-        }
         
 		
 		
