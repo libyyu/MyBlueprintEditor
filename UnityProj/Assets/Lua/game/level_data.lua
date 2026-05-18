@@ -3,83 +3,76 @@
 --
 -- 结构：
 --   chapters[i] = {
---     id      = 'chapter_1',
---     name    = '第一章',
---     levels  = {
---       { id='1_1', scene='Level_1_1', name='关卡1', unlock=true },
+--     id    = "1",
+--     name  = "第一章",
+--     levels = {
+--       { id="1_1", name="1-1", scene="Level_1_1", coming_soon=false },
 --       ...
 --     }
 --   }
 --
--- 说明：
---   - scene 对应 YooAsset address 或 Build Settings 场景名
---   - unlock=true 表示默认解锁（第一关），其余通过存档解锁
---   - 星级/分数运行时从 SaveManager 读取，不在此定义
+-- coming_soon=true 的关卡在选关界面显示为灰色锁定，不可点击，
+-- 等场景制作完成后去掉该字段即可上线。
 
 local M = {}
 
 M.chapters = {
     {
-        id   = 'chapter_1',
-        name = '第一章：初识绳索',
-        icon = 'UI/Chapter/chapter_1_icon',  -- YooAsset address
+        id   = "1",
+        name = "第一章",
         levels = {
-            { id = '1_1', scene = 'Level_1_1', name = '第1关', unlock = true  },
-            { id = '1_2', scene = 'Level_1_2', name = '第2关', unlock = false },
-            { id = '1_3', scene = 'Level_1_3', name = '第3关', unlock = false },
-            { id = '1_4', scene = 'Level_1_4', name = '第4关', unlock = false },
-            { id = '1_5', scene = 'Level_1_5', name = '第5关', unlock = false },
-        },
+            { id = "1_1", name = "1-1", scene = "Level_1_1" },
+            { id = "1_2", name = "1-2", scene = "Level_1_2", coming_soon = true },
+            { id = "1_3", name = "1-3", scene = "Level_1_3", coming_soon = true },
+            { id = "1_4", name = "1-4", scene = "Level_1_4", coming_soon = true },
+            { id = "1_5", name = "1-5", scene = "Level_1_5", coming_soon = true },
+        }
     },
     {
-        id   = 'chapter_2',
-        name = '第二章：重力挑战',
-        icon = 'UI/Chapter/chapter_2_icon',
+        id   = "2",
+        name = "第二章",
         levels = {
-            { id = '2_1', scene = 'Level_2_1', name = '第1关', unlock = false },
-            { id = '2_2', scene = 'Level_2_2', name = '第2关', unlock = false },
-            { id = '2_3', scene = 'Level_2_3', name = '第3关', unlock = false },
-            { id = '2_4', scene = 'Level_2_4', name = '第4关', unlock = false },
-            { id = '2_5', scene = 'Level_2_5', name = '第5关', unlock = false },
-        },
+            { id = "2_1", name = "2-1", scene = "Level_2_1", coming_soon = true },
+            { id = "2_2", name = "2-2", scene = "Level_2_2", coming_soon = true },
+            { id = "2_3", name = "2-3", scene = "Level_2_3", coming_soon = true },
+            { id = "2_4", name = "2-4", scene = "Level_2_4", coming_soon = true },
+            { id = "2_5", name = "2-5", scene = "Level_2_5", coming_soon = true },
+        }
     },
-    -- TODO: 后续添加更多章节
 }
 
--- ── 索引表（快速查找）────────────────────────────────────────────────────
+-- ── 快速索引 ──────────────────────────────────────────────────────────────
+-- 所有关卡展开为线性列表，方便 next_level / get_level 查询
+M._flat = {}
+M._map  = {}
 
--- levelId → level config
-local _levelIndex = {}
--- levelId → chapter config
-local _chapterIndex = {}
-
-for _, chapter in ipairs(M.chapters) do
-    for _, level in ipairs(chapter.levels) do
-        _levelIndex[level.id]   = level
-        _chapterIndex[level.id] = chapter
+for _, ch in ipairs(M.chapters) do
+    for _, lv in ipairs(ch.levels) do
+        lv.chapter_id = ch.id
+        lv.chapter_name = ch.name
+        table.insert(M._flat, lv)
+        M._map[lv.id] = lv
     end
 end
 
---- 根据 levelId 获取关卡配置
-function M.get_level(levelId)
-    return _levelIndex[levelId]
+--- 根据 id 获取关卡配置
+function M.get_level(id)
+    return M._map[id]
 end
 
---- 根据 levelId 获取所属章节配置
-function M.get_chapter_by_level(levelId)
-    return _chapterIndex[levelId]
-end
-
---- 获取某章节中 levelId 的下一关（同章节内）
-function M.next_level(levelId)
-    local chapter = _chapterIndex[levelId]
-    if not chapter then return nil end
-    for i, lv in ipairs(chapter.levels) do
-        if lv.id == levelId and chapter.levels[i + 1] then
-            return chapter.levels[i + 1]
+--- 获取下一关配置（跨章节）
+function M.next_level(id)
+    for i, lv in ipairs(M._flat) do
+        if lv.id == id then
+            return M._flat[i + 1]
         end
     end
-    return nil  -- 已是本章最后一关
+    return nil
+end
+
+--- 获取所有关卡（线性顺序）
+function M.all_levels()
+    return M._flat
 end
 
 return M

@@ -4,6 +4,7 @@
 --   Panel/lbl_score / Panel/btn_next / Panel/btn_retry
 
 local FPanelBaseUI = require "ui.FPanelBaseUI"
+local LevelData    = require "game.level_data"
 
 local PREFAB_PATH = "Assets/DefaultPackage/UI/Prefab/UILevelComplete.prefab"
 
@@ -59,14 +60,13 @@ do
 
     function FPanelLevelComplete:OnClickNext()
         print("[LevelComplete] next")
-        -- 简单关卡 ID 递增：1_1 → 1_2
-        local nextId = self:_nextLevelId(self.m_levelId)
+        local LM   = require "game.level_manager"
+        local next = LM.has_next() and LevelData.next_level(self.m_levelId) or nil
         self:DestroyPanel()
         require "ui.FPanelHUD".Instance():DestroyPanel()
-        if nextId then
-            require "game.level_manager".load_level(nextId)
+        if next and not next.coming_soon then
+            LM.load_level(next.id)
         else
-            -- 没有下一关，回主菜单
             require "game.scene_manager".goto_main_menu()
         end
     end
@@ -77,16 +77,6 @@ do
         self:DestroyPanel()
         require "ui.FPanelHUD".Instance():DestroyPanel()
         require "game.level_manager".load_level(id)
-    end
-
-    function FPanelLevelComplete:_nextLevelId(id)
-        if not id then return nil end
-        -- 格式 "world_level" 如 "1_1"
-        local w, l = id:match("^(%d+)_(%d+)$")
-        if w and l then
-            return w .. "_" .. (tonumber(l) + 1)
-        end
-        return nil
     end
 
     function FPanelLevelComplete:OnDestroy()
