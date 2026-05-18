@@ -107,45 +107,36 @@ end
 -- ── 内部：通关 ────────────────────────────────────────────────────────────
 
 function M._handle_win()
-    _ctrl.StopLevel()
+    _ctrl:StopLevel()
+    print('[level_controller] candy eaten → dispatch on_win to blueprint')
 
-    -- 让关卡脚本计算星级和分数
-    local stars = 1
-    local score = 0
-    if _levelMod.calc_stars then
-        stars = _levelMod.calc_stars(_ctrl)
-    end
-    if _levelMod.calc_score then
-        score = _levelMod.calc_score(_ctrl)
-    end
-
-    print(string.format('[level_controller] WIN: stars=%d score=%d', stars, score))
-
-    -- 通知 LevelManager（存档、解锁下一关）
-    LM.complete(stars, score)
-
-    -- 触发关卡脚本的通关回调（可显示特效等）
-    if _levelMod.on_win then _levelMod.on_win(_ctrl, stars, score) end
-
-    -- 触发蓝图自定义事件 on_win → 由蓝图处理打开通关面板
+    -- 存档、星级计算、面板全部由蓝图节点接管：
+    --   Level.CalcStars → Level.Complete(存档) → UI.CloseAll → UI.Open(LevelComplete)
+    -- Lua 侧只需派发事件，不做任何 UI 操作
+    if _G._PushLevelEvent then _G._PushLevelEvent('candy_eaten') end
     if BPR and BPR.Instance then
         BPR.Instance:DispatchEvent('on_win')
+    else
+        -- 蓝图不存在时降级处理：用 default.lua 算星级存档
+        local stars = _levelMod.calc_stars and _levelMod.calc_stars(_ctrl) or 1
+        local score = _levelMod.calc_score and _levelMod.calc_score(_ctrl) or 0
+        LM.complete(stars, score)
+        if _levelMod.on_win then _levelMod.on_win(_ctrl, stars, score) end
     end
 end
 
 -- ── 内部：失败 ────────────────────────────────────────────────────────────
 
 function M._handle_fail()
-    _ctrl.StopLevel()
+    _ctrl:StopLevel()
+    print('[level_controller] candy failed → dispatch on_fail to blueprint')
 
-    print('[level_controller] FAIL')
-    LM.fail()
-
-    if _levelMod.on_fail then _levelMod.on_fail(_ctrl) end
-
-    -- 触发蓝图自定义事件 on_fail → 由蓝图处理打开失败面板
+    if _G._PushLevelEvent then _G._PushLevelEvent('candy_failed') end
     if BPR and BPR.Instance then
         BPR.Instance:DispatchEvent('on_fail')
+    else
+        LM.fail()
+        if _levelMod.on_fail then _levelMod.on_fail(_ctrl) end
     end
 end
 

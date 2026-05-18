@@ -33,7 +33,7 @@ end
 -- ── 5. 注入关卡生命周期钩子 ──────────────────────────────────────────────
 LM.on_level_loaded = function(levelId)
     print('[GameLogic] on_level_loaded: ' .. levelId)
-    require 'ui.FPanelHUD'.Instance():ShowPanel(true)
+    -- HUD 由蓝图 OnBeginPlay 节点开启，这里只停关卡 controller
     local ok2, err2 = pcall(function()
         local LC = require 'game.level_controller'
         LC.init(levelId)
@@ -44,17 +44,14 @@ LM.on_level_loaded = function(levelId)
 end
 
 LM.on_level_complete = function(levelId, stars, score)
-    print(string.format('[GameLogic] on_level_complete: %s  stars=%d  score=%d', levelId, stars or 0, score or 0))
-    local panel = require 'ui.FPanelLevelComplete'.Instance()
-    panel:ShowPanel(true)
-    panel:SetResult(levelId, score)
+    -- UI 由蓝图 on_win 事件处理，这里只记日志
+    print(string.format('[GameLogic] on_level_complete: %s  stars=%d  score=%d',
+        levelId, stars or 0, score or 0))
 end
 
 LM.on_level_failed = function(levelId)
+    -- UI 由蓝图 on_fail 事件处理
     print('[GameLogic] on_level_failed: ' .. levelId)
-    local panel = require 'ui.FPanelLevelFailed'.Instance()
-    panel:ShowPanel(true)
-    panel:SetLevelId(levelId)
 end
 
 -- ── 6. 跳转主菜单，启动游戏 ──────────────────────────────────────────────
