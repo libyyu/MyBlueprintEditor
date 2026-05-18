@@ -1,50 +1,26 @@
 -- game/levels/1_1.lua
--- 第一章第一关 — 新手引导关
+-- 第一章第一关 — 场景级钩子
 --
--- 规则：
---   - 只有1根绳子，1刀即可通关
---   - 无时间限制
---   - 3星：1刀，2星：不可能（1刀=3星），1星：其他
---   - 显示新手提示文字
+-- 职责：
+--   只处理"这个场景独有、不适合蓝图表达"的内容
+--   星级计算 / 通关失败 UI 编排 全由 blueprint_1_1.bjson 驱动
+--
+-- 蓝图节点对照：
+--   on_win  → Level.CalcStars(MaxCuts=1) → Level.Complete → Timer.Wait → UI.Open(LevelComplete)
+--   on_fail → UI.CloseAll → UI.Open(LevelFailed)
+--   on_pause → Level.Pause
 
 local M = {}
 
 function M.on_ready(ctrl)
-    print('[1_1] 新手关就绪，提示玩家切割绳子')
-    -- TODO: 显示新手引导 UI
-    -- CS.CutRope.Framework.UIManager.LuaOpen('UI/TutorialHint', '切断绳子喂给怪兽！', nil)
+    -- 场景就绪：可在这里做关卡专属初始化
+    -- 例如：设置物理参数、生成特殊道具、播放入场动画
+    print('[1_1] Ready')
 end
 
 function M.on_tick(ctrl, dt)
-    -- 无时间限制，不做任何处理
-end
-
-function M.on_cut(ctrl, cutCount, x, y)
-    if cutCount == 1 then
-        print('[1_1] 绳子切断，糖果自由落体中...')
-        -- TODO: 收起引导 UI
-    end
-end
-
-function M.calc_stars(ctrl)
-    -- 第一关只有1根绳子，切1刀就是满星
-    return 3
-end
-
-function M.calc_score(ctrl)
-    -- 新手关固定高分，鼓励玩家
-    local timeBonus = math.max(0, 500 - math.floor(ctrl.ElapsedTime * 20))
-    return 1000 + timeBonus
-end
-
-function M.on_win(ctrl, stars, score)
-    print(string.format('[1_1] 通关！score=%d 恭喜完成第一关！', score))
-    -- TODO: 触发特效（糖果飞入怪兽嘴、怪兽开心动画）
-    -- CS.CutRope.Game.GameEvent.Emit('candy_eaten')
-end
-
-function M.on_fail(ctrl)
-    print('[1_1] 失败，糖果掉落')
+    -- 第一关无时间限制，无需处理
+    -- 有限时关卡在这里做倒计时 → 超时调 _G._PushLevelEvent('candy_failed')
 end
 
 return M
