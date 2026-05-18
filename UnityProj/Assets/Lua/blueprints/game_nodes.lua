@@ -386,4 +386,309 @@ end)
 
 -- ───────────────────────────────────────────────────────────────────────────────
 
-print("[game_nodes] Registered: UI(4) + Scene(4) + Level(6) + Rope(2) + Candy(1) = 17 nodes")
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Level 扩展：Pause / Resume / CalcStars
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+Blueprint.RegisterNodeDef({
+    id          = "Level.Pause",
+    name        = "Level Pause",
+    category    = "Game/Level",
+    color       = "9A6A1A",
+    description = "暂停关卡（停止 Tick，打开暂停面板）",
+    inputs  = { { name = "In", type = "Flow" } },
+    outputs = { { name = "Out", type = "Flow" } },
+})
+Blueprint.RegisterHandler("Level.Pause", function(ctx)
+    local ctrl = CS.CutRope.Game.LevelController.Current
+    if ctrl then ctrl:PauseLevel() end
+    CS.CutRope.Framework.UIManager.LuaOpen("UI/Pause", nil, nil)
+    return true
+end)
+
+-- ───────────────────────────────────────────────────────────────────────────────
+
+Blueprint.RegisterNodeDef({
+    id          = "Level.Resume",
+    name        = "Level Resume",
+    category    = "Game/Level",
+    color       = "9A6A1A",
+    description = "恢复关卡（继续 Tick，关闭暂停面板）",
+    inputs  = { { name = "In", type = "Flow" } },
+    outputs = { { name = "Out", type = "Flow" } },
+})
+Blueprint.RegisterHandler("Level.Resume", function(ctx)
+    local ctrl = CS.CutRope.Game.LevelController.Current
+    if ctrl then ctrl:ResumeLevel() end
+    CS.CutRope.Framework.UIManager.LuaClose("UI/Pause")
+    return true
+end)
+
+-- ───────────────────────────────────────────────────────────────────────────────
+
+Blueprint.RegisterNodeDef({
+    id          = "Level.CalcStars",
+    name        = "Level Calc Stars",
+    category    = "Game/Level",
+    color       = "9A6A1A",
+    description = "根据刀数计算星级（≤MaxCuts = 3星；≤MaxCuts*2 = 2星；其余 = 1星）",
+    inputs  = {
+        { name = "In",      type = "Flow"    },
+        { name = "MaxCuts", type = "Integer" },
+    },
+    outputs = {
+        { name = "Out",   type = "Flow"    },
+        { name = "Stars", type = "Integer" },
+    },
+})
+Blueprint.RegisterHandler("Level.CalcStars", function(ctx)
+    local maxCuts = ctx:GetInput("MaxCuts"):asInt()
+    local ctrl    = CS.CutRope.Game.LevelController.Current
+    local cuts    = ctrl and ctrl.CutCount or 0
+    local stars   = cuts <= maxCuts and 3 or (cuts <= maxCuts * 2 and 2 or 1)
+    ctx:SetOutput("Stars", stars)
+    return true
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- GameEvent.On* — 关卡内事件监听
+-- 蓝图里用这些节点替代 level_controller 的 Lua 回调
+-- 事件由 level_controller 写入全局队列 _G._PushLevelEvent，蓝图 OnTick 轮询消费
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+local _levelEvtQueue = {}
+
+--- C# 钩子通过 level_controller 调用此函数写入事件队列
+function _PushLevelEvent(evtId, payload)
+    table.insert(_levelEvtQueue, { id = evtId, payload = payload or "" })
+end
+_G._PushLevelEvent = _PushLevelEvent
+
+-- ───────────────────────────────────────────────────────────────────────────────
+
+Blueprint.RegisterNodeDef({
+    id          = "GameEvent.OnCut",
+    name        = "On Cut",
+    category    = "Game/Event",
+    color       = "2A7A5A",
+    description = "每次玩家切绳时触发（在 OnTick 里轮询）",
+    inputs  = { { name = "In", type = "Flow" } },
+    outputs = {
+        { name = "onCut",    type = "Flow"    },
+        { name = "onEmpty",  type = "Flow"    },
+        { name = "CutCount", type = "Integer" },
+        { name = "X",        type = "Float"   },
+        { name = "Y",        type = "Float"   },
+    },
+})
+Blueprint.RegisterHandler("GameEvent.OnCut", function(ctx)
+    for i, evt in ipairs(_levelEvtQueue) do
+        if evt.id == "cut" then
+            table.remove(_levelEvtQueue, i)
+            local parts = {}
+            for v in (evt.payload .. ","):gmatch("([^,]*),") do
+                table.insert(parts, v)
+            end
+            ctx:SetOutput("CutCount", tonumber(parts[1]) or 0)
+            ctx:SetOutput("X",        tonumber(parts[2]) or 0)
+            ctx:SetOutput("Y",        tonumber(parts[3]) or 0)
+            ctx:ActivateOutputFlow("onCut")
+            return true
+        end
+    end
+    ctx:ActivateOutputFlow("onEmpty")
+    return true
+end)
+
+-- ───────────────────────────────────────────────────────────────────────────────
+
+Blueprint.RegisterNodeDef({
+    id          = "GameEvent.OnCandyEaten",
+    name        = "On Candy Eaten",
+    category    = "Game/Event",
+    color       = "2A7A5A",
+    description = "糖果被怪兽吃掉时触发",
+    inputs  = { { name = "In", type = "Flow" } },
+    outputs = {
+        { name = "onEaten", type = "Flow" },
+        { name = "onEmpty", type = "Flow" },
+    },
+})
+Blueprint.RegisterHandler("GameEvent.OnCandyEaten", function(ctx)
+    for i, evt in ipairs(_levelEvtQueue) do
+        if evt.id == "candy_eaten" then
+            table.remove(_levelEvtQueue, i)
+            ctx:ActivateOutputFlow("onEaten")
+            return true
+        end
+    end
+    ctx:ActivateOutputFlow("onEmpty")
+    return true
+end)
+
+-- ───────────────────────────────────────────────────────────────────────────────
+
+Blueprint.RegisterNodeDef({
+    id          = "GameEvent.OnCandyFailed",
+    name        = "On Candy Failed",
+    category    = "Game/Event",
+    color       = "2A7A5A",
+    description = "糖果掉落/出界失败时触发",
+    inputs  = { { name = "In", type = "Flow" } },
+    outputs = {
+        { name = "onFailed", type = "Flow" },
+        { name = "onEmpty",  type = "Flow" },
+    },
+})
+Blueprint.RegisterHandler("GameEvent.OnCandyFailed", function(ctx)
+    for i, evt in ipairs(_levelEvtQueue) do
+        if evt.id == "candy_failed" then
+            table.remove(_levelEvtQueue, i)
+            ctx:ActivateOutputFlow("onFailed")
+            return true
+        end
+    end
+    ctx:ActivateOutputFlow("onEmpty")
+    return true
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Audio 节点
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+Blueprint.RegisterNodeDef({
+    id          = "Audio.Play",
+    name        = "Audio Play",
+    category    = "Game/Audio",
+    color       = "3A7A3A",
+    description = "播放音效（YooAsset address）",
+    inputs  = {
+        { name = "In",     type = "Flow"  },
+        { name = "Clip",   type = "String" },
+        { name = "Volume", type = "Float"  },
+    },
+    outputs = { { name = "Out", type = "Flow" } },
+})
+Blueprint.RegisterHandler("Audio.Play", function(ctx)
+    local clip   = ctx:GetInput("Clip"):asString()
+    local volume = ctx:GetInput("Volume"):asFloat()
+    if volume <= 0 then volume = 1 end
+    local ok, AudioMgr = pcall(function() return CS.CutRope.Framework.AudioManager.Instance end)
+    if ok and AudioMgr then
+        AudioMgr:PlaySFX(clip, volume)
+    else
+        print('[Audio.Play] AudioManager not found, clip=' .. clip)
+    end
+    return true
+end)
+
+-- ───────────────────────────────────────────────────────────────────────────────
+
+Blueprint.RegisterNodeDef({
+    id          = "Audio.PlayBGM",
+    name        = "Audio Play BGM",
+    category    = "Game/Audio",
+    color       = "3A7A3A",
+    description = "播放背景音乐（淡入替换当前 BGM）",
+    inputs  = {
+        { name = "In",       type = "Flow"   },
+        { name = "Clip",     type = "String" },
+        { name = "FadeTime", type = "Float"  },
+    },
+    outputs = { { name = "Out", type = "Flow" } },
+})
+Blueprint.RegisterHandler("Audio.PlayBGM", function(ctx)
+    local clip     = ctx:GetInput("Clip"):asString()
+    local fadeTime = ctx:GetInput("FadeTime"):asFloat()
+    if fadeTime <= 0 then fadeTime = 0.5 end
+    local ok, AudioMgr = pcall(function() return CS.CutRope.Framework.AudioManager.Instance end)
+    if ok and AudioMgr then AudioMgr:PlayBGM(clip, fadeTime) end
+    return true
+end)
+
+-- ───────────────────────────────────────────────────────────────────────────────
+
+Blueprint.RegisterNodeDef({
+    id          = "Audio.Stop",
+    name        = "Audio Stop BGM",
+    category    = "Game/Audio",
+    color       = "3A7A3A",
+    description = "停止背景音乐",
+    inputs  = {
+        { name = "In",       type = "Flow"  },
+        { name = "FadeTime", type = "Float" },
+    },
+    outputs = { { name = "Out", type = "Flow" } },
+})
+Blueprint.RegisterHandler("Audio.Stop", function(ctx)
+    local fadeTime = ctx:GetInput("FadeTime"):asFloat()
+    if fadeTime <= 0 then fadeTime = 0.5 end
+    local ok, AudioMgr = pcall(function() return CS.CutRope.Framework.AudioManager.Instance end)
+    if ok and AudioMgr then AudioMgr:StopBGM(fadeTime) end
+    return true
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Timer 节点
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+Blueprint.RegisterNodeDef({
+    id          = "Timer.Wait",
+    name        = "Timer Wait",
+    category    = "Game/Timer",
+    color       = "4A4A9A",
+    description = "延迟节点：每帧推进，Duration 秒后触发 onDone（在 OnTick 里驱动）",
+    inputs  = {
+        { name = "In",        type = "Flow"   },
+        { name = "TimerId",   type = "String" },
+        { name = "Duration",  type = "Float"  },
+        { name = "DeltaTime", type = "Float"  },
+    },
+    outputs = {
+        { name = "onTick",    type = "Flow"  },
+        { name = "onDone",    type = "Flow"  },
+        { name = "Elapsed",   type = "Float" },
+        { name = "Progress",  type = "Float" },
+    },
+})
+Blueprint.RegisterHandler("Timer.Wait", function(ctx)
+    local id  = ctx:GetInput("TimerId"):asString()
+    if id == "" then id = "default_timer" end
+    local dur  = ctx:GetInput("Duration"):asFloat()
+    local dt   = ctx:GetInput("DeltaTime"):asFloat()
+    local key  = "__timer_" .. id
+    local elapsed = math.min((Blueprint.GetVariable(key) or 0) + dt, dur)
+    Blueprint.SetVariable(key, elapsed)
+    ctx:SetOutput("Elapsed",  elapsed)
+    ctx:SetOutput("Progress", dur > 0 and elapsed / dur or 1)
+    if elapsed >= dur then
+        Blueprint.SetVariable(key, 0)  -- 自动重置方便复用
+        ctx:ActivateOutputFlow("onDone")
+    else
+        ctx:ActivateOutputFlow("onTick")
+    end
+    return true
+end)
+
+-- ───────────────────────────────────────────────────────────────────────────────
+
+Blueprint.RegisterNodeDef({
+    id          = "Timer.Reset",
+    name        = "Timer Reset",
+    category    = "Game/Timer",
+    color       = "4A4A9A",
+    description = "手动重置指定 Timer 的计时",
+    inputs  = {
+        { name = "In",      type = "Flow"   },
+        { name = "TimerId", type = "String" },
+    },
+    outputs = { { name = "Out", type = "Flow" } },
+})
+Blueprint.RegisterHandler("Timer.Reset", function(ctx)
+    local id = ctx:GetInput("TimerId"):asString()
+    if id == "" then id = "default_timer" end
+    Blueprint.SetVariable("__timer_" .. id, 0)
+    return true
+end)
+
+print("[game_nodes] Registered: UI(4)+Scene(4)+Level(9)+Rope(2)+Candy(1)+GameEvent.On*(3)+Audio(3)+Timer(2) = 28 nodes")

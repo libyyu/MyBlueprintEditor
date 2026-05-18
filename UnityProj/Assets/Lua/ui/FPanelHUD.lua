@@ -44,8 +44,17 @@ do
     end
 
     function FPanelHUD:OnClickPause()
-        print("[HUD] pause (TODO: FPanelPause not implemented yet)")
-        -- TODO: require 'ui.FPanelPause'.Instance():ShowPanel(true)
+        -- 优先通过蓝图事件 on_pause 驱动（蓝图可选择打开哪个面板）
+        local BPR = CS.CutRope.Framework.BlueprintRuntime
+        if BPR and BPR.Instance and BPR.Instance.IsValid then
+            BPR.Instance:DispatchEvent('on_pause')
+        else
+            -- 蓝图不存在时直接开 Pause 面板
+            local ctrl = CS.CutRope.Game.LevelController.Current
+            if ctrl then ctrl:PauseLevel() end
+            require 'ui.FPanelPause'.Instance():ShowPanel(true)
+        end
+    end
     end
 
     function FPanelHUD:OnDestroy()

@@ -31,6 +31,7 @@ namespace CutRope.Game
         public float ElapsedTime { get; private set; }
         public int   CutCount    { get; private set; }
         public bool  IsRunning   { get; private set; }
+        public bool  IsPaused    { get; private set; }
 
         // ── Lua 钩子（逻辑全在这里，由 Lua 注入）────────────────────
         [CSharpCallLua] public delegate void LuaTickDelegate(float dt);
@@ -112,7 +113,9 @@ namespace CutRope.Game
         // ── 引擎接口（供 Lua 调用）───────────────────────────────────
 
         /// <summary>停止 tick（通关或失败后调用）</summary>
-        public void StopLevel() => IsRunning = false;
+        public void StopLevel()   => IsRunning = false;
+        public void PauseLevel()  { IsPaused = true;  Time.timeScale = 0f; }
+        public void ResumeLevel() { IsPaused = false; Time.timeScale = 1f; }
 
         /// <summary>获取第 i 条绳子（Lua 直接操控）</summary>
         public RopeSpawner GetRope(int index)

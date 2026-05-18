@@ -61,14 +61,20 @@ function M.init(levelId)
     end
 
     _ctrl.OnCut = function(cutCount, x, y)
+        -- 写入蓝图事件队列（蓝图 OnTick 里的 GameEvent.OnCut 节点消费）
+        if _G._PushLevelEvent then
+            _G._PushLevelEvent('cut', cutCount .. ',' .. x .. ',' .. y)
+        end
         if _levelMod.on_cut then _levelMod.on_cut(_ctrl, cutCount, x, y) end
     end
 
     _ctrl.OnCandyEaten = function()
+        if _G._PushLevelEvent then _G._PushLevelEvent('candy_eaten') end
         M._handle_win()
     end
 
     _ctrl.OnCandyFailed = function()
+        if _G._PushLevelEvent then _G._PushLevelEvent('candy_failed') end
         M._handle_fail()
     end
 

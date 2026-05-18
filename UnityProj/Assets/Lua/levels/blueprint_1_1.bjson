@@ -5,8 +5,8 @@
       "schemaVersion": 2,
       "blueprintClass": 0,
       "name": "Level_1_1",
-      "description": "第一关蓝图：处理通关/失败 UI 编排",
-      "version": "1.0"
+      "description": "第一关蓝图：全关卡逻辑（UI编排 + 星级计算 + Pause）",
+      "version": "2.0"
     },
     "nodes": [
       {
@@ -32,22 +32,91 @@
       },
 
       {
+        "id": 20,
+        "definitionId": "CustomEventNode",
+        "definitionVersion": 1,
+        "name": "事件：糖果被吃（通关）",
+        "pins": [
+          { "id": 21, "kind": 1, "dataType": 0, "isExec": true }
+        ],
+        "customEventName": "on_win"
+      },
+      {
+        "id": 30,
+        "definitionId": "Level.CalcStars",
+        "definitionVersion": 1,
+        "name": "计算星级（1刀=3星）",
+        "pins": [
+          { "id": 31, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 32, "kind": 0, "dataType": 2, "name": "MaxCuts", "defaultValue": "1" },
+          { "id": 33, "kind": 1, "dataType": 0, "isExec": true },
+          { "id": 34, "kind": 1, "dataType": 2, "name": "Stars" }
+        ]
+      },
+      {
+        "id": 40,
+        "definitionId": "Level.Complete",
+        "definitionVersion": 1,
+        "name": "通关",
+        "pins": [
+          { "id": 41, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 42, "kind": 0, "dataType": 2, "name": "Stars" },
+          { "id": 43, "kind": 0, "dataType": 2, "name": "Score", "defaultValue": "0" },
+          { "id": 44, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 50,
+        "definitionId": "UI.CloseAll",
+        "definitionVersion": 1,
+        "name": "关闭所有面板",
+        "pins": [
+          { "id": 51, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 52, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 60,
+        "definitionId": "Timer.Wait",
+        "definitionVersion": 1,
+        "name": "延迟0.5秒（特效时间）",
+        "pins": [
+          { "id": 61, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 62, "kind": 0, "dataType": 4, "name": "TimerId",   "defaultValue": "win_delay" },
+          { "id": 63, "kind": 0, "dataType": 3, "name": "Duration",  "defaultValue": "0.5" },
+          { "id": 64, "kind": 0, "dataType": 3, "name": "DeltaTime", "defaultValue": "0" },
+          { "id": 65, "kind": 1, "dataType": 0, "isExec": true, "name": "onTick" },
+          { "id": 66, "kind": 1, "dataType": 0, "isExec": true, "name": "onDone" }
+        ]
+      },
+      {
+        "id": 70,
+        "definitionId": "UI.Open",
+        "definitionVersion": 1,
+        "name": "打开通关面板",
+        "pins": [
+          { "id": 71, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 72, "kind": 0, "dataType": 4, "name": "Address", "defaultValue": "UI/LevelComplete" },
+          { "id": 73, "kind": 0, "dataType": 4, "name": "Param",   "defaultValue": "" },
+          { "id": 74, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      {
         "id": 100,
         "definitionId": "CustomEventNode",
         "definitionVersion": 1,
-        "name": "事件：通关",
+        "name": "事件：失败",
         "pins": [
-          { "id": 101, "kind": 1, "dataType": 0, "isExec": true },
-          { "id": 102, "kind": 1, "dataType": 4, "name": "stars" },
-          { "id": 103, "kind": 1, "dataType": 4, "name": "score" }
+          { "id": 101, "kind": 1, "dataType": 0, "isExec": true }
         ],
-        "customEventName": "on_win"
+        "customEventName": "on_fail"
       },
       {
         "id": 110,
         "definitionId": "UI.CloseAll",
         "definitionVersion": 1,
-        "name": "关闭所有面板",
+        "name": "关闭所有面板（失败）",
         "pins": [
           { "id": 111, "kind": 0, "dataType": 0, "isExec": true },
           { "id": 112, "kind": 1, "dataType": 0, "isExec": true }
@@ -57,10 +126,10 @@
         "id": 120,
         "definitionId": "UI.Open",
         "definitionVersion": 1,
-        "name": "打开通关面板",
+        "name": "打开失败面板",
         "pins": [
           { "id": 121, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 122, "kind": 0, "dataType": 4, "name": "Address", "defaultValue": "UI/LevelComplete" },
+          { "id": 122, "kind": 0, "dataType": 4, "name": "Address", "defaultValue": "UI/LevelFailed" },
           { "id": 123, "kind": 0, "dataType": 4, "name": "Param",   "defaultValue": "" },
           { "id": 124, "kind": 1, "dataType": 0, "isExec": true }
         ]
@@ -70,41 +139,34 @@
         "id": 200,
         "definitionId": "CustomEventNode",
         "definitionVersion": 1,
-        "name": "事件：失败",
+        "name": "事件：暂停",
         "pins": [
           { "id": 201, "kind": 1, "dataType": 0, "isExec": true }
         ],
-        "customEventName": "on_fail"
+        "customEventName": "on_pause"
       },
       {
         "id": 210,
-        "definitionId": "UI.CloseAll",
+        "definitionId": "Level.Pause",
         "definitionVersion": 1,
-        "name": "关闭所有面板（失败）",
+        "name": "暂停关卡",
         "pins": [
           { "id": 211, "kind": 0, "dataType": 0, "isExec": true },
           { "id": 212, "kind": 1, "dataType": 0, "isExec": true }
         ]
-      },
-      {
-        "id": 220,
-        "definitionId": "UI.Open",
-        "definitionVersion": 1,
-        "name": "打开失败面板",
-        "pins": [
-          { "id": 221, "kind": 0, "dataType": 0, "isExec": true },
-          { "id": 222, "kind": 0, "dataType": 4, "name": "Address", "defaultValue": "UI/LevelFailed" },
-          { "id": 223, "kind": 0, "dataType": 4, "name": "Param",   "defaultValue": "" },
-          { "id": 224, "kind": 1, "dataType": 0, "isExec": true }
-        ]
       }
     ],
     "links": [
-      { "id": 1, "startPinId": 2,   "endPinId": 11,  "isEnabled": true },
-      { "id": 2, "startPinId": 101, "endPinId": 111, "isEnabled": true },
-      { "id": 3, "startPinId": 112, "endPinId": 121, "isEnabled": true },
-      { "id": 4, "startPinId": 201, "endPinId": 211, "isEnabled": true },
-      { "id": 5, "startPinId": 212, "endPinId": 221, "isEnabled": true }
+      { "id": 1,  "startPinId": 2,   "endPinId": 11,  "isEnabled": true },
+      { "id": 2,  "startPinId": 21,  "endPinId": 31,  "isEnabled": true },
+      { "id": 3,  "startPinId": 33,  "endPinId": 41,  "isEnabled": true },
+      { "id": 4,  "startPinId": 34,  "endPinId": 42,  "isEnabled": true },
+      { "id": 5,  "startPinId": 44,  "endPinId": 51,  "isEnabled": true },
+      { "id": 6,  "startPinId": 52,  "endPinId": 61,  "isEnabled": true },
+      { "id": 7,  "startPinId": 66,  "endPinId": 71,  "isEnabled": true },
+      { "id": 8,  "startPinId": 101, "endPinId": 111, "isEnabled": true },
+      { "id": 9,  "startPinId": 112, "endPinId": 121, "isEnabled": true },
+      { "id": 10, "startPinId": 201, "endPinId": 211, "isEnabled": true }
     ]
   },
   "editor": {
@@ -113,12 +175,17 @@
     "nodes": [
       { "id": 1,   "position": { "x": 0,    "y": 0   } },
       { "id": 10,  "position": { "x": 250,  "y": 0   } },
-      { "id": 100, "position": { "x": 0,    "y": 200 } },
-      { "id": 110, "position": { "x": 250,  "y": 200 } },
-      { "id": 120, "position": { "x": 500,  "y": 200 } },
-      { "id": 200, "position": { "x": 0,    "y": 400 } },
-      { "id": 210, "position": { "x": 250,  "y": 400 } },
-      { "id": 220, "position": { "x": 500,  "y": 400 } }
+      { "id": 20,  "position": { "x": 0,    "y": 200 } },
+      { "id": 30,  "position": { "x": 250,  "y": 200 } },
+      { "id": 40,  "position": { "x": 500,  "y": 200 } },
+      { "id": 50,  "position": { "x": 750,  "y": 200 } },
+      { "id": 60,  "position": { "x": 1000, "y": 200 } },
+      { "id": 70,  "position": { "x": 1250, "y": 200 } },
+      { "id": 100, "position": { "x": 0,    "y": 400 } },
+      { "id": 110, "position": { "x": 250,  "y": 400 } },
+      { "id": 120, "position": { "x": 500,  "y": 400 } },
+      { "id": 200, "position": { "x": 0,    "y": 600 } },
+      { "id": 210, "position": { "x": 250,  "y": 600 } }
     ],
     "viewInfo": { "viewPosition": { "x": -50, "y": -50 }, "viewScale": 1 }
   }
