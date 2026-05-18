@@ -58,7 +58,7 @@ namespace CutRope.Editor
             try
             {
                 // ① 场景 / Prefab / Tags 幂等初始化
-                RunSetup();
+                //RunSetup();
 
                 // ② YooAsset 资源打包
                 if (!BuildYooAsset(target))
