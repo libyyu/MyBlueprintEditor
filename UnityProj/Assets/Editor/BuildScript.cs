@@ -22,7 +22,7 @@ namespace CutRope.Editor
         // 打包的场景
         private static readonly string[] Scenes =
         {
-            "Assets/GameLauncher.unity",
+            "Assets/Scenes/GameLauncher.unity",
         };
 
         // YooAsset 包名
