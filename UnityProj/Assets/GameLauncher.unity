@@ -227,9 +227,11 @@ GameObject:
   - component: {fileID: 1720353691}
   - component: {fileID: 1720353690}
   - component: {fileID: 1720353689}
+  - component: {fileID: 1720353692}
   - component: {fileID: 1720353688}
   - component: {fileID: 1720353687}
   - component: {fileID: 1720353686}
+  - component: {fileID: 1720353685a}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -237,6 +239,21 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!114 &1720353685a
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1720353685}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9df4d5164ab94e94fbab2ff6e48f538b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  packageName: DefaultPackage
+  updateLuaEntry: UpdateLogic
+  gameLuaEntry: GameLogic
 --- !u!114 &1720353686
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -246,12 +263,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 1720353685}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2da67cd8c31b4ab48a4aecd03874c816, type: 3}
+  m_Script: {fileID: 11500000, guid: 5a31014a1ba07f2438f6d6e220b53d66, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  loadingUiAddress: Assets/UI/LoadingUI.prefab
-  mainSceneName: Main
-  skipSceneLoad: 0
 --- !u!114 &1720353687
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -261,7 +275,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1720353685}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b069cc0e1c6b551429793ee99d50c211, type: 3}
+  m_Script: {fileID: 11500000, guid: f5bc1dde827450c4083d786af916d35b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   gcInterval: 1
@@ -276,12 +290,24 @@ MonoBehaviour:
   m_GameObject: {fileID: 1720353685}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 90ed878d32748014c9833e22614f3986, type: 3}
+  m_Script: {fileID: 11500000, guid: 18dab383bae708f49b508bcae6b55432, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   cdnBaseUrl: https://cdn.example.com/res
   cdnFallbackUrl: 
   defaultPackageName: DefaultPackage
+--- !u!114 &1720353692
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1720353685}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a5a758063290f3045b424e44ec47f8d9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!81 &1720353689
 AudioListener:
   m_ObjectHideFlags: 0
