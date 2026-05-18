@@ -12,20 +12,28 @@ if not ok then
 end
 
 -- ── 2. 引入核心模块 ──────────────────────────────────────────────────────
-local SM = require 'game.scene_manager'
-local LM = require 'game.level_manager'
+local SM      = require 'game.scene_manager'
+local LM      = require 'game.level_manager'
 local FGUIMan = require 'ui.FGUIMan'
 
 -- ── 3. 初始化 UI Root ────────────────────────────────────────────────────
 FGUIMan.Instance():InitUIRoot()
 
--- ── 4. 注入关卡生命周期钩子 ──────────────────────────────────────────────
+-- ── 4. 场景加载完成钩子（负责打开对应 UI）────────────────────────────────
+-- scene_manager 每次加载完场景都会回调，参数为完整 address 字符串
+SM.on_scene_loaded = function(sceneName)
+    print('[GameLogic] scene loaded: ' .. sceneName)
+    -- 只取末段名字，避免路径前缀干扰
+    local name = sceneName:match("([^/]+)$") or sceneName
+    if name == 'MainMenu' or name == 'main_menu' then
+        require 'ui.FPanelMainMenu'.Instance():ShowPanel(true)
+    end
+end
 
+-- ── 5. 注入关卡生命周期钩子 ──────────────────────────────────────────────
 LM.on_level_loaded = function(levelId)
     print('[GameLogic] on_level_loaded: ' .. levelId)
-    -- 显示 HUD
     require 'ui.FPanelHUD'.Instance():ShowPanel(true)
-    -- 初始化关卡逻辑
     local ok2, err2 = pcall(function()
         local LC = require 'game.level_controller'
         LC.init(levelId)
@@ -49,20 +57,11 @@ LM.on_level_failed = function(levelId)
     panel:SetLevelId(levelId)
 end
 
--- ── 5. 跳转主菜单，启动游戏 ──────────────────────────────────────────────
--- 场景加载完后由 scene_manager 回调，在 MainMenu 场景里打开主菜单面板
-SM.on_scene_loaded = function(sceneName)
-    print('[GameLogic] scene loaded: ' .. sceneName)
-    if sceneName == 'MainMenu' or sceneName == 'main_menu' then
-        require 'ui.FPanelMainMenu'.Instance():ShowPanel(true)
-    end
-end
-
+-- ── 6. 跳转主菜单，启动游戏 ──────────────────────────────────────────────
 print('[GameLogic] goto main menu...')
 SM.goto_main_menu()
 
--- ── 6. 全局生命周期钩子（LuaManager 回调）───────────────────────────────
-
+-- ── 7. 全局生命周期钩子（LuaManager 回调）───────────────────────────────
 function onAppTick(dt)
     TickCoroutine(dt)
 end

@@ -44,8 +44,8 @@ do
     end
 
     function FPanelHUD:OnClickPause()
-        print("[HUD] pause")
-        require "ui.FPanelPause".Instance():ShowPanel(true)
+        print("[HUD] pause (TODO: FPanelPause not implemented yet)")
+        -- TODO: require 'ui.FPanelPause'.Instance():ShowPanel(true)
     end
 
     function FPanelHUD:OnDestroy()
