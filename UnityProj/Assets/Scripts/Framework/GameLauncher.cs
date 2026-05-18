@@ -66,6 +66,10 @@ namespace CutRope.Framework
                          ?? gameObject.AddComponent<BlueprintRuntime>();
             bpRuntime.Init();
 
+            // AudioManager（DontDestroyOnLoad，全局音频管理）
+            if (AudioManager.Instance == null)
+                gameObject.AddComponent<AudioManager>();
+
             // ── Phase 4：GameLogic.lua 启动（游戏正式开始）─────────
             Debug.Log("[GameLauncher] === Phase 4: GameLogic VM ===");
             if (!await _lua.RunGameLuaVM(gameLuaEntry))
