@@ -13,28 +13,59 @@
 
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- UI 节点
+-- UIManager 已废弃，全部走 Lua Panel 映射表
 -- ═══════════════════════════════════════════════════════════════════════════════
+
+-- address → Lua 模块路径映射
+-- 蓝图里填 "UI/HUD"，这里翻译成 require 路径
+local _uiModuleMap = {
+    ["UI/HUD"]           = "ui.FPanelHUD",
+    ["UI/Pause"]         = "ui.FPanelPause",
+    ["UI/LevelComplete"] = "ui.FPanelLevelComplete",
+    ["UI/LevelFailed"]   = "ui.FPanelLevelFailed",
+    ["UI/MainMenu"]      = "ui.FPanelMainMenu",
+    ["UI/LevelSelect"]   = "ui.FPanelLevelSelect",
+}
+
+local function _getPanel(address)
+    local modPath = _uiModuleMap[address]
+    if not modPath then
+        print('[UI] Unknown address: ' .. tostring(address))
+        return nil
+    end
+    local ok, mod = pcall(require, modPath)
+    if not ok or not mod then
+        print('[UI] require failed: ' .. tostring(modPath) .. ' | ' .. tostring(mod))
+        return nil
+    end
+    if type(mod.Instance) ~= 'function' then
+        print('[UI] No Instance() on: ' .. modPath)
+        return nil
+    end
+    return mod.Instance()
+end
+
+-- ───────────────────────────────────────────────────────────────────────────────
 
 Blueprint.RegisterNodeDef({
     id          = "UI.Open",
     name        = "UI Open Panel",
     category    = "Game/UI",
     color       = "5A3A9A",
-    description = "异步打开 UI 面板（从 YooAsset 加载 Prefab）",
+    description = "打开 Lua UI 面板（FPanelXxx.Instance():ShowPanel(true)）",
     inputs  = {
         { name = "In",      type = "Flow"   },
-        { name = "Address", type = "String" },  -- YooAsset address，如 "UI/MainMenu"
-        { name = "Param",   type = "String" },  -- 传给 IView.Show 的参数，可为空
+        { name = "Address", type = "String" },
+        { name = "Param",   type = "String" },
     },
     outputs = {
-        { name = "Out",  type = "Flow" },  -- 面板打开后
+        { name = "Out", type = "Flow" },
     },
 })
 Blueprint.RegisterHandler("UI.Open", function(ctx)
     local address = ctx:GetInput("Address"):asString()
-    local param   = ctx:GetInput("Param"):asString()
-    if param == "" then param = nil end
-    CS.CutRope.Framework.UIManager.LuaOpen(address, param, nil)
+    local panel = _getPanel(address)
+    if panel then panel:ShowPanel(true) end
     return true
 end)
 
@@ -45,7 +76,7 @@ Blueprint.RegisterNodeDef({
     name        = "UI Close Panel",
     category    = "Game/UI",
     color       = "5A3A9A",
-    description = "隐藏 UI 面板（不销毁，保留状态）",
+    description = "隐藏 Lua UI 面板（ShowPanel(false)）",
     inputs  = {
         { name = "In",      type = "Flow"   },
         { name = "Address", type = "String" },
@@ -56,7 +87,8 @@ Blueprint.RegisterNodeDef({
 })
 Blueprint.RegisterHandler("UI.Close", function(ctx)
     local address = ctx:GetInput("Address"):asString()
-    CS.CutRope.Framework.UIManager.LuaClose(address)
+    local panel = _getPanel(address)
+    if panel then panel:ShowPanel(false) end
     return true
 end)
 
@@ -67,7 +99,7 @@ Blueprint.RegisterNodeDef({
     name        = "UI Dispose Panel",
     category    = "Game/UI",
     color       = "5A3A9A",
-    description = "销毁 UI 面板并释放资源",
+    description = "销毁 Lua UI 面板（DestroyPanel）",
     inputs  = {
         { name = "In",      type = "Flow"   },
         { name = "Address", type = "String" },
@@ -78,7 +110,8 @@ Blueprint.RegisterNodeDef({
 })
 Blueprint.RegisterHandler("UI.Dispose", function(ctx)
     local address = ctx:GetInput("Address"):asString()
-    CS.CutRope.Framework.UIManager.LuaDispose(address)
+    local panel = _getPanel(address)
+    if panel then panel:DestroyPanel() end
     return true
 end)
 
@@ -89,12 +122,18 @@ Blueprint.RegisterNodeDef({
     name        = "UI Close All",
     category    = "Game/UI",
     color       = "5A3A9A",
-    description = "隐藏所有 UI 面板",
+    description = "隐藏所有已打开的 Lua UI 面板",
     inputs  = { { name = "In", type = "Flow" } },
     outputs = { { name = "Out", type = "Flow" } },
 })
 Blueprint.RegisterHandler("UI.CloseAll", function(ctx)
-    CS.CutRope.Framework.UIManager.LuaCloseAll()
+    for address, modPath in pairs(_uiModuleMap) do
+        local ok, mod = pcall(require, modPath)
+        if ok and mod and type(mod.Instance) == 'function' then
+            local inst = mod.Instance()
+            if inst then inst:ShowPanel(false) end
+        end
+    end
     return true
 end)
 
