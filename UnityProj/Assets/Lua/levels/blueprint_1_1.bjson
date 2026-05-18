@@ -344,26 +344,6 @@
             "isExec": true
           }
         ]
-      },
-      {
-        "id": 105,
-        "definitionId": "Level.Fail",
-        "definitionVersion": 1,
-        "name": "记录失败",
-        "pins": [
-          {
-            "id": 301,
-            "kind": 0,
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 302,
-            "kind": 1,
-            "dataType": 0,
-            "isExec": true
-          }
-        ]
       }
     ],
     "links": [
@@ -412,7 +392,7 @@
       {
         "id": 8,
         "startPinId": 101,
-        "endPinId": 301,
+        "endPinId": 111,
         "isEnabled": true
       },
       {
@@ -425,12 +405,6 @@
         "id": 10,
         "startPinId": 201,
         "endPinId": 211,
-        "isEnabled": true
-      },
-      {
-        "id": 11,
-        "startPinId": 302,
-        "endPinId": 111,
         "isEnabled": true
       }
     ]
@@ -532,13 +506,6 @@
         "position": {
           "x": 250,
           "y": 600
-        }
-      },
-      {
-        "id": 105,
-        "position": {
-          "x": 130,
-          "y": 400
         }
       }
     ],

@@ -108,20 +108,19 @@ end
 
 function M._handle_win()
     _ctrl:StopLevel()
-    print('[level_controller] candy eaten → dispatch on_win to blueprint')
 
-    -- 存档、星级计算、面板全部由蓝图节点接管：
-    --   Level.CalcStars → Level.Complete(存档) → UI.CloseAll → UI.Open(LevelComplete)
-    -- Lua 侧只需派发事件，不做任何 UI 操作
-    if _G._PushLevelEvent then _G._PushLevelEvent('candy_eaten') end
+    -- 星级和分数先用 Lua 计算（保证存档不依赖蓝图连线）
+    local stars = _levelMod.calc_stars and _levelMod.calc_stars(_ctrl) or 1
+    local score = _levelMod.calc_score and _levelMod.calc_score(_ctrl) or 0
+    print(string.format('[level_controller] WIN stars=%d score=%d', stars, score))
+
+    -- 存档、解锁下一关 —— 数据层，不依赖蓝图
+    LM.complete(stars, score)
+    if _levelMod.on_win then _levelMod.on_win(_ctrl, stars, score) end
+
+    -- 派发到蓝图：蓝图只管 UI 流程（CalcStars 节点读星级显示，不再存档）
     if BPR and BPR.Instance then
         BPR.Instance:DispatchEvent('on_win')
-    else
-        -- 蓝图不存在时降级处理：用 default.lua 算星级存档
-        local stars = _levelMod.calc_stars and _levelMod.calc_stars(_ctrl) or 1
-        local score = _levelMod.calc_score and _levelMod.calc_score(_ctrl) or 0
-        LM.complete(stars, score)
-        if _levelMod.on_win then _levelMod.on_win(_ctrl, stars, score) end
     end
 end
 
@@ -129,14 +128,15 @@ end
 
 function M._handle_fail()
     _ctrl:StopLevel()
-    print('[level_controller] candy failed → dispatch on_fail to blueprint')
+    print('[level_controller] FAIL')
 
-    if _G._PushLevelEvent then _G._PushLevelEvent('candy_failed') end
+    -- 存档——数据层，不依赖蓝图
+    LM.fail()
+    if _levelMod.on_fail then _levelMod.on_fail(_ctrl) end
+
+    -- 派发到蓝图：蓝图只管 UI 流程
     if BPR and BPR.Instance then
         BPR.Instance:DispatchEvent('on_fail')
-    else
-        LM.fail()
-        if _levelMod.on_fail then _levelMod.on_fail(_ctrl) end
     end
 end
 
