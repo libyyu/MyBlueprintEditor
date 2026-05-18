@@ -73,17 +73,23 @@ function M.init(levelId)
     end
 
     -- ── 加载关卡蓝图（负责 UI 编排：通关/失败面板等）────────────────────
-    local bjsonKey = 'game/levels/blueprint_' .. _levelId
-    -- Lua 读取 bjson 文本（YooAsset 已预加载到 LuaManager 缓存；bjson 当 TextAsset 加载）
+    -- bjson 在 YooAsset DefaultPackage 里，路径 Assets/Lua/levels/blueprint_<id>.bjson
     -- 用 pcall 保护，找不到蓝图不影响关卡基本逻辑
+    local bjsonAssetPath = 'Assets/Lua/levels/blueprint_' .. _levelId .. '.bjson'
     local ok, bjsonText = pcall(function()
-        local ta = CS.UnityEngine.Resources.Load(bjsonKey)
-        return ta and ta.text or nil
+        local package = CS.YooAsset.YooAssets.GetPackage('DefaultPackage')
+        if not package then return nil end
+        local handle = package:LoadAssetSync(bjsonAssetPath, typeof(CS.UnityEngine.TextAsset))
+        if not handle or handle.Status ~= CS.YooAsset.EOperationStatus.Succeed then return nil end
+        local ta = handle.AssetObject
+        local text = ta and ta.text or nil
+        handle:Release()
+        return text
     end)
     if ok and bjsonText then
         if BPR and BPR.Instance then
             BPR.Instance:LoadFromJson(bjsonText)
-            print('[level_controller] Blueprint loaded: ' .. bjsonKey)
+            print('[level_controller] Blueprint loaded: ' .. bjsonAssetPath)
         end
     else
         print('[level_controller] No blueprint for ' .. _levelId .. ' (optional, skipped)')
