@@ -43,6 +43,16 @@ function M.init(levelId)
     -- ── 注入 C# 钩子 ────────────────────────────────────────────────
 
     _ctrl.OnLevelReady = function()
+        -- 生成所有绳子（连接到 Candy）
+        local ropeCount = _ctrl:GetRopeCount()
+        for i = 0, ropeCount - 1 do
+            local rope = _ctrl:GetRope(i)
+            if rope then
+                rope:Spawn(_ctrl.candy)
+                print(string.format('[level_controller] Rope[%d] spawned', i))
+            end
+        end
+        -- 通知关卡脚本就绪
         if _levelMod.on_ready then _levelMod.on_ready(_ctrl) end
     end
 
