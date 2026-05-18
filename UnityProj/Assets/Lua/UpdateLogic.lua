@@ -54,6 +54,10 @@ local function finish(success, reason)
 end
 
 -- ── Step 3：下载资源 ─────────────────────────────────────────────────────
+--- 查询下载文件数量，若有待下载文件则启动异步下载流程。
+-- 下载进度映射到全局进度的 30%~100% 区间；下载完成后通过 finish 回调上报结果。
+-- 下载失败时回退使用内置资源，不会将更新流程标记为失败。
+-- @param version string 当前目标版本号，用于日志输出
 local function do_download(version)
     local count = Bridge.GetDownloadCount(DefaultPackageName, 10, 3)
     if count == 0 then

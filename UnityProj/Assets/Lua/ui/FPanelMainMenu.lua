@@ -16,6 +16,11 @@ do
         return l_instance
     end
 
+    function FPanelMainMenu:__constructor()
+        self.m_lblProgress = nil
+        self.m_btnContinue = nil
+    end
+
     function FPanelMainMenu:GetResPath() return PREFAB_PATH end
 
     function FPanelMainMenu:OnCreate()

@@ -16,13 +16,12 @@ local SM      = require 'game.scene_manager'
 local LM      = require 'game.level_manager'
 local FGUIMan = require 'ui.FGUIMan'
 
--- ── 3. 初始化 UI Root ────────────────────────────────────────────────────
-FGUIMan.Instance():InitUIRoot()
-
 -- ── 4. 场景加载完成钩子（负责打开对应 UI）────────────────────────────────
 -- scene_manager 每次加载完场景都会回调，参数为完整 address 字符串
 SM.on_scene_loaded = function(sceneName)
     print('[GameLogic] scene loaded: ' .. sceneName)
+    -- ── 3. 初始化 UI Root ────────────────────────────────────────────────────
+    FGUIMan.Instance():InitUIRoot(true)
     -- 只取末段名字，避免路径前缀干扰
     local name = sceneName:match("([^/]+)$") or sceneName
     if name == 'MainMenu' or name == 'main_menu' then
