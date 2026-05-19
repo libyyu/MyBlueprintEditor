@@ -62,8 +62,8 @@ namespace CutRope.Framework
                 return;
             }
 
-            var bpRuntime = BlueprintRuntime.Instance
-                         ?? gameObject.AddComponent<BlueprintRuntime>();
+            var bpRuntime = BlueprintRunner.Instance
+                         ?? gameObject.AddComponent<BlueprintRunner>();
             bpRuntime.Init();
 
             // AudioManager（DontDestroyOnLoad，全局音频管理）
@@ -72,7 +72,7 @@ namespace CutRope.Framework
 
             // ── Phase 4：GameLogic.lua 启动（游戏正式开始）─────────
             Debug.Log("[GameLauncher] === Phase 4: GameLogic VM ===");
-            if (!await _lua.RunGameLuaVM(gameLuaEntry))
+            if (!await _lua.RunGameLuaVM(bpRuntime.LuaState, gameLuaEntry))
             {
                 Debug.LogError("[GameLauncher] Phase 4 failed, abort.");
                 return;

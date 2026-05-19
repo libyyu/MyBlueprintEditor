@@ -53,7 +53,7 @@ do
 
         -- lbl_progress
         local lblTr = root:Find("lbl_progress")
-        self.m_lblProgress = lblTr and lblTr:GetComponent(typeof(TMPro.TMP_Text)) or nil
+        self.m_lblProgress = lblTr and lblTr:GetComponent(typeof(CS.TMPro.TMP_Text)) or nil
     end
 
     function FPanelMainMenu:OnShow(bShow)

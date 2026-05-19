@@ -35,6 +35,10 @@ M.on_level_failed   = nil  -- function(levelId)
 --- 加载指定关卡
 -- @param levelId  string  如 '1_1'
 -- @param onProgress function(float) 可为 nil
+--- 加载指定关卡
+-- @param levelId 关卡ID，需在 LevelData 中有对应配置
+-- @param onProgress 加载进度回调函数
+-- @return 无返回值；若关卡不存在或未解锁则提前返回
 function M.load_level(levelId, onProgress)
     local cfg = LevelData.get_level(levelId)
     if not cfg then
@@ -52,7 +56,7 @@ function M.load_level(levelId, onProgress)
 
     print('[level_manager] Loading level: ' .. levelId .. ' scene: ' .. cfg.scene)
 
-    SM.load(cfg.scene, onProgress, function()
+    SM.load( "Assets/DefaultPackage/Scenes/" .. cfg.scene .. ".unity", onProgress, function()
         print('[level_manager] Level loaded: ' .. levelId)
         if M.on_level_loaded then M.on_level_loaded(levelId) end
     end)

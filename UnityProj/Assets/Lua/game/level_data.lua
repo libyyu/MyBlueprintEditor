@@ -21,7 +21,7 @@ M.chapters = {
         id   = "1",
         name = "第一章",
         levels = {
-            { id = "1_1", name = "1-1", scene = "Level_1_1" },
+            { id = "1_1", name = "1-1", scene = "Level_1_1", unlock = true },
             { id = "1_2", name = "1-2", scene = "Level_1_2", coming_soon = true },
             { id = "1_3", name = "1-3", scene = "Level_1_3", coming_soon = true },
             { id = "1_4", name = "1-4", scene = "Level_1_4", coming_soon = true },

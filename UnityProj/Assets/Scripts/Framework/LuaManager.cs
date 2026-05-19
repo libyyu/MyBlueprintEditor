@@ -101,7 +101,7 @@ namespace CutRope.Framework
             Debug.Log($"[LuaManager] === Update VM start: {entryLua} ===");
 
             DisposeActiveVM();
-            var env = CreateLuaEnv("update");
+            var env = CreateLuaEnv("update", IntPtr.Zero);
             ActiveLuaEnv = env;
 
             try
@@ -140,12 +140,12 @@ namespace CutRope.Framework
         /// 起正式游戏 LuaVM 跑入口脚本（如 main.lua）。
         /// VM 持续存活直到 GameObject 销毁，Update() 会调用 _G.onAppTick。
         /// </summary>
-        public async UniTask<bool> RunGameLuaVM(string entryLua = "main")
+        public async UniTask<bool> RunGameLuaVM(IntPtr L, string entryLua = "main")
         {
             Debug.Log($"[LuaManager] === Game VM start: {entryLua} ===");
 
             DisposeActiveVM();
-            var env = CreateLuaEnv("game");
+            var env = CreateLuaEnv("game", L);
             ActiveLuaEnv = env;
 
             try
@@ -172,16 +172,15 @@ namespace CutRope.Framework
         // 内部：创建/销毁 VM
         // ════════════════════════════════════════════════════════════
 
-        private LuaEnv CreateLuaEnv(string tag)
+        private LuaEnv CreateLuaEnv(string tag, IntPtr L)
         {
             // 每个 VM 都尝试与 BlueprintRuntime 共享 lua_State（如果存在），
             // 否则起一个独立 VM。两个阶段的 VM 是完全独立的实例。
             LuaEnv env;
-            var bpRuntime = BlueprintRuntime.Instance;
-            if (bpRuntime != null && bpRuntime.LuaState != IntPtr.Zero)
+            if (L != IntPtr.Zero)
             {
-                env = new LuaEnv(bpRuntime.LuaState);
-                Debug.Log($"[LuaManager:{tag}] LuaEnv created (shared with BlueprintRuntime)");
+                env = new LuaEnv(L);
+                Debug.Log($"[LuaManager:{tag}] LuaEnv created (outer VM)");
             }
             else
             {

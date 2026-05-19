@@ -11,7 +11,7 @@
 -- 通用框架逻辑全在此文件，不需要重复写。
 
 local LM  = require 'game/level_manager'
-local BPR = CS.CutRope.Framework.BlueprintRuntime  -- C# BlueprintRuntime 单例
+local BPR = CS.CutRope.Framework.BlueprintRunner  -- C# BlueprintRunner 单例
 
 local M = {}
 local _ctrl    = nil   -- C# LevelController
