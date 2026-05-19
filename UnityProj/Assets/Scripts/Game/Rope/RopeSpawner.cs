@@ -67,8 +67,9 @@ namespace CutRope.Game
                 var rb = seg.Rb;
                 rb.mass = segmentMass;
 
-                // HingeJoint2D：连到上一节或锚点
-                var joint = go.GetComponent<HingeJoint2D>() ?? go.AddComponent<HingeJoint2D>();
+                // 直接用 RopeSegment.Joint（Awake 已保证不为 null）
+                var joint = seg.Joint;
+                joint.autoConfigureConnectedAnchor = false;
                 if (i == 0)
                 {
                     // 第0节：connectedBody 为 null，通过 connectedAnchor 锁到世界锚点

@@ -18,12 +18,16 @@ namespace CutRope.Game
         public RopeSegment NextSegment { get; set; }  // 链表：指向下一节
 
         private HingeJoint2D _joint;
-        public  Rigidbody2D  Rb { get; private set; }
+        public  Rigidbody2D  Rb    { get; private set; }
+        /// <summary>预先缓存的 HingeJoint2D，供 RopeSpawner 配置使用。</summary>
+        public  HingeJoint2D Joint { get; private set; }
 
         private void Awake()
         {
             Rb     = GetComponent<Rigidbody2D>();
-            _joint = GetComponent<HingeJoint2D>();
+            // 优先从 prefab 取；若 prefab 漏配则运行时补加，保证不为 null
+            _joint = GetComponent<HingeJoint2D>() ?? gameObject.AddComponent<HingeJoint2D>();
+            Joint  = _joint;
         }
 
         /// <summary>断开与上一节的连接（销毁关节）</summary>
