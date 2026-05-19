@@ -37,6 +37,15 @@ namespace CutRope.Framework
         /// <summary>当前活跃的 LuaEnv（更新阶段或游戏阶段）。同一时刻只有一个。</summary>
         public LuaEnv ActiveLuaEnv { get; private set; }
 
+        public static bool IsLuaValid 
+        { 
+            get
+            {
+                if (Instance == null) { return false; }
+                return Instance.ActiveLuaEnv != null;
+            }
+        }
+
         // ── 私有 ─────────────────────────────────────────────────────
         private float       _gcTimer;
         private LuaFunction _luaUpdate;

@@ -5,6 +5,7 @@ using System;
 using UnityEngine.UI;
 using UGUIEvent;
 using XLua;
+using CutRope.Framework;
 
 
 [LuaCallCSharp]
@@ -256,8 +257,9 @@ public class UILuaBehaviour : MonoBehaviour {
     /// <summary>
     /// 执行Lua方法
     /// </summary>
-    object[] CallMethod(string func, params object[] args) {
-        if (!initialize || null == msgHandle) return null;
+    object[] CallMethod(string func, params object[] args) 
+    {
+        if (!initialize || null == msgHandle || LuaManager.IsLuaValid) return null;
         var fun = msgHandle.Get<LuaFunction>(func);
         if (null == fun) return null;
         return fun.Call(args);
