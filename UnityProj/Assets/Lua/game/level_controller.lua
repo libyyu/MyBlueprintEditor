@@ -88,42 +88,42 @@ function M.init(levelId)
 
     print('[level_controller] Initialized: ' .. _levelId)
 
-    -- ── 异步加载关卡蓝图（YooAsset 异步接口）──────────────────────────
+    print('[level_controller] Initialized: ' .. _levelId)
+
+    -- ── 异步加载关卡蓝图（用 YooAssetsLuaBridge.LoadAsset 回调模式）──────────
     M._load_blueprint_async(_levelId)
 end
 
---- 异步加载蓝图，支持依赖/子蓝图递归加载
--- @param levelId  string  如 '1_1'
--- @param onDone   function() 可选，加载完成回调
+-- 异步加载蓝图，支持依赖子蓝图
 function M._load_blueprint_async(levelId, onDone)
     local bjsonPath = 'Assets/Lua/levels/blueprint_' .. levelId .. '.bjson'
-    M._load_asset_async(bjsonPath, function(text)
-        if not text then
-            print('[level_controller] No blueprint for ' .. levelId .. ' (optional, skipped)')
+    local Bridge = CS.YooAssetsLuaBridge
+    Bridge.LoadAsset('DefaultPackage', bjsonPath, function(ok, asset, err)
+        if not ok or not asset then
+            print('[level_controller] No blueprint for ' .. levelId .. ': ' .. tostring(err))
             if onDone then onDone() end
             return
         end
-        -- 解析 JSON，检查是否有 subBlueprints 依赖
+        local text = asset.text
+        -- 检查是否有子蓝图依赖
         local deps = M._parse_blueprint_deps(text)
         if #deps == 0 then
             M._apply_blueprint(text, levelId)
             if onDone then onDone() end
         else
-            -- 先加载所有依赖蓝图，再加载主蓝图
+            -- 递归加载依赖子蓝图
             local loaded = 0
-            local depTexts = {}
-            for i, dep in ipairs(deps) do
-                M._load_asset_async('Assets/Lua/levels/' .. dep .. '.bjson', function(depText)
-                    depTexts[dep] = depText or ''
+            for _, depId in ipairs(deps) do
+                local depPath = 'Assets/Lua/levels/' .. depId .. '.bjson'
+                Bridge.LoadAsset('DefaultPackage', depPath, function(dok, dasset, derr)
+                    if dok and dasset then
+                        M._apply_blueprint(dasset.text, depId)
+                    else
+                        print('[level_controller] Sub-blueprint failed: ' .. depId .. ' ' .. tostring(derr))
+                    end
                     loaded = loaded + 1
                     if loaded == #deps then
-                        -- 依赖全部加载完，注入后加载主蓝图
-                        for depId, dt in pairs(depTexts) do
-                            if dt ~= '' and BPR and BPR.Instance then
-                                BPR.Instance:LoadFromJson(dt)
-                                print('[level_controller] Sub-blueprint loaded: ' .. depId)
-                            end
-                        end
+                        -- 子蓝图全部完成，加载主蓝图
                         M._apply_blueprint(text, levelId)
                         if onDone then onDone() end
                     end
@@ -133,10 +133,9 @@ function M._load_blueprint_async(levelId, onDone)
     end)
 end
 
---- 从 bjson 文本解析依赖的子蓝图 id 列表
+-- 解析 bjson 里的 subBlueprints 列表
 function M._parse_blueprint_deps(text)
     local deps = {}
-    -- 简单字符串匹配 "subBlueprints": ["1_2", ...]
     local arr = text:match('"subBlueprints"%s*:%s*%[(.-)%]')
     if arr then
         for id in arr:gmatch('"([^"]+)"') do
@@ -146,69 +145,11 @@ function M._parse_blueprint_deps(text)
     return deps
 end
 
---- 将蓝图 JSON 提交给 BlueprintRunner
+-- 提交蓝图文本给 BlueprintRunner
 function M._apply_blueprint(text, levelId)
     if BPR and BPR.Instance then
         BPR.Instance:LoadFromJson(text)
-        print('[level_controller] Blueprint loaded: ' .. levelId)
-    end
-end
-
---- YooAsset 异步加载 TextAsset，完成后回调 fn(text|nil)
-function M._load_asset_async(assetPath, fn)
-    local package = CS.YooAsset.YooAssets.GetPackage('DefaultPackage')
-    if not package then
-        print('[level_controller] YooAsset package not found')
-        fn(nil)
-        return
-    end
-    local handle = package:LoadAssetAsync(assetPath, typeof(CS.UnityEngine.TextAsset))
-    if not handle then
-        fn(nil)
-        return
-    end
-    -- 用 coro 等待异步完成
-    local co = coroutine.create(function()
-        -- 轮询直到完成
-        while not handle.IsDone do
-            coroutine.yield()
-        end
-        if handle.Status == CS.YooAsset.EOperationStatus.Succeed then
-            local ta = handle.AssetObject
-            local text = ta and ta.text or nil
-            handle:Release()
-            fn(text)
-        else
-            print('[level_controller] Load failed: ' .. assetPath)
-            handle:Release()
-            fn(nil)
-        end
-    end)
-    -- 注册到全局 coro 调度器
-    if StartCoroutine then
-        StartCoroutine(co)
-    else
-        -- fallback: 用 timer 每帧推进
-        local function tick(dt)
-            if coroutine.status(co) ~= 'dead' then
-                coroutine.resume(co)
-            end
-        end
-        -- 挂到 LevelController OnTick
-        local origTick = _ctrl.OnTick
-        local _myTick
-        _myTick = function(dt)
-            if coroutine.status(co) ~= 'dead' then
-                coroutine.resume(co)
-            end
-            if origTick then origTick(dt) end
-            if coroutine.status(co) == 'dead' then
-                -- 加载完成，移除临时 tick
-                _ctrl.OnTick = origTick
-            end
-        end
-        _ctrl.OnTick = _myTick
-        coroutine.resume(co)  -- 启动
+        print('[level_controller] Blueprint applied: ' .. levelId)
     end
 end
 
