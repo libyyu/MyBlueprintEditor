@@ -733,18 +733,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Candy
       objectReference: {fileID: 0}
-    - target: {fileID: 9079349267385033170, guid: 69fb24eccd749d94d9ff3a09c89c47f1, type: 3}
-      propertyPath: m_Color.r
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 9079349267385033170, guid: 69fb24eccd749d94d9ff3a09c89c47f1, type: 3}
-      propertyPath: m_Color.g
-      value: 0.85
-      objectReference: {fileID: 0}
-    - target: {fileID: 9079349267385033170, guid: 69fb24eccd749d94d9ff3a09c89c47f1, type: 3}
-      propertyPath: m_Color.b
-      value: 0.1
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
