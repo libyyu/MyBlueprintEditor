@@ -97,6 +97,13 @@ struct ImportResult
     std::vector<std::string> warnings;            // 警告信息
 };
 
+struct ImportMetaResult
+{
+    bool                success = false;
+    std::string         errorMessage;
+    BlueprintMetadata   metadata;                 // 成功时加载的数据
+};
+
 // ============================================================================
 // 蓝图导入导出接口
 // ============================================================================
@@ -119,6 +126,10 @@ public:
 
     // 从文件导入（自动兼容）
     virtual ImportResult importRuntimeFromFile(const std::string& filePath, const ImportOptions& options = ImportOptions()) const = 0;
+
+	virtual ImportMetaResult importMetadataFromFile(const std::string& filePath, const ImportOptions& options = ImportOptions()) const = 0;
+
+    virtual ImportMetaResult importMetadataFromString(const std::string& content, const ImportOptions& options = ImportOptions()) const = 0;
 
     // ---- 单文件导出（runtime + editor 合并）----
 
@@ -158,6 +169,9 @@ public:
     ImportResult importRuntimeFromString(const std::string& content, const ImportOptions& options = ImportOptions()) const override;
     ImportResult importRuntimeFromFile(const std::string& filePath, const ImportOptions& options = ImportOptions()) const override;
 
+    ImportMetaResult importMetadataFromFile(const std::string& filePath, const ImportOptions& options = ImportOptions()) const override;
+    ImportMetaResult importMetadataFromString(const std::string& content, const ImportOptions& options = ImportOptions()) const override;
+
     // 单文件导出（runtime + editor 合并）
     EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const override;
 
@@ -189,6 +203,9 @@ public:
     ExportResult exportRuntimeToFile(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const override;
     ImportResult importRuntimeFromString(const std::string& content, const ImportOptions& options = ImportOptions()) const override;
     ImportResult importRuntimeFromFile(const std::string& filePath, const ImportOptions& options = ImportOptions()) const override;
+
+    ImportMetaResult importMetadataFromFile(const std::string& filePath, const ImportOptions& options = ImportOptions()) const override;
+    ImportMetaResult importMetadataFromString(const std::string& content, const ImportOptions& options = ImportOptions()) const override;
 
     EditorExportResult exportEditorFiles(const BlueprintData& data, const std::string& filePath, const ExportOptions& options = ExportOptions()) const override;
 

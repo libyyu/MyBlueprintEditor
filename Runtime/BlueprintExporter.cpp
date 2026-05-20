@@ -1438,6 +1438,126 @@ ImportResult JsonBlueprintExporter::importRuntimeFromFile(const std::string& fil
     return result;
 }
 
+ImportMetaResult JsonBlueprintExporter::importMetadataFromFile(const std::string& filePath, const ImportOptions& options) const
+{
+    ImportMetaResult result;
+#ifndef __EMSCRIPTEN__
+    try
+    {
+        std::string errorMsg;
+        std::string content;
+        if (!m_fileSystem->ReadFile(filePath, content, errorMsg))
+        {
+            result.errorMessage = errorMsg;
+            return result;
+        }
+
+        result = importMetadataFromString(content, options);
+    }
+    catch (const std::exception& e)
+    {
+        result.errorMessage = std::string("Exception: ") + e.what();
+    }
+#else
+    {
+        std::string errorMsg;
+        std::string content;
+        if (!m_fileSystem->ReadFile(filePath, content, errorMsg))
+        {
+            result.errorMessage = errorMsg;
+            return result;
+        }
+
+        result = importMetadataFromString(content, options);
+    }
+#endif
+
+    return result;
+}
+
+ImportMetaResult JsonBlueprintExporter::importMetadataFromString(const std::string& content, const ImportOptions& options) const
+{
+    ImportMetaResult result;
+
+    // 使用 crude_json 解析
+    crude_json::value root = crude_json::value::parse(content);
+    if (root.is_discarded())
+    {
+        result.errorMessage = "JSON parse error";
+        return result;
+    }
+
+    if (root.type() != crude_json::type_t::object)
+    {
+        result.errorMessage = "Root JSON element must be an object";
+        return result;
+    }
+
+    auto& rootObj = root;
+
+    // ---- 辅助别名（使用文件级辅助函数，通过 lambda 保留默认参数）----
+    auto getNumber = [](const crude_json::value& obj, const char* key, double defaultVal = 0.0) { return getJsonNumber(obj, key, defaultVal); };
+    auto getString = [](const crude_json::value& obj, const char* key) { return getJsonString(obj, key); };
+    auto getBool = [](const crude_json::value& obj, const char* key, bool defaultVal = false) { return getJsonBool(obj, key, defaultVal); };
+
+    // ---- 解析元数据 ----
+    if (rootObj.contains("metadata") && rootObj["metadata"].type() == crude_json::type_t::object)
+    {
+        auto& meta = rootObj["metadata"];
+        result.metadata.schemaVersion = static_cast<int>(getNumber(meta, "schemaVersion", 0));
+        result.metadata.blueprintClass = static_cast<BlueprintClass>(
+            static_cast<int>(getNumber(meta, "blueprintClass", 0)));
+        result.metadata.name = getString(meta, "name");
+        result.metadata.description = getString(meta, "description");
+        result.metadata.version = getString(meta, "version");
+        result.metadata.author = getString(meta, "author");
+        result.metadata.createdAt = getString(meta, "createdAt");
+        result.metadata.updatedAt = getString(meta, "updatedAt");
+
+        if (meta.contains("tags") && meta["tags"].type() == crude_json::type_t::array)
+        {
+            for (auto& tag : meta["tags"].get<crude_json::array>())
+            {
+                if (tag.type() == crude_json::type_t::string)
+                    result.metadata.tags.push_back(tag.get<std::string>());
+            }
+        }
+
+        // dependencies：加载时按序读取（Runtime 用来决定 Library 加载顺序）
+        if (meta.contains("dependencies") && meta["dependencies"].type() == crude_json::type_t::array)
+        {
+            for (auto& dep : meta["dependencies"].get<crude_json::array>())
+            {
+                if (dep.type() == crude_json::type_t::string)
+                    result.metadata.dependencies.push_back(dep.get<std::string>());
+            }
+        }
+    }
+
+    // ---- Schema 版本检查 ----
+    {
+        int fileSchema = result.metadata.schemaVersion;
+        if (fileSchema > BLUEPRINT_CURRENT_SCHEMA_VERSION)
+        {
+            result.errorMessage = "Blueprint file requires schema version "
+                + std::to_string(fileSchema)
+                + ", but this runtime only supports up to version "
+                + std::to_string(BLUEPRINT_CURRENT_SCHEMA_VERSION)
+                + ". Please update the application.";
+            return result;
+        }
+
+        // fileSchema == 0 表示老文件没有 schemaVersion 字段，视为版本 1
+        if (fileSchema == 0)
+        {
+            result.metadata.schemaVersion = 1;
+        }
+    }
+
+    result.success = true;
+    return result;
+}
+
 // ============================================================================
 // JsonBlueprintExporter — 编辑器合并加载
 // ============================================================================
@@ -1871,6 +1991,20 @@ ImportResult BinaryBlueprintExporter::importRuntimeFromString(const std::string&
 ImportResult BinaryBlueprintExporter::importRuntimeFromFile(const std::string& /*filePath*/, const ImportOptions& /*options*/) const
 {
     ImportResult result;
+    result.errorMessage = "Binary import not yet implemented";
+    return result;
+}
+
+ImportMetaResult BinaryBlueprintExporter::importMetadataFromFile(const std::string& filePath, const ImportOptions& /*options*/) const
+{
+    ImportMetaResult result;
+    result.errorMessage = "Binary import not yet implemented";
+    return result;
+}
+
+ImportMetaResult BinaryBlueprintExporter::importMetadataFromString(const std::string& content, const ImportOptions& /*options*/) const
+{
+    ImportMetaResult result;
     result.errorMessage = "Binary import not yet implemented";
     return result;
 }

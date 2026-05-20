@@ -21,21 +21,27 @@ namespace XLua.CSObjectWrap
         {
 			ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
 			System.Type type = typeof(CutRope.Game.LevelController);
-			Utils.BeginObjectRegister(type, L, translator, 0, 3, 11, 8);
+			Utils.BeginObjectRegister(type, L, translator, 0, 5, 15, 9);
 			
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "StopLevel", _m_StopLevel);
+			Utils.RegisterFunc(L, Utils.METHOD_IDX, "PauseLevel", _m_PauseLevel);
+			Utils.RegisterFunc(L, Utils.METHOD_IDX, "ResumeLevel", _m_ResumeLevel);
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "GetRope", _m_GetRope);
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "GetRopeCount", _m_GetRopeCount);
 			
 			
-			Utils.RegisterFunc(L, Utils.GETTER_IDX, "ElapsedTime", _g_get_ElapsedTime);
+			Utils.RegisterFunc(L, Utils.GETTER_IDX, "StarCount", _g_get_StarCount);
+            Utils.RegisterFunc(L, Utils.GETTER_IDX, "StarsCollected", _g_get_StarsCollected);
+            Utils.RegisterFunc(L, Utils.GETTER_IDX, "ElapsedTime", _g_get_ElapsedTime);
             Utils.RegisterFunc(L, Utils.GETTER_IDX, "CutCount", _g_get_CutCount);
             Utils.RegisterFunc(L, Utils.GETTER_IDX, "IsRunning", _g_get_IsRunning);
+            Utils.RegisterFunc(L, Utils.GETTER_IDX, "IsPaused", _g_get_IsPaused);
             Utils.RegisterFunc(L, Utils.GETTER_IDX, "OnTick", _g_get_OnTick);
             Utils.RegisterFunc(L, Utils.GETTER_IDX, "OnCut", _g_get_OnCut);
             Utils.RegisterFunc(L, Utils.GETTER_IDX, "OnCandyEaten", _g_get_OnCandyEaten);
             Utils.RegisterFunc(L, Utils.GETTER_IDX, "OnCandyFailed", _g_get_OnCandyFailed);
             Utils.RegisterFunc(L, Utils.GETTER_IDX, "OnLevelReady", _g_get_OnLevelReady);
+            Utils.RegisterFunc(L, Utils.GETTER_IDX, "OnStarCollected", _g_get_OnStarCollected);
             Utils.RegisterFunc(L, Utils.GETTER_IDX, "ropes", _g_get_ropes);
             Utils.RegisterFunc(L, Utils.GETTER_IDX, "candy", _g_get_candy);
             Utils.RegisterFunc(L, Utils.GETTER_IDX, "cutInput", _g_get_cutInput);
@@ -45,6 +51,7 @@ namespace XLua.CSObjectWrap
             Utils.RegisterFunc(L, Utils.SETTER_IDX, "OnCandyEaten", _s_set_OnCandyEaten);
             Utils.RegisterFunc(L, Utils.SETTER_IDX, "OnCandyFailed", _s_set_OnCandyFailed);
             Utils.RegisterFunc(L, Utils.SETTER_IDX, "OnLevelReady", _s_set_OnLevelReady);
+            Utils.RegisterFunc(L, Utils.SETTER_IDX, "OnStarCollected", _s_set_OnStarCollected);
             Utils.RegisterFunc(L, Utils.SETTER_IDX, "ropes", _s_set_ropes);
             Utils.RegisterFunc(L, Utils.SETTER_IDX, "candy", _s_set_candy);
             Utils.RegisterFunc(L, Utils.SETTER_IDX, "cutInput", _s_set_cutInput);
@@ -109,6 +116,60 @@ namespace XLua.CSObjectWrap
                 {
                     
                     gen_to_be_invoked.StopLevel(  );
+                    
+                    
+                    
+                    return 0;
+                }
+                
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _m_PauseLevel(RealStatePtr L)
+        {
+		    try {
+            
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            
+            
+                CutRope.Game.LevelController gen_to_be_invoked = (CutRope.Game.LevelController)translator.FastGetCSObj(L, 1);
+            
+            
+                
+                {
+                    
+                    gen_to_be_invoked.PauseLevel(  );
+                    
+                    
+                    
+                    return 0;
+                }
+                
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _m_ResumeLevel(RealStatePtr L)
+        {
+		    try {
+            
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            
+            
+                CutRope.Game.LevelController gen_to_be_invoked = (CutRope.Game.LevelController)translator.FastGetCSObj(L, 1);
+            
+            
+                
+                {
+                    
+                    gen_to_be_invoked.ResumeLevel(  );
                     
                     
                     
@@ -194,6 +255,34 @@ namespace XLua.CSObjectWrap
         }
         
         [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _g_get_StarCount(RealStatePtr L)
+        {
+		    try {
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+			
+                CutRope.Game.LevelController gen_to_be_invoked = (CutRope.Game.LevelController)translator.FastGetCSObj(L, 1);
+                LuaAPI.xlua_pushinteger(L, gen_to_be_invoked.StarCount);
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            return 1;
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _g_get_StarsCollected(RealStatePtr L)
+        {
+		    try {
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+			
+                CutRope.Game.LevelController gen_to_be_invoked = (CutRope.Game.LevelController)translator.FastGetCSObj(L, 1);
+                LuaAPI.xlua_pushinteger(L, gen_to_be_invoked.StarsCollected);
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            return 1;
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
         static int _g_get_ElapsedTime(RealStatePtr L)
         {
 		    try {
@@ -229,6 +318,20 @@ namespace XLua.CSObjectWrap
 			
                 CutRope.Game.LevelController gen_to_be_invoked = (CutRope.Game.LevelController)translator.FastGetCSObj(L, 1);
                 LuaAPI.lua_pushboolean(L, gen_to_be_invoked.IsRunning);
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            return 1;
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _g_get_IsPaused(RealStatePtr L)
+        {
+		    try {
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+			
+                CutRope.Game.LevelController gen_to_be_invoked = (CutRope.Game.LevelController)translator.FastGetCSObj(L, 1);
+                LuaAPI.lua_pushboolean(L, gen_to_be_invoked.IsPaused);
             } catch(System.Exception gen_e) {
                 return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
             }
@@ -299,6 +402,20 @@ namespace XLua.CSObjectWrap
 			
                 CutRope.Game.LevelController gen_to_be_invoked = (CutRope.Game.LevelController)translator.FastGetCSObj(L, 1);
                 translator.Push(L, gen_to_be_invoked.OnLevelReady);
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            return 1;
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _g_get_OnStarCollected(RealStatePtr L)
+        {
+		    try {
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+			
+                CutRope.Game.LevelController gen_to_be_invoked = (CutRope.Game.LevelController)translator.FastGetCSObj(L, 1);
+                translator.Push(L, gen_to_be_invoked.OnStarCollected);
             } catch(System.Exception gen_e) {
                 return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
             }
@@ -417,6 +534,21 @@ namespace XLua.CSObjectWrap
 			
                 CutRope.Game.LevelController gen_to_be_invoked = (CutRope.Game.LevelController)translator.FastGetCSObj(L, 1);
                 gen_to_be_invoked.OnLevelReady = translator.GetDelegate<CutRope.Game.LevelController.LuaVoidDelegate>(L, 2);
+            
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            return 0;
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _s_set_OnStarCollected(RealStatePtr L)
+        {
+		    try {
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+			
+                CutRope.Game.LevelController gen_to_be_invoked = (CutRope.Game.LevelController)translator.FastGetCSObj(L, 1);
+                gen_to_be_invoked.OnStarCollected = translator.GetDelegate<CutRope.Game.LevelController.LuaStarDelegate>(L, 2);
             
             } catch(System.Exception gen_e) {
                 return LuaAPI.luaL_error(L, "c# exception:" + gen_e);

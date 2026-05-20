@@ -6,7 +6,9 @@
 	    <type fullname="CutRope.Game.Candy" preserve="all"/>
 		<type fullname="CutRope.Game.CutInput" preserve="all"/>
 		<type fullname="CutRope.Game.LevelController" preserve="all"/>
+		<type fullname="CutRope.Game.Obstacle" preserve="all"/>
 		<type fullname="CutRope.Game.RopeSpawner" preserve="all"/>
+		<type fullname="CutRope.Game.Star" preserve="all"/>
 		<type fullname="CutRope.Game.UI.UIController" preserve="all"/>
 		
 	</assembly>
@@ -15,6 +17,7 @@
 	    <type fullname="FTimerListBehavior" preserve="all"/>
 		<type fullname="UILuaBehaviour" preserve="all"/>
 		<type fullname="YooAssetsLuaBridge" preserve="all"/>
+		<type fullname="CutRope.Framework.AudioManager" preserve="all"/>
 		<type fullname="CutRope.Framework.GameUtil" preserve="all"/>
 		<type fullname="CutRope.Framework.SceneLoader" preserve="all"/>
 		<type fullname="CutRope.Framework.UIManager" preserve="all"/>
