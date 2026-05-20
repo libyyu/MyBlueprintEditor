@@ -1,18 +1,17 @@
 // BlueprintRunner.cs
-// Blueprint C Runtime �� C# P/Invoke ��װ
+// Blueprint C Runtime 的 C# P/Invoke 封装
 //
-// ����˼·��
-//   xLua �� LuaEnv.rawL (IntPtr) ���� lua_State*
-//   ͨ�� BP_SetExternalLuaState ���������� Blueprint Runner
-//   ���� Blueprint Runtime ��ע��� Blueprint ȫ�ֶ���ͺ� xLua ��ͬһ�� VM ��
-//   game_extensions.lua / game_nodes.lua ��� Blueprint.RegisterNodeDef ������������
+// 设计思路：
+//   xLua 的 LuaEnv.rawL (IntPtr) 就是 lua_State*
+//   通过 BP_SetExternalLuaState 把它注入给 Blueprint Runner
+//   让 Blueprint Runtime 注册的 Blueprint 全局对象和 xLua 共同一个 VM
+//   game_extensions.lua / game_nodes.lua 里的 Blueprint.RegisterNodeDef 注册的节点可直接调用
 //
-// ��ʼ��˳�򣨱����ϸ����أ���
-//   1. LuaManager.Awake() �� LuaEnv �������
-//   2. BlueprintRunner.Init(luaEnv) �� ���� Runner + BP_SetExternalLuaState
-//   3. LuaManager.StartLuaAsync() �� Ԥ���� Lua �� ִ�� main.lua
-//      ��ʱ Blueprint ȫ�ֶ������� Runtime ע�룬BlueprintEntry.lua ��������ע��ڵ�
-
+// 初始化顺序（必须严格按顺序）：
+//   1. LuaManager.Awake() 把 LuaEnv 创建好
+//   2. BlueprintRunner.Init(luaEnv) — 创建 Runner + BP_SetExternalLuaState
+//   3. LuaManager.StartLuaAsync() — 预加载 Lua 包，执行 main.lua
+//      此时 Blueprint 全局对象已被 Runtime 注入，BlueprintEntry.lua 可以注入节点
 using BlueprintRuntime;
 using System;
 using UnityEngine;
@@ -21,15 +20,15 @@ namespace CutRope.Framework
 {
     public class BlueprintRunner : MonoBehaviour
     {
-        // ���� ���� ����������������������������������������������������������������������������������������������������������
+        // ── 静态单例 ──────────────────────────────────────────────────────────────────────
         public static BlueprintRunner Instance { get; private set; }
 
-        // Runner ���
+        // Runner 实例
         private BPRunner _runner = null;
         public BPRunner Runner => _runner;
         public bool IsValid => _runner != null;
 
-        // ���� �������� ��������������������������������������������������������������������������������������������������
+        // ── 生命周期 ──────────────────────────────────────────────────────────────────────
 
         private void Awake()
         {
@@ -44,13 +43,13 @@ namespace CutRope.Framework
             if (Instance == this) Instance = null;
         }
 
-        // ���� ���� API ��������������������������������������������������������������������������������������������������
+        // ── 公开 API ──────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// ��ʼ�� Blueprint Runtime��
-        /// BP_CreateRunner �ڲ���������ʼ�� Lua VM��
-        /// ��ɺ� C# ����ͨ�� LuaState ȡ�� lua_State*��
-        /// ���� new LuaEnv(externalL) ����ͬһ�� VM��
+        /// 初始化 Blueprint Runtime。
+        /// BP_CreateRunner 内部会自动初始化 Lua VM。
+        /// 完成后 C# 侧通过 LuaState 取得 lua_State*，
+        /// 传给 new LuaEnv(externalL) 共用同一个 VM。
         /// </summary>
         public bool Init()
         {
@@ -105,12 +104,12 @@ namespace CutRope.Framework
         }
 
         /// <summary>
-        /// Runtime �ڲ��� lua_State������ new LuaEnv(externalL) ʹ�ã�
+        /// Runtime 内部的 lua_State������ new LuaEnv(externalL) 使用。
         /// </summary>
         public IntPtr LuaState => _luaState;
         private IntPtr _luaState;
 
-        /// <summary>�� JSON �ַ������ز�ִ����ͼ</summary>
+        /// <summary>从 JSON 字符串加载并执行蓝图</summary>
         public bool LoadFromJson(string json)
         {
             if (!IsValid) return false;
@@ -126,13 +125,13 @@ namespace CutRope.Framework
             }
         }
 
-        /// <summary>�ɷ��¼���������ͼ�е� GameEvent.Poll �ڵ㣩</summary>
+        /// <summary>派发事件（触发蓝图中的 GameEvent.Poll 节点）</summary>
         public void DispatchEvent(string eventId)
         {
             if (IsValid) _runner.DispatchEvent(eventId);
         }
 
-        /// <summary>ÿ֡ Tick������ Timer / Tween ��ʱ��ڵ㣩</summary>
+        /// <summary>每帧 Tick（驱动 Timer / Tween 计时节点）</summary>
         private void Update()
         {
             if (IsValid) _runner.Tick(Time.deltaTime);
