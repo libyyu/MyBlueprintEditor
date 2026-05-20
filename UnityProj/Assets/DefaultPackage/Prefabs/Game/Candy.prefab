@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 6093512635923329125}
   - component: {fileID: 6831089850462076092}
   - component: {fileID: 7915878244697022420}
+  - component: {fileID: 6076891410021011815}
   m_Layer: 0
   m_Name: Candy
   m_TagString: Untagged
@@ -162,3 +163,28 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   outOfBoundsY: -10
+--- !u!233 &6076891410021011815
+HingeJoint2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9034317789520629337}
+  m_Enabled: 1
+  serializedVersion: 4
+  m_EnableCollision: 0
+  m_ConnectedRigidBody: {fileID: 0}
+  m_BreakForce: Infinity
+  m_BreakTorque: Infinity
+  m_BreakAction: 3
+  m_AutoConfigureConnectedAnchor: 1
+  m_Anchor: {x: 0, y: 0}
+  m_ConnectedAnchor: {x: 0, y: 0}
+  m_UseMotor: 0
+  m_Motor:
+    m_MotorSpeed: 0
+    m_MaximumMotorForce: 10000
+  m_UseLimits: 0
+  m_AngleLimits:
+    m_LowerAngle: 0
+    m_UpperAngle: 359
