@@ -164,8 +164,8 @@ namespace CutRope.Game
                 if (d < minDist) { minDist = d; nearest = i; }
             }
 
-            // 只切割距离切割点足够近的节点（避免误触）
-            if (nearest >= 0 && minDist < segmentLength * 2f)
+            // 切割检测半径 = segmentLength 的 3 倍，足够宽松反馈好
+            if (nearest >= 0 && minDist < segmentLength * 3f)
                 Cut(nearest);
         }
 

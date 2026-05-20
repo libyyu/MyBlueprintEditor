@@ -58,8 +58,9 @@ namespace CutRope.Game
             else if (Input.GetMouseButton(0) && _pressing)
             {
                 Vector2 cur = GetWorldPos(Input.mousePosition);
-                float dist  = Vector2.Distance(cur, _prevPos);
-                if (dist >= minSwipeDistance * 0.01f)  // 转换为世界单位近似
+                // 世界坐标下直接对比距离，不需要像素单位转换
+                float dist = Vector2.Distance(cur, _prevPos);
+                if (dist >= 0.05f)  // 世界单位 0.05m（足够灰灰划动就触发）
                 {
                     TryCut(_prevPos, cur);
                     _prevPos = cur;
