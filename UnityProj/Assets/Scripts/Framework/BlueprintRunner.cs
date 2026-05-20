@@ -65,6 +65,21 @@ namespace CutRope.Framework
 
                 _runner.OnPrint += (lv, msg) =>
                 {
+                    // 拦截蓝图内部指令（BlueprintRuntime 的 Lua VM 不能直接调 C# 对象）
+                    if (msg.StartsWith("__shake:"))
+                    {
+                        var parts = msg.Split(':');
+                        if (parts.Length >= 3 &&
+                            float.TryParse(parts[1], System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out float intensity) &&
+                            float.TryParse(parts[2], System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out float duration))
+                        {
+                            var shaker = CutRope.Game.CameraShaker.Instance;
+                            if (shaker != null) shaker.Shake(intensity, duration);
+                        }
+                        return;
+                    }
                     switch (lv)
                     {
                         case BPLogLevel.Warning: Debug.LogWarning($"[BlueprintRunner-InnrPrint] {msg}"); break;

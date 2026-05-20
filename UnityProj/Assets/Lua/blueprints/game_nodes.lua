@@ -848,13 +848,9 @@ Blueprint.RegisterHandler("Camera.Shake", function(ctx)
     local duration  = ctx:GetInput("Duration"):asFloat()
     if intensity <= 0 then intensity = 0.3 end
     if duration  <= 0 then duration  = 0.2 end
-    -- 用 C# CameraShaker 安全执行震屏（避免在蓝图 Handler 里用 Lua coroutine 崩溃）
-    local shaker = CS.CutRope.Game.CameraShaker.Instance
-    if shaker then
-        shaker:Shake(intensity, duration)
-    else
-        print('[Camera.Shake] CameraShaker not found on Main Camera')
-    end
+    -- 不能在 BlueprintRuntime 自带的 Lua VM 里用 CS.xxx（不是 XLua VM）
+    -- 改为通过 ctx:Print 输出指令，C# 侧监听 OnPrint 执行震屏
+    ctx:Print(string.format('__shake:%.4f:%.4f', intensity, duration))
     return true
 end)
 
