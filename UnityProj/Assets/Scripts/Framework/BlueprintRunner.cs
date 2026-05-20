@@ -62,11 +62,23 @@ namespace CutRope.Framework
                 {
                     switch (lv)
                     {
-                        case BPLogLevel.Warning: Debug.LogWarning($"[BlueprintRunner] {msg}"); break;
-                        case BPLogLevel.Error: Debug.LogError($"[BlueprintRunner] {msg}"); break;
-                        default: Debug.Log($"[BlueprintRunner] {msg}"); break;
+                        case BPLogLevel.Warning: Debug.LogWarning($"[BlueprintRunner-InnrPrint] {msg}"); break;
+                        case BPLogLevel.Error: Debug.LogError($"[BlueprintRunner-InnrPrint] {msg}"); break;
+                        default: Debug.Log($"[BlueprintRunner-InnrPrint] {msg}"); break;
                     }
                 };
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                _runner.EnableLogging(true);
+                _runner.OnLog += (lv, msg) =>
+                {
+                    switch(lv)
+                    {
+                        case BPLogLevel.Warning: Debug.LogWarning($"[BlueprintRunner] {msg}"); break;
+                        case BPLogLevel.Error: Debug.LogError($"[BlueprintRunner] {msg}"); break;
+                        default: Debug.Log($"[BlueprintRunner-InnrPrint] {msg}"); break;
+                    }
+                };
+#endif
 
                 _luaState = _runner.GetLuaState();
                 if (_luaState == IntPtr.Zero)
