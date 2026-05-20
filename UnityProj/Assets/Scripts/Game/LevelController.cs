@@ -27,6 +27,11 @@ namespace CutRope.Game
         public Candy             candy;
         public CutInput          cutInput;
 
+        // ── 星星 ─────────────────────────────────────────────────────
+        private readonly List<Star> _stars = new List<Star>();
+        public int StarCount     => _stars.Count;
+        public int StarsCollected { get; private set; }
+
         // ── 只读引擎数据（Lua 可读，不可在 C# 里判断）───────────────
         public float ElapsedTime { get; private set; }
         public int   CutCount    { get; private set; }
@@ -37,12 +42,14 @@ namespace CutRope.Game
         [CSharpCallLua] public delegate void LuaTickDelegate(float dt);
         [CSharpCallLua] public delegate void LuaCutDelegate(int index, float worldX, float worldY);
         [CSharpCallLua] public delegate void LuaVoidDelegate();
+        [CSharpCallLua] public delegate void LuaStarDelegate(int starIndex, int totalCollected);
 
-        public LuaTickDelegate OnTick        { get; set; }  // 每帧
-        public LuaCutDelegate  OnCut         { get; set; }  // 切割时
-        public LuaVoidDelegate OnCandyEaten  { get; set; }  // 糖果进嘴
-        public LuaVoidDelegate OnCandyFailed { get; set; }  // 糖果失败
-        public LuaVoidDelegate OnLevelReady  { get; set; }  // 场景就绪（Start 后）
+        public LuaTickDelegate OnTick          { get; set; }  // 每帧
+        public LuaCutDelegate  OnCut           { get; set; }  // 切割时
+        public LuaVoidDelegate OnCandyEaten    { get; set; }  // 糖果进嘴
+        public LuaVoidDelegate OnCandyFailed   { get; set; }  // 糖果失败
+        public LuaVoidDelegate OnLevelReady    { get; set; }  // 场景就绪（Start 后）
+        public LuaStarDelegate OnStarCollected { get; set; }  // 星星收集
 
         // ── 生命周期 ─────────────────────────────────────────────────
         private void Awake()
@@ -84,6 +91,20 @@ namespace CutRope.Game
                 candy.OnFailed += () => OnCandyFailed?.Invoke();
             }
 
+            // 自动收集场景中所有星星并注册回调
+            var sceneStars = FindObjectsByType<Star>(FindObjectsSortMode.None);
+            foreach (var star in sceneStars)
+            {
+                _stars.Add(star);
+                star.OnCollected += (s) =>
+                {
+                    StarsCollected++;
+                    OnStarCollected?.Invoke(s.starIndex, StarsCollected);
+                    Debug.Log($"[LevelController] Star {s.starIndex} collected! Total: {StarsCollected}/{StarCount}");
+                };
+            }
+            Debug.Log($"[LevelController] Stars in scene: {_stars.Count}");
+
             IsRunning = true;
 
             // 延一帧确保 Lua 已注入钩子
@@ -102,12 +123,13 @@ namespace CutRope.Game
         private void OnDestroy()
         {
             if (Current == this) Current = null;
-            IsRunning    = false;
-            OnTick        = null;
-            OnCut         = null;
-            OnCandyEaten  = null;
-            OnCandyFailed = null;
-            OnLevelReady  = null;
+            IsRunning      = false;
+            OnTick         = null;
+            OnCut          = null;
+            OnCandyEaten   = null;
+            OnCandyFailed  = null;
+            OnLevelReady   = null;
+            OnStarCollected = null;
         }
 
         // ── 引擎接口（供 Lua 调用）───────────────────────────────────

@@ -78,6 +78,14 @@ function M.init(levelId)
         M._handle_fail()
     end
 
+    -- 星星收集钩子
+    _ctrl.OnStarCollected = function(starIndex, totalCollected)
+        if _G._PushLevelEvent then
+            _G._PushLevelEvent('star_collected', starIndex .. ',' .. totalCollected)
+        end
+        print(string.format('[level_controller] Star %d collected (%d total)', starIndex, totalCollected))
+    end
+
     -- ── 加载关卡蓝图（负责 UI 编排：通关/失败面板等）────────────────────
     -- bjson 在 YooAsset DefaultPackage 里，路径 Assets/Lua/levels/blueprint_<id>.bjson
     -- 用 pcall 保护，找不到蓝图不影响关卡基本逻辑

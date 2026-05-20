@@ -1,26 +1,38 @@
 -- game/levels/1_1.lua
 -- 第一章第一关 — 场景级钩子
 --
--- 职责：
---   只处理"这个场景独有、不适合蓝图表达"的内容
---   星级计算 / 通关失败 UI 编排 全由 blueprint_1_1.bjson 驱动
---
--- 蓝图节点对照：
---   on_win  → Level.CalcStars(MaxCuts=1) → Level.Complete → Timer.Wait → UI.Open(LevelComplete)
---   on_fail → UI.CloseAll → UI.Open(LevelFailed)
---   on_pause → Level.Pause
+-- 关卡设计：
+--   - 2 根绳子（左右各一），需要找到正确顺序切
+--   - 3 颗星星散布在绳子路径上，经过时收集
+--   - 1 个移动障碍物（蓝图启动后开始移动）
+--   - 星级 = 收集到的星星数（0~3星）
 
 local M = {}
 
 function M.on_ready(ctrl)
-    -- 场景就绪：可在这里做关卡专属初始化
-    -- 例如：设置物理参数、生成特殊道具、播放入场动画
-    print('[1_1] Ready')
+    print('[1_1] Ready — ropes=' .. ctrl:GetRopeCount() .. ' stars=' .. ctrl.StarCount)
 end
 
 function M.on_tick(ctrl, dt)
-    -- 第一关无时间限制，无需处理
-    -- 有限时关卡在这里做倒计时 → 超时调 _G._PushLevelEvent('candy_failed')
+    -- 第一关无倒计时
+end
+
+--- 通关星级 = 收集到的星星数
+function M.calc_stars(ctrl)
+    return math.max(1, ctrl.StarsCollected)  -- 至少 1 星（能喂到就给1星）
+end
+
+function M.calc_score(ctrl)
+    -- 基础分 100，每颗星 +50，每刀 -10
+    return math.max(0, 100 + ctrl.StarsCollected * 50 - ctrl.CutCount * 10)
+end
+
+function M.on_win(ctrl, stars, score)
+    print(string.format('[1_1] WIN! stars=%d score=%d cuts=%d', stars, score, ctrl.CutCount))
+end
+
+function M.on_fail(ctrl)
+    print('[1_1] FAIL — candy missed')
 end
 
 return M

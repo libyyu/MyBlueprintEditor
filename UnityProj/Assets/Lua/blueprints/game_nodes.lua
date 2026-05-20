@@ -730,4 +730,140 @@ Blueprint.RegisterHandler("Timer.Reset", function(ctx)
     return true
 end)
 
-print("[game_nodes] Registered: UI(4)+Scene(4)+Level(9)+Rope(2)+Candy(1)+GameEvent.On*(3)+Audio(3)+Timer(2) = 28 nodes")
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Star 节点
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+Blueprint.RegisterNodeDef({
+    id          = "Star.GetCount",
+    name        = "Star Get Count",
+    category    = "Game/Star",
+    color       = "9A8A1A",
+    description = "获取当前关卡星星总数和已收集数",
+    inputs  = { { name = "In", type = "Flow" } },
+    outputs = {
+        { name = "Out",       type = "Flow"    },
+        { name = "Total",     type = "Integer" },
+        { name = "Collected", type = "Integer" },
+    },
+})
+Blueprint.RegisterHandler("Star.GetCount", function(ctx)
+    local ctrl = CS.CutRope.Game.LevelController.Current
+    ctx:SetOutput("Total",     ctrl and ctrl.StarCount     or 0)
+    ctx:SetOutput("Collected", ctrl and ctrl.StarsCollected or 0)
+    return true
+end)
+
+-- ───────────────────────────────────────────────────────────────────────────────
+
+Blueprint.RegisterNodeDef({
+    id          = "GameEvent.OnStarCollected",
+    name        = "On Star Collected",
+    category    = "Game/Event",
+    color       = "2A7A5A",
+    description = "收集到星星时触发（OnTick 里轮询）",
+    inputs  = { { name = "In", type = "Flow" } },
+    outputs = {
+        { name = "onCollected", type = "Flow"    },
+        { name = "onEmpty",     type = "Flow"    },
+        { name = "StarIndex",   type = "Integer" },
+        { name = "Total",       type = "Integer" },
+    },
+})
+Blueprint.RegisterHandler("GameEvent.OnStarCollected", function(ctx)
+    for i, evt in ipairs(_levelEvtQueue) do
+        if evt.id == "star_collected" then
+            table.remove(_levelEvtQueue, i)
+            local parts = {}
+            for v in (evt.payload .. ","):gmatch("([^,]*),") do
+                table.insert(parts, v)
+            end
+            ctx:SetOutput("StarIndex", tonumber(parts[1]) or 0)
+            ctx:SetOutput("Total",     tonumber(parts[2]) or 0)
+            ctx:ActivateOutputFlow("onCollected")
+            return true
+        end
+    end
+    ctx:ActivateOutputFlow("onEmpty")
+    return true
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Obstacle 节点
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+Blueprint.RegisterNodeDef({
+    id          = "Obstacle.SetMoving",
+    name        = "Obstacle Set Moving",
+    category    = "Game/Obstacle",
+    color       = "8A1A1A",
+    description = "启动/停止障碍物移动（蓝图驱动障碍物行为）",
+    inputs  = {
+        { name = "In",        type = "Flow"    },
+        { name = "Name",      type = "String"  },  -- GameObject 名字
+        { name = "Moving",    type = "Boolean" },
+        { name = "Speed",     type = "Float"   },
+        { name = "Range",     type = "Float"   },
+    },
+    outputs = { { name = "Out", type = "Flow" } },
+})
+Blueprint.RegisterHandler("Obstacle.SetMoving", function(ctx)
+    local name    = ctx:GetInput("Name"):asString()
+    local moving  = ctx:GetInput("Moving"):asBool()
+    local speed   = ctx:GetInput("Speed"):asFloat()
+    local range   = ctx:GetInput("Range"):asFloat()
+    local go = CS.UnityEngine.GameObject.Find(name)
+    if go then
+        local obs = go:GetComponent(typeof(CS.CutRope.Game.Obstacle))
+        if obs then
+            if speed > 0 then obs:SetMoveSpeed(speed) end
+            if range > 0 then obs:SetMoveRange(range) end
+            obs:SetMoving(moving)
+        end
+    end
+    return true
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Camera 节点
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+Blueprint.RegisterNodeDef({
+    id          = "Camera.Shake",
+    name        = "Camera Shake",
+    category    = "Game/Camera",
+    color       = "3A5A8A",
+    description = "摄像机震屏（切绳/通关/失败时反馈）",
+    inputs  = {
+        { name = "In",        type = "Flow"  },
+        { name = "Intensity", type = "Float" },  -- 震动强度（默认 0.3）
+        { name = "Duration",  type = "Float" },  -- 持续时间（默认 0.2）
+    },
+    outputs = { { name = "Out", type = "Flow" } },
+})
+
+local _shakeCoroutine = nil
+Blueprint.RegisterHandler("Camera.Shake", function(ctx)
+    local intensity = ctx:GetInput("Intensity"):asFloat()
+    local duration  = ctx:GetInput("Duration"):asFloat()
+    if intensity <= 0 then intensity = 0.3 end
+    if duration  <= 0 then duration  = 0.2 end
+    local cam = CS.UnityEngine.Camera.main
+    if not cam then return true end
+    -- 用 coro 做震屏
+    local origPos = cam.transform.localPosition
+    local elapsed = 0
+    coroutine.wrap(function()
+        while elapsed < duration do
+            elapsed = elapsed + CS.UnityEngine.Time.deltaTime
+            local x = origPos.x + CS.UnityEngine.Random.Range(-intensity, intensity)
+            local y = origPos.y + CS.UnityEngine.Random.Range(-intensity, intensity)
+            cam.transform.localPosition = CS.UnityEngine.Vector3(x, y, origPos.z)
+            coroutine.yield()
+        end
+        cam.transform.localPosition = origPos
+    end)()
+    return true
+end)
+
+print("[game_nodes] Registered: UI(4)+Scene(4)+Level(9)+Rope(2)+Candy(1)+Star(2)+Obstacle(1)+Camera(1)+GameEvent.On*(4)+Audio(3)+Timer(2) = 33 nodes")
