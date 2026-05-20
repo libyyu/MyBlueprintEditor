@@ -43,9 +43,9 @@ PlayerSettings:
   m_VirtualRealitySplashScreen: {fileID: 0}
   m_HolographicTrackingLossScreen: {fileID: 0}
   defaultScreenWidth: 750
-  defaultScreenHeight: 1334
+  defaultScreenHeight: 1344
   defaultScreenWidthWeb: 375
-  defaultScreenHeightWeb: 667
+  defaultScreenHeightWeb: 672
   m_StereoRenderingPath: 0
   m_ActiveColorSpace: 0
   unsupportedMSAAFallback: 0
