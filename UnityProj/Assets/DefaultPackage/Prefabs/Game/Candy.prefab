@@ -162,7 +162,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6356efd95b3a6b14f84ccf421003144b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  outOfBoundsY: -10
+  outOfBoundsY: -12
 --- !u!233 &6076891410021011815
 HingeJoint2D:
   m_ObjectHideFlags: 0

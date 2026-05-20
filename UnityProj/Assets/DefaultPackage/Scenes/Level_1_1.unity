@@ -322,8 +322,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 982fcecc06a68aa4a8597c571033ca0a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  segmentCount: 12
-  segmentLength: 0.15
+  segmentCount: 20
+  segmentLength: 0.25
   segmentMass: 0.05
   segmentPrefab: {fileID: 7268310622528710787, guid: cc89766afec8a8949a3fcb57042913e8, type: 3}
   lineRenderer: {fileID: 1292178976}
@@ -629,7 +629,7 @@ Transform:
   m_GameObject: {fileID: 1560272233}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -5, z: 0}
+  m_LocalPosition: {x: 0, y: -7, z: 0}
   m_LocalScale: {x: 1.2, y: 1.2, z: 1.2}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -695,7 +695,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1262400201685923087, guid: 69fb24eccd749d94d9ff3a09c89c47f1, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 5
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 1262400201685923087, guid: 69fb24eccd749d94d9ff3a09c89c47f1, type: 3}
       propertyPath: m_LocalPosition.z
