@@ -848,21 +848,13 @@ Blueprint.RegisterHandler("Camera.Shake", function(ctx)
     local duration  = ctx:GetInput("Duration"):asFloat()
     if intensity <= 0 then intensity = 0.3 end
     if duration  <= 0 then duration  = 0.2 end
-    local cam = CS.UnityEngine.Camera.main
-    if not cam then return true end
-    -- 用 coro 做震屏
-    local origPos = cam.transform.localPosition
-    local elapsed = 0
-    coroutine.wrap(function()
-        while elapsed < duration do
-            elapsed = elapsed + CS.UnityEngine.Time.deltaTime
-            local x = origPos.x + CS.UnityEngine.Random.Range(-intensity, intensity)
-            local y = origPos.y + CS.UnityEngine.Random.Range(-intensity, intensity)
-            cam.transform.localPosition = CS.UnityEngine.Vector3(x, y, origPos.z)
-            coroutine.yield()
-        end
-        cam.transform.localPosition = origPos
-    end)()
+    -- 用 C# CameraShaker 安全执行震屏（避免在蓝图 Handler 里用 Lua coroutine 崩溃）
+    local shaker = CS.CutRope.Game.CameraShaker.Instance
+    if shaker then
+        shaker:Shake(intensity, duration)
+    else
+        print('[Camera.Shake] CameraShaker not found on Main Camera')
+    end
     return true
 end)
 
