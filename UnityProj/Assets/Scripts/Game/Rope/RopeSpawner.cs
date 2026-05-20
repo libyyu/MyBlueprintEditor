@@ -125,13 +125,31 @@ namespace CutRope.Game
             UpdateLineRenderer();
         }
 
-        /// <summary>在第 index 节点处切断绳子</summary>
+        /// <summary>在第 index 节点处切断绳子，销毁该节点及以下所有节点</summary>
         public void Cut(int index)
         {
             if (index < 0 || index >= _segments.Count) return;
+
+            // 断开第 index 节与上方的关节
             _segments[index].BreakJoint();
+
+            // 销毁 index 及以下所有节点（不再跟着 Candy 下落）
+            for (int i = index; i < _segments.Count; i++)
+            {
+                if (_segments[i] != null)
+                    Destroy(_segments[i].gameObject);
+            }
+            _segments.RemoveRange(index, _segments.Count - index);
+
+            // Candy 的 HingeJoint2D 也断开（让它自由落体）
+            if (_candy != null)
+            {
+                var cj = _candy.GetComponent<HingeJoint2D>();
+                if (cj != null) Destroy(cj);
+            }
+
             OnRopeCut?.Invoke(this);
-            Debug.Log($"[RopeSpawner] Cut at index {index}");
+            Debug.Log($"[RopeSpawner] Cut at index {index}, segments left: {_segments.Count}");
         }
 
         /// <summary>在世界坐标最近处切断（CutInput 调用）</summary>
@@ -160,7 +178,10 @@ namespace CutRope.Game
 
         private void UpdateLineRenderer()
         {
-            if (lineRenderer == null || _segments.Count == 0) return;
+            if (lineRenderer == null) return;
+            // 过滤掉已销毁的节点
+            _segments.RemoveAll(s => s == null);
+            if (_segments.Count == 0) { lineRenderer.positionCount = 0; return; }
 
             var points = new Vector3[_segments.Count + (_candy ? 1 : 0)];
             for (int i = 0; i < _segments.Count; i++)
