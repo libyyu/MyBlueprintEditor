@@ -53,6 +53,29 @@ namespace CutRope.Game
                 return;
             }
 
+            // 初始化 LineRenderer 外观
+            if (lineRenderer != null)
+            {
+                lineRenderer.startWidth        = 0.08f;
+                lineRenderer.endWidth          = 0.05f;
+                lineRenderer.numCornerVertices = 4;
+                lineRenderer.numCapVertices    = 4;
+                lineRenderer.useWorldSpace     = true;
+                lineRenderer.sortingOrder      = 1;
+                var grad = new Gradient();
+                grad.SetKeys(
+                    new GradientColorKey[] {
+                        new GradientColorKey(new Color(0.85f, 0.55f, 0.15f), 0f),
+                        new GradientColorKey(new Color(0.70f, 0.40f, 0.10f), 1f)
+                    },
+                    new GradientAlphaKey[] {
+                        new GradientAlphaKey(1f, 0f),
+                        new GradientAlphaKey(1f, 1f)
+                    }
+                );
+                lineRenderer.colorGradient = grad;
+            }
+
             _candy = candy;
             Vector3 pos = transform.position;
 
