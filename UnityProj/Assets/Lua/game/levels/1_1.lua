@@ -9,26 +9,36 @@
 
 local M = {}
 
+-- 安全读取 XLua 可能未暴露的 C# 属性
+local function safeGet(fn, default)
+    local ok, v = pcall(fn)
+    return (ok and v ~= nil) and v or (default or 0)
+end
+
 function M.on_ready(ctrl)
-    print('[1_1] Ready — ropes=' .. ctrl:GetRopeCount() .. ' stars=' .. ctrl.StarCount)
+    local ropeCount = ctrl:GetRopeCount()
+    local starCount = safeGet(function() return ctrl.StarCount end, 0)
+    print('[1_1] Ready — ropes=' .. ropeCount .. ' stars=' .. starCount)
 end
 
 function M.on_tick(ctrl, dt)
     -- 第一关无倒计时
 end
 
---- 通关星级 = 收集到的星星数
+--- 通关星级 = 收集到的星星数（至少1星）
 function M.calc_stars(ctrl)
-    return math.max(1, ctrl.StarsCollected)  -- 至少 1 星（能喂到就给1星）
+    local collected = safeGet(function() return ctrl.StarsCollected end, 0)
+    return math.max(1, collected)
 end
 
 function M.calc_score(ctrl)
-    -- 基础分 100，每颗星 +50，每刀 -10
-    return math.max(0, 100 + ctrl.StarsCollected * 50 - ctrl.CutCount * 10)
+    local collected = safeGet(function() return ctrl.StarsCollected end, 0)
+    local cuts      = safeGet(function() return ctrl.CutCount end, 0)
+    return math.max(0, 100 + collected * 50 - cuts * 10)
 end
 
 function M.on_win(ctrl, stars, score)
-    print(string.format('[1_1] WIN! stars=%d score=%d cuts=%d', stars, score, ctrl.CutCount))
+    print(string.format('[1_1] WIN! stars=%d score=%d', stars or 0, score or 0))
 end
 
 function M.on_fail(ctrl)
