@@ -856,6 +856,7 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
+  - component: {fileID: 3002000005}
   - component: {fileID: 3002000003}
   - component: {fileID: 3002000002}
   - component: {fileID: 3002000004}
@@ -945,7 +946,7 @@ CircleCollider2D:
   m_Offset: {x: 0, y: 0}
   serializedVersion: 2
   m_Radius: 0.35
---- !u!4 &3002000003b
+--- !u!4 &3002000005
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -968,6 +969,7 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
+  - component: {fileID: 3003000005}
   - component: {fileID: 3003000003}
   - component: {fileID: 3003000002}
   - component: {fileID: 3003000004}
@@ -1057,7 +1059,7 @@ CircleCollider2D:
   m_Offset: {x: 0, y: 0}
   serializedVersion: 2
   m_Radius: 0.35
---- !u!4 &3003000003b
+--- !u!4 &3003000005
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1080,6 +1082,7 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
+  - component: {fileID: 3004000005}
   - component: {fileID: 3004000003}
   - component: {fileID: 3004000002}
   - component: {fileID: 3004000004}
@@ -1169,7 +1172,7 @@ CircleCollider2D:
   m_Offset: {x: 0, y: 0}
   serializedVersion: 2
   m_Radius: 0.35
---- !u!4 &3004000003b
+--- !u!4 &3004000005
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1192,6 +1195,7 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
+  - component: {fileID: 3005000005}
   - component: {fileID: 3005000003}
   - component: {fileID: 3005000002}
   - component: {fileID: 3005000004}
@@ -1281,7 +1285,7 @@ CircleCollider2D:
   m_Offset: {x: 0, y: 0}
   serializedVersion: 2
   m_Radius: 0.4
---- !u!4 &3005000003b
+--- !u!4 &3005000005
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
