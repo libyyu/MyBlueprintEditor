@@ -110,10 +110,24 @@ do
 	end
 
 	function FGUIMan:InitUIRoot()
+		if IsValidObject(self.m_UIRoot) then
+			return
+		end
+
+		local tag = "UIRoot"
+		print("GUIMan:InitUIRoot Tag = ", tag)
+		
+		local object = GameObject.FindGameObjectWithTag(tag)
+		if IsValidObject(object) then
+			self.m_UIRoot = object
+			return
+		end
+
 		if not IsValidObject(self.m_UIRoot) then
 			self.m_UIRoot = NewGameObject("UIRootContainer")
 		    self.m_UIRoot.transform.localPosition = Vector3(0, 0, 0)
 		    self.m_UIRoot.transform.localScale = Vector3(1, 1, 1)
+			self.m_UIRoot.tag = tag
 		end
 		self:InitUGUIRoot()
 		--FGUI暂时未实现，需要插件支持，先不创建FGUIRoot
