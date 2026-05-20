@@ -1,17 +1,17 @@
 // BlueprintRunner.cs
-// Blueprint C Runtime µÄ C# P/Invoke ·â×°
+// Blueprint C Runtime ï¿½ï¿½ C# P/Invoke ï¿½ï¿½×°
 //
-// ºËÐÄË¼Â·£º
-//   xLua µÄ LuaEnv.rawL (IntPtr) ¾ÍÊÇ lua_State*
-//   Í¨¹ý BP_SetExternalLuaState °ÑËü¹²Ïí¸ø Blueprint Runner
-//   ÕâÑù Blueprint Runtime Àï×¢ÈëµÄ Blueprint È«¾Ö¶ÔÏó¾ÍºÍ xLua ÔÚÍ¬Ò»¸ö VM Àï
-//   game_extensions.lua / game_nodes.lua ÀïµÄ Blueprint.RegisterNodeDef ¾ÍÄÜÕý³£¹¤×÷
+// ï¿½ï¿½ï¿½ï¿½Ë¼Â·ï¿½ï¿½
+//   xLua ï¿½ï¿½ LuaEnv.rawL (IntPtr) ï¿½ï¿½ï¿½ï¿½ lua_State*
+//   Í¨ï¿½ï¿½ BP_SetExternalLuaState ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Blueprint Runner
+//   ï¿½ï¿½ï¿½ï¿½ Blueprint Runtime ï¿½ï¿½×¢ï¿½ï¿½ï¿½ Blueprint È«ï¿½Ö¶ï¿½ï¿½ï¿½Íºï¿½ xLua ï¿½ï¿½Í¬Ò»ï¿½ï¿½ VM ï¿½ï¿½
+//   game_extensions.lua / game_nodes.lua ï¿½ï¿½ï¿½ Blueprint.RegisterNodeDef ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //
-// ³õÊ¼»¯Ë³Ðò£¨±ØÐëÑÏ¸ñ×ñÊØ£©£º
-//   1. LuaManager.Awake() ¡ú LuaEnv ´´½¨Íê³É
-//   2. BlueprintRunner.Init(luaEnv) ¡ú ´´½¨ Runner + BP_SetExternalLuaState
-//   3. LuaManager.StartLuaAsync() ¡ú Ô¤¼ÓÔØ Lua ¡ú Ö´ÐÐ main.lua
-//      ´ËÊ± Blueprint È«¾Ö¶ÔÏóÒÑÓÉ Runtime ×¢Èë£¬BlueprintEntry.lua ¿ÉÒÔÕý³£×¢²á½Úµã
+// ï¿½ï¿½Ê¼ï¿½ï¿½Ë³ï¿½ò£¨±ï¿½ï¿½ï¿½ï¿½Ï¸ï¿½ï¿½ï¿½ï¿½Ø£ï¿½ï¿½ï¿½
+//   1. LuaManager.Awake() ï¿½ï¿½ LuaEnv ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+//   2. BlueprintRunner.Init(luaEnv) ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Runner + BP_SetExternalLuaState
+//   3. LuaManager.StartLuaAsync() ï¿½ï¿½ Ô¤ï¿½ï¿½ï¿½ï¿½ Lua ï¿½ï¿½ Ö´ï¿½ï¿½ main.lua
+//      ï¿½ï¿½Ê± Blueprint È«ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Runtime ×¢ï¿½ë£¬BlueprintEntry.lua ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×¢ï¿½ï¿½Úµï¿½
 
 using BlueprintRuntime;
 using System;
@@ -21,15 +21,15 @@ namespace CutRope.Framework
 {
     public class BlueprintRunner : MonoBehaviour
     {
-        // ©¤©¤ µ¥Àý ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         public static BlueprintRunner Instance { get; private set; }
 
-        // Runner ¾ä±ú
+        // Runner ï¿½ï¿½ï¿½
         private BPRunner _runner = null;
         public BPRunner Runner => _runner;
         public bool IsValid => _runner != null;
 
-        // ©¤©¤ ÉúÃüÖÜÆÚ ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
         private void Awake()
         {
@@ -44,18 +44,24 @@ namespace CutRope.Framework
             if (Instance == this) Instance = null;
         }
 
-        // ©¤©¤ ¹«¹² API ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ API ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
         /// <summary>
-        /// ³õÊ¼»¯ Blueprint Runtime¡£
-        /// BP_CreateRunner ÄÚ²¿»áÁ¢¼´³õÊ¼»¯ Lua VM£¬
-        /// Íê³Éºó C# ¾ÍÄÜÍ¨¹ý LuaState È¡µÃ lua_State*£¬
-        /// ´«¸ø new LuaEnv(externalL) ¹²ÏíÍ¬Ò»¸ö VM¡£
+        /// ï¿½ï¿½Ê¼ï¿½ï¿½ Blueprint Runtimeï¿½ï¿½
+        /// BP_CreateRunner ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ Lua VMï¿½ï¿½
+        /// ï¿½ï¿½Éºï¿½ C# ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½ LuaState È¡ï¿½ï¿½ lua_State*ï¿½ï¿½
+        /// ï¿½ï¿½ï¿½ï¿½ new LuaEnv(externalL) ï¿½ï¿½ï¿½ï¿½Í¬Ò»ï¿½ï¿½ VMï¿½ï¿½
         /// </summary>
         public bool Init()
         {
             try
             {
+                // åœ¨åˆå§‹åŒ–å‰å…ˆè®¾å¥½ dump ç›®å½•ï¼Œè¿™æ ·å³ä½¿ Init è‡ªèº«å´©æºƒä¹Ÿèƒ½æŠ“åˆ°
+                string dumpDir = System.IO.Path.Combine(
+                    UnityEngine.Application.persistentDataPath, "CrashDumps");
+                BPRunner.SetCrashDumpDir(dumpDir);
+                Debug.Log($"[BlueprintRunner] Crash dump dir: {dumpDir}");
+
                 _runner = new BPRunner();
 
                 _runner.OnPrint += (lv, msg) =>
@@ -99,12 +105,12 @@ namespace CutRope.Framework
         }
 
         /// <summary>
-        /// Runtime ÄÚ²¿µÄ lua_State£¨´«¸ø new LuaEnv(externalL) Ê¹ÓÃ£©
+        /// Runtime ï¿½Ú²ï¿½ï¿½ï¿½ lua_Stateï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ new LuaEnv(externalL) Ê¹ï¿½Ã£ï¿½
         /// </summary>
         public IntPtr LuaState => _luaState;
         private IntPtr _luaState;
 
-        /// <summary>´Ó JSON ×Ö·û´®¼ÓÔØ²¢Ö´ÐÐÀ¶Í¼</summary>
+        /// <summary>ï¿½ï¿½ JSON ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø²ï¿½Ö´ï¿½ï¿½ï¿½ï¿½Í¼</summary>
         public bool LoadFromJson(string json)
         {
             if (!IsValid) return false;
@@ -120,13 +126,13 @@ namespace CutRope.Framework
             }
         }
 
-        /// <summary>ÅÉ·¢ÊÂ¼þ£¨Çý¶¯À¶Í¼ÖÐµÄ GameEvent.Poll ½Úµã£©</summary>
+        /// <summary>ï¿½É·ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¼ï¿½Ðµï¿½ GameEvent.Poll ï¿½Úµã£©</summary>
         public void DispatchEvent(string eventId)
         {
             if (IsValid) _runner.DispatchEvent(eventId);
         }
 
-        /// <summary>Ã¿Ö¡ Tick£¨Çý¶¯ Timer / Tween µÈÊ±¼ä½Úµã£©</summary>
+        /// <summary>Ã¿Ö¡ Tickï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Timer / Tween ï¿½ï¿½Ê±ï¿½ï¿½Úµã£©</summary>
         private void Update()
         {
             if (IsValid) _runner.Tick(Time.deltaTime);

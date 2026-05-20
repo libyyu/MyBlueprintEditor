@@ -526,6 +526,14 @@ namespace BlueprintRuntime
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
         public static extern int BP_CtxGetActivatedInputPin(IntPtr ctx, IntPtr buf, int bufLen);
 
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void BP_SetCrashDumpDir(
+            [MarshalAs(UnmanagedType.LPStr)] string dir);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void BP_WriteCrashDump(
+            [MarshalAs(UnmanagedType.LPStr)] string reason);
+
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)] 
         public static extern void BP_SetExternalLuaState(IntPtr runner, IntPtr L);
 
@@ -960,6 +968,16 @@ namespace BlueprintRuntime
         // =====================================================================
         // Global (static) API — shared across all runners
         // =====================================================================
+
+        /// <summary>Set dump output directory (UTF-8 path). Call early in Awake().
+        /// Recommended: Application.persistentDataPath + "/CrashDumps"</summary>
+        public static void SetCrashDumpDir(string dir) =>
+            Native.BP_SetCrashDumpDir(dir ?? "");
+
+        /// <summary>Manually write a memory snapshot dump without crashing.
+        /// Useful for diagnosing hangs or abnormal states.</summary>
+        public static void WriteCrashDump(string reason = null) =>
+            Native.BP_WriteCrashDump(reason ?? "manual");
 
         /// <summary>Initialize the default HTTP client (cpp-httplib on native,
         /// emscripten_fetch on WebGL). Required before any LLM.* / HTTP.* node

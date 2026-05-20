@@ -57,6 +57,7 @@ message(STATUS "[BlueprintRuntime] Building as ${_RUNTIME_LIB_TYPE}")
 # Sources
 # ---------------------------------------------------------------------------
 set(RUNTIME_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/CrashHandler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NodeDefinition.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintExporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintRunner.cpp
