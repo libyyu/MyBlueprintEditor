@@ -13,7 +13,7 @@
 //   [DllImport("BlueprintRuntime")] static extern void BP_WriteCrashDump(string reason);
 
 #include "BlueprintExport.h"
-
+#include "BlueprintCAPI.h"
 #if defined(_WIN32) || defined(_WIN64)
 
 #ifndef WIN32_LEAN_AND_MEAN
@@ -61,8 +61,8 @@ namespace {
         std::time_t t = std::time(nullptr);
         struct tm tm_info;
         localtime_s(&tm_info, &t);
-        wchar_t ts[32];
-        wswprintf(ts, 32, L"%04d%02d%02d_%02d%02d%02d",
+        wchar_t ts[32] = { 0x0 };
+        swprintf(ts, 32, L"%04d%02d%02d_%02d%02d%02d",
             tm_info.tm_year + 1900, tm_info.tm_mon + 1, tm_info.tm_mday,
             tm_info.tm_hour, tm_info.tm_min, tm_info.tm_sec);
         DWORD pid = GetCurrentProcessId();
