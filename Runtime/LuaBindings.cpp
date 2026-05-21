@@ -35,6 +35,54 @@ static const char* VARIANT_MT = "Blueprint.Variant";
 static const char* CTX_MT     = "Blueprint.ExecutionContext";
 
 // =========================================================================
+// Any 类型支持：Lua 对象 ↔ Variant.opaqueRef
+// =========================================================================
+//
+// 设计：把 Lua 栈顶值用 luaL_ref 注册到 LUA_REGISTRYINDEX，得到一个 int ref；
+// 用 shared_ptr<int> 持有 ref，自定义 deleter 在引用计数归零时 luaL_unref。
+//
+// 注意：lua_State* 必须在 deleter 闭包里捕获。这要求 Variant 使用期间
+// lua_State 必须仍然有效（同一 VM）。跨 VM 不应使用 Any。
+
+namespace {
+
+// Deleter 闭包：持有 lua_State 弱引用，析构时释放 registry 中的 ref
+struct LuaRefDeleter {
+    lua_State* L;
+    void operator()(void* p) const {
+        if (!p || !L) return;
+        int ref = *static_cast<int*>(p);
+        delete static_cast<int*>(p);
+        luaL_unref(L, LUA_REGISTRYINDEX, ref);
+    }
+};
+
+// 从栈位置 idx 取一个值（不弹栈），注册到 LUA_REGISTRYINDEX，返回 Any Variant
+static Variant makeAnyFromLuaIndex(lua_State* L, int idx)
+{
+    lua_pushvalue(L, idx);                                      // 复制到栈顶
+    int ref = luaL_ref(L, LUA_REGISTRYINDEX);                   // pop + 存 registry
+    if (ref == LUA_REFNIL) return Variant();                    // nil 直接返回空 Variant
+
+    auto* refSlot = new int(ref);
+    std::shared_ptr<void> sp(refSlot, LuaRefDeleter{L});
+    return Variant::MakeAny(std::move(sp));
+}
+
+// 把 Any Variant 持有的 ref 推到栈顶；非 Any 或空引用时推 nil
+static void pushAnyToLua(lua_State* L, const Variant& v)
+{
+    if (v.type != PinDataType::Any || !v.asAny()) {
+        lua_pushnil(L);
+        return;
+    }
+    int ref = *static_cast<int*>(v.asAny());
+    lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
+}
+
+} // namespace
+
+// =========================================================================
 // Variant → Lua 压栈（原生 Lua 类型，非 userdata）
 // =========================================================================
 static void pushVariantRaw(lua_State* L, const Variant& v)
@@ -70,6 +118,12 @@ static void pushVariantRaw(lua_State* L, const Variant& v)
             pushVariantRaw(L, elements[i]);
             lua_rawseti(L, -2, static_cast<int>(i + 1));
         }
+        break;
+    }
+    case PinDataType::Any: {
+        // Any 类型：还原 Lua registry 中的原始对象（table / userdata / function / 等）
+        // 走 pushAnyToLua —— Variant 持有 LUA_REGISTRYINDEX ref，rawgeti 还原即可。
+        pushAnyToLua(L, v);
         break;
     }
     default: lua_pushnil(L); break;
@@ -178,6 +232,13 @@ static int variant_asString(lua_State* L)
     return 1;
 }
 
+// 把 Any Variant 还原为 Lua 原生对象推到栈顶。非 Any 类型推 nil。
+static int variant_asAny(lua_State* L)
+{
+    pushAnyToLua(L, *checkVariant(L, 1));
+    return 1;
+}
+
 static int variant_tostring(lua_State* L)
 {
     lua_pushstring(L, checkVariant(L, 1)->asString().c_str());
@@ -209,6 +270,7 @@ static void registerVariantMetatable(lua_State* L)
         {"asInt",      variant_asInt},
         {"asFloat",    variant_asFloat},
         {"asString",   variant_asString},
+        {"asAny",      variant_asAny},
         {"isValid",    variant_isValid},
         {"__tostring", variant_tostring},
         {"__gc",       variant_gc},
@@ -249,6 +311,46 @@ static int ctx_setOutput(lua_State* L)
 
     ctx->SetOutputValue(name, val);
     return 0;
+}
+
+// =========================================================================
+// Any 类型专用接口（ctx:GetInputAny / ctx:SetOutputAny）
+// =========================================================================
+//
+// 用法（Lua 节点之间透传任意 Lua 对象，包括 table / userdata / function）：
+//
+//   -- 节点 A：输出一个 xLua userdata（GameObject 等）
+//   ctx:SetOutputAny("Target", some_go)
+//
+//   -- 节点 B：拿到原始引用（identity 一致，无拷贝）
+//   local go = ctx:GetInputAny("Target")
+//   go.transform.position = ...
+//
+// 与 GetInput/SetOutput 的差别：
+//   · GetInput 走 toVariant，遇到 table 会启发式拍平为 Map/Array Variant（值拷贝）
+//   · GetInputAny 把对象直接放进 LUA_REGISTRYINDEX 持有引用，原样还原（引用一致）
+//
+// 约束：
+//   · 仅在同一 lua_State 生命周期内有效（Variant 的 deleter 持有 lua_State*）
+//   · 不可序列化（保存/加载蓝图时丢失）
+//   · 不应被 C++ handler 消费（C++ 不知道里面是什么）
+
+static int ctx_setOutputAny(lua_State* L)
+{
+    auto* ctx = checkCtx(L, 1);
+    const char* name = luaL_checkstring(L, 2);
+    // 第 3 个参数：任意 Lua 值（table / userdata / function / nil 均可）
+    Variant val = makeAnyFromLuaIndex(L, 3);
+    ctx->SetOutputValue(name, val);
+    return 0;
+}
+
+static int ctx_getInputAny(lua_State* L)
+{
+    auto* ctx = checkCtx(L, 1);
+    const char* name = luaL_checkstring(L, 2);
+    pushAnyToLua(L, ctx->GetInputValue(name));
+    return 1;
 }
 
 static int ctx_getVariable(lua_State* L)
@@ -359,6 +461,8 @@ static void registerCtxMetatable(lua_State* L)
     static const luaL_Reg methods[] = {
         {"GetInput",                  ctx_getInput},
         {"SetOutput",                 ctx_setOutput},
+        {"GetInputAny",               ctx_getInputAny},
+        {"SetOutputAny",              ctx_setOutputAny},
         {"GetVariable",               ctx_getVariable},
         {"SetVariable",               ctx_setVariable},
         {"ActivateOutputFlow",        ctx_activateOutputFlow},

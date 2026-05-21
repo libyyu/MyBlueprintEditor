@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <variant>
 #include <utility>   // std::pair
+#include <memory>    // std::shared_ptr — for Variant::opaqueRef (Any 类型)
 
 namespace NodeEditor {
 namespace Runtime {
@@ -98,6 +99,22 @@ struct Variant
     // 改为有序 vector<pair<Variant,Variant>> 以支持任意键类型
     std::vector<std::pair<Variant, Variant>> mapValue;
 
+    // ============================================================
+    // Opaque 跨语言对象引用（仅 PinDataType::Any 使用）
+    // ============================================================
+    // 用于在 Lua 节点之间透传不透明对象（Lua table / userdata / xLua object 等）。
+    // C++ Runtime 永远不解释 opaqueRef 指向的内容，仅做搬运。
+    //
+    // shared_ptr<void> 的优势：
+    //   · 类型擦除 + 引用计数（拷贝 Variant 时自动 +1）
+    //   · 支持自定义 deleter（C# GCHandle / Lua luaL_unref / 纯 C 资源释放）
+    //   · 不依赖 Lua 头文件，纯 C++ 标准库
+    //   · 释放路径由创建者决定（shared_ptr 析构时调 deleter）
+    //
+    // 序列化、跨 VM、C++ handler 消费等场景下都不应使用 Any，
+    // 设计语义请参考方案文档。
+    std::shared_ptr<void> opaqueRef;
+
     // 默认构造
     Variant() : numericValue(std::monostate{}) {}
 
@@ -138,6 +155,52 @@ struct Variant
     }
 
     // ============================================================
+    // Any（不透明跨语言对象）工厂与访问器
+    // ============================================================
+
+    // 持有所有权（shared_ptr 析构时调用 deleter 释放原始资源）
+    // 调用者构造 shared_ptr 时把生命周期管理逻辑放到 deleter 里：
+    //   auto sp = std::shared_ptr<void>(rawPtr, [](void* p){ /* 释放 p */ });
+    //   Variant v = Variant::MakeAny(sp);
+    static Variant MakeAny(std::shared_ptr<void> ref)
+    {
+        Variant v;
+        v.type      = PinDataType::Any;
+        v.opaqueRef = std::move(ref);
+        return v;
+    }
+
+    // 借用语义：外部托管生命周期，Variant 不释放（deleter 为 no-op）
+    // 适合短生命周期的临时引用（如单次 handler 调用内）
+    static Variant MakeAnyBorrow(void* rawPtr)
+    {
+        Variant v;
+        v.type      = PinDataType::Any;
+        v.opaqueRef = std::shared_ptr<void>(rawPtr, [](void*){});
+        return v;
+    }
+
+    // 取出原始指针（不影响引用计数）。type != Any 时返回 nullptr。
+    void* asAny() const
+    {
+        if (type != PinDataType::Any) return nullptr;
+        return opaqueRef.get();
+    }
+
+    // 取出 shared_ptr（增加引用计数）。type != Any 时返回空 shared_ptr。
+    std::shared_ptr<void> asAnyShared() const
+    {
+        if (type != PinDataType::Any) return nullptr;
+        return opaqueRef;
+    }
+
+    bool hasAny() const
+    {
+        return type == PinDataType::Any && opaqueRef != nullptr;
+    }
+
+
+    // ============================================================
     // 相等性比较（用于 Set 去重和 Map 键比较）
     // ============================================================
     // 安全访问 numericValue：variant 处于 monostate 或类型不匹配时返回默认值
@@ -156,6 +219,7 @@ struct Variant
         case PinDataType::Float:   return numAsDouble() == other.numAsDouble();
         case PinDataType::String:
         case PinDataType::Object:  return stringValue == other.stringValue;
+        case PinDataType::Any:     return opaqueRef.get() == other.opaqueRef.get();
         default:                   return false;
         }
     }
@@ -198,6 +262,7 @@ struct Variant
         case PinDataType::Array:   return !arrayValue.empty();
         case PinDataType::Map:     return !mapValue.empty();
         case PinDataType::Set:     return !arrayValue.empty();
+        case PinDataType::Any:     return opaqueRef != nullptr;
         default:                   return false;
         }
     }
@@ -289,6 +354,14 @@ struct Variant
             }
             result += "}";
             return result;
+        }
+        case PinDataType::Any:
+        {
+            // Any 类型只能给出指针级别的调试字符串（C++ 不解析具体内容）
+            if (!opaqueRef) return "(any:null)";
+            char buf[40];
+            std::snprintf(buf, sizeof(buf), "(any:%p)", opaqueRef.get());
+            return std::string(buf);
         }
         default:                   return std::string();
         }

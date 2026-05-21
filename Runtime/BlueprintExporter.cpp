@@ -1787,12 +1787,12 @@ std::string JsonBlueprintExporter::variantToJson(const Variant& value) const
     switch (value.type)
     {
     case PinDataType::Boolean:
-        return std::get<bool>(value.numericValue) ? "true" : "false";
+        return value.numAsBool() ? "true" : "false";
     case PinDataType::Integer:
-        return std::to_string(std::get<int64_t>(value.numericValue));
+        return std::to_string(value.numAsInt());
     case PinDataType::Float:
     {
-        double d = std::get<double>(value.numericValue);
+        double d = value.numAsDouble();
         // JSON 不允许 Infinity 和 NaN，将其替换为 0 并在调试时可检测
         if (std::isinf(d) || std::isnan(d)) d = 0.0;
         // %.17g: 最短精确往返表示，去除尾零；不用 std::to_string 的 %.6f
@@ -1839,6 +1839,9 @@ std::string JsonBlueprintExporter::variantToJson(const Variant& value) const
         s += "]";
         return s;
     }
+    case PinDataType::Any:
+        // Any 不可序列化（指向运行时跨语言对象），输出 null 占位。
+        return "null";
     default:
         return "null";
     }
