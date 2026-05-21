@@ -72,7 +72,7 @@ function M.init(levelId)
     print('[level_controller] Bound to LevelController: ' .. _levelId)
 
     -- ── 异步加载蓝图 ──────────────────────────────────────────────────
-    M._load_blueprint_async(_levelId)
+    --M._load_blueprint_async(_levelId)
 end
 
 -- 写入蓝图事件队列（game_nodes.lua 里的 GameEvent.On* 节点消费）
