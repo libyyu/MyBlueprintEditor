@@ -860,4 +860,116 @@ Blueprint.RegisterHandler("Camera.Shake", function(ctx)
     return true
 end)
 
-print("[game_nodes] Registered: UI(4)+Scene(4)+Level(9)+Rope(2)+Candy(1)+Star(2)+Obstacle(1)+Camera(1)+GameEvent.On*(4)+Audio(3)+Timer(2) = 33 nodes")
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- HUD 节点 — 直接更新 FPanelHUD 的显示
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+Blueprint.RegisterNodeDef({
+    id          = "HUD.SetScore",
+    name        = "HUD Set Score",
+    category    = "Game/HUD",
+    color       = "5A6A9A",
+    description = "更新 HUD 分数显示",
+    inputs  = {
+        { name = "In",    type = "Flow"    },
+        { name = "Score", type = "Integer" },
+    },
+    outputs = { { name = "Out", type = "Flow" } },
+})
+Blueprint.RegisterHandler("HUD.SetScore", function(ctx)
+    local score = ctx:GetInput("Score"):asInt()
+    local ok, hud = pcall(require, "ui.FPanelHUD")
+    if ok and hud and type(hud.Instance) == "function" then
+        local inst = hud.Instance()
+        if inst and inst.SetScore then inst:SetScore(score) end
+    end
+    return true
+end)
+
+-- ───────────────────────────────────────────────────────────────────────────────
+
+Blueprint.RegisterNodeDef({
+    id          = "HUD.SetStars",
+    name        = "HUD Set Stars",
+    category    = "Game/HUD",
+    color       = "5A6A9A",
+    description = "更新 HUD 星星显示（★☆☆）",
+    inputs  = {
+        { name = "In",        type = "Flow"    },
+        { name = "Collected", type = "Integer" },
+        { name = "Total",     type = "Integer" },
+    },
+    outputs = { { name = "Out", type = "Flow" } },
+})
+Blueprint.RegisterHandler("HUD.SetStars", function(ctx)
+    local collected = ctx:GetInput("Collected"):asInt()
+    local total     = ctx:GetInput("Total"):asInt()
+    if total <= 0 then total = 3 end
+    local ok, hud = pcall(require, "ui.FPanelHUD")
+    if ok and hud and type(hud.Instance) == "function" then
+        local inst = hud.Instance()
+        if inst and inst.SetStars then inst:SetStars(collected, total) end
+    end
+    return true
+end)
+
+-- ───────────────────────────────────────────────────────────────────────────────
+
+Blueprint.RegisterNodeDef({
+    id          = "HUD.SetCuts",
+    name        = "HUD Set Cuts",
+    category    = "Game/HUD",
+    color       = "5A6A9A",
+    description = "更新 HUD 刀数显示",
+    inputs  = {
+        { name = "In",   type = "Flow"    },
+        { name = "Cuts", type = "Integer" },
+    },
+    outputs = { { name = "Out", type = "Flow" } },
+})
+Blueprint.RegisterHandler("HUD.SetCuts", function(ctx)
+    local cuts = ctx:GetInput("Cuts"):asInt()
+    local ok, hud = pcall(require, "ui.FPanelHUD")
+    if ok and hud and type(hud.Instance) == "function" then
+        local inst = hud.Instance()
+        if inst and inst.SetCuts then inst:SetCuts(cuts) end
+    end
+    return true
+end)
+
+-- ───────────────────────────────────────────────────────────────────────────────
+-- HUD.Sync — 一次性同步所有 HUD 数据（Score + Stars + Cuts）
+-- ───────────────────────────────────────────────────────────────────────────────
+
+Blueprint.RegisterNodeDef({
+    id          = "HUD.Sync",
+    name        = "HUD Sync",
+    category    = "Game/HUD",
+    color       = "5A6A9A",
+    description = "一次性从 LevelController 读取状态，更新 HUD 分数+星星+刀数",
+    inputs  = {
+        { name = "In",    type = "Flow"    },
+        { name = "Score", type = "Integer" },  -- 外部传入分数
+    },
+    outputs = { { name = "Out", type = "Flow" } },
+})
+Blueprint.RegisterHandler("HUD.Sync", function(ctx)
+    local score = ctx:GetInput("Score"):asInt()
+    local ctrl  = CS.CutRope.Game.LevelController.Current
+    local cuts      = ctrl and ctrl.CutCount      or 0
+    local collected = ctrl and ctrl.StarsCollected or 0
+    local total     = ctrl and ctrl.StarCount      or 3
+
+    local ok, hud = pcall(require, "ui.FPanelHUD")
+    if ok and hud and type(hud.Instance) == "function" then
+        local inst = hud.Instance()
+        if inst then
+            if inst.SetScore and score > 0 then inst:SetScore(score) end
+            if inst.SetStars then inst:SetStars(collected, total) end
+            if inst.SetCuts  then inst:SetCuts(cuts)  end
+        end
+    end
+    return true
+end)
+
+print("[game_nodes] Registered: UI(4)+Scene(4)+Level(9)+Rope(2)+Candy(1)+Star(2)+Obstacle(1)+Camera(1)+GameEvent.On*(4)+Audio(3)+Timer(2)+HUD(4) = 37 nodes")

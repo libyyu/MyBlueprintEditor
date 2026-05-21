@@ -1,7 +1,8 @@
 -- ui/FPanelHUD.lua
--- 游戏内 HUD
+-- 游戏内 HUD — 改善版
 -- Prefab: UIHUD.prefab
 --   TopBar/lbl_score / TopBar/btn_pause
+--   TopBar/lbl_stars / TopBar/lbl_cuts (动态创建)
 
 local FPanelBaseUI = require "ui.FPanelBaseUI"
 
@@ -21,9 +22,17 @@ do
     function FPanelHUD:OnCreate()
         local root = self.m_panel.transform
 
-        -- lbl_score
+        -- lbl_score（分数，居中）
         local lblTr = root:Find("TopBar/lbl_score")
         self.m_lblScore = lblTr and lblTr:GetComponent(typeof(TMPro.TMP_Text)) or nil
+
+        -- lbl_stars（星星，左侧）
+        local starTr = root:Find("TopBar/lbl_stars")
+        self.m_lblStars = starTr and starTr:GetComponent(typeof(TMPro.TMP_Text)) or nil
+
+        -- lbl_cuts（刀数，分数右侧）
+        local cutTr = root:Find("TopBar/lbl_cuts")
+        self.m_lblCuts = cutTr and cutTr:GetComponent(typeof(TMPro.TMP_Text)) or nil
 
         -- btn_pause
         local btnPause = root:Find("TopBar/btn_pause")
@@ -33,13 +42,46 @@ do
             end)
         end
 
+        -- 初始化数值
         self:SetScore(0)
+        self:SetStars(0, 3)
+        self:SetCuts(0)
     end
 
     --- 更新分数显示
     function FPanelHUD:SetScore(score)
         if self.m_lblScore then
             self.m_lblScore.text = tostring(score)
+        end
+    end
+
+    --- 更新星星显示 (collected/total)
+    function FPanelHUD:SetStars(collected, total)
+        if not self.m_lblStars then return end
+        total = total or 3
+        local stars = ""
+        for i = 1, total do
+            if i <= collected then
+                stars = stars .. "★"
+            else
+                stars = stars .. "☆"
+            end
+        end
+        self.m_lblStars.text = stars
+        -- 收集满了变金色
+        if collected >= total then
+            self.m_lblStars.color = CS.UnityEngine.Color(1.0, 0.85, 0.1, 1.0)
+        elseif collected > 0 then
+            self.m_lblStars.color = CS.UnityEngine.Color(1.0, 0.85, 0.1, 1.0)
+        else
+            self.m_lblStars.color = CS.UnityEngine.Color(0.7, 0.7, 0.7, 1.0)
+        end
+    end
+
+    --- 更新刀数显示
+    function FPanelHUD:SetCuts(cuts)
+        if self.m_lblCuts then
+            self.m_lblCuts.text = "✂ " .. tostring(cuts)
         end
     end
 
@@ -54,7 +96,6 @@ do
             if ctrl then ctrl:PauseLevel() end
             require 'ui.FPanelPause'.Instance():ShowPanel(true)
         end
-    end
     end
 
     function FPanelHUD:OnDestroy()

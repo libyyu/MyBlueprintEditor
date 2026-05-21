@@ -26,4 +26,12 @@ public static class XLuaConfig
         //FTimerList
         typeof(FTimerList.TimerCallback)
     };
+
+    [LuaCallCSharp]
+    public static List<Type> LuaCallCSharp_Extra = new List<Type>()
+    {
+        typeof(CutRope.Game.RopeRenderer),
+        typeof(CutRope.Game.RopeVisualSetup),
+        typeof(CutRope.Game.GameVisualEnhancer),
+    };
 }

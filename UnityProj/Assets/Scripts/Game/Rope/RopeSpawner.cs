@@ -34,6 +34,9 @@ namespace CutRope.Game
         [Tooltip("用于绘制绳子的 LineRenderer（可为 null，此时用 Gizmos 调试）")]
         public LineRenderer lineRenderer;
 
+        [Tooltip("高质量绳子渲染器（自动检测，优先级高于 lineRenderer）")]
+        public RopeRenderer ropeRenderer;
+
         // ── 运行时状态 ────────────────────────────────────────────────
         private readonly List<RopeSegment> _segments = new List<RopeSegment>();
         private Candy _candy;
@@ -53,20 +56,25 @@ namespace CutRope.Game
                 return;
             }
 
-            // 初始化 LineRenderer 外观
-            if (lineRenderer != null)
+            // 优先使用 RopeRenderer（高质量），否则 fallback 到 LineRenderer
+            if (ropeRenderer == null)
+                ropeRenderer = GetComponent<RopeRenderer>() ?? GetComponentInChildren<RopeRenderer>();
+
+            // 初始化 LineRenderer 外观（仅当没有 RopeRenderer 时才配置）
+            if (ropeRenderer == null && lineRenderer != null)
             {
-                lineRenderer.startWidth        = 0.08f;
-                lineRenderer.endWidth          = 0.05f;
-                lineRenderer.numCornerVertices = 4;
-                lineRenderer.numCapVertices    = 4;
+                lineRenderer.startWidth        = 0.10f;
+                lineRenderer.endWidth          = 0.06f;
+                lineRenderer.numCornerVertices = 6;
+                lineRenderer.numCapVertices    = 6;
                 lineRenderer.useWorldSpace     = true;
-                lineRenderer.sortingOrder      = 1;
+                lineRenderer.sortingOrder      = 2;
                 var grad = new Gradient();
                 grad.SetKeys(
                     new GradientColorKey[] {
-                        new GradientColorKey(new Color(0.85f, 0.55f, 0.15f), 0f),
-                        new GradientColorKey(new Color(0.70f, 0.40f, 0.10f), 1f)
+                        new GradientColorKey(new Color(0.55f, 0.32f, 0.08f), 0f),
+                        new GradientColorKey(new Color(0.80f, 0.50f, 0.15f), 0.4f),
+                        new GradientColorKey(new Color(0.65f, 0.38f, 0.10f), 1f)
                     },
                     new GradientAlphaKey[] {
                         new GradientAlphaKey(1f, 0f),
@@ -169,28 +177,43 @@ namespace CutRope.Game
                 Cut(nearest);
         }
 
-        // ── LineRenderer 更新 ─────────────────────────────────────────
+        // ── 渲染更新 ─────────────────────────────────────────────────
         private void LateUpdate()
         {
-            if (_segments.Count > 0 && lineRenderer != null)
-                UpdateLineRenderer();
+            if (_segments.Count > 0)
+                UpdateRender();
         }
 
-        private void UpdateLineRenderer()
+        private void UpdateRender()
         {
-            if (lineRenderer == null) return;
             // 过滤掉已销毁的节点
             _segments.RemoveAll(s => s == null);
-            if (_segments.Count == 0) { lineRenderer.positionCount = 0; return; }
+            if (_segments.Count == 0)
+            {
+                ropeRenderer?.Clear();
+                if (lineRenderer) lineRenderer.positionCount = 0;
+                return;
+            }
 
-            var points = new Vector3[_segments.Count + (_candy ? 1 : 0)];
+            // 收集世界坐标点（包含糖果位置）
+            var points = new List<Vector3>(_segments.Count + 1);
+            // 加入锚点（绳子起点的父物体世界坐标）
+            points.Add(transform.position);
             for (int i = 0; i < _segments.Count; i++)
-                points[i] = _segments[i].transform.position;
+                points.Add(_segments[i].transform.position);
             if (_candy)
-                points[_segments.Count] = _candy.transform.position;
+                points.Add(_candy.transform.position);
 
-            lineRenderer.positionCount = points.Length;
-            lineRenderer.SetPositions(points);
+            // 优先 RopeRenderer
+            if (ropeRenderer != null)
+            {
+                ropeRenderer.SetPoints(points);
+            }
+            else if (lineRenderer != null)
+            {
+                lineRenderer.positionCount = points.Count;
+                lineRenderer.SetPositions(points.ToArray());
+            }
         }
 
         // ── 节点触发回调（来自 RopeSegment）────────────────────────────
