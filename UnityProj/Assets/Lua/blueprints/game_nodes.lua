@@ -696,10 +696,9 @@ Blueprint.RegisterHandler("Timer.Wait", function(ctx)
     if id == "" then id = "default_timer" end
     local dur     = ctx:GetInput("Duration"):asFloat()
     local dt      = ctx:GetInput("DeltaTime"):asFloat()
-    -- Enabled 未连线时 isValid()==false → 默认启用
     local enabledV = ctx:GetInput("Enabled")
     local enabled  = (not enabledV:isValid()) or enabledV:asBool()
-    if not enabled then dt = 0 end  -- 禁用时不推进
+    if not enabled then dt = 0 end
     local key  = "__timer_" .. id
     local elapsed = math.min((Blueprint.GetVariable(key) or 0) + dt, dur)
     Blueprint.SetVariable(key, elapsed)
