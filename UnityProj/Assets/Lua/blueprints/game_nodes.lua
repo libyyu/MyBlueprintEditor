@@ -678,10 +678,11 @@ Blueprint.RegisterNodeDef({
     color       = "4A4A9A",
     description = "延迟节点：每帧推进，Duration 秒后触发 onDone（在 OnTick 里驱动）",
     inputs  = {
-        { name = "In",        type = "Flow"   },
-        { name = "TimerId",   type = "String" },
-        { name = "Duration",  type = "Float"  },
-        { name = "DeltaTime", type = "Float"  },
+        { name = "In",        type = "Flow"    },
+        { name = "TimerId",   type = "String"  },
+        { name = "Duration",  type = "Float"   },
+        { name = "DeltaTime", type = "Float"   },
+        { name = "Enabled",   type = "Boolean" },  -- false 时不推进（默认 true）
     },
     outputs = {
         { name = "onTick",    type = "Flow"  },
@@ -693,8 +694,12 @@ Blueprint.RegisterNodeDef({
 Blueprint.RegisterHandler("Timer.Wait", function(ctx)
     local id  = ctx:GetInput("TimerId"):asString()
     if id == "" then id = "default_timer" end
-    local dur  = ctx:GetInput("Duration"):asFloat()
-    local dt   = ctx:GetInput("DeltaTime"):asFloat()
+    local dur     = ctx:GetInput("Duration"):asFloat()
+    local dt      = ctx:GetInput("DeltaTime"):asFloat()
+    -- Enabled 未连线时 isValid()==false → 默认启用
+    local enabledV = ctx:GetInput("Enabled")
+    local enabled  = (not enabledV:isValid()) or enabledV:asBool()
+    if not enabled then dt = 0 end  -- 禁用时不推进
     local key  = "__timer_" .. id
     local elapsed = math.min((Blueprint.GetVariable(key) or 0) + dt, dur)
     Blueprint.SetVariable(key, elapsed)
@@ -972,4 +977,211 @@ Blueprint.RegisterHandler("HUD.Sync", function(ctx)
     return true
 end)
 
-print("[game_nodes] Registered: UI(4)+Scene(4)+Level(9)+Rope(2)+Candy(1)+Star(2)+Obstacle(1)+Camera(1)+GameEvent.On*(4)+Audio(3)+Timer(2)+HUD(4) = 37 nodes")
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Rope 补充节点：Spawn（单条） / SpawnAll（全部）
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+Blueprint.RegisterNodeDef({
+    id          = "Rope.Spawn",
+    name        = "Rope Spawn",
+    category    = "Game/Rope",
+    color       = "6A3A1A",
+    description = "生成第 RopeIndex 条绳子，末端连接到 Candy",
+    inputs  = {
+        { name = "In",        type = "Flow"    },
+        { name = "RopeIndex", type = "Integer" },  -- 默认 0
+    },
+    outputs = { { name = "Out", type = "Flow" } },
+})
+Blueprint.RegisterHandler("Rope.Spawn", function(ctx)
+    local ctrl = CS.CutRope.Game.LevelController.Current
+    if not ctrl then return true end
+    local idx  = ctx:GetInput("RopeIndex"):asInt()
+    local rope = ctrl:GetRope(idx)
+    if rope then
+        rope:Spawn(ctrl.candy)
+        print(string.format('[Rope.Spawn] rope[%d] spawned', idx))
+    else
+        print(string.format('[Rope.Spawn] rope[%d] not found', idx))
+    end
+    return true
+end)
+
+-- ───────────────────────────────────────────────────────────────────────────────
+
+Blueprint.RegisterNodeDef({
+    id          = "Rope.SpawnAll",
+    name        = "Rope Spawn All",
+    category    = "Game/Rope",
+    color       = "6A3A1A",
+    description = "生成场景中所有绳子，末端全部连接到 Candy",
+    inputs  = { { name = "In", type = "Flow" } },
+    outputs = {
+        { name = "Out",   type = "Flow"    },
+        { name = "Count", type = "Integer" },  -- 实际生成数量
+    },
+})
+Blueprint.RegisterHandler("Rope.SpawnAll", function(ctx)
+    local ctrl = CS.CutRope.Game.LevelController.Current
+    if not ctrl then
+        ctx:SetOutput("Count", 0)
+        return true
+    end
+    local count = ctrl:GetRopeCount()
+    for i = 0, count - 1 do
+        local rope = ctrl:GetRope(i)
+        if rope then rope:Spawn(ctrl.candy) end
+    end
+    ctx:SetOutput("Count", count)
+    print(string.format('[Rope.SpawnAll] spawned %d ropes', count))
+    return true
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Level 补充：按收集星星数计算星级 / 计算分数
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+Blueprint.RegisterNodeDef({
+    id          = "Level.CalcStarsByCollected",
+    name        = "Level Calc Stars By Collected",
+    category    = "Game/Level",
+    color       = "9A6A1A",
+    description = "按收集到的星星数直接返回星级（收集数即星级，最少1星）",
+    inputs  = { { name = "In", type = "Flow" } },
+    outputs = {
+        { name = "Out",       type = "Flow"    },
+        { name = "Stars",     type = "Integer" },
+        { name = "Collected", type = "Integer" },
+        { name = "Total",     type = "Integer" },
+    },
+})
+Blueprint.RegisterHandler("Level.CalcStarsByCollected", function(ctx)
+    local ctrl      = CS.CutRope.Game.LevelController.Current
+    local collected = ctrl and ctrl.StarsCollected or 0
+    local total     = ctrl and ctrl.StarCount      or 3
+    local stars     = math.max(1, math.min(3, collected))
+    ctx:SetOutput("Stars",     stars)
+    ctx:SetOutput("Collected", collected)
+    ctx:SetOutput("Total",     total)
+    return true
+end)
+
+-- ───────────────────────────────────────────────────────────────────────────────
+
+Blueprint.RegisterNodeDef({
+    id          = "Score.Calc",
+    name        = "Score Calc",
+    category    = "Game/Level",
+    color       = "9A6A1A",
+    description = "计算分数：Base + Collected×StarBonus - Cuts×CutPenalty",
+    inputs  = {
+        { name = "In",         type = "Flow"    },
+        { name = "Base",       type = "Integer" },  -- 基础分，默认 100
+        { name = "StarBonus",  type = "Integer" },  -- 每颗星加分，默认 50
+        { name = "CutPenalty", type = "Integer" },  -- 每刀扣分，默认 10
+    },
+    outputs = {
+        { name = "Out",   type = "Flow"    },
+        { name = "Score", type = "Integer" },
+    },
+})
+Blueprint.RegisterHandler("Score.Calc", function(ctx)
+    local base       = ctx:GetInput("Base"):asInt()
+    local starBonus  = ctx:GetInput("StarBonus"):asInt()
+    local cutPenalty = ctx:GetInput("CutPenalty"):asInt()
+    if base       <= 0 then base       = 100 end
+    if starBonus  <= 0 then starBonus  = 50  end
+    if cutPenalty <= 0 then cutPenalty = 10  end
+    local ctrl      = CS.CutRope.Game.LevelController.Current
+    local collected = ctrl and ctrl.StarsCollected or 0
+    local cuts      = ctrl and ctrl.CutCount       or 0
+    local score     = math.max(0, base + collected * starBonus - cuts * cutPenalty)
+    ctx:SetOutput("Score", score)
+    return true
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Level.SetResult — 把最终结果推给通关面板
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+Blueprint.RegisterNodeDef({
+    id          = "Level.SetResult",
+    name        = "Level Set Result",
+    category    = "Game/Level",
+    color       = "9A6A1A",
+    description = "把 Stars / Score 写入通关面板（在 UI.Open LevelComplete 之前调用）",
+    inputs  = {
+        { name = "In",    type = "Flow"    },
+        { name = "Stars", type = "Integer" },
+        { name = "Score", type = "Integer" },
+    },
+    outputs = { { name = "Out", type = "Flow" } },
+})
+Blueprint.RegisterHandler("Level.SetResult", function(ctx)
+    local stars = ctx:GetInput("Stars"):asInt()
+    local score = ctx:GetInput("Score"):asInt()
+    -- 暂存到全局，LevelComplete 面板 OnCreate 时读取
+    _G._pendingLevelResult = { stars = stars, score = score }
+    -- 如果面板已打开，直接更新
+    local ok, mod = pcall(require, "ui.FPanelLevelComplete")
+    if ok and mod and type(mod.Instance) == "function" then
+        local inst = mod.Instance()
+        if inst and inst.SetResult then
+            local LM = require 'game.level_manager'
+            inst:SetResult(LM.current_level_id or '', score)
+        end
+    end
+    print(string.format('[Level.SetResult] stars=%d score=%d', stars, score))
+    return true
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Var 节点 — 读写蓝图全局变量（门控、计数器等）
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+Blueprint.RegisterNodeDef({
+    id          = "Var.Set",
+    name        = "Var Set",
+    category    = "Game/Var",
+    color       = "4A7A4A",
+    description = "设置蓝图全局变量（布尔 / 数字 / 字符串）",
+    inputs  = {
+        { name = "In",    type = "Flow"   },
+        { name = "Key",   type = "String" },
+        { name = "Value", type = "String" },  -- 用字符串传输，支持 '1'/'0'/'true'/'false' 和数字字符串
+    },
+    outputs = { { name = "Out", type = "Flow" } },
+})
+Blueprint.RegisterHandler("Var.Set", function(ctx)
+    local key = ctx:GetInput("Key"):asString()
+    local val = ctx:GetInput("Value"):asString()
+    Blueprint.SetVariable(key, val)
+    return true
+end)
+
+-- ───────────────────────────────────────────────────────────────────────────────
+
+Blueprint.RegisterNodeDef({
+    id          = "Var.GetBool",
+    name        = "Var Get Bool",
+    category    = "Game/Var",
+    color       = "4A7A4A",
+    description = "读取蓝图变量（返回布尔），用于 Timer.Wait 的 Enabled 引脚等门控场景",
+    inputs  = {
+        { name = "In",  type = "Flow"   },
+        { name = "Key", type = "String" },
+    },
+    outputs = {
+        { name = "Out",   type = "Flow"    },
+        { name = "Value", type = "Boolean" },
+    },
+})
+Blueprint.RegisterHandler("Var.GetBool", function(ctx)
+    local key = ctx:GetInput("Key"):asString()
+    local raw = Blueprint.GetVariable(key)
+    local val = raw == "1" or raw == "true" or raw == true
+    ctx:SetOutput("Value", val)
+    return true
+end)
+
+print("[game_nodes] Registered: UI(4)+Scene(4)+Level(11)+Rope(4)+Candy(1)+Star(2)+Obstacle(1)+Camera(1)+GameEvent.On*(4)+Audio(3)+Timer(2)+HUD(4)+Score(1)+Var(2) = 44 nodes")
