@@ -83,6 +83,10 @@ bool LuaScriptEngine::Initialize(BlueprintRunner* runner)
         return false;
     }
 
+    // Any Variant 生命周期保护：注册 lua_State 到全局 guard 表，
+    // Shutdown 时 Unregister 让残留 Variant 析构变成安全 no-op
+    RegisterLuaState(m_L);
+
     // 打开标准库
     luaL_openlibs(m_L);
 
@@ -167,6 +171,13 @@ bool LuaScriptEngine::InitializeWithExternalState(lua_State* L, BlueprintRunner*
     m_runner    = runner;
     m_ownsState = false;  // 不拥有这个 VM，Shutdown 时不 close
 
+    // 注册外部 VM 到 guard 表：让 Any Variant 的 deleter 能查询到 guard。
+    // Unregister 不在 Shutdown 里调（外部 VM 由 host 管理生命周期），
+    // 而是由 host close VM 之前显式调用 UnregisterLuaState(L)；
+    // 如未调用也不会立刻崩溃——只是后续 Any Variant 析构时
+    // luaL_unref 会作用于已关闭 VM。host 可通过 BP_*** C API 解决。
+    RegisterLuaState(L);
+
     // 不调用 luaL_openlibs（外部 VM 已初始化，重复 open 可能覆盖全局表）
     // 只注册 Blueprint.* 绑定 + json/http 库
     RegisterLuaBindings(m_L, m_runner);
@@ -232,9 +243,13 @@ void LuaScriptEngine::Shutdown()
 {
     if (m_L)
     {
-        // 外部 State 模式：不关闭 VM，只清空引用
+        // 自有 VM：先 Unregister guard（让残留 Any Variant 析构变 no-op），
+        // 再 lua_close。外部 VM 不动，host 自己负责 lifecycle。
         if (m_ownsState)
+        {
+            UnregisterLuaState(m_L);
             lua_close(m_L);
+        }
         m_L = nullptr;
     }
     m_runner = nullptr;

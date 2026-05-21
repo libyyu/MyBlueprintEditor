@@ -22,6 +22,8 @@
 #include <vector>
 #include <unordered_map>
 #include <mutex>
+#include <atomic>           // LuaStateGuard.alive
+#include <memory>           // shared_ptr / weak_ptr
 #include <condition_variable>
 #include <functional>
 
@@ -41,19 +43,91 @@ static const char* CTX_MT     = "Blueprint.ExecutionContext";
 // 设计：把 Lua 栈顶值用 luaL_ref 注册到 LUA_REGISTRYINDEX，得到一个 int ref；
 // 用 shared_ptr<int> 持有 ref，自定义 deleter 在引用计数归零时 luaL_unref。
 //
-// 注意：lua_State* 必须在 deleter 闭包里捕获。这要求 Variant 使用期间
-// lua_State 必须仍然有效（同一 VM）。跨 VM 不应使用 Any。
+// 生命周期安全（防 lua_State 悬空）：
+//   裸 lua_State* 存在 UAF 风险——如果 VM 比 Variant 先关闭（多 VM 切换、
+//   异常退出、跨线程持有），shared_ptr 析构时 luaL_unref 会访问野指针。
+//
+//   解决方案：维护进程级 LuaStateGuard 注册表，VM 关闭时把对应的 guard 标记
+//   为 dead。Variant 的 deleter 通过 weak_ptr<Guard> 做活性检查：guard 已死
+//   时直接跳过 luaL_unref（registry 早已随 lua_close 整体释放，本来也无需
+//   unref，安全 no-op）。
+//
+//   Lua 5.4 不是线程安全的，所以注册表本身用互斥锁保护跨线程访问注册/
+//   注销操作；deleter 一旦 lock 成功 weak_ptr，luaL_unref 必须在 VM 关闭
+//   线程或受控时机执行（Lua 的常规约束，不归本注册表负责）。
 
 namespace {
 
-// Deleter 闭包：持有 lua_State 弱引用，析构时释放 registry 中的 ref
+// 单个 lua_State 的"活性 token"。VM 关闭时 alive_=false，deleter 据此判断。
+struct LuaStateGuard {
+    lua_State*        L;
+    std::atomic<bool> alive{true};
+    explicit LuaStateGuard(lua_State* state) : L(state) {}
+};
+
+// 进程级注册表：lua_State* -> shared_ptr<LuaStateGuard>
+class LuaStateRegistry {
+public:
+    static LuaStateRegistry& Instance() {
+        static LuaStateRegistry inst;
+        return inst;
+    }
+
+    // VM 启动后调用，返回本 VM 的 guard（同一 L 多次调用返回同一个）
+    std::shared_ptr<LuaStateGuard> Register(lua_State* L) {
+        std::lock_guard<std::mutex> lk(mu_);
+        auto it = map_.find(L);
+        if (it != map_.end()) return it->second;
+        auto g = std::make_shared<LuaStateGuard>(L);
+        map_[L] = g;
+        return g;
+    }
+
+    // 查询，找不到返回空（用于 makeAnyFromLuaIndex）
+    std::shared_ptr<LuaStateGuard> Find(lua_State* L) {
+        std::lock_guard<std::mutex> lk(mu_);
+        auto it = map_.find(L);
+        return (it != map_.end()) ? it->second : nullptr;
+    }
+
+    // VM 关闭前调用：标记 dead 并从表中移除。后续所有持有此 weak_ptr 的
+    // deleter 在 lock() 时拿到的 shared_ptr 上 alive==false，会跳过 unref。
+    void Unregister(lua_State* L) {
+        std::shared_ptr<LuaStateGuard> g;
+        {
+            std::lock_guard<std::mutex> lk(mu_);
+            auto it = map_.find(L);
+            if (it == map_.end()) return;
+            g = it->second;
+            map_.erase(it);
+        }
+        // 锁外 store，避免 deleter 回调（极少见）造成自死锁
+        g->alive.store(false, std::memory_order_release);
+    }
+
+private:
+    std::mutex mu_;
+    std::unordered_map<lua_State*, std::shared_ptr<LuaStateGuard>> map_;
+};
+
+// Deleter 闭包：用 weak_ptr 持有 guard，析构时检查 VM 是否还活着
 struct LuaRefDeleter {
-    lua_State* L;
+    std::weak_ptr<LuaStateGuard> weakGuard;
+
     void operator()(void* p) const {
-        if (!p || !L) return;
-        int ref = *static_cast<int*>(p);
-        delete static_cast<int*>(p);
-        luaL_unref(L, LUA_REGISTRYINDEX, ref);
+        if (!p) return;
+        int* refSlot = static_cast<int*>(p);
+        int  ref     = *refSlot;
+        delete refSlot;
+
+        // 检查 VM 活性：guard 还在 + alive==true 才安全 luaL_unref
+        if (auto g = weakGuard.lock()) {
+            if (g->alive.load(std::memory_order_acquire)) {
+                luaL_unref(g->L, LUA_REGISTRYINDEX, ref);
+            }
+            // 否则：VM 已 lua_close，registry 整体随 GC 释放，不需要 unref
+        }
+        // 否则：guard 都没了，VM 早就死了，no-op
     }
 };
 
@@ -64,8 +138,11 @@ static Variant makeAnyFromLuaIndex(lua_State* L, int idx)
     int ref = luaL_ref(L, LUA_REGISTRYINDEX);                   // pop + 存 registry
     if (ref == LUA_REFNIL) return Variant();                    // nil 直接返回空 Variant
 
+    // 自动注册（首次见到此 L 时建立 guard，避免上层忘记调用 Register）
+    auto guard = LuaStateRegistry::Instance().Register(L);
+
     auto* refSlot = new int(ref);
-    std::shared_ptr<void> sp(refSlot, LuaRefDeleter{L});
+    std::shared_ptr<void> sp(refSlot, LuaRefDeleter{guard});
     return Variant::MakeAny(std::move(sp));
 }
 
@@ -81,6 +158,25 @@ static void pushAnyToLua(lua_State* L, const Variant& v)
 }
 
 } // namespace
+
+// =========================================================================
+// 公共 API：VM 生命周期通告（供 LuaScriptEngine / 外部 VM 管理者调用）
+// =========================================================================
+//
+// 用法：
+//   - 创建 lua_State 后可调用 RegisterLuaState(L) 建立 guard
+//     （非必须，makeAnyFromLuaIndex 会按需自动注册）
+//   - lua_close(L) 之前必须调用 UnregisterLuaState(L)，否则残留 Any
+//     Variant 在 VM 关闭后析构会触发 UAF。
+void RegisterLuaState(lua_State* L)
+{
+    if (L) LuaStateRegistry::Instance().Register(L);
+}
+
+void UnregisterLuaState(lua_State* L)
+{
+    if (L) LuaStateRegistry::Instance().Unregister(L);
+}
 
 // =========================================================================
 // Variant → Lua 压栈（原生 Lua 类型，非 userdata）

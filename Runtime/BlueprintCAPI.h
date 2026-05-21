@@ -285,6 +285,22 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetExternalLuaState(BP_Runner 
 /// Returns NULL if the runner is not yet initialized or has no Lua engine.
 /// Use this to attach an xLua LuaEnv to the same VM as the Blueprint Runtime.
 BLUEPRINT_CAPI_EXPORT lua_State* BLUEPRINT_CAPI_CALL BP_GetLuaState(BP_Runner runner);
+
+/// Notify Blueprint that a lua_State is going to be closed by the host.
+///
+/// Must be called BEFORE host's lua_close(L) when:
+///   - Any-typed Variant pins were used (ctx:SetOutputAny / GetInputAny)
+///   - The lua_State is shared via BP_SetExternalLuaState
+///
+/// Without this call, Variants that outlive the VM (e.g. cached in a graph
+/// state, kept across VM swaps) will, on destruction, call luaL_unref on a
+/// dangling lua_State* and crash.
+///
+/// After this call, all Any Variants tied to L become safe-noop on destruction
+/// (skip luaL_unref because the registry has been GC'd by lua_close).
+///
+/// Safe to call multiple times; safe to call on a state never seen by Blueprint.
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_NotifyLuaStateClosing(lua_State* L);
 #endif
 
 // ---------------------------------------------------------------------------

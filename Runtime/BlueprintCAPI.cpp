@@ -520,7 +520,13 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetLastError(BP_Runner runner, 
 // ---------------------------------------------------------------------------
 
 #ifdef BLUEPRINT_HAS_LUA
+// LuaScriptEngine.h / LuaBindings.h 含 C++ 命名空间内的函数声明，
+// 此处 BlueprintCAPI 实现处于外层 extern "C" {} 块内，会让这些 C++ 函数
+// 被错误识别为 C 链接（导致链接器找不到符号）。用 extern "C++" 临时跳出。
+extern "C++" {
 #include "LuaScriptEngine.h"
+#include "LuaBindings.h"     // RegisterLuaState / UnregisterLuaState
+}
 
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetExternalLuaState(BP_Runner runner, lua_State* L)
 {
@@ -540,6 +546,11 @@ BLUEPRINT_CAPI_EXPORT lua_State* BLUEPRINT_CAPI_CALL BP_GetLuaState(BP_Runner ru
     LuaScriptEngine* engine = w->runner.GetLuaEngine();
     if (!engine) return nullptr;
     return engine->GetState();
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_NotifyLuaStateClosing(lua_State* L)
+{
+    NodeEditor::Runtime::UnregisterLuaState(L);
 }
 #endif
 
