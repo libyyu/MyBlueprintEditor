@@ -539,6 +539,30 @@ namespace BlueprintRuntime
 
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr BP_GetLuaState(IntPtr runner);
+
+        // ----------------------------------------------------------------
+        // Metadata / Dependency query
+        // ----------------------------------------------------------------
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr BP_MetaParseFromJson([MarshalAs(UnmanagedType.LPUTF8Str)] string json);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void BP_MetaFree(IntPtr meta);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BP_MetaGetDependencyCount(IntPtr meta);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BP_MetaGetDependency(IntPtr meta, int index, IntPtr buf, int bufLen);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BP_MetaGetName(IntPtr meta, IntPtr buf, int bufLen);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BP_MetaGetVersion(IntPtr meta, IntPtr buf, int bufLen);
+
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BP_MetaGetBlueprintClass(IntPtr meta);
         // Blittable mirror of C BP_PinDef — layout must match exactly.
         // strings are passed as null-terminated UTF-8 pointers (IntPtr).
         // We pin the string bytes ourselves in BPRunner.RegisterNodeDef.
@@ -945,8 +969,19 @@ namespace BlueprintRuntime
         }
 
         // ---------------------------------------------------------------------
-        // Internals
+        // Metadata / Dependency query  (static — no runner needed)
         // ---------------------------------------------------------------------
+
+        /// <summary>
+        /// Parse metadata from a bjson string and return a <see cref="BPBlueprintMeta"/> RAII wrapper.
+        /// Returns null if parsing fails. Caller must Dispose() the result (or use a using block).
+        /// </summary>
+        public static BPBlueprintMeta ParseMetaFromJson(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return null;
+            var handle = Native.BP_MetaParseFromJson(json);
+            return handle == IntPtr.Zero ? null : new BPBlueprintMeta(handle);
+        }
 
         private void ThrowIfDisposed()
         {
@@ -1015,6 +1050,86 @@ namespace BlueprintRuntime
     public sealed class BPException : Exception
     {
         public BPException(string message) : base(message) { }
+    }
+
+    // =========================================================================
+    // BPBlueprintMeta — RAII wrapper around BP_Meta opaque handle
+    // =========================================================================
+
+    /// <summary>
+    /// Parsed blueprint metadata returned by <see cref="BPRunner.ParseMetaFromJson"/>.
+    /// Always dispose via using or Dispose() to free native memory.
+    /// </summary>
+    public sealed class BPBlueprintMeta : IDisposable
+    {
+        private IntPtr _handle;
+        private const int BufSize = 512;
+
+        internal BPBlueprintMeta(IntPtr handle) { _handle = handle; }
+
+        public void Dispose()
+        {
+            if (_handle != IntPtr.Zero)
+            {
+                Native.BP_MetaFree(_handle);
+                _handle = IntPtr.Zero;
+            }
+        }
+
+        /// <summary>Number of dependency paths in metadata.dependencies.</summary>
+        public int DependencyCount =>
+            _handle != IntPtr.Zero ? Native.BP_MetaGetDependencyCount(_handle) : 0;
+
+        /// <summary>Get dependency path at index. Returns null if out of range.</summary>
+        public string GetDependency(int index)
+        {
+            if (_handle == IntPtr.Zero) return null;
+            IntPtr buf = Marshal.AllocHGlobal(BufSize);
+            try
+            {
+                int n = Native.BP_MetaGetDependency(_handle, index, buf, BufSize);
+                return n >= 0 ? Marshal.PtrToStringUTF8(buf, n) : null;
+            }
+            finally { Marshal.FreeHGlobal(buf); }
+        }
+
+        /// <summary>All dependency paths as a string array.</summary>
+        public string[] Dependencies
+        {
+            get
+            {
+                int count = DependencyCount;
+                var result = new string[count];
+                for (int i = 0; i < count; i++)
+                    result[i] = GetDependency(i) ?? "";
+                return result;
+            }
+        }
+
+        public string Name
+        {
+            get
+            {
+                if (_handle == IntPtr.Zero) return "";
+                IntPtr buf = Marshal.AllocHGlobal(BufSize);
+                try { int n = Native.BP_MetaGetName(_handle, buf, BufSize); return n > 0 ? Marshal.PtrToStringUTF8(buf, n) : ""; }
+                finally { Marshal.FreeHGlobal(buf); }
+            }
+        }
+
+        public string Version
+        {
+            get
+            {
+                if (_handle == IntPtr.Zero) return "";
+                IntPtr buf = Marshal.AllocHGlobal(BufSize);
+                try { int n = Native.BP_MetaGetVersion(_handle, buf, BufSize); return n > 0 ? Marshal.PtrToStringUTF8(buf, n) : ""; }
+                finally { Marshal.FreeHGlobal(buf); }
+            }
+        }
+
+        public int BlueprintClass =>
+            _handle != IntPtr.Zero ? Native.BP_MetaGetBlueprintClass(_handle) : -1;
     }
 }
 

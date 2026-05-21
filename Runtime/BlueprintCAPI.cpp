@@ -825,3 +825,64 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_CtxGetActivatedInputPin(BP_Cont
 }
 
 } // extern "C"
+
+// ---------------------------------------------------------------------------
+// Metadata / Dependency query — extern "C++" implementation block
+// (uses C++ BlueprintExporter; must live outside the extern "C" block above)
+// ---------------------------------------------------------------------------
+
+#include "BlueprintExporter.h"
+
+extern "C" {
+
+BLUEPRINT_CAPI_EXPORT BP_Meta BLUEPRINT_CAPI_CALL BP_MetaParseFromJson(const char* json)
+{
+    if (!json) return nullptr;
+    JsonBlueprintExporter exporter;
+    auto result = exporter.importMetadataFromString(json);
+    if (!result.success) return nullptr;
+    // 堆分配 BlueprintMetadata，封装为不透明指针
+    return new BlueprintMetadata(std::move(result.metadata));
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_MetaFree(BP_Meta meta)
+{
+    delete static_cast<BlueprintMetadata*>(meta);
+}
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_MetaGetDependencyCount(BP_Meta meta)
+{
+    if (!meta) return -1;
+    return static_cast<int>(static_cast<BlueprintMetadata*>(meta)->dependencies.size());
+}
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_MetaGetDependency(
+    BP_Meta meta, int index, char* buf, int bufLen)
+{
+    if (!meta) return -1;
+    const auto& deps = static_cast<BlueprintMetadata*>(meta)->dependencies;
+    if (index < 0 || index >= static_cast<int>(deps.size())) return -1;
+    return copyString(deps[static_cast<size_t>(index)], buf, bufLen);
+}
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_MetaGetName(
+    BP_Meta meta, char* buf, int bufLen)
+{
+    if (!meta) return -1;
+    return copyString(static_cast<BlueprintMetadata*>(meta)->name, buf, bufLen);
+}
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_MetaGetVersion(
+    BP_Meta meta, char* buf, int bufLen)
+{
+    if (!meta) return -1;
+    return copyString(static_cast<BlueprintMetadata*>(meta)->version, buf, bufLen);
+}
+
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_MetaGetBlueprintClass(BP_Meta meta)
+{
+    if (!meta) return -1;
+    return static_cast<int>(static_cast<BlueprintMetadata*>(meta)->blueprintClass);
+}
+
+} // extern "C" (metadata block)

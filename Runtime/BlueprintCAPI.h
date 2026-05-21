@@ -451,6 +451,42 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_CtxGetCurrentNodeDefId(BP_Conte
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_CtxGetActivatedInputPin(BP_Context ctx,
                                                                            char* buf, int bufLen);
 
+// ---------------------------------------------------------------------------
+// Metadata / Dependency query  (no Runner needed — works on raw JSON)
+// ---------------------------------------------------------------------------
+//
+// Opaque handle to a parsed metadata result. Must be freed with BP_MetaFree.
+typedef void* BP_Meta;
+
+/// Parse metadata from a JSON string (bjson content).
+/// Returns an opaque BP_Meta handle on success, NULL on failure.
+/// The handle is NOT tied to any runner — it is a standalone heap object.
+/// Caller MUST call BP_MetaFree() when done.
+BLUEPRINT_CAPI_EXPORT BP_Meta BLUEPRINT_CAPI_CALL BP_MetaParseFromJson(const char* json);
+
+/// Free a BP_Meta handle returned by BP_MetaParseFromJson.
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_MetaFree(BP_Meta meta);
+
+/// Returns the number of entries in metadata.dependencies.
+/// Returns -1 if meta is NULL.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_MetaGetDependencyCount(BP_Meta meta);
+
+/// Copies the dependency path at [index] into buf (at most bufLen-1 bytes + NUL).
+/// Returns bytes written (excl. NUL), or -1 if meta is NULL / index out of range.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_MetaGetDependency(
+    BP_Meta meta, int index, char* buf, int bufLen);
+
+/// Copies metadata.name into buf. Returns bytes written (excl. NUL), or -1.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_MetaGetName(
+    BP_Meta meta, char* buf, int bufLen);
+
+/// Copies metadata.version into buf. Returns bytes written (excl. NUL), or -1.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_MetaGetVersion(
+    BP_Meta meta, char* buf, int bufLen);
+
+/// Returns metadata.blueprintClass as integer, or -1 if meta is NULL.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_MetaGetBlueprintClass(BP_Meta meta);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
