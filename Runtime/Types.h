@@ -140,14 +140,20 @@ struct Variant
     // ============================================================
     // 相等性比较（用于 Set 去重和 Map 键比较）
     // ============================================================
+    // 安全访问 numericValue：variant 处于 monostate 或类型不匹配时返回默认值
+    // 避免 std::get 抛 std::bad_variant_access 导致进程崩溃
+    bool   numAsBool()   const { auto* p = std::get_if<bool>(&numericValue);    return p ? *p : false; }
+    int64_t numAsInt()   const { auto* p = std::get_if<int64_t>(&numericValue); return p ? *p : 0; }
+    double numAsDouble() const { auto* p = std::get_if<double>(&numericValue);  return p ? *p : 0.0; }
+
     bool operator==(const Variant& other) const
     {
         if (type != other.type) return false;
         switch (type)
         {
-        case PinDataType::Boolean: return std::get<bool>(numericValue) == std::get<bool>(other.numericValue);
-        case PinDataType::Integer: return std::get<int64_t>(numericValue) == std::get<int64_t>(other.numericValue);
-        case PinDataType::Float:   return std::get<double>(numericValue) == std::get<double>(other.numericValue);
+        case PinDataType::Boolean: return numAsBool()   == other.numAsBool();
+        case PinDataType::Integer: return numAsInt()    == other.numAsInt();
+        case PinDataType::Float:   return numAsDouble() == other.numAsDouble();
         case PinDataType::String:
         case PinDataType::Object:  return stringValue == other.stringValue;
         default:                   return false;
@@ -162,8 +168,8 @@ struct Variant
         if (type != other.type) return false;
         if (type == PinDataType::Float)
         {
-            double a = std::get<double>(numericValue);
-            double b = std::get<double>(other.numericValue);
+            double a = numAsDouble();
+            double b = other.numAsDouble();
             // ULP-based epsilon：相对误差 1e-9 或绝对误差 1e-12
             double diff = a - b;
             if (diff < 0) diff = -diff;
@@ -184,9 +190,9 @@ struct Variant
     {
         switch (type)
         {
-        case PinDataType::Boolean: return std::get<bool>(numericValue);
-        case PinDataType::Integer: return std::get<int64_t>(numericValue) != 0;
-        case PinDataType::Float:   return std::get<double>(numericValue) != 0.0;
+        case PinDataType::Boolean: return numAsBool();
+        case PinDataType::Integer: return numAsInt() != 0;
+        case PinDataType::Float:   return numAsDouble() != 0.0;
         case PinDataType::String:  return !stringValue.empty();
         case PinDataType::Object:  return !stringValue.empty();
         case PinDataType::Array:   return !arrayValue.empty();
@@ -200,9 +206,9 @@ struct Variant
     {
         switch (type)
         {
-        case PinDataType::Integer: return std::get<int64_t>(numericValue);
-        case PinDataType::Boolean: return std::get<bool>(numericValue) ? 1 : 0;
-        case PinDataType::Float:   return static_cast<int64_t>(std::get<double>(numericValue));
+        case PinDataType::Integer: return numAsInt();
+        case PinDataType::Boolean: return numAsBool() ? 1 : 0;
+        case PinDataType::Float:   return static_cast<int64_t>(numAsDouble());
         case PinDataType::String:
         {
             if (stringValue.empty()) return 0;
@@ -221,9 +227,9 @@ struct Variant
     {
         switch (type)
         {
-        case PinDataType::Float:   return std::get<double>(numericValue);
-        case PinDataType::Integer: return static_cast<double>(std::get<int64_t>(numericValue));
-        case PinDataType::Boolean: return std::get<bool>(numericValue) ? 1.0 : 0.0;
+        case PinDataType::Float:   return numAsDouble();
+        case PinDataType::Integer: return static_cast<double>(numAsInt());
+        case PinDataType::Boolean: return numAsBool() ? 1.0 : 0.0;
         case PinDataType::String:
         {
             if (stringValue.empty()) return 0.0;
@@ -240,12 +246,12 @@ struct Variant
         switch (type)
         {
         case PinDataType::String:  return stringValue;
-        case PinDataType::Boolean: return std::get<bool>(numericValue) ? "True" : "False";
-        case PinDataType::Integer: return std::to_string(std::get<int64_t>(numericValue));
+        case PinDataType::Boolean: return numAsBool() ? "True" : "False";
+        case PinDataType::Integer: return std::to_string(numAsInt());
         case PinDataType::Float:
         {
             char buf[64];
-            std::snprintf(buf, sizeof(buf), "%.17g", std::get<double>(numericValue));
+            std::snprintf(buf, sizeof(buf), "%.17g", numAsDouble());
             return std::string(buf);
         }
         case PinDataType::Object:  return stringValue.empty() ? "(none)" : stringValue;

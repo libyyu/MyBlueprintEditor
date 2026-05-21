@@ -1849,6 +1849,16 @@ Variant JsonBlueprintExporter::jsonToVariant(const std::string& json, PinDataTyp
     Variant result;
     result.type = type;
 
+    // 关键：先按 type 初始化 numericValue 到对应零值，避免后续 JSON 解析失败或类型不匹配时
+    // numericValue 保持 monostate，导致运行时 std::get 抛 bad_variant_access 崩溃。
+    switch (type)
+    {
+    case PinDataType::Boolean: result.numericValue = false;             break;
+    case PinDataType::Integer: result.numericValue = static_cast<int64_t>(0); break;
+    case PinDataType::Float:   result.numericValue = 0.0;               break;
+    default: break;
+    }
+
     crude_json::value val = crude_json::value::parse(json);
     if (val.is_discarded())
         return result;
@@ -1858,14 +1868,34 @@ Variant JsonBlueprintExporter::jsonToVariant(const std::string& json, PinDataTyp
     case PinDataType::Boolean:
         if (val.type() == crude_json::type_t::boolean)
             result.numericValue = val.get<bool>();
+        else if (val.type() == crude_json::type_t::number)
+            result.numericValue = (val.get<double>() != 0.0);
         break;
     case PinDataType::Integer:
         if (val.type() == crude_json::type_t::number)
             result.numericValue = static_cast<int64_t>(val.get<double>());
+        else if (val.type() == crude_json::type_t::boolean)
+            result.numericValue = static_cast<int64_t>(val.get<bool>() ? 1 : 0);
+        else if (val.type() == crude_json::type_t::string)
+        {
+            const auto& s = val.get<std::string>();
+            char* end = nullptr;
+            int64_t v = std::strtoll(s.c_str(), &end, 10);
+            if (end != s.c_str()) result.numericValue = v;
+        }
         break;
     case PinDataType::Float:
         if (val.type() == crude_json::type_t::number)
             result.numericValue = val.get<double>();
+        else if (val.type() == crude_json::type_t::boolean)
+            result.numericValue = val.get<bool>() ? 1.0 : 0.0;
+        else if (val.type() == crude_json::type_t::string)
+        {
+            const auto& s = val.get<std::string>();
+            char* end = nullptr;
+            double v = std::strtod(s.c_str(), &end);
+            if (end != s.c_str()) result.numericValue = v;
+        }
         break;
     case PinDataType::String:
         if (val.type() == crude_json::type_t::string)
