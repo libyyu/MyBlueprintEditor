@@ -22,16 +22,25 @@ namespace XLua.CSObjectWrap
         static void wrapInit0(LuaEnv luaenv, ObjectTranslator translator)
         {
         
+            translator.DelayWrapLoader(typeof(CutRope.Game.CameraShaker), CutRopeGameCameraShakerWrap.__Register);
+        
+        
             translator.DelayWrapLoader(typeof(CutRope.Game.Candy), CutRopeGameCandyWrap.__Register);
         
         
             translator.DelayWrapLoader(typeof(CutRope.Game.CutInput), CutRopeGameCutInputWrap.__Register);
         
         
+            translator.DelayWrapLoader(typeof(CutRope.Game.GameVisualEnhancer), CutRopeGameGameVisualEnhancerWrap.__Register);
+        
+        
             translator.DelayWrapLoader(typeof(CutRope.Game.LevelController), CutRopeGameLevelControllerWrap.__Register);
         
         
             translator.DelayWrapLoader(typeof(CutRope.Game.Obstacle), CutRopeGameObstacleWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(CutRope.Game.RopeRenderer), CutRopeGameRopeRendererWrap.__Register);
         
         
             translator.DelayWrapLoader(typeof(CutRope.Game.RopeSpawner), CutRopeGameRopeSpawnerWrap.__Register);
@@ -41,6 +50,9 @@ namespace XLua.CSObjectWrap
         
         
             translator.DelayWrapLoader(typeof(CutRope.Game.UI.UIController), CutRopeGameUIUIControllerWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(CutRope.Game.RopeVisualSetup), CutRopeGameRopeVisualSetupWrap.__Register);
         
         
             translator.DelayWrapLoader(typeof(FTimerListBehavior), FTimerListBehaviorWrap.__Register);

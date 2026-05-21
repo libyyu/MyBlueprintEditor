@@ -21,7 +21,7 @@ namespace XLua.CSObjectWrap
         {
 			ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
 			System.Type type = typeof(CutRope.Game.RopeSpawner);
-			Utils.BeginObjectRegister(type, L, translator, 0, 4, 7, 6);
+			Utils.BeginObjectRegister(type, L, translator, 0, 4, 8, 7);
 			
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "Spawn", _m_Spawn);
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "Cut", _m_Cut);
@@ -35,6 +35,7 @@ namespace XLua.CSObjectWrap
             Utils.RegisterFunc(L, Utils.GETTER_IDX, "segmentMass", _g_get_segmentMass);
             Utils.RegisterFunc(L, Utils.GETTER_IDX, "segmentPrefab", _g_get_segmentPrefab);
             Utils.RegisterFunc(L, Utils.GETTER_IDX, "lineRenderer", _g_get_lineRenderer);
+            Utils.RegisterFunc(L, Utils.GETTER_IDX, "ropeRenderer", _g_get_ropeRenderer);
             Utils.RegisterFunc(L, Utils.GETTER_IDX, "OnRopeCut", _g_get_OnRopeCut);
             
 			Utils.RegisterFunc(L, Utils.SETTER_IDX, "segmentCount", _s_set_segmentCount);
@@ -42,6 +43,7 @@ namespace XLua.CSObjectWrap
             Utils.RegisterFunc(L, Utils.SETTER_IDX, "segmentMass", _s_set_segmentMass);
             Utils.RegisterFunc(L, Utils.SETTER_IDX, "segmentPrefab", _s_set_segmentPrefab);
             Utils.RegisterFunc(L, Utils.SETTER_IDX, "lineRenderer", _s_set_lineRenderer);
+            Utils.RegisterFunc(L, Utils.SETTER_IDX, "ropeRenderer", _s_set_ropeRenderer);
             Utils.RegisterFunc(L, Utils.SETTER_IDX, "OnRopeCut", _s_set_OnRopeCut);
             
 			
@@ -289,6 +291,20 @@ namespace XLua.CSObjectWrap
         }
         
         [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _g_get_ropeRenderer(RealStatePtr L)
+        {
+		    try {
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+			
+                CutRope.Game.RopeSpawner gen_to_be_invoked = (CutRope.Game.RopeSpawner)translator.FastGetCSObj(L, 1);
+                translator.Push(L, gen_to_be_invoked.ropeRenderer);
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            return 1;
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
         static int _g_get_OnRopeCut(RealStatePtr L)
         {
 		    try {
@@ -372,6 +388,21 @@ namespace XLua.CSObjectWrap
 			
                 CutRope.Game.RopeSpawner gen_to_be_invoked = (CutRope.Game.RopeSpawner)translator.FastGetCSObj(L, 1);
                 gen_to_be_invoked.lineRenderer = (UnityEngine.LineRenderer)translator.GetObject(L, 2, typeof(UnityEngine.LineRenderer));
+            
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            return 0;
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _s_set_ropeRenderer(RealStatePtr L)
+        {
+		    try {
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+			
+                CutRope.Game.RopeSpawner gen_to_be_invoked = (CutRope.Game.RopeSpawner)translator.FastGetCSObj(L, 1);
+                gen_to_be_invoked.ropeRenderer = (CutRope.Game.RopeRenderer)translator.GetObject(L, 2, typeof(CutRope.Game.RopeRenderer));
             
             } catch(System.Exception gen_e) {
                 return LuaAPI.luaL_error(L, "c# exception:" + gen_e);

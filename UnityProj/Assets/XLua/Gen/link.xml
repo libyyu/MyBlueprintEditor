@@ -3,13 +3,17 @@
 <linker>
 
 	<assembly fullname="Assembly-CSharp">
-	    <type fullname="CutRope.Game.Candy" preserve="all"/>
+	    <type fullname="CutRope.Game.CameraShaker" preserve="all"/>
+		<type fullname="CutRope.Game.Candy" preserve="all"/>
 		<type fullname="CutRope.Game.CutInput" preserve="all"/>
+		<type fullname="CutRope.Game.GameVisualEnhancer" preserve="all"/>
 		<type fullname="CutRope.Game.LevelController" preserve="all"/>
 		<type fullname="CutRope.Game.Obstacle" preserve="all"/>
+		<type fullname="CutRope.Game.RopeRenderer" preserve="all"/>
 		<type fullname="CutRope.Game.RopeSpawner" preserve="all"/>
 		<type fullname="CutRope.Game.Star" preserve="all"/>
 		<type fullname="CutRope.Game.UI.UIController" preserve="all"/>
+		<type fullname="CutRope.Game.RopeVisualSetup" preserve="all"/>
 		
 	</assembly>
 

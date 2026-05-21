@@ -132,6 +132,7 @@ GameObject:
   m_Component:
   - component: {fileID: 285820469}
   - component: {fileID: 285820468}
+  - component: {fileID: 285820470}
   m_Layer: 0
   m_Name: LevelController
   m_TagString: Untagged
@@ -169,6 +170,26 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &285820470
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 285820467}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4dd9df61f2bb2004baa81788c2b8bc2d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  enhanceBackground: 1
+  bgColorTop: {r: 0.1, g: 0.1, b: 0.22, a: 1}
+  bgColorBottom: {r: 0.05, g: 0.12, b: 0.28, a: 1}
+  enhanceCandy: 1
+  showCutTrail: 1
+  trailDuration: 0.25
+  trailColor: {r: 1, g: 0.9, b: 0.3, a: 0.9}
+  showCutParticles: 1
 --- !u!1 &773243990
 GameObject:
   m_ObjectHideFlags: 0
@@ -180,6 +201,7 @@ GameObject:
   - component: {fileID: 773243993}
   - component: {fileID: 773243992}
   - component: {fileID: 773243991}
+  - component: {fileID: 773243994}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -205,7 +227,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.14901961, g: 0.14901961, b: 0.2509804, a: 1}
+  m_BackGroundColor: {r: 0.08, g: 0.1, b: 0.2, a: 1}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -261,6 +283,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &773243994
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 773243990}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a3c7e2bd1f094abb8d5e6cf0b2a19d3e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1292178973
 GameObject:
   m_ObjectHideFlags: 0
@@ -272,6 +306,7 @@ GameObject:
   - component: {fileID: 1292178975}
   - component: {fileID: 1292178974}
   - component: {fileID: 1292178976}
+  - component: {fileID: 1292178977}
   m_Layer: 0
   m_Name: RopeSpawner
   m_TagString: Untagged
@@ -296,6 +331,7 @@ MonoBehaviour:
   segmentMass: 0.05
   segmentPrefab: {fileID: 7268310622528710787, guid: cc89766afec8a8949a3fcb57042913e8, type: 3}
   lineRenderer: {fileID: 1292178976}
+  ropeRenderer: {fileID: 0}
 --- !u!4 &1292178975
 Transform:
   m_ObjectHideFlags: 0
@@ -415,6 +451,18 @@ LineRenderer:
   m_UseWorldSpace: 1
   m_Loop: 0
   m_ApplyActiveColorSpace: 1
+--- !u!114 &1292178977
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1292178973}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb8ed22283f06ba4e96e7e128ce394b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1386546005
 GameObject:
   m_ObjectHideFlags: 0
@@ -761,6 +809,7 @@ GameObject:
   - component: {fileID: 3001000003}
   - component: {fileID: 3001000002}
   - component: {fileID: 3001000004}
+  - component: {fileID: 3001000005}
   m_Layer: 0
   m_Name: RopeSpawner2
   m_TagString: Untagged
@@ -785,6 +834,7 @@ MonoBehaviour:
   segmentMass: 0.05
   segmentPrefab: {fileID: 7268310622528710787, guid: cc89766afec8a8949a3fcb57042913e8, type: 3}
   lineRenderer: {fileID: 3001000004}
+  ropeRenderer: {fileID: 0}
 --- !u!4 &3001000003
 Transform:
   m_ObjectHideFlags: 0
@@ -860,6 +910,15 @@ LineRenderer:
         weightedMode: 0
         inWeight: 0.33333334
         outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.36101082
+        value: 0.9830508
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
@@ -904,6 +963,18 @@ LineRenderer:
   m_UseWorldSpace: 1
   m_Loop: 0
   m_ApplyActiveColorSpace: 1
+--- !u!114 &3001000005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3001000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb8ed22283f06ba4e96e7e128ce394b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &3002000001
 GameObject:
   m_ObjectHideFlags: 0

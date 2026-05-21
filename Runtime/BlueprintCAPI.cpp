@@ -164,7 +164,7 @@ int copyString(const std::string& src, char* dst, int bufLen)
 // ---------------------------------------------------------------------------
 // Global HTTP client
 // ---------------------------------------------------------------------------
-
+extern "C" {
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_InitDefaultHttpClient(void)
 {
     // 幂等：已有注册时不重复覆盖
@@ -173,6 +173,8 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_InitDefaultHttpClient(void)
     if (!::NodeEditor::Runtime::BP_GetHttpClient())
         ::NodeEditor::Runtime::BP_SetHttpClient(::NodeEditor::Runtime::CreateDefaultHttpClient());
 }
+
+} // extern "C"
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -516,45 +518,6 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetLastError(BP_Runner runner, 
 }
 
 // ---------------------------------------------------------------------------
-// Lua external state
-// ---------------------------------------------------------------------------
-
-#ifdef BLUEPRINT_HAS_LUA
-// LuaScriptEngine.h / LuaBindings.h 含 C++ 命名空间内的函数声明，
-// 此处 BlueprintCAPI 实现处于外层 extern "C" {} 块内，会让这些 C++ 函数
-// 被错误识别为 C 链接（导致链接器找不到符号）。用 extern "C++" 临时跳出。
-extern "C++" {
-#include "LuaScriptEngine.h"
-#include "LuaBindings.h"     // RegisterLuaState / UnregisterLuaState
-}
-
-BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetExternalLuaState(BP_Runner runner, lua_State* L)
-{
-    if (!runner || !L) return;
-    auto* w = asWrapper(runner);
-    LuaScriptEngine* engine = w->runner.GetLuaEngine();
-    if (!engine) return;
-    if (engine->IsInitialized()) return;  // 已初始化则忽略，避免重复设置
-
-    engine->InitializeWithExternalState(L, &w->runner);
-}
-
-BLUEPRINT_CAPI_EXPORT lua_State* BLUEPRINT_CAPI_CALL BP_GetLuaState(BP_Runner runner)
-{
-    if (!runner) return nullptr;
-    auto* w = asWrapper(runner);
-    LuaScriptEngine* engine = w->runner.GetLuaEngine();
-    if (!engine) return nullptr;
-    return engine->GetState();
-}
-
-BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_NotifyLuaStateClosing(lua_State* L)
-{
-    NodeEditor::Runtime::UnregisterLuaState(L);
-}
-#endif
-
-// ---------------------------------------------------------------------------
 // Script node definition registration
 // ---------------------------------------------------------------------------
 
@@ -825,6 +788,45 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_CtxGetActivatedInputPin(BP_Cont
 }
 
 } // extern "C"
+
+// ---------------------------------------------------------------------------
+// Lua external state
+// ---------------------------------------------------------------------------
+
+#ifdef BLUEPRINT_HAS_LUA
+
+#include "LuaScriptEngine.h"
+#include "LuaBindings.h"     // RegisterLuaState / UnregisterLuaState
+
+extern "C" {
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetExternalLuaState(BP_Runner runner, lua_State* L)
+{
+    if (!runner || !L) return;
+    auto* w = asWrapper(runner);
+    LuaScriptEngine* engine = w->runner.GetLuaEngine();
+    if (!engine) return;
+    if (engine->IsInitialized()) return;  // 已初始化则忽略，避免重复设置
+
+    engine->InitializeWithExternalState(L, &w->runner);
+}
+
+BLUEPRINT_CAPI_EXPORT lua_State* BLUEPRINT_CAPI_CALL BP_GetLuaState(BP_Runner runner)
+{
+    if (!runner) return nullptr;
+    auto* w = asWrapper(runner);
+    LuaScriptEngine* engine = w->runner.GetLuaEngine();
+    if (!engine) return nullptr;
+    return engine->GetState();
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_NotifyLuaStateClosing(lua_State* L)
+{
+    NodeEditor::Runtime::UnregisterLuaState(L);
+}
+
+} // extern "C"
+#endif
 
 // ---------------------------------------------------------------------------
 // Metadata / Dependency query — extern "C++" implementation block

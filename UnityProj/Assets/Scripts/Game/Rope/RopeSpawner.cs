@@ -130,7 +130,8 @@ namespace CutRope.Game
                 candyJoint.connectedAnchor = Vector2.zero;
             }
 
-            UpdateLineRenderer();
+            //TODO: UpdateLineRenderer未实现
+            //UpdateLineRenderer();
         }
 
         /// <summary>在第 index 节点处切断绳子，销毁该节点及以下所有节点</summary>
