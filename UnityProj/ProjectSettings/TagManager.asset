@@ -8,6 +8,7 @@ TagManager:
   - Spike
   - Trap
   - UIRoot
+  - Candy
   layers:
   - Default
   - TransparentFX
