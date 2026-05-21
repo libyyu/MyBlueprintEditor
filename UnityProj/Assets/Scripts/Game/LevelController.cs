@@ -107,11 +107,25 @@ namespace CutRope.Game
 
             IsRunning = true;
 
-            // 延一帧确保 Lua 已注入钩子
-            Invoke(nameof(FireReady), 0.05f);
+            // 延一帧再触发 Ready：确保 BlueprintBehaviour 也已 Start 完毕，
+            // Execute() 的 OnBeginPlay 在 Lua 侧调用 Rope.SpawnAll 时 candy 已初始化
+            Invoke(nameof(FireReady), 0.1f);
         }
 
-        private void FireReady() => OnLevelReady?.Invoke();
+        private void FireReady()
+        {
+            OnLevelReady?.Invoke();
+
+            // 通知场景里的 BlueprintBehaviour 执行蓝图（如果它 autoExecute=false）
+            // 如果 autoExecute=true，BlueprintBehaviour.Start() 已经执行过了，
+            // 这里再 Execute() 会重新触发 OnBeginPlay，确保 candy/ropes 已就绪
+            var bp = FindFirstObjectByType<CutRope.Framework.BlueprintBehaviour>();
+            if (bp != null && bp.Runner != null && bp.Runner.IsLoaded)
+            {
+                try { bp.Runner.Execute(); }
+                catch (System.Exception e) { Debug.LogError($"[LevelController] Blueprint Execute error: {e.Message}"); }
+            }
+        }
 
         private void Update()
         {
