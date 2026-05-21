@@ -872,46 +872,6 @@
             "name": "onDone"
           }
         ]
-      },
-      {
-        "id": 600,
-        "definitionId": "Level.Stop",
-        "definitionVersion": 1,
-        "name": "停止关卡（通关）",
-        "pins": [
-          {
-            "id": 6001,
-            "kind": 0,
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 6002,
-            "kind": 1,
-            "dataType": 0,
-            "isExec": true
-          }
-        ]
-      },
-      {
-        "id": 601,
-        "definitionId": "Level.Stop",
-        "definitionVersion": 1,
-        "name": "停止关卡（失败）",
-        "pins": [
-          {
-            "id": 6011,
-            "kind": 0,
-            "dataType": 0,
-            "isExec": true
-          },
-          {
-            "id": 6012,
-            "kind": 1,
-            "dataType": 0,
-            "isExec": true
-          }
-        ]
       }
     ],
     "links": [
@@ -1075,18 +1035,6 @@
         "id": 50,
         "startPinId": 301,
         "endPinId": 306,
-        "isEnabled": true
-      },
-      {
-        "id": 57,
-        "startPinId": 153,
-        "endPinId": 6001,
-        "isEnabled": true
-      },
-      {
-        "id": 58,
-        "startPinId": 219,
-        "endPinId": 6011,
         "isEnabled": true
       }
     ]
@@ -1286,20 +1234,6 @@
         "position": {
           "x": 220,
           "y": 900
-        }
-      },
-      {
-        "id": 600,
-        "position": {
-          "x": 1980,
-          "y": 480
-        }
-      },
-      {
-        "id": 601,
-        "position": {
-          "x": 880,
-          "y": 700
         }
       }
     ],

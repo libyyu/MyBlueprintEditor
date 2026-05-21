@@ -47,19 +47,18 @@ function M.init(levelId)
     end
 
     -- 糖果吃掉 → 事件队列 + 蓝图 on_candy_eaten
-    -- 注意：不在这里调 StopLevel，由蓝图在 Timer 跑完、UI 打开之后调 Level.Stop
-    -- 确保 OnTick 继续跑，Timer.Wait 才能推进
     _ctrl.OnCandyEaten = function()
         _push('candy_eaten')
+        _ctrl:StopLevel()
         if BPR and BPR.Instance then
             BPR.Instance:DispatchEvent('on_candy_eaten')
         end
     end
 
     -- 糖果失败 → 事件队列 + 蓝图 on_candy_failed
-    -- 同上，StopLevel 由蓝图控制
     _ctrl.OnCandyFailed = function()
         _push('candy_failed')
+        _ctrl:StopLevel()
         if BPR and BPR.Instance then
             BPR.Instance:DispatchEvent('on_candy_failed')
         end
