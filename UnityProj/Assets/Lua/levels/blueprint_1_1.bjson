@@ -1036,6 +1036,12 @@
         "startPinId": 301,
         "endPinId": 306,
         "isEnabled": true
+      },
+      {
+        "id": 51,
+        "startPinId": 139,
+        "endPinId": 401,
+        "isEnabled": true
       }
     ]
   },
