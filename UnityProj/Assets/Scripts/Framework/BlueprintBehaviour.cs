@@ -39,39 +39,10 @@ namespace CutRope.Framework
         /// <summary>Access the underlying runner for variable read/write and handler registration.</summary>
         public BPRunner Runner { get; private set; }
 
-        IntPtr LuaState => LuaManager.IsLuaValid ? LuaManager.Instance.ActiveLuaEnv.L : IntPtr.Zero;
-
         protected virtual void Awake()
         {
-            Runner = new BPRunner();
-            // 将 xLua 的 lua_State 注入给 BlueprintRuntime
-            // BR 不拥有此 VM，不会在 Dispose 时 lua_close
-            Runner.SetExternalLuaState(LuaState);
-            string dumpDir = System.IO.Path.Combine(
-                    UnityEngine.Application.dataPath, "../CrashDumps");
-            BPRunner.SetCrashDumpDir(dumpDir);
-            Runner.OnPrint += (lv, msg) =>
-            {
-                switch (lv)
-                {
-                    case BPLogLevel.Warning: Debug.LogWarning($"[Blueprint] {msg}"); break;
-                    case BPLogLevel.Error: Debug.LogError($"[Blueprint] {msg}"); break;
-                    default: Debug.Log($"[Blueprint] {msg}"); break;
-                }
-            };
+            Runner = BlueprintService.Instance.CreateRunner();
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            Runner.EnableLogging(true);
-            Runner.OnLog += (lv, msg) =>
-            {
-                switch (lv)
-                {
-                    case BPLogLevel.Warning: Debug.LogWarning($"[BP:dbg] {msg}"); break;
-                    case BPLogLevel.Error: Debug.LogError($"[BP:dbg] {msg}"); break;
-                    default: Debug.Log($"[BP:dbg] {msg}"); break;
-                }
-            };
-#endif
             // Register custom node defs + handlers before loading the blueprint.
             RegisterNodes(Runner);
 

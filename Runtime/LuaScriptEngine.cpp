@@ -458,7 +458,7 @@ namespace {
     }
 }
 
-std::shared_ptr<LuaScriptEngine> LuaScriptEngineRegistry::GetDefault()
+std::shared_ptr<LuaScriptEngine> LuaScriptEngineRegistry::GetDefault(bool skipCreate)
 {
     // 强制 LuaStateRegistry 先构造（保证析构顺序：default engine 先死，
     // registry 后死，避免 Engine::Shutdown -> UnregisterLuaState 访问已死 registry）
@@ -466,7 +466,7 @@ std::shared_ptr<LuaScriptEngine> LuaScriptEngineRegistry::GetDefault()
 
     std::lock_guard<std::mutex> lk(defaultEngineMutex());
     auto& slot = defaultEngineSlot();
-    if (!slot)
+    if (!slot && !skipCreate)
     {
         // 首次访问：自动创建并初始化
         // runner=nullptr：默认 Engine 不绑定到任何 Runner，

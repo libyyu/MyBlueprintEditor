@@ -38,11 +38,13 @@
 //       return true;
 //   });
 
+using CutRope.Framework;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using UnityEngine;
+using static PlasticGui.PlasticTableColumn;
 
 namespace BlueprintRuntime
 {
@@ -620,7 +622,7 @@ namespace BlueprintRuntime
         // Construction / disposal
         // ---------------------------------------------------------------------
 
-        public BPRunner()
+        internal BPRunner()
         {
             _handle = Native.BP_CreateRunner();
             if (_handle == IntPtr.Zero)
@@ -640,6 +642,7 @@ namespace BlueprintRuntime
                 {
                     Native.BP_SetLogCallback(_handle, null);
                     Native.BP_SetPrintCallback(_handle, null);
+                    NotifyLuaStateClosing();
                     Native.BP_DestroyRunner(_handle);
                     _handle = IntPtr.Zero;
                 }
@@ -1158,5 +1161,129 @@ namespace BlueprintRuntime
         public int BlueprintClass =>
             _handle != IntPtr.Zero ? Native.BP_MetaGetBlueprintClass(_handle) : -1;
     }
+
+
+    public class BlueprintService : MonoBehaviour
+    {
+        // ── 单例 ───────────────────────────────────────────────────
+        public static BlueprintService Instance { get; private set; }
+
+        // ── Runner 管理 ───────────────────────────────────────────
+        private readonly List<BPRunner> _runners = new List<BPRunner>();
+
+        // ── 状态 ──────────────────────────────────────────────────
+        public event Action<BPRunner> OnRunnerCreated;  // Runner 创建后触发（用于注册自定义节点）
+
+        IntPtr LuaState => LuaManager.IsLuaValid ? LuaManager.Instance.ActiveLuaEnv.L : IntPtr.Zero;
+
+        void Awake()
+        {
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // WebGL：HTTP 客户端由 Emscripten + fetch API 提供
+            // 默认 CreateDefaultHttpClient 在 WebGL 下就是 HttpClient_Emscripten
+            // 注意：LLM 域名必须在 Unity Player Settings → WebGL → Publishing Settings 的 CORS 允许列表里
+            // 或由 LLM 供应商返回正确的 CORS 响应头
+#endif
+            // 初始化默认 HTTP 客户端（Runtime 内部幂等，重复调用无副作用）
+            BPRunner.InitDefaultHttpClient();
+        }
+
+        void Start()
+        {
+        }
+
+        /// <summary>创建一个新 Runner。服务会自动每帧 Tick 它。</summary>
+        public BPRunner CreateRunner()
+        {
+            var r = new BPRunner();
+            _runners.Add(r);
+            OnRunnerCreated?.Invoke(r);
+
+            // 将 xLua 的 lua_State 注入给 BlueprintRuntime
+            // BR 不拥有此 VM，不会在 Dispose 时 lua_close
+            r.SetExternalLuaState(LuaState);
+
+            string dumpDir = System.IO.Path.Combine(UnityEngine.Application.dataPath, "../CrashDumps");
+            BPRunner.SetCrashDumpDir(dumpDir);
+            
+            r.OnPrint += (lv, msg) =>
+            {
+                switch (lv)
+                {
+                    case BPLogLevel.Warning: Debug.LogWarning($"[Blueprint] {msg}"); break;
+                    case BPLogLevel.Error: Debug.LogError($"[Blueprint] {msg}"); break;
+                    default: Debug.Log($"[Blueprint] {msg}"); break;
+                }
+            };
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            r.EnableLogging(true);
+            r.OnLog += (lv, msg) =>
+            {
+                switch (lv)
+                {
+                    case BPLogLevel.Warning: Debug.LogWarning($"[BP:dbg] {msg}"); break;
+                    case BPLogLevel.Error: Debug.LogError($"[BP:dbg] {msg}"); break;
+                    default: Debug.Log($"[BP:dbg] {msg}"); break;
+                }
+            };
+#endif
+
+            return r;
+        }
+
+        /// <summary>释放 Runner。NPC Destroy 时必须调用。</summary>
+        public void ReleaseRunner(BPRunner r)
+        {
+            if (r == null) return;
+            _runners.Remove(r);
+            r.Dispose();
+        }
+
+        public void ReleaseAllRunner()
+        {
+            foreach (var r in _runners)
+                r?.Dispose();
+            _runners.Clear();
+
+        }
+
+        //void Update()
+        //{
+        //    // 先 drain 全局异步队列（HTTP 回调等），即使没有 runner 也要做
+        //    BPRunner.DrainQueue();
+
+        //    float dt = Time.unscaledDeltaTime;
+        //    // 倒序遍历以防 Tick 回调里自销毁
+        //    for (int i = _runners.Count - 1; i >= 0; i--)
+        //    {
+        //        var r = _runners[i];
+        //        if (r == null) { _runners.RemoveAt(i); continue; }
+        //        try
+        //        {
+        //            r.Tick(dt);
+        //        }
+        //        catch (Exception e) { Debug.LogError($"[BlueprintService] Tick failed: {e}"); }
+        //    }
+        //}
+
+        void OnDestroy()
+        {
+            foreach (var r in _runners)
+                r?.Dispose();
+            _runners.Clear();
+            if (Instance == this) Instance = null;
+        }
+    }
+
+
 }
 

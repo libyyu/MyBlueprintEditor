@@ -190,7 +190,7 @@ class BLUEPRINT_API LuaScriptEngineRegistry
 public:
     /// 取默认共享 Engine。首次调用时会自动创建并 Initialize（runner=nullptr，
     /// 各 BlueprintRunner 通过 m_runner 独立持有）。
-    static std::shared_ptr<LuaScriptEngine> GetDefault();
+    static std::shared_ptr<LuaScriptEngine> GetDefault(bool skipCreate = false);
 
     /// 设置默认共享 Engine。传 nullptr 则清除（下次 GetDefault() 会重建）。
     /// 调用时机要求：在第一个 BlueprintRunner 触发 Lua 之前，

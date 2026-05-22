@@ -13,10 +13,11 @@
 //   require "main"        → Assets/Lua/main.lua
 //   require "game/util"   → Assets/Lua/game/util.lua
 
+using BlueprintRuntime;
+using Cysharp.Threading.Tasks;
 using System;
 using System.IO;
 using UnityEngine;
-using Cysharp.Threading.Tasks;
 using XLua;
 using YooAsset;
 
@@ -168,7 +169,6 @@ namespace CutRope.Framework
             catch (Exception e)
             {
                 Debug.LogError($"[LuaManager] Game VM exception: {e}");
-                DisposeActiveVM();
                 return false;
             }
         }
@@ -209,12 +209,8 @@ namespace CutRope.Framework
 
             // xLua 主 VM 模式下：Dispose 前先通知 BlueprintRuntime 清空 lua_State 指针。
             // 避免 LuaEnv.Dispose 后 Tick 还在访问已释放的 VM 导致 SIGSEGV。
-            var bpRunner = BlueprintRunner.Instance?.Runner;
-            if (bpRunner != null)
-            {
-                try { bpRunner.NotifyLuaStateClosing(); }
-                catch (Exception e) { Debug.LogWarning($"[LuaManager] NotifyLuaStateClosing: {e.Message}"); }
-            }
+            try { BlueprintService.Instance?.ReleaseAllRunner(); }
+            catch(Exception e) { Debug.LogWarning($"[LuaManager] ReleaseAllRunner: {e.Message}"); }
 
             try { ActiveLuaEnv.Dispose(); }
             catch (Exception e) { Debug.LogWarning($"[LuaManager] Dispose: {e.Message}"); }

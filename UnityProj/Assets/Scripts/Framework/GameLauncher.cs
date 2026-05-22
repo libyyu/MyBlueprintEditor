@@ -9,6 +9,7 @@
 //
 // VM 主从关系：xLua 是主，BlueprintRuntime 共享 xLua 的 lua_State（不拥有）。
 
+using BlueprintRuntime;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -66,9 +67,9 @@ namespace CutRope.Framework
                 return;
             }
 
-            // BR 实例确保存在（Awake 里可能已创建）
-            if (BlueprintRunner.Instance == null)
-                gameObject.AddComponent<BlueprintRunner>();
+            // 保证BlueprintService创建了
+            if (BlueprintService.Instance == null)
+                gameObject.AddComponent<BlueprintService>();
 
             // AudioManager
             if (AudioManager.Instance == null)
