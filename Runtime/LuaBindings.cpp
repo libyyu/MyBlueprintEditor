@@ -597,9 +597,14 @@ static int luaErrorHandler(lua_State* L)
 static NodeHandler wrapLuaHandler(lua_State* L, int funcRef, const std::string& defId)
 {
     // lambda 捕获 lua_State* 和 funcRef
-    // 生命周期安全：handler 存在 m_handlers 中，runner 析构时 handler 销毁，
-    //              此时 LuaScriptEngine 尚未析构（析构顺序：成员逆序声明顺序），
-    //              所以 lua_State* 仍然有效。
+    // 生命周期安全：handler 存在全局 HandlerRegistry 中，与 LuaScriptEngine 同寿命，
+    //              engine Shutdown 时 UnregisterAllScriptedNodes 把这个 lambda 摘掉，
+    //              所以 L 在 lambda 被调用期间始终有效。
+    //
+    // 不依赖 LUA_REGISTRYINDEX["__blueprint_runner"] 全局：
+    //   handler 内若需要 Runner 级 API，请用 ctx.GetRunner()——它由当前正在
+    //   执行节点的 BlueprintRunner 设置，比 __blueprint_runner 更可靠
+    //   （后者只在脚本顶层 / RegisterHandler 阶段保证有意义）。
     return [L, funcRef, defId](ExecutionContext& ctx) -> bool {
 
         // 压入错误处理函数

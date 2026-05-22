@@ -324,6 +324,11 @@ public:
     // 通过输入引脚 ID 找到连接的源节点并执行
     bool FireConnectedNode(PinId inputPinId);
 
+    // 获取所属 runner（用于 binding / handler 内访问 Runner 级 API，
+    // 避免依赖 LUA_REGISTRYINDEX["__blueprint_runner"] 全局）。
+    // 返回值在 handler 执行期间保证非空。
+    BlueprintRunner* GetRunner() const { return m_runner; }
+
 private:
     friend class BlueprintRunner;
 
@@ -549,8 +554,9 @@ public:
 #ifdef BLUEPRINT_HAS_LUA
 
     // 加载 Lua 脚本文件并执行
-    // 脚本中调用 Blueprint.RegisterHandler() 会自动注册 handler 到本 runner
-    // 同时将脚本注册的节点 ID 记入 m_luaRegisteredNodeIds（可通过 GetLuaRegisteredNodeIds 查询）
+    // 脚本中调用 Blueprint.RegisterHandler() 会自动注册 handler 到全局 SharedRegistry，
+    // 同时将脚本注册的节点 ID 记入 LuaScriptEngine（per lua_State，可通过
+    // GetLuaRegisteredNodeIds 查询）
     bool LoadLuaScript(const std::string& filePath);
 
     // 加载 Lua 代码字符串并执行
@@ -561,20 +567,24 @@ public:
     bool ReloadLuaScript(const std::string& filePath);
 
     // 注销所有由 Lua 脚本注册的节点定义和 handler（热重载全量重置时使用）
+    // 转发到 m_luaEngine->UnregisterAllScriptedNodes()。
     void UnregisterAllLuaNodes();
 
     // 向 Lua VM 的 package.path 追加搜索目录（dir/?.lua; dir/?/init.lua）
     void AddLuaPath(const std::string& dir);
 
-    // 获取所有由 Lua 脚本注册的节点 ID 集合（编辑器用于同步节点库）
-    const std::unordered_set<std::string>& GetLuaRegisteredNodeIds() const { return m_luaRegisteredNodeIds; }
+    // 获取所有由 Lua 脚本注册的节点 ID 集合（编辑器用于同步节点库）。
+    // 返回的引用绑定到 LuaScriptEngine（per lua_State）；引擎未初始化时返回空集合。
+    const std::unordered_set<std::string>& GetLuaRegisteredNodeIds() const;
 
-    // 获取已加载的 Lua 文件列表（按加载顺序，编辑器用于在 persistentRunner 重新加载）
-    const std::vector<std::string>& GetLuaLoadedFiles() const { return m_luaLoadedFiles; }
+    // 获取已加载的 Lua 文件列表（按加载顺序，编辑器用于在 persistentRunner 重新加载）。
+    // 引擎未初始化时返回空 vector。
+    const std::vector<std::string>& GetLuaLoadedFiles() const;
 
-    // 内部：由 LuaBindings 回调，记录某节点 ID 是 Lua 注册的（勿手动调用）
-    void MarkLuaRegisteredNode(const std::string& id) { m_luaRegisteredNodeIds.insert(id); }
-    void UnmarkLuaRegisteredNode(const std::string& id) { m_luaRegisteredNodeIds.erase(id); }
+    // 内部：由 LuaBindings 回调，记录某节点 ID 是 Lua 注册的（勿手动调用）。
+    // 转发到当前绑定的 LuaScriptEngine（per lua_State）。
+    void MarkLuaRegisteredNode(const std::string& id);
+    void UnmarkLuaRegisteredNode(const std::string& id);
 
     // 获取 Lua 引擎实例（高级用途：注册自定义 C 函数等）
     LuaScriptEngine* GetLuaEngine();
@@ -869,14 +879,9 @@ private:
 
     // 脚本动态节点定义注册表已迁移到全局 NodeDefRegistry（SharedRegistry.h）
 
-#ifdef BLUEPRINT_HAS_LUA
-    // Lua 注册的节点 ID 集合（用于热重载时精确清理）
-    std::unordered_set<std::string>                     m_luaRegisteredNodeIds;
-    // Lua 加载的文件列表（按加载顺序，用于 ReloadLuaScript）
-    std::vector<std::string>                            m_luaLoadedFiles;
-    // 文件上次修改时间（ReloadLuaScript 用于判断是否有变化）
-    std::unordered_map<std::string, int64_t>            m_luaFileMtimes;
-#endif
+    // Lua 注册元数据（节点 ID 集合 / 已加载文件 / 文件 mtime）已下沉到
+    // LuaScriptEngine（per lua_State）。BlueprintRunner 通过 m_luaEngine
+    // 转发访问，避免共享 VM 时多 Runner 集合不同步。
 
     // 数据层：节点执行状态（引脚值、变量、当前节点等纯数据）
     NodeExecutionState                                  m_state;

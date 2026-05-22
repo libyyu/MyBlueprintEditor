@@ -15,6 +15,8 @@
 #include <string>
 #include <vector>
 #include <memory>           // std::shared_ptr
+#include <unordered_set>    // m_registeredNodeIds
+#include <unordered_map>    // m_fileMtimes
 
 // MSVC C4251: 'member': class 'std::...' needs to have dll-interface
 // Safe to suppress when DLL and consumer share the same CRT/compiler.
@@ -89,6 +91,34 @@ public:
     // 获取已加载的脚本数量（含字符串加载）
     int GetLoadedCount() const { return m_loadedCount; }
 
+    // -----------------------------------------------------------------
+    // Per-VM 注册元数据（与 lua_State 寿命相同）
+    // -----------------------------------------------------------------
+    // 当多个 BlueprintRunner 共享同一个 lua_State 时，"哪些节点是被
+    // Lua 脚本注册的" 应该挂在 VM 上，而不是某个 Runner 上。这样：
+    //   · 共享 VM 时所有 Runner 看到的注册集合一致；
+    //   · 任意 Runner 触发 ReloadLua 都能把脚本注册的节点全部清掉；
+    //   · ExecutionPanel 同步到 persistentRunner 时不会漏脚本注册节点。
+
+    void MarkRegisteredNode(const std::string& id) { m_registeredNodeIds.insert(id); }
+    void UnmarkRegisteredNode(const std::string& id) { m_registeredNodeIds.erase(id); }
+    const std::unordered_set<std::string>& GetRegisteredNodeIds() const { return m_registeredNodeIds; }
+    void ClearRegisteredNodes() { m_registeredNodeIds.clear(); }
+
+    // 是否已经加载过指定文件（共享 VM 时用于避免重复执行同一脚本）
+    bool HasLoadedFile(const std::string& filePath) const;
+
+    // 文件修改时间记录（PollFileChanges 用）
+    int64_t  GetFileMtime(const std::string& filePath) const;
+    void     SetFileMtime(const std::string& filePath, int64_t mtime);
+    void     ClearFileMtimes() { m_fileMtimes.clear(); }
+    const std::unordered_map<std::string, int64_t>& GetFileMtimes() const { return m_fileMtimes; }
+
+    // 全量注销脚本注册的节点定义和 handler，并清空记录。
+    // 注意：调用方负责确保 VM 内残留的 Lua function ref 已不再被使用
+    // （shared engine 模式下旧 ref 在 Lua GC 后才真正释放）。
+    void UnregisterAllScriptedNodes();
+
     // 心跳 Tick：每帧/每定时器调用。
     // 若 Lua 全局存在 onTick(deltaSeconds) 函数则调用它。
     // deltaSeconds 为距上次调用的秒数（由调用方计算传入）。
@@ -105,6 +135,10 @@ private:
     std::string                m_lastError;
     std::vector<std::string>   m_loadedFiles;   // 按顺序记录已加载的文件路径
     int                        m_loadedCount = 0; // 总加载次数（文件 + 字符串）
+
+    // Per-VM Lua-注册节点集合（共享 VM 时所有 Runner 看到同一集合）
+    std::unordered_set<std::string>           m_registeredNodeIds;
+    std::unordered_map<std::string, int64_t>  m_fileMtimes;
 };
 
 // =========================================================================

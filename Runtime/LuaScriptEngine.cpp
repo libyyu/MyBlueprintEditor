@@ -5,9 +5,11 @@
 #include "LuaScriptEngine.h"
 #include "LuaBindings.h"
 #include "BlueprintRunner.h"
+#include "SharedRegistry.h"
 
 #include <lua.hpp>
 #include <mutex>          // LuaScriptEngineRegistry 锁
+#include <algorithm>      // std::find
 
 namespace NodeEditor {
 namespace Runtime {
@@ -24,10 +26,15 @@ LuaScriptEngine::LuaScriptEngine(LuaScriptEngine&& other) noexcept
     , m_runner(other.m_runner)
     , m_ownsState(other.m_ownsState)
     , m_lastError(std::move(other.m_lastError))
+    , m_loadedFiles(std::move(other.m_loadedFiles))
+    , m_loadedCount(other.m_loadedCount)
+    , m_registeredNodeIds(std::move(other.m_registeredNodeIds))
+    , m_fileMtimes(std::move(other.m_fileMtimes))
 {
     other.m_L = nullptr;
     other.m_runner = nullptr;
     other.m_ownsState = true;
+    other.m_loadedCount = 0;
 }
 
 LuaScriptEngine& LuaScriptEngine::operator=(LuaScriptEngine&& other) noexcept
@@ -39,9 +46,14 @@ LuaScriptEngine& LuaScriptEngine::operator=(LuaScriptEngine&& other) noexcept
         m_runner = other.m_runner;
         m_ownsState = other.m_ownsState;
         m_lastError = std::move(other.m_lastError);
+        m_loadedFiles = std::move(other.m_loadedFiles);
+        m_loadedCount = other.m_loadedCount;
+        m_registeredNodeIds = std::move(other.m_registeredNodeIds);
+        m_fileMtimes = std::move(other.m_fileMtimes);
         other.m_L = nullptr;
         other.m_runner = nullptr;
         other.m_ownsState = true;
+        other.m_loadedCount = 0;
     }
     return *this;
 }
@@ -248,6 +260,8 @@ void LuaScriptEngine::Shutdown()
         // 再 lua_close。外部 VM 不动，host 自己负责 lifecycle。
         if (m_ownsState)
         {
+            // 注销脚本注册的所有节点（否则下次创建 VM 后注册表里仍残留旧 handler）
+            UnregisterAllScriptedNodes();
             UnregisterLuaState(m_L);
             lua_close(m_L);
         }
@@ -257,6 +271,39 @@ void LuaScriptEngine::Shutdown()
     m_ownsState = true;
     m_loadedFiles.clear();
     m_loadedCount = 0;
+    m_registeredNodeIds.clear();
+    m_fileMtimes.clear();
+}
+
+// ---------------------------------------------------------------------------
+// Per-VM 注册元数据访问
+// ---------------------------------------------------------------------------
+bool LuaScriptEngine::HasLoadedFile(const std::string& filePath) const
+{
+    return std::find(m_loadedFiles.begin(), m_loadedFiles.end(), filePath) != m_loadedFiles.end();
+}
+
+int64_t LuaScriptEngine::GetFileMtime(const std::string& filePath) const
+{
+    auto it = m_fileMtimes.find(filePath);
+    return (it != m_fileMtimes.end()) ? it->second : 0;
+}
+
+void LuaScriptEngine::SetFileMtime(const std::string& filePath, int64_t mtime)
+{
+    m_fileMtimes[filePath] = mtime;
+}
+
+void LuaScriptEngine::UnregisterAllScriptedNodes()
+{
+    auto& nodeReg    = NodeDefRegistry::Instance();
+    auto& handlerReg = HandlerRegistry::Instance();
+    for (const auto& id : m_registeredNodeIds)
+    {
+        nodeReg.Unregister(id);
+        handlerReg.Unregister(id);
+    }
+    m_registeredNodeIds.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -316,8 +363,9 @@ bool LuaScriptEngine::LoadFile(const std::string& filePath)
     if (!ExecuteChunk(filePath))
         return false;
 
-    // 记录加载顺序
-    m_loadedFiles.push_back(filePath);
+    // 记录加载顺序（去重——共享 VM 多 Runner 时可能反复调进来）
+    if (std::find(m_loadedFiles.begin(), m_loadedFiles.end(), filePath) == m_loadedFiles.end())
+        m_loadedFiles.push_back(filePath);
     ++m_loadedCount;
 
     m_lastError.clear();

@@ -2482,6 +2482,15 @@ bool BlueprintRunner::LoadLuaScript(const std::string& filePath)
     // 让脚本里的 Blueprint.RegisterHandler / print 能路由到本 Runner
     BindRunnerToLuaState(m_luaEngine->GetState(), this);
 
+    // 共享 VM 时同一脚本可能已被先前的 Runner 加载过 —— 直接复用注册结果，
+    // 避免重复执行脚本顶层副作用、重复注册 handler
+    if (m_luaEngine->HasLoadedFile(filePath))
+    {
+        Log("[Lua] Script already loaded in shared VM, reusing: " + filePath,
+            LogLevel::Verbose);
+        return true;
+    }
+
     Log("[Lua] Loading script: " + filePath + " (order: " +
         std::to_string(m_luaEngine->GetLoadedCount() + 1) + ")", LogLevel::Verbose);
 
@@ -2492,16 +2501,12 @@ bool BlueprintRunner::LoadLuaScript(const std::string& filePath)
         return false;
     }
 
-    // 记录文件（去重）
-    if (std::find(m_luaLoadedFiles.begin(), m_luaLoadedFiles.end(), filePath) == m_luaLoadedFiles.end())
-        m_luaLoadedFiles.push_back(filePath);
-
-    // 记录修改时间（热重载用；WebGL 无文件系统，跳过）
+    // 记录修改时间到 engine（热重载用；WebGL 无文件系统，跳过）
 #if !defined(__EMSCRIPTEN__) && !defined(BLUEPRINT_NO_FILESYSTEM)
     try {
         namespace fs = std::filesystem;
         auto t = fs::last_write_time(filePath);
-        m_luaFileMtimes[filePath] = t.time_since_epoch().count();
+        m_luaEngine->SetFileMtime(filePath, t.time_since_epoch().count());
     } catch (...) {}
 #endif
 
@@ -2513,25 +2518,19 @@ bool BlueprintRunner::ReloadLuaScript(const std::string& filePath)
 {
     if (!m_luaEngine) return LoadLuaScript(filePath);
 
-    // 注销该文件之前注册的所有节点（无法精确区分文件，全量重载时调 UnregisterAllLuaNodes）
-    // 这里做全量注销再重新加载全部文件（简单可靠）
+    // 注销脚本注册的所有节点（共享 engine 模式下会影响其他 Runner，
+    // 但调用方已知会触发全量重载）
     UnregisterAllLuaNodes();
 
-    // 共享 Engine 模式下不能整体 reset（会影响其他 Runner）；只放弃本 Runner
-    // 的引用，下一次 EnsureLuaEngine 时重新 bind 到默认 Engine。
-    // 旧的 lua handler ref 会在 Lua VM 全局表里留存到 GC，但 m_handlers 已经
-    // 通过 UnregisterAllLuaNodes 清理。
     if (m_luaEngine.use_count() > 1)
     {
         Log("[Lua] ReloadLuaScript on shared engine — will rebind, "
             "old function refs in shared VM remain until GC.", LogLevel::Verbose);
     }
-    m_luaEngine.reset();
 
-    // 重新加载所有文件
-    auto files = m_luaLoadedFiles;
-    m_luaLoadedFiles.clear();
-    m_luaFileMtimes.clear();
+    // 拷贝旧的文件列表，再 reset engine，重新逐个加载
+    auto files = m_luaEngine->GetLoadedFiles();
+    m_luaEngine.reset();
 
     for (const auto& f : files)
     {
@@ -2543,14 +2542,33 @@ bool BlueprintRunner::ReloadLuaScript(const std::string& filePath)
 
 void BlueprintRunner::UnregisterAllLuaNodes()
 {
-    auto& nodeReg    = NodeDefRegistry::Instance();
-    auto& handlerReg = HandlerRegistry::Instance();
-    for (const auto& id : m_luaRegisteredNodeIds)
-    {
-        nodeReg.Unregister(id);
-        handlerReg.Unregister(id);
-    }
-    m_luaRegisteredNodeIds.clear();
+    if (m_luaEngine)
+        m_luaEngine->UnregisterAllScriptedNodes();
+}
+
+const std::unordered_set<std::string>& BlueprintRunner::GetLuaRegisteredNodeIds() const
+{
+    static const std::unordered_set<std::string> kEmpty;
+    return m_luaEngine ? m_luaEngine->GetRegisteredNodeIds() : kEmpty;
+}
+
+const std::vector<std::string>& BlueprintRunner::GetLuaLoadedFiles() const
+{
+    static const std::vector<std::string> kEmpty;
+    return m_luaEngine ? m_luaEngine->GetLoadedFiles() : kEmpty;
+}
+
+void BlueprintRunner::MarkLuaRegisteredNode(const std::string& id)
+{
+    // 必须由 LuaBindings 在 Runner 已绑定 engine 之后回调；防御性兜底
+    if (m_luaEngine)
+        m_luaEngine->MarkRegisteredNode(id);
+}
+
+void BlueprintRunner::UnmarkLuaRegisteredNode(const std::string& id)
+{
+    if (m_luaEngine)
+        m_luaEngine->UnmarkRegisteredNode(id);
 }
 
 void BlueprintRunner::AddLuaPath(const std::string& dir)
