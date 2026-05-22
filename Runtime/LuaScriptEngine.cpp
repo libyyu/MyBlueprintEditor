@@ -7,6 +7,7 @@
 #include "BlueprintRunner.h"
 
 #include <lua.hpp>
+#include <mutex>          // LuaScriptEngineRegistry 锁
 
 namespace NodeEditor {
 namespace Runtime {
@@ -373,6 +374,72 @@ void LuaScriptEngine::Tick(double deltaSeconds)
         m_lastError = err ? err : "OnGlobalTick error";
         lua_pop(m_L, 1);
     }
+}
+
+// =========================================================================
+// LuaScriptEngineRegistry：进程级默认共享 Engine
+// =========================================================================
+//
+// 析构顺序保护：
+//   s_defaultEngine 用函数 static 而非 namespace 静态，因为：
+//     1. LuaStateRegistry::Instance() 是 Meyers singleton，进程内首个使用
+//        Lua 的代码触发其构造
+//     2. s_defaultEngine 内部持有 LuaScriptEngine，析构会调 Shutdown ->
+//        UnregisterLuaState -> LuaStateRegistry::Instance()
+//     3. 让 s_defaultEngine 在 LuaStateRegistry 之后构造，C++ 标准保证
+//        Meyers singletons 按构造逆序析构 → s_defaultEngine 先析构，
+//        UnregisterLuaState 访问 registry 仍安全。
+//   所以 GetDefault() 内先访问一次 LuaStateRegistry::Instance()，强制
+//   它先于 s_defaultEngine 构造。
+namespace {
+    static std::shared_ptr<LuaScriptEngine>& defaultEngineSlot()
+    {
+        static std::mutex                       s_mutex;
+        static std::shared_ptr<LuaScriptEngine> s_engine;
+        (void)s_mutex;  // 仅用于声明顺序占位（实际锁在 GetDefault 内）
+        return s_engine;
+    }
+    static std::mutex& defaultEngineMutex()
+    {
+        static std::mutex m;
+        return m;
+    }
+}
+
+std::shared_ptr<LuaScriptEngine> LuaScriptEngineRegistry::GetDefault()
+{
+    // 强制 LuaStateRegistry 先构造（保证析构顺序：default engine 先死，
+    // registry 后死，避免 Engine::Shutdown -> UnregisterLuaState 访问已死 registry）
+    TouchLuaStateRegistry();
+
+    std::lock_guard<std::mutex> lk(defaultEngineMutex());
+    auto& slot = defaultEngineSlot();
+    if (!slot)
+    {
+        // 首次访问：自动创建并初始化
+        // runner=nullptr：默认 Engine 不绑定到任何 Runner，
+        // 各 BlueprintRunner 通过自己的 ctx 把执行流路由到具体 Runner。
+        slot = std::make_shared<LuaScriptEngine>();
+        if (!slot->Initialize(nullptr))
+        {
+            // 初始化失败：清空避免后续 Runner 拿到坏 Engine
+            slot.reset();
+        }
+    }
+    return slot;
+}
+
+void LuaScriptEngineRegistry::SetDefault(std::shared_ptr<LuaScriptEngine> engine)
+{
+    TouchLuaStateRegistry();
+    std::lock_guard<std::mutex> lk(defaultEngineMutex());
+    defaultEngineSlot() = std::move(engine);
+}
+
+bool LuaScriptEngineRegistry::HasDefault()
+{
+    std::lock_guard<std::mutex> lk(defaultEngineMutex());
+    return defaultEngineSlot() != nullptr;
 }
 
 } // namespace Runtime

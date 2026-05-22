@@ -178,6 +178,12 @@ void UnregisterLuaState(lua_State* L)
     if (L) LuaStateRegistry::Instance().Unregister(L);
 }
 
+void TouchLuaStateRegistry()
+{
+    // 强制 Meyers singleton 构造（用于析构顺序排序）
+    (void)LuaStateRegistry::Instance();
+}
+
 // =========================================================================
 // Variant → Lua 压栈（原生 Lua 类型，非 userdata）
 // =========================================================================
@@ -829,6 +835,13 @@ static int l_hasNodeDef(lua_State* L)
 // 入口：注册所有 Lua 绑定
 // =========================================================================
 
+// 共享 lua_State 时切换当前活跃 Runner（影响 Blueprint.RegisterHandler、print 等）
+void BindRunnerToLuaState(lua_State* L, BlueprintRunner* runner)
+{
+    if (!L) return;
+    lua_pushlightuserdata(L, runner);
+    lua_setfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
+}
 
 void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner)
 {
@@ -836,9 +849,8 @@ void RegisterLuaBindings(lua_State* L, BlueprintRunner* runner)
     registerVariantMetatable(L);
     registerCtxMetatable(L);
 
-    // 将 runner 指针存入 registry
-    lua_pushlightuserdata(L, runner);
-    lua_setfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
+    // 将 runner 指针存入 registry（共享 lua_State 时由 BindRunnerToLuaState 动态切换）
+    BindRunnerToLuaState(L, runner);
 
     // 创建 Blueprint 全局表
     lua_newtable(L);

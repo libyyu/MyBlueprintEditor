@@ -3,6 +3,9 @@
 #include "BlueprintRunner.h"
 #include "BlueprintExporter.h"
 #include "MainThreadDispatcher.h"
+#ifdef BLUEPRINT_HAS_LUA
+#  include "LuaBindings.h"      // BindRunnerToLuaState（必须在 namespace 外 include）
+#endif
 #include <sstream>
 #include <chrono>
 #include <algorithm>
@@ -2474,8 +2477,12 @@ bool ExecutionContext::EvaluateConditionPin(const std::string& pinName)
 
 bool BlueprintRunner::LoadLuaScript(const std::string& filePath)
 {
-    // 确保 Lua 引擎已初始化（首次调用时创建，后续复用）
+    // 确保 Lua 引擎已初始化（首次调用时创建/绑定共享，后续复用）
     if (!EnsureLuaEngine()) return false;
+
+    // 共享 lua_State 场景：把当前活跃 Runner 切换为 this，
+    // 让脚本里的 Blueprint.RegisterHandler / print 能路由到本 Runner
+    BindRunnerToLuaState(m_luaEngine->GetState(), this);
 
     Log("[Lua] Loading script: " + filePath + " (order: " +
         std::to_string(m_luaEngine->GetLoadedCount() + 1) + ")", LogLevel::Verbose);
@@ -2512,7 +2519,15 @@ bool BlueprintRunner::ReloadLuaScript(const std::string& filePath)
     // 这里做全量注销再重新加载全部文件（简单可靠）
     UnregisterAllLuaNodes();
 
-    // 重置 Lua VM（清除函数引用，避免旧 handler 残留）
+    // 共享 Engine 模式下不能整体 reset（会影响其他 Runner）；只放弃本 Runner
+    // 的引用，下一次 EnsureLuaEngine 时重新 bind 到默认 Engine。
+    // 旧的 lua handler ref 会在 Lua VM 全局表里留存到 GC，但 m_handlers 已经
+    // 通过 UnregisterAllLuaNodes 清理。
+    if (m_luaEngine.use_count() > 1)
+    {
+        Log("[Lua] ReloadLuaScript on shared engine — will rebind, "
+            "old function refs in shared VM remain until GC.", LogLevel::Verbose);
+    }
     m_luaEngine.reset();
 
     // 重新加载所有文件
@@ -2540,16 +2555,7 @@ void BlueprintRunner::UnregisterAllLuaNodes()
 
 void BlueprintRunner::AddLuaPath(const std::string& dir)
 {
-    if (!m_luaEngine)
-    {
-        // 延迟创建 VM
-        m_luaEngine = std::make_unique<LuaScriptEngine>();
-        if (!m_luaEngine->Initialize(this))
-        {
-            m_luaEngine.reset();
-            return;
-        }
-    }
+    if (!EnsureLuaEngine()) return;
     m_luaEngine->AddLuaPath(dir);
 }
 
@@ -2557,19 +2563,14 @@ void BlueprintRunner::AddLuaPath(const std::string& dir)
 
 bool BlueprintRunner::LoadLuaString(const std::string& code, const std::string& name)
 {
-    // 延迟创建 Lua 引擎
-    if (!m_luaEngine)
+    // 延迟创建/绑定 Lua 引擎（默认走共享）
+    if (!EnsureLuaEngine())
     {
-        m_luaEngine = std::make_unique<LuaScriptEngine>();
-        if (!m_luaEngine->Initialize(this))
-        {
-            m_lastError = "Failed to initialize Lua: " + m_luaEngine->GetLastError();
-            LogError("[Lua] " + m_lastError);
-            m_luaEngine.reset();
-            return false;
-        }
-        Log("[Lua] Engine initialized", LogLevel::Verbose);
+        return false;
     }
+
+    // 共享 lua_State 场景：切换到本 Runner（影响 Blueprint.RegisterHandler 路由）
+    BindRunnerToLuaState(m_luaEngine->GetState(), this);
 
     Log("[Lua] Loading string: " + name + " (order: " +
         std::to_string(m_luaEngine->GetLoadedCount() + 1) + ")", LogLevel::Verbose);
@@ -2590,10 +2591,35 @@ LuaScriptEngine* BlueprintRunner::GetLuaEngine()
     return m_luaEngine.get();
 }
 
+bool BlueprintRunner::SetSharedLuaEngine(std::shared_ptr<LuaScriptEngine> engine)
+{
+    if (m_luaEngine)
+    {
+        // 已经持有引擎，不允许热替换（避免 handler/state 不一致）
+        m_lastError = "BlueprintRunner already has a Lua engine; cannot replace";
+        return false;
+    }
+    m_luaEngine = std::move(engine);
+    return m_luaEngine != nullptr;
+}
+
 bool BlueprintRunner::EnsureLuaEngine()
 {
     if (m_luaEngine) return true;
-    m_luaEngine = std::make_unique<LuaScriptEngine>();
+
+    // 优先使用进程级默认共享 Engine（多 Runner 共享一个 lua_State）
+    auto shared = LuaScriptEngineRegistry::GetDefault();
+    if (shared && shared->IsInitialized())
+    {
+        m_luaEngine = shared;
+        Log("[Lua] Bound to shared Lua engine (lua_State=" +
+            std::to_string(reinterpret_cast<uintptr_t>(shared->GetState())) + ")",
+            LogLevel::Verbose);
+        return true;
+    }
+
+    // 默认 Engine 不可用 —— 极少见，回退到独立 VM（不与其他 Runner 共享）
+    m_luaEngine = std::make_shared<LuaScriptEngine>();
     if (!m_luaEngine->Initialize(this))
     {
         m_lastError = "Failed to initialize Lua: " + m_luaEngine->GetLastError();
@@ -2601,7 +2627,7 @@ bool BlueprintRunner::EnsureLuaEngine()
         m_luaEngine.reset();
         return false;
     }
-    Log("[Lua] Engine initialized", LogLevel::Verbose);
+    Log("[Lua] Standalone engine initialized (default registry unavailable)", LogLevel::Verbose);
     return true;
 }
 

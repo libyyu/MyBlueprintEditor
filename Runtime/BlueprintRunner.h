@@ -585,8 +585,32 @@ public:
 
     // 获取 Lua 引擎实例（高级用途：注册自定义 C 函数等）
     LuaScriptEngine* GetLuaEngine();
-    /// 确保 Lua VM 已初始化（首次调用时创建）。返回 false 表示初始化失败。
+    /// 确保 Lua VM 已初始化（首次调用时创建或绑定到默认共享引擎）。
+    /// 返回 false 表示初始化失败。
     bool EnsureLuaEngine();
+
+#ifdef BLUEPRINT_HAS_LUA
+    // ----------------------------------------------------------------------
+    // Lua 引擎共享 / 注入
+    // ----------------------------------------------------------------------
+    // 默认行为：所有 BlueprintRunner 自动共享 BlueprintRuntime::GetDefaultLuaEngine()
+    // 返回的引擎，避免每个 Runner 各创一个 lua_State 的浪费。
+    //
+    // 高级用途（双 VM / 隔离 / 外部 xLua 注入）：
+    //   1. 自己 new 一个 LuaScriptEngine（shared_ptr 持有）
+    //   2. Initialize() 或 InitializeWithExternalState(L)
+    //   3. SetSharedLuaEngine(myEngine) 显式绑定
+    //
+    // 必须在 LoadLuaScript / RegisterHandler / EnsureLuaEngine 之前调用，
+    // 否则 Runner 已经懒加载了默认引擎，再换会失败。
+
+    /// 注入共享 Lua 引擎（必须在首次使用 Lua 之前调用）
+    /// 返回 false 表示 Runner 已经持有引擎（尚未实现热替换）
+    bool SetSharedLuaEngine(std::shared_ptr<LuaScriptEngine> engine);
+
+    /// 获取持有的共享 Lua 引擎（可能为空 —— 尚未首次访问 Lua）
+    std::shared_ptr<LuaScriptEngine> GetSharedLuaEngine() const { return m_luaEngine; }
+#endif
 
     // 心跳 Tick：驱动 Lua 脚本的 onTick(deltaSeconds) 全局函数（若存在）。
     // 建议在游戏循环 / Editor 定时器里每帧或固定间隔调用。
@@ -984,8 +1008,10 @@ private:
     static const int kMaxFlowDepth = 512;
 
 #ifdef BLUEPRINT_HAS_LUA
-    // Lua 脚本引擎（延迟创建：首次 LoadLuaScript 时初始化）
-    std::unique_ptr<LuaScriptEngine>                    m_luaEngine;
+    // Lua 脚本引擎（共享：默认从 BlueprintRuntime::GetDefaultLuaEngine() 取，
+    // 可通过 SetSharedLuaEngine 替换）。多个 BlueprintRunner 持有同一个引擎，
+    // 使所有 Runner 共享 Lua 节点定义、handler 表和已加载的脚本。
+    std::shared_ptr<LuaScriptEngine>                    m_luaEngine;
 #endif
 
     // ── 私有辅助方法 ─────────────────────────────────────────────────────────

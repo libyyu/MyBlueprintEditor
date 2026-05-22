@@ -804,11 +804,18 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetExternalLuaState(BP_Runner 
 {
     if (!runner || !L) return;
     auto* w = asWrapper(runner);
-    LuaScriptEngine* engine = w->runner.GetLuaEngine();
-    if (!engine) return;
-    if (engine->IsInitialized()) return;  // 已初始化则忽略，避免重复设置
 
-    engine->InitializeWithExternalState(L, &w->runner);
+    // 共享 Engine 模型：把外部 VM 装到一个新 Engine 里，并设为进程默认。
+    // 之后所有 BlueprintRunner（含本 runner）通过 EnsureLuaEngine 自动绑定到这个外部 VM。
+    auto sharedEng = std::make_shared<NodeEditor::Runtime::LuaScriptEngine>();
+    if (!sharedEng->InitializeWithExternalState(L, &w->runner))
+    {
+        return;
+    }
+    NodeEditor::Runtime::LuaScriptEngineRegistry::SetDefault(sharedEng);
+
+    // 让本 runner 立即绑定到这个 Engine（如果尚未持有引擎）
+    w->runner.SetSharedLuaEngine(sharedEng);
 }
 
 BLUEPRINT_CAPI_EXPORT lua_State* BLUEPRINT_CAPI_CALL BP_GetLuaState(BP_Runner runner)
@@ -816,8 +823,12 @@ BLUEPRINT_CAPI_EXPORT lua_State* BLUEPRINT_CAPI_CALL BP_GetLuaState(BP_Runner ru
     if (!runner) return nullptr;
     auto* w = asWrapper(runner);
     LuaScriptEngine* engine = w->runner.GetLuaEngine();
-    if (!engine) return nullptr;
-    return engine->GetState();
+    if (engine) return engine->GetState();
+
+    // Runner 尚未触发 Lua —— 返回默认共享 Engine 的 state（如果有）
+    if (auto def = NodeEditor::Runtime::LuaScriptEngineRegistry::GetDefault())
+        return def->GetState();
+    return nullptr;
 }
 
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_NotifyLuaStateClosing(lua_State* L)

@@ -14,6 +14,7 @@
 #include "BlueprintExport.h"
 #include <string>
 #include <vector>
+#include <memory>           // std::shared_ptr
 
 // MSVC C4251: 'member': class 'std::...' needs to have dll-interface
 // Safe to suppress when DLL and consumer share the same CRT/compiler.
@@ -104,6 +105,58 @@ private:
     std::string                m_lastError;
     std::vector<std::string>   m_loadedFiles;   // 按顺序记录已加载的文件路径
     int                        m_loadedCount = 0; // 总加载次数（文件 + 字符串）
+};
+
+// =========================================================================
+// 进程级默认 Lua Engine（共享 VM，避免每个 BlueprintRunner 各自创建一个 lua_State）
+// =========================================================================
+//
+// 设计目标：
+//   · 默认情况下所有 BlueprintRunner 共享同一个 lua_State，
+//     避免 N 个 Runner = N 个 VM 的浪费（每个 VM 50KB+ 基础开销，
+//     加上加载的 Lua 模块、handler 表、xLua 桥接对象，可能数 MB）。
+//   · 共享后：所有 Lua 模块只需加载一次，Lua 节点定义可跨 Runner 复用。
+//
+// 用法：
+//
+//   1. 默认行为（不调用任何接口）：
+//      第一个 BlueprintRunner 触发 Lua 时自动创建默认 Engine 并注册为全局；
+//      之后所有 Runner 自动共享。析构时引用计数归零，自动释放 VM。
+//
+//   2. 接入外部 VM（xLua / Unity 宿主）：
+//      auto eng = std::make_shared<LuaScriptEngine>();
+//      eng->InitializeWithExternalState(xluaState, nullptr);   // runner 可空
+//      LuaScriptEngine::SetDefault(eng);
+//
+//   3. 双 VM 隔离（Update/Game 阶段切换）：
+//      auto upd = std::make_shared<LuaScriptEngine>();
+//      upd->Initialize(nullptr);
+//      LuaScriptEngine::SetDefault(upd);
+//      // ... 跑 update 阶段 ...
+//      LuaScriptEngine::SetDefault(nullptr);  // 释放 upd（如果没人持有）
+//      auto game = std::make_shared<LuaScriptEngine>();
+//      game->Initialize(nullptr);
+//      LuaScriptEngine::SetDefault(game);
+//
+//   4. 显式独立 VM（不走默认）：
+//      auto isolated = std::make_shared<LuaScriptEngine>();
+//      isolated->Initialize(nullptr);
+//      runner.SetSharedLuaEngine(isolated);
+
+class BLUEPRINT_API LuaScriptEngineRegistry
+{
+public:
+    /// 取默认共享 Engine。首次调用时会自动创建并 Initialize（runner=nullptr，
+    /// 各 BlueprintRunner 通过 m_runner 独立持有）。
+    static std::shared_ptr<LuaScriptEngine> GetDefault();
+
+    /// 设置默认共享 Engine。传 nullptr 则清除（下次 GetDefault() 会重建）。
+    /// 调用时机要求：在第一个 BlueprintRunner 触发 Lua 之前，
+    /// 否则之前已创建的默认引擎不会被替换（但已绑定的 Runner 不受影响）。
+    static void SetDefault(std::shared_ptr<LuaScriptEngine> engine);
+
+    /// 是否已经创建了默认 Engine
+    static bool HasDefault();
 };
 
 } // namespace Runtime
