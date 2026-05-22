@@ -1234,15 +1234,24 @@ namespace BlueprintRuntime
         {
             if (r == null) return;
             _runners.Remove(r);
+            // 先通知 C++ 侧清空 m_L，再 Dispose
+            try { r.NotifyLuaStateClosing(); } catch { }
             r.Dispose();
         }
 
         public void ReleaseAllRunner()
         {
+            // 先批量通知所有 Runner 清空 m_L（LuaEnv.Dispose 前必须完成），
+            // 再批量 Dispose，避免 LuaEnv 已关闭后 Tick 访问野指针。
             foreach (var r in _runners)
+            {
+                try { r?.NotifyLuaStateClosing(); } catch { }
+            }
+            foreach (var r in _runners)
+            {
                 r?.Dispose();
+            }
             _runners.Clear();
-
         }
     }
 

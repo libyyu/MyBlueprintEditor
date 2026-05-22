@@ -5,7 +5,7 @@ using UnityEngine;
 namespace CutRope.Framework
 {
     // =========================================================================
-    // MonoBehaviour helper �C optional convenience component
+    // MonoBehaviour helper �C optional convenience component
     // =========================================================================
 
     /// <summary>
@@ -70,7 +70,9 @@ namespace CutRope.Framework
 
         protected virtual void Update()
         {
-            if (tickEveryFrame && Runner != null)
+            // xLua 主 VM 模式：LuaEnv 已 Dispose 时跳过 Tick，
+            // 避免 Update 在 LuaEnv.Dispose 后访问已释放的 lua_State。
+            if (tickEveryFrame && Runner != null && LuaManager.IsLuaValid)
                 Runner.Tick(Time.deltaTime);
         }
 
