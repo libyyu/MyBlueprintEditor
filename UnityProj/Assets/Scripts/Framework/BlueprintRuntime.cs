@@ -642,7 +642,9 @@ namespace BlueprintRuntime
                 {
                     Native.BP_SetLogCallback(_handle, null);
                     Native.BP_SetPrintCallback(_handle, null);
-                    NotifyLuaStateClosing();
+                    // 不在单个 Runner.Dispose 里调 NotifyLuaStateClosing：
+                    // 共享 VM 尚被其他 Runner 使用，这里调会把 m_L 清空导致其他 Runner Tick 失败。
+                    // NotifyLuaStateClosing 展层由 BlueprintService.ReleaseAllRunner 在 VM 整体关闭前调用。
                     Native.BP_DestroyRunner(_handle);
                     _handle = IntPtr.Zero;
                 }
