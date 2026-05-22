@@ -3163,20 +3163,18 @@ void RegisterHandlers_AI(
         ctx.MarkDownstreamAsHandled("onError");
 
         auto alive = runner.GetAliveFlag();
-        auto currentHandlers = std::make_shared<std::unordered_map<std::string, NodeHandler>>(
-            runner.GetHandlers());
+        // Handler 全局共享（HandlerRegistry），子 runner 自动可用，无需快照
 
         // 在异步线程中创建子 runner 并执行
-        auto dispatcher = [&runner, filePath, paramsStr, eventName, spawnId, alive, currentHandlers]
+        auto dispatcher = [&runner, filePath, paramsStr, eventName, spawnId, alive]
                           (ExecutionContext::AsyncResolve resolve) mutable
         {
             if (!alive->load(std::memory_order_acquire)) { resolve(); return; }
 
-            // 子 runner 继承 timer manager，共享 handler 表
+            // 子 runner 继承 timer manager；handler 全局共享
             auto subRunner = std::make_shared<BlueprintRunner>(runner.GetFileSystem());
             subRunner->SetParentTimerManager(runner.GetTimerManagerPtr());
             subRunner->SetLogCallback([](LogLevel, const std::string&){});
-            subRunner->RegisterHandlers(*currentHandlers);
 
             bool loaded = subRunner->LoadFromFileWithDeps(filePath);
             if (!loaded) { resolve(); return; }

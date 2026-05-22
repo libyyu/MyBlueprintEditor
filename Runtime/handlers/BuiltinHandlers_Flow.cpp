@@ -121,10 +121,7 @@ void RegisterHandlers_Flow(
 
         ctx.Log("  [ExecuteBlueprint] Loaded " + std::to_string(importResult.data.nodes.size()) + " nodes");
 
-        // 共享 handler 表
-        auto currentHandlers = std::make_shared<std::unordered_map<std::string, NodeHandler>>(
-            runner.GetHandlers());
-
+        // Handler 已全局共享（HandlerRegistry），子 runner 自动可用，无需快照
         // 异步执行
         ctx.Log("  [ExecuteBlueprint] Async: scheduling sub-blueprint for next frame...");
 
@@ -152,7 +149,7 @@ void RegisterHandlers_Flow(
 
         ExecutionContext* pCtx = &ctx;
         auto alive = runner.GetAliveFlag();
-        ctx.Delay(0.0f, [pCtx, &runner, sharedData, currentHandlers, completedPinId, resolvedPath, alive, paramsStr]() {
+        ctx.Delay(0.0f, [pCtx, &runner, sharedData, completedPinId, resolvedPath, alive, paramsStr]() {
             if (!alive->load(std::memory_order_acquire)) return;
             pCtx->Log("  [ExecuteBlueprint] Async: executing \"" + resolvedPath + "\"...");
 
@@ -189,7 +186,7 @@ void RegisterHandlers_Flow(
                 subCtx.Log("  [Default Handler] pass-through");
                 return true;
             });
-            subRunner->RegisterHandlers(*currentHandlers);
+            // Handler 全局共享，无需 RegisterHandlers
 
             // 将父 runner 的外部函数库（m_externalFunctions）透传给子 runner，
             // 确保子蓝图中引用的 FuncLib.* 节点能找到对应的函数定义。

@@ -59,6 +59,7 @@ message(STATUS "[BlueprintRuntime] Building as ${_RUNTIME_LIB_TYPE}")
 set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/CrashHandler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NodeDefinition.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SharedRegistry.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintExporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintRunner.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FrameTimerManager.cpp
@@ -108,6 +109,7 @@ set(RUNTIME_PUBLIC_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintCAPI.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Types.h
     ${CMAKE_CURRENT_SOURCE_DIR}/NodeDefinition.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/SharedRegistry.h
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintData.h
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintExporter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintRunner.h

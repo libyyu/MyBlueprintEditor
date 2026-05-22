@@ -180,16 +180,14 @@ void RegisterHandlers_Agent(
 
         // 同时注册一个 handler：当 Tool.CallByName 调用 name 时，
         // 路由到对应子蓝图执行（同步简化版）
-        auto currentHandlers = std::make_shared<std::unordered_map<std::string, NodeHandler>>(
-            runner.GetHandlers());
+        // Handler 全局共享（HandlerRegistry），无需快照
         runner.RegisterHandler("__dyntool_" + name,
-            [&runner, name, filePath, currentHandlers](ExecutionContext& c) -> bool {
+            [&runner, name, filePath](ExecutionContext& c) -> bool {
                 std::string args = c.GetInputValue("Arguments").asString();
-                // 创建子 runner，共享 handler 表
+                // 创建子 runner；handler 全局共享
                 auto subRunner = std::make_unique<BlueprintRunner>(runner.GetFileSystem());
                 subRunner->SetParentTimerManager(runner.GetTimerManagerPtr());
                 subRunner->SetLogCallback([&c](LogLevel, const std::string& m){ c.Log(m); });
-                subRunner->RegisterHandlers(*currentHandlers);
                 if (!subRunner->LoadFromFileWithDeps(filePath)) {
                     c.SetOutputValue("Result", Variant(std::string("[Error] cannot load: " + filePath)));
                     c.ActivateOutputFlow("onNotFound");

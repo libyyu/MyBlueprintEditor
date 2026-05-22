@@ -97,12 +97,8 @@ void BlueprintEditor::InitRunnerForDoc(BlueprintDocument* doc,
             }
         }
 
-        // 同步节点定义（handler 已由重加载脚本时 RegisterHandler 写入，无需重复）
-        for (const auto& id : m_luaRunner.GetLuaRegisteredNodeIds())
-        {
-            const auto* def = m_luaRunner.GetNodeDef(id);
-            if (def) doc->persistentRunner.RegisterNodeDef(*def);
-        }
+        // 节点定义和 handler 已在全局 SharedRegistry 中（HandlerRegistry / NodeDefRegistry），
+        // persistentRunner 自动可见，无需手工同步
     }
 
     if (m_DefaultHandler)

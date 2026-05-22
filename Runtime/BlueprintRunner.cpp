@@ -2,6 +2,7 @@
 
 #include "BlueprintRunner.h"
 #include "BlueprintExporter.h"
+#include "SharedRegistry.h"
 #include "MainThreadDispatcher.h"
 #ifdef BLUEPRINT_HAS_LUA
 #  include "LuaBindings.h"      // BindRunnerToLuaState（必须在 namespace 外 include）
@@ -90,7 +91,7 @@ bool BlueprintRunner::loadDependencies(const std::vector<std::string>& deps,
 std::unique_ptr<BlueprintRunner> BlueprintRunner::CreateChildRunner() const
 {
     auto sub = std::make_unique<BlueprintRunner>();
-    sub->RegisterHandlers(m_handlers);
+    // Handler 已全局共享（HandlerRegistry），无需复制
     sub->SetParentTimerManager(m_timerManager);
     if (m_logCallback)      sub->SetLogCallback(m_logCallback);
     if (m_printCallback)    sub->SetPrintCallback(m_printCallback);
@@ -222,30 +223,31 @@ bool BlueprintRunner::LoadFromFileWithDeps(const std::string& filePath)
 }
 
 // ============================================================================
-// 处理器注册
+// 处理器注册（全部转发到全局 HandlerRegistry，多 Runner 共享）
 // ============================================================================
 
 void BlueprintRunner::RegisterHandler(const std::string& definitionId, NodeHandler handler)
 {
-    m_handlers[definitionId] = std::move(handler);
+    HandlerRegistry::Instance().Register(definitionId, std::move(handler));
 }
 
 void BlueprintRunner::RegisterHandlers(const std::unordered_map<std::string, NodeHandler>& handlers)
 {
+    auto& reg = HandlerRegistry::Instance();
     for (const auto& pair : handlers)
     {
-        m_handlers[pair.first] = pair.second;
+        reg.Register(pair.first, pair.second);
     }
 }
 
 void BlueprintRunner::UnregisterHandler(const std::string& definitionId)
 {
-    m_handlers.erase(definitionId);
+    HandlerRegistry::Instance().Unregister(definitionId);
 }
 
 bool BlueprintRunner::HasHandler(const std::string& definitionId) const
 {
-    return m_handlers.find(definitionId) != m_handlers.end();
+    return HandlerRegistry::Instance().Has(definitionId);
 }
 
 void BlueprintRunner::SetDefaultHandler(NodeHandler handler)
@@ -254,27 +256,27 @@ void BlueprintRunner::SetDefaultHandler(NodeHandler handler)
 }
 
 // ============================================================================
-// 脚本动态节点定义注册（Lua / C# 共用）
+// 脚本动态节点定义注册（全部转发到全局 NodeDefRegistry）
 // ============================================================================
 
 void BlueprintRunner::RegisterNodeDef(const NodeDefinition& def)
 {
-    m_scriptRegistry.registerNode(def);
+    NodeDefRegistry::Instance().Register(def);
 }
 
 void BlueprintRunner::UnregisterNodeDef(const std::string& id)
 {
-    m_scriptRegistry.unregisterNode(id);
+    NodeDefRegistry::Instance().Unregister(id);
 }
 
 bool BlueprintRunner::HasNodeDef(const std::string& id) const
 {
-    return m_scriptRegistry.getNodeDefinition(id) != nullptr;
+    return NodeDefRegistry::Instance().Has(id);
 }
 
 const NodeDefinition* BlueprintRunner::GetNodeDef(const std::string& id) const
 {
-    return m_scriptRegistry.getNodeDefinition(id);
+    return NodeDefRegistry::Instance().Find(id);
 }
 
 // ============================================================================
@@ -728,19 +730,15 @@ bool BlueprintRunner::executeNodeInternal(const NodeInstance& node)
         return true;
     }
 
-    // 查找处理器
-    auto it = m_handlers.find(node.definitionId);
-    NodeHandler handler;
+    // 查找处理器（全局共享 HandlerRegistry）
+    NodeHandler handler = HandlerRegistry::Instance().Find(node.definitionId);
 
-    if (it != m_handlers.end())
-    {
-        handler = it->second;
-    }
-    else if (m_defaultHandler)
+    if (!handler && m_defaultHandler)
     {
         handler = m_defaultHandler;
     }
-    else
+
+    if (!handler)
     {
         // 没有处理器，跳过但记录警告
         if (m_logCallback)
@@ -2545,10 +2543,12 @@ bool BlueprintRunner::ReloadLuaScript(const std::string& filePath)
 
 void BlueprintRunner::UnregisterAllLuaNodes()
 {
+    auto& nodeReg    = NodeDefRegistry::Instance();
+    auto& handlerReg = HandlerRegistry::Instance();
     for (const auto& id : m_luaRegisteredNodeIds)
     {
-        m_scriptRegistry.unregisterNode(id);
-        m_handlers.erase(id);
+        nodeReg.Unregister(id);
+        handlerReg.Unregister(id);
     }
     m_luaRegisteredNodeIds.clear();
 }

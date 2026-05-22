@@ -433,12 +433,8 @@ public:
     // 获取节点定义（未注册返回 nullptr）
     const NodeDefinition* GetNodeDef(const std::string& id) const;
 
-    // 获取脚本注册表（编辑器/外部合并用）
-    INodeRegistry& GetScriptRegistry() { return m_scriptRegistry; }
-    const INodeRegistry& GetScriptRegistry() const { return m_scriptRegistry; }
-
     // ------------------------------------------------------------------
-    // 注册节点处理器
+    // 注册节点处理器（转发到全局 HandlerRegistry，所有 Runner 共享）
     // ------------------------------------------------------------------
 
     // 注册单个节点类型的处理器
@@ -452,9 +448,6 @@ public:
 
     // 检查处理器是否已注册
     bool HasHandler(const std::string& definitionId) const;
-
-    // 获取所有已注册的处理器映射表（用于传递给子蓝图）
-    const std::unordered_map<std::string, NodeHandler>& GetHandlers() const { return m_handlers; }
 
     // 设置默认处理器（用于没有注册处理器的节点）
     void SetDefaultHandler(NodeHandler handler);
@@ -870,12 +863,11 @@ private:
     // 用于 FuncLib.* / Function.Call 节点执行时从完整节点图中构建函数子图（而非空索引）
     std::unordered_map<std::string, std::shared_ptr<BlueprintData>> m_externalLibraries;
 
-    // 节点处理器注册表
-    std::unordered_map<std::string, NodeHandler>        m_handlers;
+    // 节点处理器注册表已迁移到全局 HandlerRegistry（SharedRegistry.h）
+    // 仅保留默认 handler（按 Runner 配置，因为不同 Runner 可能有不同 fallback 行为）
     NodeHandler                                         m_defaultHandler;
 
-    // 脚本动态节点定义注册表（Lua / C# 通过 RegisterNodeDef 注册）
-    DefaultNodeRegistry                                 m_scriptRegistry;
+    // 脚本动态节点定义注册表已迁移到全局 NodeDefRegistry（SharedRegistry.h）
 
 #ifdef BLUEPRINT_HAS_LUA
     // Lua 注册的节点 ID 集合（用于热重载时精确清理）
