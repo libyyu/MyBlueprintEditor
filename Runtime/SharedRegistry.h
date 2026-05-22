@@ -31,7 +31,10 @@ namespace Runtime {
 
 class ExecutionContext;
 using NodeHandler = std::function<bool(ExecutionContext& context)>;
-
+#ifdef _MSC_VER
+#   pragma warning(push)
+#   pragma warning(disable: 4251)  // STL members in DLL-exported class
+#endif
 // =============================================================================
 // HandlerRegistry — 全局节点处理器注册表
 // =============================================================================
@@ -110,6 +113,10 @@ private:
     mutable std::mutex                                  m_mutex;
     std::unordered_map<std::string, NodeDefinition>     m_defs;
 };
+
+#ifdef _MSC_VER
+#   pragma warning(pop)
+#endif
 
 } // namespace Runtime
 } // namespace NodeEditor

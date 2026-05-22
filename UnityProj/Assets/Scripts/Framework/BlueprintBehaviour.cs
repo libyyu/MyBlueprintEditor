@@ -1,4 +1,5 @@
 using BlueprintRuntime;
+using System;
 using UnityEngine;
 
 namespace CutRope.Framework
@@ -38,10 +39,17 @@ namespace CutRope.Framework
         /// <summary>Access the underlying runner for variable read/write and handler registration.</summary>
         public BPRunner Runner { get; private set; }
 
+        IntPtr LuaState => LuaManager.IsLuaValid ? LuaManager.Instance.ActiveLuaEnv.L : IntPtr.Zero;
+
         protected virtual void Awake()
         {
             Runner = new BPRunner();
-
+            // 将 xLua 的 lua_State 注入给 BlueprintRuntime
+            // BR 不拥有此 VM，不会在 Dispose 时 lua_close
+            Runner.SetExternalLuaState(LuaState);
+            string dumpDir = System.IO.Path.Combine(
+                    UnityEngine.Application.dataPath, "../CrashDumps");
+            BPRunner.SetCrashDumpDir(dumpDir);
             Runner.OnPrint += (lv, msg) =>
             {
                 switch (lv)

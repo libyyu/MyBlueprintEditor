@@ -2370,6 +2370,11 @@ bool BlueprintRunner::FireConnectedNode(PinId inputPinId)
 
 void BlueprintRunner::Tick(float deltaTime)
 {
+#ifdef BLUEPRINT_HAS_LUA
+	// 驱动扩展脚本的 OnGlobalTick(dt)（若脚本已加载且函数存在）
+	TickScriptExtensions(static_cast<double>(deltaTime));
+#endif
+
     // Paused 或 Stopped 时不推进计时器
     {
         RunState s = m_runState.load();
@@ -2422,11 +2427,6 @@ void BlueprintRunner::Tick(float deltaTime)
                 }),
             m_keepAliveRunners.end());
     }
-
-#ifdef BLUEPRINT_HAS_LUA
-    // 驱动扩展脚本的 OnGlobalTick(dt)（若脚本已加载且函数存在）
-    TickScriptExtensions(static_cast<double>(deltaTime));
-#endif
 }
 
 // ============================================================================

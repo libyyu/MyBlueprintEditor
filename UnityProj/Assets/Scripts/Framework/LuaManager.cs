@@ -153,14 +153,6 @@ namespace CutRope.Framework
             var env = CreateLuaEnv("game", IntPtr.Zero);
             ActiveLuaEnv = env;
 
-            // 把 xLua 的 lua_State 注入给 BlueprintRuntime，让 BR 共享这个 VM
-            var bpRuntime = BlueprintRunner.Instance
-                         ?? FindFirstObjectByType<BlueprintRunner>();
-            if (bpRuntime != null)
-                bpRuntime.InitWithExternalLuaState(env.rawL);
-            else
-                Debug.LogWarning("[LuaManager] BlueprintRunner not found, BR will use standalone VM");
-
             try
             {
                 env.DoString($"require '{entryLua}'");

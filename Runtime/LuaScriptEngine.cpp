@@ -111,7 +111,7 @@ bool LuaScriptEngine::Initialize(BlueprintRunner* runner)
 
     // 重定向 Lua print() → runner 的 PrintCallback（若无 runner 则保持 stdout）
     // 这样 Lua 脚本里的 print() 输出能在编辑器控制台和 runtime-example 都能看到
-    if (m_runner)
+    if (!m_runner)
     {
         // 把 runner 指针存入 Lua registry，供 print 覆盖函数访问
         // （__blueprint_runner 已由 RegisterLuaBindings 设置，此处直接复用）

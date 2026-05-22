@@ -104,7 +104,7 @@ namespace CutRope.Game
         private void SetupCutTrail()
         {
             _trailGo = new GameObject("CutTrail");
-            DontDestroyOnLoad(_trailGo);
+            //DontDestroyOnLoad(_trailGo);
 
             _trail = _trailGo.AddComponent<TrailRenderer>();
             _trail.time          = trailDuration;
