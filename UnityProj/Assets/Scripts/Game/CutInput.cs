@@ -17,7 +17,7 @@ namespace CutRope.Game
     {
         [Header("切割参数")]
         [Tooltip("切割检测半径（世界单位）")]
-        public float cutRadius = 0.1f;
+        public float cutRadius = 0.4f;
 
         [Tooltip("最小划动距离（像素），防止点击误切")]
         public float minSwipeDistance = 5f;
@@ -96,7 +96,7 @@ namespace CutRope.Game
             foreach (var rope in _ropes)
             {
                 if (!rope || !rope.IsAlive) continue;
-                rope.CutAtWorld(ClosestPointOnSegment(from, to, Camera.main));
+                rope.TryCutWithSegment(from, to, cutRadius);
             }
         }
 
@@ -108,10 +108,14 @@ namespace CutRope.Game
             return new Vector2(wp.x, wp.y);
         }
 
-        // 简化版：取线段中点作为切割点（足够精确）
-        private static Vector2 ClosestPointOnSegment(Vector2 a, Vector2 b, Camera cam)
+        /// <summary>点到线段的最近距离</summary>
+        public static float PointToSegmentDistance(Vector2 p, Vector2 a, Vector2 b)
         {
-            return (a + b) * 0.5f;
+            Vector2 ab = b - a;
+            float lenSq = ab.sqrMagnitude;
+            if (lenSq < 1e-6f) return Vector2.Distance(p, a);
+            float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / lenSq);
+            return Vector2.Distance(p, a + t * ab);
         }
 
         private void OnDestroy()

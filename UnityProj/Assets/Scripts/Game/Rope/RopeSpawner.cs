@@ -161,7 +161,26 @@ namespace CutRope.Game
             Debug.Log($"[RopeSpawner] Cut at index {index}, segments left: {_segments.Count}");
         }
 
-        /// <summary>在世界坐标最近处切断（CutInput 调用）</summary>
+        /// <summary>用划动线段检测切割（CutInput 调用）。
+        /// 遍历每个节点，找出距划动线段最近且小于 cutRadius 的节点并切断。</summary>
+        public void TryCutWithSegment(Vector2 from, Vector2 to, float cutRadius)
+        {
+            int    nearest = -1;
+            float  minDist = float.MaxValue;
+
+            for (int i = 0; i < _segments.Count; i++)
+            {
+                if (_segments[i] == null) continue;
+                Vector2 sp = _segments[i].transform.position;
+                float d = CutInput.PointToSegmentDistance(sp, from, to);
+                if (d < minDist) { minDist = d; nearest = i; }
+            }
+
+            if (nearest >= 0 && minDist <= cutRadius)
+                Cut(nearest);
+        }
+
+        /// <summary>在世界坐标最近处切断（兼容旧接口）</summary>
         public void CutAtWorld(Vector2 worldPos)
         {
             int    nearest = -1;

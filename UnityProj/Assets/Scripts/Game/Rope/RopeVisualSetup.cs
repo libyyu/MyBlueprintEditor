@@ -43,6 +43,12 @@ namespace CutRope.Game
             rr.pinColor           = new Color(0.72f, 0.72f, 0.78f);
             rr.textureScrollSpeed = 0f;  // 无纹理时关掉动画
 
+            // 给 LineRenderer 配置渲染材质，避免默认粉红色
+            var mat = new Material(Shader.Find("Sprites/Default"));
+            mat.color = Color.white;
+            lr.material = mat;
+            lr.sortingOrder = 2;
+
             spawner.ropeRenderer = rr;
             spawner.lineRenderer  = lr;  // 兼容：RopeRenderer 内部用同一个 LineRenderer
 
