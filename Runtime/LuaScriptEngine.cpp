@@ -203,6 +203,7 @@ bool LuaScriptEngine::InitializeWithExternalState(lua_State* L, BlueprintRunner*
 void LuaScriptEngine::SetSearcher(lua_CFunction loader)
 {
     if (!m_L || !loader) return;
+    if (!IsLuaStateAlive(m_L)) { m_L = nullptr; return; }
     lua_State* L = m_L;
     int top = lua_gettop(L);
 
@@ -226,6 +227,7 @@ void LuaScriptEngine::SetSearcher(lua_CFunction loader)
 void LuaScriptEngine::AddLuaPath(const std::string& dir)
 {
     if (!m_L || dir.empty()) return;
+    if (!IsLuaStateAlive(m_L)) { m_L = nullptr; return; }
     lua_State* L = m_L;
     int top = lua_gettop(L);
 
@@ -353,6 +355,12 @@ bool LuaScriptEngine::LoadFile(const std::string& filePath)
         m_lastError = "Lua VM not initialized";
         return false;
     }
+    if (!IsLuaStateAlive(m_L))
+    {
+        m_L = nullptr;
+        m_lastError = "Lua VM has been closed by host";
+        return false;
+    }
 
     // 加载文件（编译为 chunk，压入栈顶）
     if (luaL_loadfile(m_L, filePath.c_str()) != LUA_OK)
@@ -383,6 +391,12 @@ bool LuaScriptEngine::LoadString(const std::string& code, const std::string& chu
         m_lastError = "Lua VM not initialized";
         return false;
     }
+    if (!IsLuaStateAlive(m_L))
+    {
+        m_L = nullptr;
+        m_lastError = "Lua VM has been closed by host";
+        return false;
+    }
 
     // 加载字符串（编译为 chunk，压入栈顶）
     if (luaL_loadbuffer(m_L, code.c_str(), code.size(), chunkName.c_str()) != LUA_OK)
@@ -408,6 +422,15 @@ bool LuaScriptEngine::LoadString(const std::string& code, const std::string& chu
 void LuaScriptEngine::Tick(double deltaSeconds)
 {
     if (!m_L) return;
+
+    // 防御性检查：外部 host（如 xLua）可能已经 lua_close(m_L) 但忘记调
+    // BP_NotifyLuaStateClosing；或者 InvalidateLuaState 没命中本 engine。
+    // 通过全局 LuaStateRegistry 的 guard 判断 VM 是否仍存活，避免访问野指针。
+    if (!IsLuaStateAlive(m_L))
+    {
+        m_L = nullptr;  // 主动同步，避免后续重复检查
+        return;
+    }
 
     // 查找全局 onTick 函数
     lua_getglobal(m_L, "OnGlobalTick");

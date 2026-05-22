@@ -178,6 +178,14 @@ void UnregisterLuaState(lua_State* L)
     if (L) LuaStateRegistry::Instance().Unregister(L);
 }
 
+bool IsLuaStateAlive(lua_State* L)
+{
+    if (!L) return false;
+    auto g = LuaStateRegistry::Instance().Find(L);
+    if (!g) return false;
+    return g->alive.load(std::memory_order_acquire);
+}
+
 void TouchLuaStateRegistry()
 {
     // 强制 Meyers singleton 构造（用于析构顺序排序）
@@ -844,6 +852,9 @@ static int l_hasNodeDef(lua_State* L)
 void BindRunnerToLuaState(lua_State* L, BlueprintRunner* runner)
 {
     if (!L) return;
+    // 防御：host 已 lua_close 但调用方仍持有过时 L
+    auto g = LuaStateRegistry::Instance().Find(L);
+    if (!g || !g->alive.load(std::memory_order_acquire)) return;
     lua_pushlightuserdata(L, runner);
     lua_setfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
 }

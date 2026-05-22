@@ -42,6 +42,15 @@ BLUEPRINT_API void BindRunnerToLuaState(lua_State* L, BlueprintRunner* runner);
 BLUEPRINT_API void RegisterLuaState(lua_State* L);
 BLUEPRINT_API void UnregisterLuaState(lua_State* L);
 
+// 查询给定 lua_State 是否仍然存活（未被 UnregisterLuaState 标记 dead）。
+// 用于在调用任何 lua C API 之前做活性检查，避免 host 已 lua_close 后
+// BR 仍持有的 m_L 指针访问野内存导致 SIGSEGV。
+//
+// 返回 false 的情况：
+//   1. L 从未被 RegisterLuaState 注册过（未知 VM）
+//   2. L 已被 UnregisterLuaState 标记 dead（外部已调 lua_close）
+BLUEPRINT_API bool IsLuaStateAlive(lua_State* L);
+
 // 内部使用：强制 LuaStateRegistry singleton 在调用方之前构造，
 // 用于解决进程退出时的析构顺序问题（让 default Lua engine 比 registry 先死）。
 BLUEPRINT_API void TouchLuaStateRegistry();
