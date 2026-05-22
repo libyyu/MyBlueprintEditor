@@ -201,7 +201,7 @@ namespace CutRope.Framework
         private void DisposeActiveVM()
         {
             if (ActiveLuaEnv == null) return;
-
+            Debug.Log("[LuaManager] LuaEnv begin dispose");
             try { _luaOnDestroy?.Call(); } catch (Exception e) { Debug.LogWarning($"[LuaManager] onAppDestroy: {e.Message}"); }
 
             _luaOnDestroy?.Dispose(); _luaOnDestroy = null;

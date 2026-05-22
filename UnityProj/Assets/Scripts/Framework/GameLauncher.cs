@@ -41,6 +41,11 @@ namespace CutRope.Framework
             _lua     = GetComponent<LuaManager>();
         }
 
+        private void OnDestroy()
+        {
+            
+        }
+
         private async void Start()
         {
             // ── Phase 1：本地资源库初始化 ─────────────────────────────
@@ -66,10 +71,6 @@ namespace CutRope.Framework
                 Debug.LogError("[GameLauncher] Phase 3 failed, abort.");
                 return;
             }
-
-            // 保证BlueprintService创建了
-            if (BlueprintService.Instance == null)
-                gameObject.AddComponent<BlueprintService>();
 
             // AudioManager
             if (AudioManager.Instance == null)

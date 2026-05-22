@@ -76,8 +76,7 @@ namespace CutRope.Framework
 
         protected virtual void OnDestroy()
         {
-            Runner?.Dispose();
-            Runner = null;
+            BlueprintService.Instance.ReleaseRunner(Runner);
         }
 
         /// <summary>

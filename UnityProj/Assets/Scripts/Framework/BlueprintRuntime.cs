@@ -1163,10 +1163,11 @@ namespace BlueprintRuntime
     }
 
 
-    public class BlueprintService : MonoBehaviour
+    public class BlueprintService
     {
         // ── 单例 ───────────────────────────────────────────────────
-        public static BlueprintService Instance { get; private set; }
+        private static readonly BlueprintService _instance = new BlueprintService();
+        public static BlueprintService Instance => _instance;
 
         // ── Runner 管理 ───────────────────────────────────────────
         private readonly List<BPRunner> _runners = new List<BPRunner>();
@@ -1176,16 +1177,8 @@ namespace BlueprintRuntime
 
         IntPtr LuaState => LuaManager.IsLuaValid ? LuaManager.Instance.ActiveLuaEnv.L : IntPtr.Zero;
 
-        void Awake()
+        private BlueprintService()
         {
-            if (Instance != null && Instance != this)
-            {
-                Destroy(gameObject);
-                return;
-            }
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-
 #if UNITY_WEBGL && !UNITY_EDITOR
             // WebGL：HTTP 客户端由 Emscripten + fetch API 提供
             // 默认 CreateDefaultHttpClient 在 WebGL 下就是 HttpClient_Emscripten
@@ -1194,10 +1187,6 @@ namespace BlueprintRuntime
 #endif
             // 初始化默认 HTTP 客户端（Runtime 内部幂等，重复调用无副作用）
             BPRunner.InitDefaultHttpClient();
-        }
-
-        void Start()
-        {
         }
 
         /// <summary>创建一个新 Runner。服务会自动每帧 Tick 它。</summary>
@@ -1254,33 +1243,6 @@ namespace BlueprintRuntime
                 r?.Dispose();
             _runners.Clear();
 
-        }
-
-        //void Update()
-        //{
-        //    // 先 drain 全局异步队列（HTTP 回调等），即使没有 runner 也要做
-        //    BPRunner.DrainQueue();
-
-        //    float dt = Time.unscaledDeltaTime;
-        //    // 倒序遍历以防 Tick 回调里自销毁
-        //    for (int i = _runners.Count - 1; i >= 0; i--)
-        //    {
-        //        var r = _runners[i];
-        //        if (r == null) { _runners.RemoveAt(i); continue; }
-        //        try
-        //        {
-        //            r.Tick(dt);
-        //        }
-        //        catch (Exception e) { Debug.LogError($"[BlueprintService] Tick failed: {e}"); }
-        //    }
-        //}
-
-        void OnDestroy()
-        {
-            foreach (var r in _runners)
-                r?.Dispose();
-            _runners.Clear();
-            if (Instance == this) Instance = null;
         }
     }
 
