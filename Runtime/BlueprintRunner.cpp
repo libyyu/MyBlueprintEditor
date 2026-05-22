@@ -2424,8 +2424,8 @@ void BlueprintRunner::Tick(float deltaTime)
     }
 
 #ifdef BLUEPRINT_HAS_LUA
-    // 驱动 Lua 全局 OnGlobalTick(dt)（若脚本已加载且函数存在）
-    TickLua(static_cast<double>(deltaTime));
+    // 驱动扩展脚本的 OnGlobalTick(dt)（若脚本已加载且函数存在）
+    TickScriptExtensions(static_cast<double>(deltaTime));
 #endif
 }
 
@@ -2473,12 +2473,12 @@ bool ExecutionContext::EvaluateConditionPin(const std::string& pinName)
 
 #include "LuaScriptEngine.h"
 
-bool BlueprintRunner::LoadLuaScript(const std::string& filePath)
+bool BlueprintRunner::LoadExtensionScript(const std::string& filePath)
 {
-    // 确保 Lua 引擎已初始化（首次调用时创建/绑定共享，后续复用）
-    if (!EnsureLuaEngine()) return false;
+    // 确保脚本引擎已初始化（首次调用时创建/绑定共享，后续复用）
+    if (!EnsureScriptEngine()) return false;
 
-    // 共享 lua_State 场景：把当前活跃 Runner 切换为 this，
+    // 共享 VM 场景：把当前活跃 Runner 切换为 this，
     // 让脚本里的 Blueprint.RegisterHandler / print 能路由到本 Runner
     BindRunnerToLuaState(m_luaEngine->GetState(), this);
 
@@ -2486,18 +2486,18 @@ bool BlueprintRunner::LoadLuaScript(const std::string& filePath)
     // 避免重复执行脚本顶层副作用、重复注册 handler
     if (m_luaEngine->HasLoadedFile(filePath))
     {
-        Log("[Lua] Script already loaded in shared VM, reusing: " + filePath,
+        Log("[Script] Already loaded in shared VM, reusing: " + filePath,
             LogLevel::Verbose);
         return true;
     }
 
-    Log("[Lua] Loading script: " + filePath + " (order: " +
+    Log("[Script] Loading: " + filePath + " (order: " +
         std::to_string(m_luaEngine->GetLoadedCount() + 1) + ")", LogLevel::Verbose);
 
     if (!m_luaEngine->LoadFile(filePath))
     {
-        m_lastError = "Lua load error: " + m_luaEngine->GetLastError();
-        LogError("[Lua] " + m_lastError);
+        m_lastError = "Script load error: " + m_luaEngine->GetLastError();
+        LogError("[Script] " + m_lastError);
         return false;
     }
 
@@ -2510,21 +2510,21 @@ bool BlueprintRunner::LoadLuaScript(const std::string& filePath)
     } catch (...) {}
 #endif
 
-    Log("[Lua] Script loaded OK: " + filePath, LogLevel::Verbose);
+    Log("[Script] Loaded OK: " + filePath, LogLevel::Verbose);
     return true;
 }
 
-bool BlueprintRunner::ReloadLuaScript(const std::string& filePath)
+bool BlueprintRunner::ReloadExtensionScript(const std::string& filePath)
 {
-    if (!m_luaEngine) return LoadLuaScript(filePath);
+    if (!m_luaEngine) return LoadExtensionScript(filePath);
 
     // 注销脚本注册的所有节点（共享 engine 模式下会影响其他 Runner，
     // 但调用方已知会触发全量重载）
-    UnregisterAllLuaNodes();
+    UnregisterAllScriptedNodes();
 
     if (m_luaEngine.use_count() > 1)
     {
-        Log("[Lua] ReloadLuaScript on shared engine — will rebind, "
+        Log("[Script] Reload on shared engine — will rebind, "
             "old function refs in shared VM remain until GC.", LogLevel::Verbose);
     }
 
@@ -2534,73 +2534,72 @@ bool BlueprintRunner::ReloadLuaScript(const std::string& filePath)
 
     for (const auto& f : files)
     {
-        if (!LoadLuaScript(f))
+        if (!LoadExtensionScript(f))
             return false;  // 报错止步
     }
+    (void)filePath;  // 当前实现总是全量重载，保留参数以备将来精确单文件实现
     return true;
 }
 
-void BlueprintRunner::UnregisterAllLuaNodes()
+void BlueprintRunner::UnregisterAllScriptedNodes()
 {
     if (m_luaEngine)
         m_luaEngine->UnregisterAllScriptedNodes();
 }
 
-const std::unordered_set<std::string>& BlueprintRunner::GetLuaRegisteredNodeIds() const
+const std::unordered_set<std::string>& BlueprintRunner::GetScriptRegisteredNodeIds() const
 {
     static const std::unordered_set<std::string> kEmpty;
     return m_luaEngine ? m_luaEngine->GetRegisteredNodeIds() : kEmpty;
 }
 
-const std::vector<std::string>& BlueprintRunner::GetLuaLoadedFiles() const
+const std::vector<std::string>& BlueprintRunner::GetLoadedExtensionScripts() const
 {
     static const std::vector<std::string> kEmpty;
     return m_luaEngine ? m_luaEngine->GetLoadedFiles() : kEmpty;
 }
 
-void BlueprintRunner::MarkLuaRegisteredNode(const std::string& id)
+void BlueprintRunner::MarkScriptRegisteredNode(const std::string& id)
 {
-    // 必须由 LuaBindings 在 Runner 已绑定 engine 之后回调；防御性兜底
+    // 必须由脚本绑定层在 Runner 已绑定 engine 之后回调；防御性兜底
     if (m_luaEngine)
         m_luaEngine->MarkRegisteredNode(id);
 }
 
-void BlueprintRunner::UnmarkLuaRegisteredNode(const std::string& id)
+void BlueprintRunner::UnmarkScriptRegisteredNode(const std::string& id)
 {
     if (m_luaEngine)
         m_luaEngine->UnmarkRegisteredNode(id);
 }
 
-void BlueprintRunner::AddLuaPath(const std::string& dir)
+void BlueprintRunner::AddScriptSearchPath(const std::string& dir)
 {
-    if (!EnsureLuaEngine()) return;
+    if (!EnsureScriptEngine()) return;
     m_luaEngine->AddLuaPath(dir);
 }
 
-
-
-bool BlueprintRunner::LoadLuaString(const std::string& code, const std::string& name)
+bool BlueprintRunner::LoadExtensionScriptString(const std::string& code, const std::string& name)
 {
-    // 延迟创建/绑定 Lua 引擎（默认走共享）
-    if (!EnsureLuaEngine())
+    // 延迟创建/绑定脚本引擎（默认走共享）
+    if (!EnsureScriptEngine())
     {
         return false;
     }
 
-    // 共享 lua_State 场景：切换到本 Runner（影响 Blueprint.RegisterHandler 路由）
+    // 共享 VM 场景：切换到本 Runner（影响 Blueprint.RegisterHandler 路由）
     BindRunnerToLuaState(m_luaEngine->GetState(), this);
 
-    Log("[Lua] Loading string: " + name + " (order: " +
+    Log("[Script] Loading string: " + name + " (order: " +
         std::to_string(m_luaEngine->GetLoadedCount() + 1) + ")", LogLevel::Verbose);
 
     if (!m_luaEngine->LoadString(code, name))
     {
-        m_lastError = "Lua exec error: " + m_luaEngine->GetLastError();
-        LogError("[Lua] " + m_lastError);
+        m_lastError = "Script exec error: " + m_luaEngine->GetLastError();
+        LogError("[Script] " + m_lastError);
         return false;
     }
 
-    Log("[Lua] String loaded OK: " + name, LogLevel::Verbose);
+    Log("[Script] String loaded OK: " + name, LogLevel::Verbose);
     return true;
 }
 
@@ -2614,23 +2613,23 @@ bool BlueprintRunner::SetSharedLuaEngine(std::shared_ptr<LuaScriptEngine> engine
     if (m_luaEngine)
     {
         // 已经持有引擎，不允许热替换（避免 handler/state 不一致）
-        m_lastError = "BlueprintRunner already has a Lua engine; cannot replace";
+        m_lastError = "BlueprintRunner already has a script engine; cannot replace";
         return false;
     }
     m_luaEngine = std::move(engine);
     return m_luaEngine != nullptr;
 }
 
-bool BlueprintRunner::EnsureLuaEngine()
+bool BlueprintRunner::EnsureScriptEngine()
 {
     if (m_luaEngine) return true;
 
-    // 优先使用进程级默认共享 Engine（多 Runner 共享一个 lua_State）
+    // 优先使用进程级默认共享 Engine（多 Runner 共享一个 VM）
     auto shared = LuaScriptEngineRegistry::GetDefault();
     if (shared && shared->IsInitialized())
     {
         m_luaEngine = shared;
-        Log("[Lua] Bound to shared Lua engine (lua_State=" +
+        Log("[Script] Bound to shared engine (lua_State=" +
             std::to_string(reinterpret_cast<uintptr_t>(shared->GetState())) + ")",
             LogLevel::Verbose);
         return true;
@@ -2640,16 +2639,16 @@ bool BlueprintRunner::EnsureLuaEngine()
     m_luaEngine = std::make_shared<LuaScriptEngine>();
     if (!m_luaEngine->Initialize(this))
     {
-        m_lastError = "Failed to initialize Lua: " + m_luaEngine->GetLastError();
-        LogError("[Lua] " + m_lastError);
+        m_lastError = "Failed to initialize script engine: " + m_luaEngine->GetLastError();
+        LogError("[Script] " + m_lastError);
         m_luaEngine.reset();
         return false;
     }
-    Log("[Lua] Standalone engine initialized (default registry unavailable)", LogLevel::Verbose);
+    Log("[Script] Standalone engine initialized (default registry unavailable)", LogLevel::Verbose);
     return true;
 }
 
-void BlueprintRunner::TickLua(double deltaSeconds)
+void BlueprintRunner::TickScriptExtensions(double deltaSeconds)
 {
     if (m_luaEngine)
         m_luaEngine->Tick(deltaSeconds);

@@ -1,10 +1,9 @@
-// BlueprintEditor/LuaNodeRegistrar.cpp
-// 编辑器侧 Lua 扩展管理器实现
-// 所有 Lua 操作委托给绑定的 BlueprintRunner（Runtime 层统一管理 Lua VM）
-// 编辑器本身对 Lua 无感知：此文件不使用 BLUEPRINT_HAS_LUA，
-// 无 Lua 时 Runtime 接口均为空操作，行为退化为无事发生。
+// BlueprintEditor/ScriptExtensionManager.cpp
+// 编辑器侧的扩展脚本管理器实现。
+// 所有操作委托给绑定的 BlueprintRunner（Runtime 层统一管理脚本后端 VM）。
+// 编辑器对具体后端（Lua / JS / ...）无感知；运行时未启用后端时全部为空操作。
 
-#include "LuaNodeRegistrar.h"
+#include "ScriptExtensionManager.h"
 #include "../Runtime/BlueprintRunner.h"
 #include "BpLogger.h"
 #include <filesystem>
@@ -16,13 +15,13 @@ namespace fs = std::filesystem;
 // BindRunner
 // ============================================================================
 
-void LuaNodeRegistrar::BindRunner(NodeEditor::Runtime::BlueprintRunner* runner)
+void ScriptExtensionManager::BindRunner(NodeEditor::Runtime::BlueprintRunner* runner)
 {
     m_runner = runner;
 
     if (!runner) return;
 
-    // 将编辑器的日志回调注入 runner：Lua print/warn 输出到编辑器控制台
+    // 将编辑器的日志回调注入 runner：脚本 print/warn 输出到编辑器控制台
     if (m_logCallback)
     {
         runner->SetLogCallback([this](NodeEditor::Runtime::LogLevel level, const std::string& msg) {
@@ -37,7 +36,7 @@ void LuaNodeRegistrar::BindRunner(NodeEditor::Runtime::BlueprintRunner* runner)
 // SetLogCallback
 // ============================================================================
 
-void LuaNodeRegistrar::SetLogCallback(LogCallback cb)
+void ScriptExtensionManager::SetLogCallback(LogCallback cb)
 {
     m_logCallback = std::move(cb);
 
@@ -54,24 +53,24 @@ void LuaNodeRegistrar::SetLogCallback(LogCallback cb)
 }
 
 // ============================================================================
-// AddLuaPath
+// AddSearchPath
 // ============================================================================
 
-void LuaNodeRegistrar::AddLuaPath(const std::string& dir)
+void ScriptExtensionManager::AddSearchPath(const std::string& dir)
 {
-    if (m_runner) m_runner->AddLuaPath(dir);
+    if (m_runner) m_runner->AddScriptSearchPath(dir);
 }
 
 // ============================================================================
-// LoadEntrySilent — 加载全局 / 工程 BlueprintEntry.lua（不存在则静默跳过）
+// LoadEntrySilent — 加载全局/工程入口脚本（不存在则静默跳过）
 // ============================================================================
 
-bool LuaNodeRegistrar::LoadEntrySilent(const std::string& filePath, const std::string& /*chunkName*/)
+bool ScriptExtensionManager::LoadEntrySilent(const std::string& filePath, const std::string& /*chunkName*/)
 {
     if (!m_runner || filePath.empty()) return false;
     if (!fs::exists(filePath)) return false;
 
-    if (!m_runner->LoadLuaScript(filePath))
+    if (!m_runner->LoadExtensionScript(filePath))
     {
         m_lastError = m_runner->GetLastError();
         if (m_logCallback)
@@ -85,7 +84,7 @@ bool LuaNodeRegistrar::LoadEntrySilent(const std::string& filePath, const std::s
 // WatchEntryScript
 // ============================================================================
 
-void LuaNodeRegistrar::WatchEntryScript(const std::string& filePath, const std::string& chunkName)
+void ScriptExtensionManager::WatchEntryScript(const std::string& filePath, const std::string& chunkName)
 {
     if (filePath.empty()) return;
 
@@ -119,7 +118,7 @@ void LuaNodeRegistrar::WatchEntryScript(const std::string& filePath, const std::
 // LoadScript
 // ============================================================================
 
-bool LuaNodeRegistrar::LoadScript(const std::string& filePath)
+bool ScriptExtensionManager::LoadScript(const std::string& filePath)
 {
     if (!m_runner)
     {
@@ -127,7 +126,7 @@ bool LuaNodeRegistrar::LoadScript(const std::string& filePath)
         return false;
     }
 
-    if (!m_runner->LoadLuaScript(filePath))
+    if (!m_runner->LoadExtensionScript(filePath))
     {
         m_lastError = m_runner->GetLastError();
         return false;
@@ -151,17 +150,17 @@ bool LuaNodeRegistrar::LoadScript(const std::string& filePath)
 // ReloadAll
 // ============================================================================
 
-bool LuaNodeRegistrar::ReloadAll()
+bool ScriptExtensionManager::ReloadAll()
 {
     if (!m_runner || m_loadedFiles.empty()) return true;
 
-    if (!m_runner->ReloadLuaScript(m_loadedFiles[0]))
+    if (!m_runner->ReloadExtensionScript(m_loadedFiles[0]))
     {
         m_lastError = m_runner->GetLastError();
         return false;
     }
 
-    // ReloadLuaScript 内部重新加载所有 m_luaLoadedFiles（即 runner 侧的列表）
+    // ReloadExtensionScript 内部重新加载所有已加载脚本
     // 同步编辑器侧修改时间
     for (const auto& f : m_loadedFiles)
     {
@@ -179,7 +178,7 @@ bool LuaNodeRegistrar::ReloadAll()
 // ReloadFile
 // ============================================================================
 
-bool LuaNodeRegistrar::ReloadFile(const std::string& filePath)
+bool ScriptExtensionManager::ReloadFile(const std::string& filePath)
 {
     (void)filePath;  // TODO: 优化为精确单文件重载（当前实现为全量重载）
     return ReloadAll();
@@ -189,9 +188,9 @@ bool LuaNodeRegistrar::ReloadFile(const std::string& filePath)
 // UnregisterAll
 // ============================================================================
 
-void LuaNodeRegistrar::UnregisterAll()
+void ScriptExtensionManager::UnregisterAll()
 {
-    if (m_runner) m_runner->UnregisterAllLuaNodes();
+    if (m_runner) m_runner->UnregisterAllScriptedNodes();
     m_loadedFiles.clear();
     m_fileModTimes.clear();
 }
@@ -200,7 +199,7 @@ void LuaNodeRegistrar::UnregisterAll()
 // PollFileChanges
 // ============================================================================
 
-void LuaNodeRegistrar::PollFileChanges(float deltaTime)
+void ScriptExtensionManager::PollFileChanges(float deltaTime)
 {
     m_pollAccum += deltaTime;
     if (m_pollAccum < m_pollIntervalSec) return;
@@ -218,7 +217,7 @@ void LuaNodeRegistrar::PollFileChanges(float deltaTime)
                 if (it == m_fileModTimes.end() || it->second != tval)
                 {
                     if (m_logCallback)
-                        m_logCallback(0, "[Lua] Hot-reload: " + f);
+                        m_logCallback(0, "[Script] Hot-reload: " + f);
                     ReloadFile(f);
                     break;  // ReloadAll 已处理全部文件，退出循环
                 }
@@ -244,7 +243,7 @@ void LuaNodeRegistrar::PollFileChanges(float deltaTime)
 // Tick
 // ============================================================================
 
-void LuaNodeRegistrar::Tick(float deltaTime)
+void ScriptExtensionManager::Tick(float deltaTime)
 {
-    if (m_runner) m_runner->TickLua(static_cast<double>(deltaTime));
+    if (m_runner) m_runner->TickScriptExtensions(static_cast<double>(deltaTime));
 }

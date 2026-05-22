@@ -54,13 +54,13 @@ void BlueprintEditor::NewProject()
     BPLOG("Created new project: " + name);
     SetTitle(("Blueprint Editor - [" + name + "]").c_str());
 
-    // ── 新建工程后：watch 工程目录下的 BlueprintEntry.lua（静默）──────────
-    m_LuaNodeRegistrar.AddLuaPath(m_Project.projectDir);
-    m_LuaNodeRegistrar.WatchEntryScript(
+    // ── 新建工程后：watch 工程目录下的入口脚本（静默）──────────
+    m_scriptExtensions.AddSearchPath(m_Project.projectDir);
+    m_scriptExtensions.WatchEntryScript(
         m_Project.projectDir + "/BlueprintEntry.lua",
         m_Project.name + ":BlueprintEntry"
     );
-    SyncLuaDefsToRegistry();
+    SyncScriptedDefsToRegistry();
 }
 
 // ============================================================================
@@ -93,13 +93,13 @@ void BlueprintEditor::OpenProject()
     SetTitle(("Blueprint Editor - [" + m_Project.name + "]").c_str());
     BPLOG("Opened project: " + m_Project.name + " @ " + m_Project.filePath);
 
-    // ── 打开工程后：watch 工程目录下的 BlueprintEntry.lua（静默）──────────
-    m_LuaNodeRegistrar.AddLuaPath(m_Project.projectDir);
-    m_LuaNodeRegistrar.WatchEntryScript(
+    // ── 打开工程后：watch 工程目录下的入口脚本（静默）──────────
+    m_scriptExtensions.AddSearchPath(m_Project.projectDir);
+    m_scriptExtensions.WatchEntryScript(
         m_Project.projectDir + "/BlueprintEntry.lua",
         m_Project.name + ":BlueprintEntry"
     );
-    SyncLuaDefsToRegistry();
+    SyncScriptedDefsToRegistry();
 }
 
 // ============================================================================
@@ -145,8 +145,8 @@ void BlueprintEditor::CloseProject()
     if (!m_Project.IsOpen()) return;
     BPLOG("Closing project: " + m_Project.name);
 
-    // 清除 Lua 注册的节点定义（无 Lua 时 UnregisterAll 为空操作）
-    m_LuaNodeRegistrar.UnregisterAll();
+    // 清除扩展脚本注册的节点定义（无脚本后端时为空操作）
+    m_scriptExtensions.UnregisterAll();
 
     m_Project = BpProject{};
     SetTitle("Blueprint Editor - [No Project]");
@@ -381,24 +381,24 @@ void BlueprintEditor::SyncProjectLibrariesToRegistry()
         m_NodeRegistry.registerCategory(cat);
     }
 
-    // 加载 Lua 扩展脚本（无 Lua 时各接口为空操作）
-    m_LuaNodeRegistrar.UnregisterAll();
-    m_LuaNodeRegistrar.BindRunner(&m_luaRunner);
-    int luaTotal = 0;
-    for (const auto& relPath : m_Project.luaExtensions)
+    // 加载扩展脚本（无脚本后端时各接口为空操作）
+    m_scriptExtensions.UnregisterAll();
+    m_scriptExtensions.BindRunner(&m_extensionRunner);
+    int scriptTotal = 0;
+    for (const auto& relPath : m_Project.scriptExtensions)
     {
         std::string absPath = m_Project.AbsPath(relPath);
         if (absPath.empty() || !fs::exists(absPath)) continue;
-        bool ok = m_LuaNodeRegistrar.LoadScript(absPath);
+        bool ok = m_scriptExtensions.LoadScript(absPath);
         if (ok)
-            ++luaTotal;
+            ++scriptTotal;
         else
-            BPLOG("[Lua] Error loading " + relPath + ": " + m_LuaNodeRegistrar.GetLastError());
+            BPLOG("[Script] Error loading " + relPath + ": " + m_scriptExtensions.GetLastError());
     }
-    if (luaTotal > 0)
-        BPLOG("SyncProjectLibraries: registered Lua scripts: " + std::to_string(luaTotal));
-    // 同步 Lua 注册的节点定义到编辑器节点库
-    SyncLuaDefsToRegistry();
+    if (scriptTotal > 0)
+        BPLOG("SyncProjectLibraries: registered extension scripts: " + std::to_string(scriptTotal));
+    // 同步扩展脚本注册的节点定义到编辑器节点库
+    SyncScriptedDefsToRegistry();
 
     // 节点定义变更，强制重建缓存
     m_CachedDefCount = 0;
@@ -997,10 +997,12 @@ void BlueprintEditor::DrawProjectPanel()
     drawSection(m_Project.libraries,  "##sec_lib", "LIBRARIES",  ICON_FA_CUBE, RTBlueprintClass::FunctionLibrary);
 
 #ifdef BLUEPRINT_HAS_LUA
-    // ── Lua 脚本 Section（仅在支持 Lua 的构建中显示）────────────────────
+    // ── 扩展脚本 Section（仅在编译启用了脚本后端时显示）──────────────────
+    // 当前后端为 Lua，UI 中以 "Lua Script" 字面呈现给用户（用户增删的是 .lua 文件）；
+    // 编辑器代码层面只看到通用的 ScriptExtensionManager / scriptExtensions 抽象。
     {
-        ImGui::PushID("##sec_lua");
-        ImGuiID stateId = ImGui::GetID("##sec_lua");
+        ImGui::PushID("##sec_scripts");
+        ImGuiID stateId = ImGui::GetID("##sec_scripts");
         bool* pOpen = ImGui::GetStateStorage()->GetBoolRef(stateId, false);
 
         float secH   = lineH + 6.0f;
@@ -1015,11 +1017,11 @@ void BlueprintEditor::DrawProjectPanel()
         const char* arrow = *pOpen ? ICON_FA_CARET_DOWN : ICON_FA_CARET_RIGHT;
         char headerText[80];
         std::snprintf(headerText, sizeof(headerText), "%s  " ICON_FA_CODE_BRANCH "  LUA SCRIPTS  (%d)",
-                      arrow, (int)m_Project.luaExtensions.size());
+                      arrow, (int)m_Project.scriptExtensions.size());
         ImVec2 textPos(secMin.x + 6.0f, secMin.y + (secH - lineH) * 0.5f);
         dl->AddText(textPos, IM_COL32(200, 170, 100, 230), headerText);
 
-        // [+] 按钮（添加 Lua 脚本）
+        // [+] 按钮（添加脚本）
         float plusW = ImGui::CalcTextSize(ICON_FA_PLUS).x + 8.0f;
         float plusX = secMin.x + panelW - plusW - 4.0f;
         float plusY = secMin.y + (secH - lineH) * 0.5f;
@@ -1034,17 +1036,17 @@ void BlueprintEditor::DrawProjectPanel()
         {
             // 打开文件选择对话框，选择 .lua 文件加入工程
             std::string startDir = m_Project.projectDir.empty() ? "." : m_Project.projectDir;
-            std::string luaPath = OpenFileDialog("Lua Script (*.lua)\0*.lua\0All Files (*.*)\0*.*\0", "Add Lua Script");
-            if (!luaPath.empty())
+            std::string scriptPath = OpenFileDialog("Lua Script (*.lua)\0*.lua\0All Files (*.*)\0*.*\0", "Add Lua Script");
+            if (!scriptPath.empty())
             {
-                std::string relPath = m_Project.RelPath(luaPath);
+                std::string relPath = m_Project.RelPath(scriptPath);
                 // 去重
                 bool exists = false;
-                for (const auto& p : m_Project.luaExtensions)
+                for (const auto& p : m_Project.scriptExtensions)
                     if (p == relPath) { exists = true; break; }
                 if (!exists)
                 {
-                    m_Project.luaExtensions.push_back(relPath);
+                    m_Project.scriptExtensions.push_back(relPath);
                     SaveProject();
                     SyncProjectLibrariesToRegistry();
                 }
@@ -1072,7 +1074,7 @@ void BlueprintEditor::DrawProjectPanel()
         if (*pOpen)
         {
             // 热重载状态指示
-            const auto& lastErr = m_LuaNodeRegistrar.GetLastError();
+            const auto& lastErr = m_scriptExtensions.GetLastError();
             if (!lastErr.empty())
             {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.3f, 1.0f));
@@ -1081,21 +1083,21 @@ void BlueprintEditor::DrawProjectPanel()
             }
 
             // 自动热重载切换
-            bool autoReload = m_LuaNodeRegistrar.GetAutoReload();
-            if (ImGui::Checkbox("  Auto hot-reload##lua", &autoReload))
-                m_LuaNodeRegistrar.SetAutoReload(autoReload);
+            bool autoReload = m_scriptExtensions.GetAutoReload();
+            if (ImGui::Checkbox("  Auto hot-reload##scripts", &autoReload))
+                m_scriptExtensions.SetAutoReload(autoReload);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Reload Lua scripts automatically when files change");
 
             ImGui::SameLine();
-            if (ImGui::SmallButton(ICON_FA_ARROWS_ROTATE " Reload All##lua"))
+            if (ImGui::SmallButton(ICON_FA_ARROWS_ROTATE " Reload All##scripts"))
             {
-                bool ok = m_LuaNodeRegistrar.ReloadAll();
+                bool ok = m_scriptExtensions.ReloadAll();
                 m_CachedDefCount = 0;
                 if (ok)
-                    BPLOG("[Lua] Reloaded all scripts");
+                    BPLOG("[Script] Reloaded all scripts");
                 else
-                    BPLOG("[Lua] Reload failed: " + m_LuaNodeRegistrar.GetLastError());
+                    BPLOG("[Script] Reload failed: " + m_scriptExtensions.GetLastError());
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Force reload all Lua scripts now");
@@ -1103,10 +1105,10 @@ void BlueprintEditor::DrawProjectPanel()
             ImGui::Spacing();
 
             int removeIdx = -1;
-            for (int i = 0; i < (int)m_Project.luaExtensions.size(); ++i)
+            for (int i = 0; i < (int)m_Project.scriptExtensions.size(); ++i)
             {
                 ImGui::PushID(i);
-                const auto& relPath = m_Project.luaExtensions[i];
+                const auto& relPath = m_Project.scriptExtensions[i];
                 std::string fname = fs::path(relPath).filename().string();
 
                 float rowH   = lineH + 4.0f;
@@ -1117,7 +1119,7 @@ void BlueprintEditor::DrawProjectPanel()
                     dl->AddRectFilled(rowMin, ImVec2(rowMin.x + panelW, rowMin.y + rowH),
                                       IM_COL32(255, 255, 255, 12));
 
-                // Lua 文件图标（橙黄色）
+                // 脚本文件图标（橙黄色）
                 bool fileExists = fs::exists(m_Project.AbsPath(relPath));
                 ImU32 textCol = fileExists ? IM_COL32(220, 180, 60, 230) : IM_COL32(160, 60, 60, 200);
                 std::string rowText = std::string("    " ICON_FA_CODE_BRANCH "  ") + fname;
@@ -1134,15 +1136,15 @@ void BlueprintEditor::DrawProjectPanel()
 
                 // 右键：移除
                 if (rowHov && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-                    ImGui::OpenPopup("##luaEntryCtx");
-                if (ImGui::BeginPopup("##luaEntryCtx"))
+                    ImGui::OpenPopup("##scriptEntryCtx");
+                if (ImGui::BeginPopup("##scriptEntryCtx"))
                 {
                     if (ImGui::MenuItem(ICON_FA_XMARK " Remove from project"))
                         removeIdx = i;
                     if (ImGui::MenuItem(ICON_FA_ARROWS_ROTATE " Reload this script"))
                     {
                         std::string absPath = m_Project.AbsPath(relPath);
-                        m_LuaNodeRegistrar.ReloadFile(absPath);
+                        m_scriptExtensions.ReloadFile(absPath);
                         m_CachedDefCount = 0;
                     }
                     ImGui::EndPopup();
@@ -1155,9 +1157,9 @@ void BlueprintEditor::DrawProjectPanel()
 
             if (removeIdx >= 0)
             {
-                m_Project.luaExtensions.erase(m_Project.luaExtensions.begin() + removeIdx);
+                m_Project.scriptExtensions.erase(m_Project.scriptExtensions.begin() + removeIdx);
                 SaveProject();
-                m_LuaNodeRegistrar.UnregisterAll();
+                m_scriptExtensions.UnregisterAll();
                 SyncProjectLibrariesToRegistry();
             }
 

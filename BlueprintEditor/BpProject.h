@@ -22,7 +22,11 @@ struct BpProject
     int                         projVersion = 1;// .bproj 格式版本
     std::vector<BpProjectEntry> blueprints;     // Actor 蓝图列表（blueprintClass=0）
     std::vector<BpProjectEntry> libraries;      // Library 蓝图列表（blueprintClass=1）
-    std::vector<std::string>    luaExtensions;  // Lua 扩展脚本路径列表（相对路径）
+
+    // 扩展脚本路径列表（相对路径）。当前后端为 Lua（.lua 文件），
+    // 编辑器对此保持透明：只存路径，加载/执行交给 ScriptExtensionManager。
+    // 序列化字段名为 "scriptExtensions"；读取时为兼容旧工程也接受 "luaExtensions"。
+    std::vector<std::string>    scriptExtensions;
 
     // ── 运行时辅助（不序列化）──────────────────────────────────────────────
     std::string                 filePath;       // 当前已打开的工程文件绝对路径

@@ -73,13 +73,13 @@ bool SaveBpProject(const BpProject& proj, const std::string& filePath)
     }
     root["libraries"] = libArr;
 
-    // luaExtensions 数组（可选）
-    if (!proj.luaExtensions.empty())
+    // scriptExtensions 数组（可选）— 当前后端为 Lua 时即 .lua 文件相对路径
+    if (!proj.scriptExtensions.empty())
     {
-        value luaArr = array();
-        for (const auto& p : proj.luaExtensions)
-            luaArr.push_back(value(p));
-        root["luaExtensions"] = luaArr;
+        value scriptArr = array();
+        for (const auto& p : proj.scriptExtensions)
+            scriptArr.push_back(value(p));
+        root["scriptExtensions"] = scriptArr;
     }
 
     std::string json = root.dump();
@@ -163,16 +163,23 @@ bool LoadBpProject(BpProject& proj, const std::string& filePath)
     parseEntries("blueprints", proj.blueprints);
     parseEntries("libraries",  proj.libraries);
 
-    // luaExtensions（字符串数组，可选）
-    if (root.contains("luaExtensions") &&
-        root["luaExtensions"].type() == crude_json::type_t::array)
-    {
-        for (const auto& item : root["luaExtensions"].get<crude_json::array>())
+    // 扩展脚本路径数组（字符串数组，可选）
+    // 优先读新字段 "scriptExtensions"；为兼容旧工程也回退读取 "luaExtensions"。
+    auto readScriptArray = [&](const char* fieldName) {
+        if (root.contains(fieldName) &&
+            root[fieldName].type() == crude_json::type_t::array)
         {
-            if (item.type() == crude_json::type_t::string)
-                proj.luaExtensions.push_back(item.get<std::string>());
+            for (const auto& item : root[fieldName].get<crude_json::array>())
+            {
+                if (item.type() == crude_json::type_t::string)
+                    proj.scriptExtensions.push_back(item.get<std::string>());
+            }
         }
-    }
+    };
+    if (root.contains("scriptExtensions"))
+        readScriptArray("scriptExtensions");
+    else
+        readScriptArray("luaExtensions");  // 兼容旧版 .bproj
 
     // 记录文件路径和目录
     proj.filePath = fs::absolute(filePath).string();

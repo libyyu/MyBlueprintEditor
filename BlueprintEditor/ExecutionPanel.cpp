@@ -68,31 +68,31 @@ void BlueprintEditor::InitRunnerForDoc(BlueprintDocument* doc,
 
     ::NodeEditor::Runtime::RegisterBuiltinHandlers(doc->persistentRunner, bp, &m_HandlerRegistry);
 
-    // Lua 集成：让 persistentRunner 拥有独立 Lua VM，重新加载 m_luaRunner 已加载的全部脚本。
-    // 这样 Lua handler 内的 Blueprint.AcquireAsync/ReleaseAsync 打到 persistentRunner，
-    // HasPendingWork() 才能感知 Lua 层的异步活动，编辑器 Tick 循环持续驱动。
-    // 无 Lua 时 GetLuaLoadedFiles() 返回空集合，下面的循环为空操作。
+    // 扩展脚本集成：让 persistentRunner 拥有自己的脚本引擎绑定，重新加载已加载的全部扩展脚本。
+    // 这样脚本 handler 内的 Blueprint.AcquireAsync/ReleaseAsync 打到 persistentRunner，
+    // HasPendingWork() 才能感知脚本层的异步活动，编辑器 Tick 循环持续驱动。
+    // 无脚本后端时 GetLoadedExtensionScripts() 返回空集合，下面的循环为空操作。
     {
-        // 同步搜索路径（把 m_luaRunner 的脚本父目录加到 persistentRunner）
+        // 同步搜索路径（把扩展脚本的父目录加到 persistentRunner）
 #ifndef __EMSCRIPTEN__
         {
             namespace fs = std::filesystem;
-            for (const auto& f : m_luaRunner.GetLuaLoadedFiles())
+            for (const auto& f : m_extensionRunner.GetLoadedExtensionScripts())
             {
                 auto parent = fs::path(f).parent_path().string();
                 if (!parent.empty())
-                    doc->persistentRunner.AddLuaPath(parent);
+                    doc->persistentRunner.AddScriptSearchPath(parent);
             }
         }
 #endif
 
-        // 重新加载所有 Lua 脚本到 persistentRunner（__blueprint_runner 将指向 persistentRunner）
-        for (const auto& f : m_luaRunner.GetLuaLoadedFiles())
+        // 重新加载所有扩展脚本到 persistentRunner（脚本引擎会路由到 persistentRunner）
+        for (const auto& f : m_extensionRunner.GetLoadedExtensionScripts())
         {
-            if (!doc->persistentRunner.LoadLuaScript(f))
+            if (!doc->persistentRunner.LoadExtensionScript(f))
             {
                 capturedDoc->executionLog.push_back(
-                    "[WARN] Lua: " + f + " — " + doc->persistentRunner.GetLastError());
+                    "[WARN] Script: " + f + " — " + doc->persistentRunner.GetLastError());
                 capturedDoc->executionLogDirty = true;
             }
         }

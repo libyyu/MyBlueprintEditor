@@ -475,10 +475,9 @@ if(NOT BUILD_RUNTIME_ONLY)
 
     target_link_libraries(BlueprintEditor PRIVATE Application ImGuiColorTextEdit BlueprintRuntime)
 
-    # Phase 3: 若 Runtime 开启了 Lua，Editor 也需要链接 Lua 库（LuaNodeRegistrar.cpp 使用 lua.hpp）
-    # LuaNodeRegistrar.cpp 属于 BlueprintEditor，必须显式传递 BLUEPRINT_HAS_LUA 和 Lua include。
-    # BLUEPRINT_HAS_LUA 虽然在 BlueprintRuntime PUBLIC，但经过多层静态库传递不保证到达编译单元，
-    # 因此此处显式设置，确保 LuaNodeRegistrar.cpp 中的 #ifdef 生效。
+    # 若 Runtime 开启了 Lua 后端（BLUEPRINT_LUA=ON），Editor 通过 BLUEPRINT_HAS_LUA 决定是否
+    # 显示 "Lua Scripts" 工程面板。Editor 本身的 ScriptExtensionManager 不直接调用 Lua API，
+    # 所以不再需要 Lua include；保留 BLUEPRINT_HAS_LUA 仅用于条件编译 UI Section。
     if(BLUEPRINT_LUA)
         target_compile_definitions(BlueprintEditor PRIVATE BLUEPRINT_HAS_LUA)
         if(TARGET lua54)

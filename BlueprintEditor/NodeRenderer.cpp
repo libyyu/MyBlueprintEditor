@@ -71,7 +71,7 @@ void BlueprintEditor::DrawNodes(util::BlueprintNodeBuilder& builder)
                 continue;
 
             // ── 自动恢复：如果之前因 NodeDef 缺失标红，但现在注册表里有了 ──
-            // （支持依赖库延迟加载、热重载 Lua 脚本等场景）
+            // （支持依赖库延迟加载、扩展脚本热重载等场景）
             if (node.HasError && node.ErrorMessage.find("not found") != std::string::npos)
             {
                 auto* def = m_NodeRegistry.getNodeDefinition(node.DefinitionId);

@@ -1085,11 +1085,11 @@ void BlueprintEditor::OnStart()
         BpRuntime::BP_SetHttpClient(BpRuntime::CreateDefaultHttpClient());
     }
 
-    // 初始化 Lua 节点注册器：绑定编辑器级 Lua Runner（Runtime 统一管理 Lua VM）
-    m_LuaNodeRegistrar.BindRunner(&m_luaRunner);
+    // 初始化扩展脚本管理器：绑定编辑器级扩展 Runner（Runtime 统一管理脚本引擎）
+    m_scriptExtensions.BindRunner(&m_extensionRunner);
 
-    // 注入日志回调：Lua print/warn 输出到活跃文档的 executionLog（编辑器控制台）
-    m_LuaNodeRegistrar.SetLogCallback([this](int level, const std::string& msg) {
+    // 注入日志回调：脚本 print/warn 输出到活跃文档的 executionLog（编辑器控制台）
+    m_scriptExtensions.SetLogCallback([this](int level, const std::string& msg) {
         // 同时写 BpLogger 文件日志
         if (level == 0)      BpLogger::Get().Info(msg);
         else if (level == 1) BpLogger::Get().Warn(msg);
@@ -1104,7 +1104,7 @@ void BlueprintEditor::OnStart()
         }
     });
 
-    // ── Lua 搜索路径：追加 exe 所在目录 + 静默加载全局 BlueprintEntry ──────
+    // ── 扩展脚本搜索路径：追加 exe 所在目录 + 静默加载全局 BlueprintEntry ──
     {
 #ifndef __EMSCRIPTEN__
         namespace fs = std::filesystem;
@@ -1119,18 +1119,18 @@ void BlueprintEditor::OnStart()
         {
             std::string dataDir = ROOT_DIR;
             dataDir += "/data";
-            m_LuaNodeRegistrar.AddLuaPath(dataDir);
+            m_scriptExtensions.AddSearchPath(dataDir);
 
 			// 工程跟目录/data
 			std::string globalEntry = dataDir + "/BlueprintEntry.lua";
-            bLoaded = m_LuaNodeRegistrar.LoadEntrySilent(globalEntry, "global:BlueprintEntry");
+            bLoaded = m_scriptExtensions.LoadEntrySilent(globalEntry, "global:BlueprintEntry");
             if (bLoaded)
 			{
-				BPLOG("Lua global path: " + dataDir);
+				BPLOG("Script global path: " + dataDir);
 			}
         }
 #endif
-        m_LuaNodeRegistrar.AddLuaPath(exeDir);
+        m_scriptExtensions.AddSearchPath(exeDir);
 
         // exe 目录下的全局入口脚本（不存在则静默跳过，不 watch——全局不会动态出现）
         if(!bLoaded)
@@ -1154,20 +1154,20 @@ void BlueprintEditor::OnStart()
             {
                 if (fs::exists(cand))
                 {
-                    m_LuaNodeRegistrar.AddLuaPath(fs::path(cand).parent_path().string());
-                    bLoaded = m_LuaNodeRegistrar.LoadEntrySilent(cand, "global:BlueprintEntry");
+                    m_scriptExtensions.AddSearchPath(fs::path(cand).parent_path().string());
+                    bLoaded = m_scriptExtensions.LoadEntrySilent(cand, "global:BlueprintEntry");
                     if (bLoaded)
                     {
-                        BPLOG("Lua global path: " + fs::path(cand).parent_path().string());
+                        BPLOG("Script global path: " + fs::path(cand).parent_path().string());
                         break;
                     }
                 }
             }
         }
 
-        // 将 Lua 注册的节点定义同步到编辑器节点库（全局入口脚本加载后）
+        // 将扩展脚本注册的节点定义同步到编辑器节点库（全局入口脚本加载后）
         if (bLoaded)
-            SyncLuaDefsToRegistry();
+            SyncScriptedDefsToRegistry();
 #endif
     }
 

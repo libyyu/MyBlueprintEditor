@@ -134,7 +134,7 @@ struct RunnerWrapper
         {
             if (fs::exists(path))
             {
-                runner.LoadLuaScript(path);
+                runner.LoadExtensionScript(path);
                 break;
             }
         }
@@ -189,8 +189,8 @@ BLUEPRINT_CAPI_EXPORT BP_Runner BLUEPRINT_CAPI_CALL BP_CreateRunner(void)
     // 注册内置节点处理器
     RegisterBuiltinHandlers(w->runner);
 #ifdef BLUEPRINT_HAS_LUA
-    // 立即初始化 Lua VM，不依赖脚本文件存在；脚本文件仍为懒加载
-    w->runner.EnsureLuaEngine();
+    // 立即初始化扩展脚本引擎，不依赖脚本文件存在；脚本文件仍为懒加载
+    w->runner.EnsureScriptEngine();
 #endif
     return static_cast<BP_Runner>(w);
 }
@@ -267,7 +267,8 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetBasePath(BP_Runner runner, 
     w->refreshHandlers();
 }
 
-/// Manually load a Lua script file into the runner's Lua engine.
+/// Manually load an extension script file into the runner's script engine.
+/// (Currently Lua-backed; the Editor / public API is engine-agnostic.)
 /// The engine is created lazily on first call.
 /// Silently succeeds (returns 0) if BLUEPRINT_HAS_LUA is not defined.
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadLuaScript(BP_Runner runner, const char* filePath)
@@ -275,7 +276,7 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadLuaScript(BP_Runner runner,
     if (!runner || !filePath) return 1;
 #ifdef BLUEPRINT_HAS_LUA
     auto* w = asWrapper(runner);
-    if (!w->runner.LoadLuaScript(std::string(filePath)))
+    if (!w->runner.LoadExtensionScript(std::string(filePath)))
     {
         w->lastError = w->runner.GetLastError();
         return 1;

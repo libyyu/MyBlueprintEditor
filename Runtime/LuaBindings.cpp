@@ -668,8 +668,8 @@ static int l_registerHandler(lua_State* L)
 
     // 包装并注册（传入 defId 用于错误信息上下文）
     runner->RegisterHandler(defId, wrapLuaHandler(L, funcRef, defId));
-    // 标记为 Lua 注册的 handler，确保编辑器执行时能同步到 persistentRunner
-    runner->MarkLuaRegisteredNode(defId);
+    // 标记为脚本注册的 handler，确保编辑器执行时能同步到 persistentRunner
+    runner->MarkScriptRegisteredNode(defId);
     return 0;
 }
 
@@ -816,7 +816,7 @@ static int l_registerNodeDef(lua_State* L)
         runner->LogWarning(std::string("[Lua] Overriding existing node def '") + def.id + "'");
 
     runner->RegisterNodeDef(def);
-    runner->MarkLuaRegisteredNode(def.id);  // 标记为 Lua 注册节点，用于热重载清理
+    runner->MarkScriptRegisteredNode(def.id);  // 标记为脚本注册节点，用于热重载清理
     return 0;
 }
 

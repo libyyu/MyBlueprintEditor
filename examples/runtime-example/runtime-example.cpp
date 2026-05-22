@@ -380,7 +380,7 @@ static int executeSingle(const RunOptions& opt)
 
         if (!luaToLoad.empty())
         {
-            if (!runner.LoadLuaScript(luaToLoad))
+            if (!runner.LoadExtensionScript(luaToLoad))
             {
                 std::cerr << "ERROR loading Lua: " << luaToLoad << "\n";
                 if (!opt.luaScript.empty()) return 1;  // 显式指定时才致命
@@ -678,8 +678,8 @@ static int runRepl()
             // rest of line is Lua code
             std::string code;
             for (size_t i = 1; i < toks.size(); ++i) { if (i>1) code+=' '; code+=toks[i]; }
-            if (!runner->LoadLuaString(code, "=repl"))
-                std::cerr << "Lua error\n";
+            if (!runner->LoadExtensionScriptString(code, "=repl"))
+                std::cerr << "Script error\n";
         }
 #endif
 

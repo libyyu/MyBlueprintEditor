@@ -549,54 +549,90 @@ public:
     const std::string& GetLastError() const { return m_lastError; }
 
     // ------------------------------------------------------------------
-    // Lua 脚本扩展（需要 BLUEPRINT_HAS_LUA 编译选项）
+    // 脚本扩展（Lua / 未来可扩展为其他脚本语言；编辑器对此保持透明）
+    //
+    // 公开 API 命名以 "ExtensionScript" / "Scripted" / "ScriptEngine" 为主，
+    // 编辑器/上层只面对 "扩展脚本" 抽象，不感知具体后端是 Lua。
+    // 仅当 BLUEPRINT_HAS_LUA 启用时这些方法才有实际效果。
     // ------------------------------------------------------------------
 #ifdef BLUEPRINT_HAS_LUA
 
-    // 加载 Lua 脚本文件并执行
+    // 加载扩展脚本文件并执行
     // 脚本中调用 Blueprint.RegisterHandler() 会自动注册 handler 到全局 SharedRegistry，
-    // 同时将脚本注册的节点 ID 记入 LuaScriptEngine（per lua_State，可通过
-    // GetLuaRegisteredNodeIds 查询）
-    bool LoadLuaScript(const std::string& filePath);
+    // 同时将脚本注册的节点 ID 记入 LuaScriptEngine（per VM，可通过
+    // GetScriptRegisteredNodeIds 查询）
+    bool LoadExtensionScript(const std::string& filePath);
 
-    // 加载 Lua 代码字符串并执行
-    bool LoadLuaString(const std::string& code, const std::string& name = "=string");
+    // 加载扩展脚本字符串并执行
+    bool LoadExtensionScriptString(const std::string& code, const std::string& name = "=string");
 
-    // 热重载指定 Lua 文件：先注销该文件注册的节点定义和 handler，再重新加载
+    // 热重载指定扩展脚本：先注销脚本注册的节点定义和 handler，再重新加载
     // 返回 true=成功，false=加载出错（GetLastError() 可查详情）
-    bool ReloadLuaScript(const std::string& filePath);
+    bool ReloadExtensionScript(const std::string& filePath);
 
-    // 注销所有由 Lua 脚本注册的节点定义和 handler（热重载全量重置时使用）
-    // 转发到 m_luaEngine->UnregisterAllScriptedNodes()。
-    void UnregisterAllLuaNodes();
+    // 注销所有由扩展脚本注册的节点定义和 handler（热重载全量重置时使用）
+    void UnregisterAllScriptedNodes();
 
-    // 向 Lua VM 的 package.path 追加搜索目录（dir/?.lua; dir/?/init.lua）
-    void AddLuaPath(const std::string& dir);
+    // 向脚本引擎追加搜索路径（如 Lua 后端：dir/?.lua; dir/?/init.lua）
+    void AddScriptSearchPath(const std::string& dir);
 
-    // 获取所有由 Lua 脚本注册的节点 ID 集合（编辑器用于同步节点库）。
-    // 返回的引用绑定到 LuaScriptEngine（per lua_State）；引擎未初始化时返回空集合。
-    const std::unordered_set<std::string>& GetLuaRegisteredNodeIds() const;
+    // 获取所有由扩展脚本注册的节点 ID 集合（编辑器用于同步节点库）。
+    // 引擎未初始化时返回空集合。
+    const std::unordered_set<std::string>& GetScriptRegisteredNodeIds() const;
 
-    // 获取已加载的 Lua 文件列表（按加载顺序，编辑器用于在 persistentRunner 重新加载）。
+    // 获取已加载的扩展脚本文件列表（按加载顺序，编辑器用于在 persistentRunner 重新加载）。
     // 引擎未初始化时返回空 vector。
-    const std::vector<std::string>& GetLuaLoadedFiles() const;
+    const std::vector<std::string>& GetLoadedExtensionScripts() const;
 
-    // 内部：由 LuaBindings 回调，记录某节点 ID 是 Lua 注册的（勿手动调用）。
-    // 转发到当前绑定的 LuaScriptEngine（per lua_State）。
-    void MarkLuaRegisteredNode(const std::string& id);
-    void UnmarkLuaRegisteredNode(const std::string& id);
+    // 内部：由脚本绑定层回调，记录某节点 ID 是脚本注册的（勿手动调用）
+    void MarkScriptRegisteredNode(const std::string& id);
+    void UnmarkScriptRegisteredNode(const std::string& id);
 
-    // 获取 Lua 引擎实例（高级用途：注册自定义 C 函数等）
-    LuaScriptEngine* GetLuaEngine();
-    /// 确保 Lua VM 已初始化（首次调用时创建或绑定到默认共享引擎）。
+    /// 确保扩展脚本引擎已初始化（首次调用时创建或绑定到默认共享引擎）。
     /// 返回 false 表示初始化失败。
-    bool EnsureLuaEngine();
+    bool EnsureScriptEngine();
+
+    // 心跳 Tick：驱动扩展脚本的全局 OnGlobalTick(dt) 函数（若存在）。
+    // 建议在游戏循环 / Editor 定时器里每帧或固定间隔调用。
+    // deltaSeconds：距上次调用的秒数。
+    void TickScriptExtensions(double deltaSeconds);
+
+    // ----------------------------------------------------------------------
+    // 旧名保留：[[deprecated]] 别名，逐步淘汰（CAPI / 第三方代码兼容）
+    // 新代码请使用上面 ExtensionScript / Scripted / ScriptEngine 命名版本。
+    // ----------------------------------------------------------------------
+    [[deprecated("use LoadExtensionScript")]]
+    bool LoadLuaScript(const std::string& filePath) { return LoadExtensionScript(filePath); }
+    [[deprecated("use LoadExtensionScriptString")]]
+    bool LoadLuaString(const std::string& code, const std::string& name = "=string") { return LoadExtensionScriptString(code, name); }
+    [[deprecated("use ReloadExtensionScript")]]
+    bool ReloadLuaScript(const std::string& filePath) { return ReloadExtensionScript(filePath); }
+    [[deprecated("use UnregisterAllScriptedNodes")]]
+    void UnregisterAllLuaNodes() { UnregisterAllScriptedNodes(); }
+    [[deprecated("use AddScriptSearchPath")]]
+    void AddLuaPath(const std::string& dir) { AddScriptSearchPath(dir); }
+    [[deprecated("use GetScriptRegisteredNodeIds")]]
+    const std::unordered_set<std::string>& GetLuaRegisteredNodeIds() const { return GetScriptRegisteredNodeIds(); }
+    [[deprecated("use GetLoadedExtensionScripts")]]
+    const std::vector<std::string>& GetLuaLoadedFiles() const { return GetLoadedExtensionScripts(); }
+    [[deprecated("use MarkScriptRegisteredNode")]]
+    void MarkLuaRegisteredNode(const std::string& id) { MarkScriptRegisteredNode(id); }
+    [[deprecated("use UnmarkScriptRegisteredNode")]]
+    void UnmarkLuaRegisteredNode(const std::string& id) { UnmarkScriptRegisteredNode(id); }
+    [[deprecated("use EnsureScriptEngine")]]
+    bool EnsureLuaEngine() { return EnsureScriptEngine(); }
+    [[deprecated("use TickScriptExtensions")]]
+    void TickLua(double deltaSeconds) { TickScriptExtensions(deltaSeconds); }
+
+    // 获取底层 Lua 引擎实例（高级用途：注册自定义 C 函数 / 接入外部 xLua 等）
+    // 这是少数明确暴露 Lua 后端的 API，仅供 host 集成时使用，编辑器不应调用。
+    LuaScriptEngine* GetLuaEngine();
 
 #ifdef BLUEPRINT_HAS_LUA
     // ----------------------------------------------------------------------
-    // Lua 引擎共享 / 注入
+    // 脚本引擎共享 / 注入（Lua 后端 — host 集成时使用）
     // ----------------------------------------------------------------------
-    // 默认行为：所有 BlueprintRunner 自动共享 BlueprintRuntime::GetDefaultLuaEngine()
+    // 默认行为：所有 BlueprintRunner 自动共享 LuaScriptEngineRegistry::GetDefault()
     // 返回的引擎，避免每个 Runner 各创一个 lua_State 的浪费。
     //
     // 高级用途（双 VM / 隔离 / 外部 xLua 注入）：
@@ -604,21 +640,16 @@ public:
     //   2. Initialize() 或 InitializeWithExternalState(L)
     //   3. SetSharedLuaEngine(myEngine) 显式绑定
     //
-    // 必须在 LoadLuaScript / RegisterHandler / EnsureLuaEngine 之前调用，
+    // 必须在 LoadExtensionScript / RegisterHandler / EnsureScriptEngine 之前调用，
     // 否则 Runner 已经懒加载了默认引擎，再换会失败。
 
-    /// 注入共享 Lua 引擎（必须在首次使用 Lua 之前调用）
+    /// 注入共享 Lua 引擎（必须在首次使用脚本引擎之前调用）
     /// 返回 false 表示 Runner 已经持有引擎（尚未实现热替换）
     bool SetSharedLuaEngine(std::shared_ptr<LuaScriptEngine> engine);
 
-    /// 获取持有的共享 Lua 引擎（可能为空 —— 尚未首次访问 Lua）
+    /// 获取持有的共享 Lua 引擎（可能为空 —— 尚未首次访问）
     std::shared_ptr<LuaScriptEngine> GetSharedLuaEngine() const { return m_luaEngine; }
 #endif
-
-    // 心跳 Tick：驱动 Lua 脚本的 onTick(deltaSeconds) 全局函数（若存在）。
-    // 建议在游戏循环 / Editor 定时器里每帧或固定间隔调用。
-    // deltaSeconds：距上次调用的秒数。
-    void TickLua(double deltaSeconds);
 
 #endif // BLUEPRINT_HAS_LUA
 

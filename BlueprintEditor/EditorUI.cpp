@@ -341,21 +341,21 @@ void BlueprintEditor::ShowLeftPane(float /*paneWidth*/)
 
 void BlueprintEditor::OnFrame(float deltaTime)
 {
-    // Lua 热重载轮询（内部按 m_pollIntervalSec 节流；无 Lua 时为空操作）
-    if (m_LuaNodeRegistrar.IsInitialized() && m_LuaNodeRegistrar.GetAutoReload())
+    // 扩展脚本热重载轮询（内部按 m_pollIntervalSec 节流；无脚本后端时为空操作）
+    if (m_scriptExtensions.IsInitialized() && m_scriptExtensions.GetAutoReload())
     {
-        size_t countBefore = m_luaRunner.GetLuaRegisteredNodeIds().size();
-        m_LuaNodeRegistrar.PollFileChanges(deltaTime);
-        size_t countAfter = m_luaRunner.GetLuaRegisteredNodeIds().size();
+        size_t countBefore = m_extensionRunner.GetScriptRegisteredNodeIds().size();
+        m_scriptExtensions.PollFileChanges(deltaTime);
+        size_t countAfter = m_extensionRunner.GetScriptRegisteredNodeIds().size();
         if (countAfter != countBefore)
-            SyncLuaDefsToRegistry();
+            SyncScriptedDefsToRegistry();
         size_t newCount = m_NodeRegistry.getAllNodeDefinitions().size();
         if (newCount != m_CachedDefCount)
             m_CachedDefCount = 0;
     }
-    // 驱动 Lua 全局 OnGlobalTick(dt)（无 Lua 时 Tick 为空操作）
-    if (m_LuaNodeRegistrar.IsInitialized())
-        m_LuaNodeRegistrar.Tick(deltaTime);
+    // 驱动扩展脚本的 OnGlobalTick(dt)（无脚本后端时 Tick 为空操作）
+    if (m_scriptExtensions.IsInitialized())
+        m_scriptExtensions.Tick(deltaTime);
 
     // 驱动所有文档的计时器
     for (auto& doc : m_Documents)

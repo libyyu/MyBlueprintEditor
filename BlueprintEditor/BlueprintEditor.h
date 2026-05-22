@@ -22,7 +22,7 @@
 #include "EventBus.h"
 #include "BpProject.h"
 #include "BpLogger.h"
-#include "LuaNodeRegistrar.h"
+#include "ScriptExtensionManager.h"
 #include "TextEditor.h"
 
 #include <string>
@@ -621,9 +621,9 @@ struct BlueprintEditor : public Application
     void RegisterBuiltinNodeDefinitions();
     void RegisterBuiltinHandlers();
 
-    // 将 m_luaRunner 中 Lua 注册的节点定义同步到 m_NodeRegistry（供编辑器节点库可见）
-    // 每次 Lua 脚本加载/重载后调用
-    void SyncLuaDefsToRegistry();
+    // 将脚本扩展注册的节点定义同步到 m_NodeRegistry（供编辑器节点库可见）
+    // 每次扩展脚本加载/重载后调用
+    void SyncScriptedDefsToRegistry();
 
     // ------------------------------------------------------------------
     // 右键菜单
@@ -736,12 +736,12 @@ struct BlueprintEditor : public Application
     RTNodeRegistry                                          m_NodeRegistry;
     std::unordered_map<std::string, RTNodeHandler>          m_HandlerRegistry;
 
-    // 编辑器级专用 Lua Runner：管理 Lua VM 生命周期（不加载蓝图，仅用于 Lua 脚本注册）
-    // Lua 脚本注册的节点定义/handler 存在此 runner，执行文档时自动同步到 persistentRunner
-    RTBlueprintRunner                                       m_luaRunner;
+    // 编辑器级专用扩展脚本 Runner：管理脚本引擎生命周期（不加载蓝图，仅承载脚本注册）
+    // 脚本注册的节点定义/handler 存在此 runner，执行文档时自动同步到 persistentRunner
+    RTBlueprintRunner                                       m_extensionRunner;
 
-    // Lua 节点注册器（薄包装，委托给 m_luaRunner）
-    LuaNodeRegistrar                                        m_LuaNodeRegistrar;
+    // 扩展脚本管理器（薄包装，委托给 m_extensionRunner）
+    ScriptExtensionManager                                  m_scriptExtensions;
 
     // Default handler
     RTNodeHandler m_DefaultHandler;

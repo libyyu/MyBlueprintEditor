@@ -26,7 +26,7 @@ BLUEPRINT_API void RegisterLuaJsonHttpLibs(lua_State* L);
 // 找当前 Runner。共享场景下这个字段必须由各 Runner 在做 Lua 操作前更新为自己。
 //
 // RegisterLuaBindings 也会写入此字段（首次初始化），但之后不会自动维护。
-// BlueprintRunner 内部在 LoadLuaScript / Execute 等入口前调 BindRunnerToLuaState。
+// BlueprintRunner 内部在 LoadExtensionScript / Execute 等入口前调 BindRunnerToLuaState。
 
 BLUEPRINT_API void BindRunnerToLuaState(lua_State* L, BlueprintRunner* runner);
 

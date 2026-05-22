@@ -12,13 +12,13 @@ void BlueprintEditor::RegisterBuiltinNodeDefinitions()
     ::NodeEditor::Runtime::RegisterBuiltinNodeDefinitions(m_NodeRegistry);
 }
 
-void BlueprintEditor::SyncLuaDefsToRegistry()
+void BlueprintEditor::SyncScriptedDefsToRegistry()
 {
-    // 将 m_luaRunner 中 Lua 注册的节点定义同步到编辑器节点库
-    // 无 Lua 时 GetLuaRegisteredNodeIds() 返回空集合，无副作用
-    for (const auto& id : m_luaRunner.GetLuaRegisteredNodeIds())
+    // 将扩展脚本（如 Lua 后端）注册的节点定义同步到编辑器节点库
+    // 无脚本后端时 GetScriptRegisteredNodeIds() 返回空集合，无副作用
+    for (const auto& id : m_extensionRunner.GetScriptRegisteredNodeIds())
     {
-        const auto* def = m_luaRunner.GetNodeDef(id);
+        const auto* def = m_extensionRunner.GetNodeDef(id);
         if (def)
             m_NodeRegistry.registerNode(*def);
     }
