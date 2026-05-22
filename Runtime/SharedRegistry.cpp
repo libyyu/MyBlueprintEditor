@@ -18,14 +18,12 @@ HandlerRegistry& HandlerRegistry::Instance()
 // 进程退出时 registry 可能先于 LuaScriptEngine 析构。
 // 析构后把 s_dead 置 true，Unregister 检查后直接跳过，避免 use-after-free。
 static bool s_handlerRegistryDead = false;
-
 struct HandlerRegistryDeadFlag {
     ~HandlerRegistryDeadFlag() { s_handlerRegistryDead = true; }
 };
 static HandlerRegistryDeadFlag s_handlerRegistryDeadFlag;
 
 bool HandlerRegistry::IsAlive() { return !s_handlerRegistryDead; }
-}
 
 void HandlerRegistry::Register(const std::string& defId, NodeHandler handler)
 {
