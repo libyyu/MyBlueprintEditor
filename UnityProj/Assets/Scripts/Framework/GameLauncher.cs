@@ -1,10 +1,13 @@
-// GameLauncherNew.cs
-// 游戏启动总入口（双 LuaVM 架构）
+// GameLauncher.cs
+// 游戏启动总入口（xLua 主 VM 架构）
 //
-//   Phase 1：YooAssetInitializerNew.LaunchInitUpdateStage()  — 本地资源库初始化
-//   Phase 2：LuaManagerNew.RunUpdateLuaVM("UpdateLogic")     — 临时 VM 跑更新逻辑
-//                                                            （Lua 内部读内置资源 + 检查更新）
-//   Phase 3：LuaManagerNew.RunGameLuaVM("GameLogic")         — 正式 VM 跑游戏逻辑
+//   Phase 1：YooAssetInitializer.LaunchInitUpdateStage()  — 本地资源库初始化
+//   Phase 2：LuaManager.PreloadAllScript()               — 预加载所有 Lua 文件
+//   Phase 3：LuaManager.RunUpdateLuaVM("UpdateLogic")    — 临时 VM 跑更新逻辑
+//   Phase 4：LuaManager.RunGameLuaVM("GameLogic")        — xLua 自建主 VM
+//              内部：new LuaEnv() → rawL 注入 BlueprintRunner → require 'GameLogic'
+//
+// VM 主从关系：xLua 是主，BlueprintRuntime 共享 xLua 的 lua_State（不拥有）。
 
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -19,13 +22,13 @@ namespace CutRope.Framework
     public class GameLauncher : MonoBehaviour
     {
         [Header("配置")]
-        public string packageName     = "DefaultPackage";
+        public string packageName    = "DefaultPackage";
 
         [Tooltip("更新阶段 Lua 入口（require 路径，无 .lua 后缀）")]
-        public string updateLuaEntry  = "UpdateLogic";
+        public string updateLuaEntry = "UpdateLogic";
 
         [Tooltip("游戏阶段 Lua 入口（require 路径，无 .lua 后缀）")]
-        public string gameLuaEntry    = "GameLogic";
+        public string gameLuaEntry   = "GameLogic";
 
         // ── 私有引用 ─────────────────────────────────────────────────
         private YooAssetInitializer _yooInit;
@@ -47,6 +50,7 @@ namespace CutRope.Framework
                 return;
             }
 
+            // ── Phase 2：预加载 Lua 文件 ──────────────────────────────
             Debug.Log("[GameLauncher] === Phase 2: preload lua ===");
             if (!await _lua.PreloadAllScript(packageName))
             {
@@ -54,7 +58,7 @@ namespace CutRope.Framework
                 return;
             }
 
-            // ── Phase 3：UpdateLogic.lua 启动（Lua 内部检查更新+下载）
+            // ── Phase 3：UpdateLogic.lua 启动（检查更新）─────────────
             Debug.Log("[GameLauncher] === Phase 3: UpdateLogic VM ===");
             if (!await _lua.RunUpdateLuaVM(updateLuaEntry))
             {
@@ -62,17 +66,21 @@ namespace CutRope.Framework
                 return;
             }
 
-            var bpRuntime = BlueprintRunner.Instance
-                         ?? gameObject.AddComponent<BlueprintRunner>();
-            bpRuntime.Init();
+            // BR 实例确保存在（Awake 里可能已创建）
+            if (BlueprintRunner.Instance == null)
+                gameObject.AddComponent<BlueprintRunner>();
 
-            // AudioManager（DontDestroyOnLoad，全局音频管理）
+            // AudioManager
             if (AudioManager.Instance == null)
                 gameObject.AddComponent<AudioManager>();
 
-            // ── Phase 4：GameLogic.lua 启动（游戏正式开始）─────────
-            Debug.Log("[GameLauncher] === Phase 4: GameLogic VM ===");
-            if (!await _lua.RunGameLuaVM(bpRuntime.LuaState, gameLuaEntry))
+            // ── Phase 4：GameLogic.lua 启动（xLua 为主 VM）───────────
+            // 内部顺序：
+            //   1. xLua new LuaEnv()（自建 lua_State，xLua 拥有生命周期）
+            //   2. rawL 注入 BlueprintRunner.InitWithExternalLuaState()
+            //   3. require 'GameLogic'（此时 Blueprint.* 全局表已就绪）
+            Debug.Log("[GameLauncher] === Phase 4: GameLogic VM (xLua master) ===");
+            if (!await _lua.RunGameLuaVM(gameLuaEntry))
             {
                 Debug.LogError("[GameLauncher] Phase 4 failed, abort.");
                 return;

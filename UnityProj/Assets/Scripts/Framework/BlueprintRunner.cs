@@ -46,10 +46,59 @@ namespace CutRope.Framework
         // ── 公开 API ──────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// 初始化 Blueprint Runtime。
-        /// BP_CreateRunner 内部会自动初始化 Lua VM。
-        /// 完成后 C# 侧通过 LuaState 取得 lua_State*，
-        /// 传给 new LuaEnv(externalL) 共用同一个 VM。
+        /// xLua 为主 VM 时的初始化入口：
+        /// BR 先 new BPRunner()，再通过 BP_SetExternalLuaState 把 xLua 的 lua_State 注入进来。
+        /// BR 不拥有 VM 生命周期（由 xLua 的 LuaEnv 负责 close）。
+        /// </summary>
+        public bool InitWithExternalLuaState(IntPtr externalL)
+        {
+            try
+            {
+                string dumpDir = System.IO.Path.Combine(
+                    UnityEngine.Application.persistentDataPath, "CrashDumps");
+                BPRunner.SetCrashDumpDir(dumpDir);
+
+                if (_runner == null)
+                    _runner = new BPRunner();
+
+                _runner.OnPrint += (lv, msg) =>
+                {
+                    switch (lv)
+                    {
+                        case BPLogLevel.Warning: Debug.LogWarning($"[BR] {msg}"); break;
+                        case BPLogLevel.Error:   Debug.LogError($"[BR] {msg}");   break;
+                        default:                 Debug.Log($"[BR] {msg}");         break;
+                    }
+                };
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                _runner.EnableLogging(true);
+                _runner.OnLog += (lv, msg) =>
+                {
+                    switch (lv)
+                    {
+                        case BPLogLevel.Warning: Debug.LogWarning($"[BR:dbg] {msg}"); break;
+                        case BPLogLevel.Error:   Debug.LogError($"[BR:dbg] {msg}");   break;
+                        default:                 Debug.Log($"[BR:dbg] {msg}");         break;
+                    }
+                };
+#endif
+                // 将 xLua 的 lua_State 注入给 BlueprintRuntime
+                // BR 不拥有此 VM，不会在 Dispose 时 lua_close
+                _runner.SetExternalLuaState(externalL);
+                _luaState = externalL;
+
+                Debug.Log($"[BlueprintRunner] Bound to xLua VM. lua_State=0x{externalL.ToInt64():X}");
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[BlueprintRunner] InitWithExternalLuaState failed: {e.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// BR 为主 VM 时的初始化入口（已有逻辑，保留兼容）。
         /// </summary>
         public bool Init()
         {

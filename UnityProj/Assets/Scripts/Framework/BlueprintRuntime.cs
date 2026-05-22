@@ -719,6 +719,17 @@ namespace BlueprintRuntime
             return Native.BP_GetLuaState(_handle);
         }
 
+        /// <summary>
+        /// 将外部 lua_State（如 xLua 的 VM）注入给 BlueprintRuntime。
+        /// 注入后 BR 共享该 VM，不拥有生命周期（不会 lua_close）。
+        /// 必须在任何 LoadLuaScript / Execute 之前调用。
+        /// </summary>
+        public void SetExternalLuaState(IntPtr L)
+        {
+            ThrowIfDisposed();
+            Native.BP_SetExternalLuaState(_handle, L);
+        }
+
         // ---------------------------------------------------------------------
         // Execution
         // ---------------------------------------------------------------------

@@ -140,13 +140,26 @@ namespace CutRope.Framework
         /// 起正式游戏 LuaVM 跑入口脚本（如 main.lua）。
         /// VM 持续存活直到 GameObject 销毁，Update() 会调用 _G.onAppTick。
         /// </summary>
-        public async UniTask<bool> RunGameLuaVM(IntPtr L, string entryLua = "main")
+        /// <summary>
+        /// 起正式游戏 LuaVM（xLua 为主 VM，自建 lua_State）。
+        /// 建完后把 rawL 暴露给 BlueprintRunner 注入，共享同一个 VM。
+        /// </summary>
+        public async UniTask<bool> RunGameLuaVM(string entryLua = "GameLogic")
         {
-            Debug.Log($"[LuaManager] === Game VM start: {entryLua} ===");
+            Debug.Log($"[LuaManager] === Game VM start (xLua master): {entryLua} ===");
 
             DisposeActiveVM();
-            var env = CreateLuaEnv("game", L);
+            // xLua 主 VM：自建 lua_State（不传入外部 L）
+            var env = CreateLuaEnv("game", IntPtr.Zero);
             ActiveLuaEnv = env;
+
+            // 把 xLua 的 lua_State 注入给 BlueprintRuntime，让 BR 共享这个 VM
+            var bpRuntime = BlueprintRunner.Instance
+                         ?? FindFirstObjectByType<BlueprintRunner>();
+            if (bpRuntime != null)
+                bpRuntime.InitWithExternalLuaState(env.rawL);
+            else
+                Debug.LogWarning("[LuaManager] BlueprintRunner not found, BR will use standalone VM");
 
             try
             {
