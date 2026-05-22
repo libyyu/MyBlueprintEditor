@@ -1234,8 +1234,8 @@ namespace BlueprintRuntime
         {
             if (r == null) return;
             _runners.Remove(r);
-            // 先通知 C++ 侧清空 m_L，再 Dispose
-            try { r.NotifyLuaStateClosing(); } catch { }
+            // 单个 Runner 销毁时不通知 lua_State 关闭——共享 VM 仍被其他 Runner 使用。
+            // NotifyLuaStateClosing 仅在整个 VM 即将 Dispose 时（ReleaseAllRunner）才调用。
             r.Dispose();
         }
 
