@@ -296,6 +296,10 @@ void LuaScriptEngine::SetFileMtime(const std::string& filePath, int64_t mtime)
 
 void LuaScriptEngine::UnregisterAllScriptedNodes()
 {
+    // 进程退出时 registry 可能先析构，检查后跳过避免 use-after-free
+    if (!HandlerRegistry::IsAlive() || !NodeDefRegistry::IsAlive())
+        return;
+
     auto& nodeReg    = NodeDefRegistry::Instance();
     auto& handlerReg = HandlerRegistry::Instance();
     for (const auto& id : m_registeredNodeIds)

@@ -54,6 +54,9 @@ public:
 
     bool Has(const std::string& defId) const;
 
+    // 进程退出时 registry 可能先于 LuaScriptEngine 析构，用于安全检查
+    static bool IsAlive();
+
     // 调试用：当前已注册的 handler 数
     size_t Size() const;
 
@@ -90,6 +93,8 @@ public:
 
     bool Has(const std::string& id) const;
     size_t Size() const;
+
+    static bool IsAlive();
 
     // 拍平复制一份所有定义（编辑器面板用，避免持有内部锁）
     std::vector<NodeDefinition> GetAll() const;
