@@ -58,6 +58,14 @@ public:
     // 注意：外部 lua_State 的生命周期由调用者管理，Blueprint 不会调用 lua_close()。
     bool InitializeWithExternalState(lua_State* L, BlueprintRunner* runner);
 
+    // 外部 VM 即将关闭时调用：将 m_L 置 null，不调 lua_close（生命周期由外部管理）。
+    // 调用后 Tick / LoadFile 等操作会安全跳过（if (!m_L) return）。
+    void InvalidateLuaState()
+    {
+        m_L = nullptr;
+        // m_ownsState 保持不变（false），确保 Shutdown 不会尝试 lua_close
+    }
+
     // 关闭 VM，释放所有资源（外部 State 模式下只注销绑定，不 close VM）
     void Shutdown();
 

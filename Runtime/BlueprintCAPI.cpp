@@ -834,7 +834,16 @@ BLUEPRINT_CAPI_EXPORT lua_State* BLUEPRINT_CAPI_CALL BP_GetLuaState(BP_Runner ru
 
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_NotifyLuaStateClosing(lua_State* L)
 {
+    // 1. Any Variant 生命周期保护：标记该 VM 已关闭，残留引用的析构变成 no-op
     NodeEditor::Runtime::UnregisterLuaState(L);
+
+    // 2. 清空默认 Engine 的 m_L：避免 xLua Dispose 后 BR 的 Tick / TickScriptExtensions
+    //    还在调用 LuaScriptEngine::Tick(m_L)，导致访问野指针崩溃。
+    if (auto eng = NodeEditor::Runtime::LuaScriptEngineRegistry::GetDefault())
+    {
+        if (eng->GetState() == L)
+            eng->InvalidateLuaState();  // 将 m_L 置 null，不调 lua_close（外部 VM）
+    }
 }
 
 } // extern "C"

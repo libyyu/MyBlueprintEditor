@@ -540,6 +540,10 @@ namespace BlueprintRuntime
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr BP_GetLuaState(IntPtr runner);
 
+        /// <summary>xLua 主 VM 即将 Dispose 前调用，通知 BR 清空 m_L 避免野指针访问</summary>
+        [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void BP_NotifyLuaStateClosing(IntPtr L);
+
         // ----------------------------------------------------------------
         // Metadata / Dependency query
         // ----------------------------------------------------------------
@@ -724,6 +728,18 @@ namespace BlueprintRuntime
         /// 注入后 BR 共享该 VM，不拥有生命周期（不会 lua_close）。
         /// 必须在任何 LoadLuaScript / Execute 之前调用。
         /// </summary>
+        /// <summary>
+        /// xLua 主 VM 即将 Dispose 前调用。
+        /// 通知 BlueprintRuntime 清空内部 lua_State 指针，避免后续 Tick 访问野指针崩溃。
+        /// </summary>
+        public void NotifyLuaStateClosing()
+        {
+            ThrowIfDisposed();
+            var L = Native.BP_GetLuaState(_handle);
+            if (L != IntPtr.Zero)
+                Native.BP_NotifyLuaStateClosing(L);
+        }
+
         public void SetExternalLuaState(IntPtr L)
         {
             ThrowIfDisposed();

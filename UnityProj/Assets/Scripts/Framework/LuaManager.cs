@@ -207,6 +207,15 @@ namespace CutRope.Framework
             _luaOnDestroy?.Dispose(); _luaOnDestroy = null;
             _luaUpdate?.Dispose();    _luaUpdate    = null;
 
+            // xLua 主 VM 模式下：Dispose 前先通知 BlueprintRuntime 清空 lua_State 指针。
+            // 避免 LuaEnv.Dispose 后 Tick 还在访问已释放的 VM 导致 SIGSEGV。
+            var bpRunner = BlueprintRunner.Instance?.Runner;
+            if (bpRunner != null)
+            {
+                try { bpRunner.NotifyLuaStateClosing(); }
+                catch (Exception e) { Debug.LogWarning($"[LuaManager] NotifyLuaStateClosing: {e.Message}"); }
+            }
+
             try { ActiveLuaEnv.Dispose(); }
             catch (Exception e) { Debug.LogWarning($"[LuaManager] Dispose: {e.Message}"); }
 
