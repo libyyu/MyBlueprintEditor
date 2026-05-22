@@ -683,6 +683,17 @@ struct BlueprintEditor : public Application
     // 蓝图执行
     // ------------------------------------------------------------------
     RTBlueprintData BuildRuntimeData();
+
+    // 扫描当前文档节点，收集被引用的子蓝图（ExecuteBlueprint）和函数库（FuncLib.*），
+    // 与 manualDeps 合并去重后返回。所有路径以"相对于 currentDocPath 所在目录"的相对路径表示
+    // （与 metadata.dependencies 加载语义一致）。
+    // 函数库通过 m_Project.libraries 反查 libStem -> 实际相对路径；找不到则跳过该项。
+    // 当 currentDocPath 为空时（未保存的新文档）保持 manualDeps 不变直接返回。
+    std::vector<std::string> CollectImpliedDependencies(
+        const RTBlueprintData& bp,
+        const std::vector<std::string>& manualDeps,
+        const std::string& currentDocPath) const;
+
     void            ExecuteBlueprint();
     void            ShowExecutionPanel(float paneWidth);
 

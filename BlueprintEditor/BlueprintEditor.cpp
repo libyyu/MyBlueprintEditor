@@ -1,6 +1,7 @@
 // BlueprintEditor.cpp -- 蓝图编辑器核心逻辑
 #include "BlueprintEditor.h"
 #include "ThemeManager.h"
+#include "PathUtils.h"
 #include <map>
 #include <functional>
 #include <algorithm>
@@ -982,10 +983,137 @@ RTBlueprintData BlueprintEditor::BuildRuntimeData()
     // 转换函数定义
     bp.functions = ActiveDoc()->functions;
 
-    // 保留 dependencies（加载时读入，保存时写回，避免手动管理的引用丢失）
-    bp.metadata.dependencies = ActiveDoc()->dependencies;
+    // 自动收集子蓝图 / 函数库依赖，与用户手动声明的合并去重后写入 metadata.dependencies。
+    // 这样 Runtime/CAPI 直接 LoadFromFileWithDeps 即可正确加载所有依赖，
+    // 不再依赖编辑器侧的"同目录兜底扫描"。
+    bp.metadata.dependencies = CollectImpliedDependencies(
+        bp, ActiveDoc()->dependencies, ActiveDoc()->filePath);
 
     return bp;
+}
+
+// ============================================================================
+// CollectImpliedDependencies — 扫描节点，收集子蓝图 / 函数库引用
+// ============================================================================
+
+std::vector<std::string> BlueprintEditor::CollectImpliedDependencies(
+    const RTBlueprintData& bp,
+    const std::vector<std::string>& manualDeps,
+    const std::string& currentDocPath) const
+{
+    namespace fs = std::filesystem;
+
+    std::vector<std::string> result;
+    std::unordered_set<std::string> seen;  // 用规范化形式去重，但 push 原始 raw
+
+    // 工具：插入一个依赖项（规范化去重）
+    auto pushDep = [&](std::string raw) {
+        if (raw.empty()) return;
+        BpPath::NormSlashInPlace(raw);
+        // 规范化用于去重：lexically_normal + 正斜杠
+        std::string norm = BpPath::NormSlash(fs::path(raw).lexically_normal().string());
+        if (seen.insert(norm).second)
+            result.push_back(raw);
+    };
+
+    // 1. 先把手动声明的全部入列（保留用户意图）
+    for (const auto& d : manualDeps)
+        pushDep(d);
+
+    // 当前文档没保存时无法计算相对路径——只回填手动声明。
+    if (currentDocPath.empty())
+        return result;
+
+    const std::string docDir = BpPath::ParentDir(currentDocPath);
+    const fs::path    docDirPath = fs::path(docDir).lexically_normal();
+
+    // 工具：把 absPath 转为相对 docDir 的相对路径（正斜杠）
+    auto toRelative = [&](const std::string& absPath) -> std::string {
+        if (absPath.empty()) return "";
+        try {
+            fs::path abs = fs::path(absPath).lexically_normal();
+            fs::path rel = abs.lexically_relative(docDirPath);
+            if (rel.empty()) return BpPath::NormSlash(abs.string());
+            return BpPath::NormSlash(rel.string());
+        } catch (...) {
+            return BpPath::NormSlash(absPath);
+        }
+    };
+
+    // 工具：判断字符串是否为绝对路径（跨平台）
+    auto isAbsolutePath = [](const std::string& p) -> bool {
+        if (p.empty()) return false;
+#ifdef _WIN32
+        return (p.size() >= 2 && p[1] == ':') ||
+               (p.size() >= 2 && (p[0] == '\\' || p[0] == '/') &&
+                                 (p[1] == '\\' || p[1] == '/'));
+#else
+        return p[0] == '/';
+#endif
+    };
+
+    // 2. 扫描节点
+    for (const auto& node : bp.nodes)
+    {
+        // ---- ExecuteBlueprint：File 引脚为目标蓝图路径 ----
+        if (node.definitionId == "ExecuteBlueprint")
+        {
+            for (const auto& pin : node.pins)
+            {
+                if (pin.kind != ::NodeEditor::Runtime::PinKind::Input) continue;
+                if (pin.name != "File") continue;
+                std::string val = pin.defaultValue.asString();
+                if (val.empty()) continue;
+                BpPath::NormSlashInPlace(val);
+
+                // ExecuteBlueprint 运行时按"相对 basePath（=蓝图所在目录）"解析；
+                // 若用户填的是绝对路径，转为相对当前文档目录写入 dependencies
+                if (isAbsolutePath(val))
+                    pushDep(toRelative(val));
+                else
+                    pushDep(val);
+            }
+            continue;
+        }
+
+        // ---- FuncLib.<libStem>.<funcId>：通过 libStem 反查工程库相对路径 ----
+        if (node.definitionId.rfind("FuncLib.", 0) == 0)
+        {
+            // 提取 libStem：FuncLib.<libStem>.<funcId>，libStem 可能含 '.'
+            std::string withoutPrefix = node.definitionId.substr(8);  // strip "FuncLib."
+            size_t lastDot = withoutPrefix.rfind('.');
+            if (lastDot == std::string::npos) continue;
+            std::string libStem = withoutPrefix.substr(0, lastDot);
+            if (libStem.empty()) continue;
+
+            // 在工程 libraries 中按 stem 反查相对路径
+            std::string libRel;
+            if (m_Project.IsOpen())
+            {
+                for (const auto& e : m_Project.libraries)
+                {
+                    if (BpPath::Stem(e.relativePath) == libStem)
+                    {
+                        std::string abs = m_Project.AbsPath(e.relativePath);
+                        if (fs::exists(abs))
+                        {
+                            libRel = toRelative(abs);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 工程未打开 / libraries 里没找到 → 使用 "<libStem>.bjson" 兜底（同目录）
+            if (libRel.empty())
+                libRel = libStem + ".bjson";
+
+            pushDep(libRel);
+            continue;
+        }
+    }
+
+    return result;
 }
 
 // ============================================================================
