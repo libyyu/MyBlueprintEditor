@@ -209,6 +209,19 @@ namespace CutRope.Framework
 
             // xLua 主 VM 模式下：Dispose 前先通知 BlueprintRuntime 清空 lua_State 指针。
             // 避免 LuaEnv.Dispose 后 Tick 还在访问已释放的 VM 导致 SIGSEGV。
+            //
+            // Fix: 直接通过 L 调 BP_NotifyLuaStateClosing，不依赖 _runners 列表。
+            // 当 BlueprintBehaviour.OnDestroy 先于 LuaManager.OnDestroy 执行时，
+            // _runners 已被 ReleaseRunner 逐个移除清空，导致 ReleaseAllRunner 遍历为空，
+            // NotifyLuaStateClosing 没有被调用，Engine.m_L 未置 null，lua_close 后成野指针，
+            // 下一帧 Tick 访问野指针触发 SIGSEGV。
+            try
+            {
+                var rawL = ActiveLuaEnv.L;
+                if (rawL != IntPtr.Zero)
+                    BlueprintRuntime.Native.BP_NotifyLuaStateClosing(rawL);
+            }
+            catch (Exception e) { Debug.LogWarning($"[LuaManager] BP_NotifyLuaStateClosing: {e.Message}"); }
             try { BlueprintService.Instance?.ReleaseAllRunner(); }
             catch(Exception e) { Debug.LogWarning($"[LuaManager] ReleaseAllRunner: {e.Message}"); }
 

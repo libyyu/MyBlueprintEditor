@@ -2625,6 +2625,8 @@ bool BlueprintRunner::EnsureScriptEngine()
     if (m_luaEngine) return true;
 
     // 优先使用进程级默认共享 Engine（多 Runner 共享一个 VM）
+    // 注意：IsInitialized() 检查 m_L != nullptr，外部 VM 被 InvalidateLuaState() 置空后
+    // 不应再绑定到该 Engine，否则 Tick 会访问野指针（lua_close 后的悬空 lua_State）。
     auto shared = LuaScriptEngineRegistry::GetDefault();
     if (shared && shared->IsInitialized())
     {
