@@ -154,6 +154,11 @@ namespace CutRope.Framework
             var env = CreateLuaEnv("game", IntPtr.Zero);
             ActiveLuaEnv = env;
 
+            // 关键：在 GameLogic.lua 运行之前，先把 Blueprint.* 绑定注入到 xLua VM。
+            // 否则 GameLogic.lua 里 require 'BlueprintEntry' 时
+            // Blueprint.RegisterHandler / RegisterNodeDef 还不存在，注册会静默失败。
+            BlueprintService.Instance.InjectLuaBindings(env.L);
+
             try
             {
                 env.DoString($"require '{entryLua}'");
