@@ -7,7 +7,9 @@
 #include <sstream>
 #include <filesystem>
 #include <iostream>
-
+#ifdef _WIN32
+#include <windows.h>
+#endif
 namespace fs = std::filesystem;
 
 // ============================================================================
@@ -143,6 +145,9 @@ void BpLogger::WorkerLoop()
             else
                 std::cerr << line;  // fallback
             batch.pop();
+#ifdef _WIN32
+			::OutputDebugStringA(line.c_str());  // 同时输出到调试器（如 Visual Studio 输出窗口）
+#endif
         }
         if (ofs.is_open()) ofs.flush();
 

@@ -2501,6 +2501,13 @@ bool BlueprintRunner::LoadExtensionScript(const std::string& filePath)
         return false;
     }
 
+#ifndef __EMSCRIPTEN__
+	namespace fs = std::filesystem;
+	std::string dataDir = fs::path(fs::absolute(filePath)).parent_path().string();
+	std::string code = "do _G.DataPath=\"" + dataDir + "\" end";
+    m_luaEngine->LoadString(code);
+#endif
+
     // 记录修改时间到 engine（热重载用；WebGL 无文件系统，跳过）
 #if !defined(__EMSCRIPTEN__) && !defined(BLUEPRINT_NO_FILESYSTEM)
     try {

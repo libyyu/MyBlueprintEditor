@@ -23,6 +23,12 @@ if not ok then
     end
 end
 
+package.path = package.path .. ";" .. _G.DataPath .. "\\UnityProj\\Assets\\Lua\\?.lua"
+local ok, err = pcall(require, "blueprints.BlueprintEntry")
+if not ok then
+    print('[GameLogic] Warning: BlueprintEntry load failed: ' .. tostring(err))
+end
+
 -- ── 注册自定义节点：LuaAgent.RunReAct ─────────────────────────────────────
 Blueprint.RegisterNodeDef({
     id          = "LuaAgent.RunReAct",
