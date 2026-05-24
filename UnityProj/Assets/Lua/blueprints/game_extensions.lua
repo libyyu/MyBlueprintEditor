@@ -25,13 +25,13 @@ Blueprint.RegisterNodeDef({
     color       = "2A7A5A",
     description = "向指定频道发出游戏事件（写入全局事件队列）",
     inputs  = {
-        { name = "In",      type = "Flow" },
+        { type = "Flow" },
         { name = "Channel", type = "String" },
         { name = "EventId", type = "String" },
         { name = "Payload", type = "String" },  -- JSON 字符串，可选
     },
     outputs = {
-        { name = "Out", type = "Flow" },
+        { type = "Flow" },
     },
 })
 Blueprint.RegisterHandler("GameEvent.Emit", function(ctx)
@@ -62,7 +62,7 @@ Blueprint.RegisterNodeDef({
     color       = "2A7A5A",
     description = "消费事件队列中最早的一个事件",
     inputs  = {
-        { name = "In",      type = "Flow" },
+        { type = "Flow" },
         { name = "Channel", type = "String" },
     },
     outputs = {
@@ -106,10 +106,10 @@ Blueprint.RegisterNodeDef({
     color       = "2A7A5A",
     description = "清空指定频道的事件队列",
     inputs  = {
-        { name = "In",      type = "Flow" },
+        { type = "Flow" },
         { name = "Channel", type = "String" },
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("GameEvent.Clear", function(ctx)
     local channel = ctx:GetInput("Channel"):asString()
@@ -130,12 +130,12 @@ Blueprint.RegisterNodeDef({
     color       = "7A5A2A",
     description = "启动对话序列（Lines 为 Array of String）",
     inputs  = {
-        { name = "In",       type = "Flow" },
+        { type = "Flow" },
         { name = "DialogueId", type = "String" },
         { name = "Lines",    type = "Array" },
     },
     outputs = {
-        { name = "Out",       type = "Flow" },
+        { type = "Flow" },
         { name = "FirstLine", type = "String" },
     },
 })
@@ -167,7 +167,7 @@ Blueprint.RegisterNodeDef({
     color       = "7A5A2A",
     description = "推进到下一句对话",
     inputs  = {
-        { name = "In",         type = "Flow" },
+        { type = "Flow" },
         { name = "DialogueId", type = "String" },
     },
     outputs = {
@@ -239,14 +239,14 @@ Blueprint.RegisterNodeDef({
     color       = "5A2A7A",
     description = "启动数值 Tween（配合 Tween.Update 每帧调用）",
     inputs  = {
-        { name = "In",       type = "Flow" },
+        { type = "Flow" },
         { name = "TweenId",  type = "String" },
         { name = "From",     type = "Float" },
         { name = "To",       type = "Float" },
         { name = "Duration", type = "Float" },
         { name = "Curve",    type = "String" },  -- 缓动曲线名，见 Easing.Apply
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Tween.Start", function(ctx)
     local id  = ctx:GetInput("TweenId"):asString()
@@ -273,7 +273,7 @@ Blueprint.RegisterNodeDef({
     color       = "5A2A7A",
     description = "每帧推进 Tween（传入 DeltaTime），输出当前插值",
     inputs  = {
-        { name = "In",        type = "Flow" },
+        { type = "Flow" },
         { name = "TweenId",   type = "String" },
         { name = "DeltaTime", type = "Float" },
     },

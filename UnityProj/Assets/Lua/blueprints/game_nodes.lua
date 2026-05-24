@@ -54,12 +54,12 @@ Blueprint.RegisterNodeDef({
     color       = "5A3A9A",
     description = "打开 Lua UI 面板（FPanelXxx.Instance():ShowPanel(true)）",
     inputs  = {
-        { name = "In",      type = "Flow"   },
+        { type = "Flow" },
         { name = "Address", type = "String" },
         { name = "Param",   type = "String" },
     },
     outputs = {
-        { name = "Out", type = "Flow" },
+        { type = "Flow" },
     },
 })
 Blueprint.RegisterHandler("UI.Open", function(ctx)
@@ -78,11 +78,11 @@ Blueprint.RegisterNodeDef({
     color       = "5A3A9A",
     description = "隐藏 Lua UI 面板（ShowPanel(false)）",
     inputs  = {
-        { name = "In",      type = "Flow"   },
+        { type = "Flow" },
         { name = "Address", type = "String" },
     },
     outputs = {
-        { name = "Out", type = "Flow" },
+        { type = "Flow" },
     },
 })
 Blueprint.RegisterHandler("UI.Close", function(ctx)
@@ -101,11 +101,11 @@ Blueprint.RegisterNodeDef({
     color       = "5A3A9A",
     description = "销毁 Lua UI 面板（DestroyPanel）",
     inputs  = {
-        { name = "In",      type = "Flow"   },
+        { type = "Flow" },
         { name = "Address", type = "String" },
     },
     outputs = {
-        { name = "Out", type = "Flow" },
+        { type = "Flow" },
     },
 })
 Blueprint.RegisterHandler("UI.Dispose", function(ctx)
@@ -123,8 +123,8 @@ Blueprint.RegisterNodeDef({
     category    = "Game/UI",
     color       = "5A3A9A",
     description = "隐藏所有已打开的 Lua UI 面板",
-    inputs  = { { name = "In", type = "Flow" } },
-    outputs = { { name = "Out", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("UI.CloseAll", function(ctx)
     for address, modPath in pairs(_uiModuleMap) do
@@ -148,11 +148,11 @@ Blueprint.RegisterNodeDef({
     color       = "3A6A9A",
     description = "异步加载场景（Single 模式，替换当前场景）",
     inputs  = {
-        { name = "In",    type = "Flow"   },
+        { type = "Flow" },
         { name = "Scene", type = "String" },  -- YooAsset address 或 Build Settings 场景名
     },
     outputs = {
-        { name = "Out", type = "Flow" },
+        { type = "Flow" },
     },
 })
 Blueprint.RegisterHandler("Scene.Load", function(ctx)
@@ -170,10 +170,10 @@ Blueprint.RegisterNodeDef({
     color       = "3A6A9A",
     description = "叠加加载场景（Additive 模式）",
     inputs  = {
-        { name = "In",    type = "Flow"   },
+        { type = "Flow" },
         { name = "Scene", type = "String" },
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Scene.LoadAdditive", function(ctx)
     local scene = ctx:GetInput("Scene"):asString()
@@ -190,10 +190,10 @@ Blueprint.RegisterNodeDef({
     color       = "3A6A9A",
     description = "卸载叠加场景",
     inputs  = {
-        { name = "In",    type = "Flow"   },
+        { type = "Flow" },
         { name = "Scene", type = "String" },
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Scene.Unload", function(ctx)
     local scene = ctx:GetInput("Scene"):asString()
@@ -209,9 +209,9 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Scene",
     color       = "3A6A9A",
     description = "获取当前激活的场景名",
-    inputs  = { { name = "In", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
     outputs = {
-        { name = "Out",  type = "Flow"   },
+        { type = "Flow" },
         { name = "Name", type = "String" },
     },
 })
@@ -232,11 +232,11 @@ Blueprint.RegisterNodeDef({
     color       = "9A6A1A",
     description = "通关：通知 LevelManager 保存成绩并解锁下一关",
     inputs  = {
-        { name = "In",    type = "Flow"    },
+        { type = "Flow" },
         { name = "Stars", type = "Integer" },  -- 1~3
         { name = "Score", type = "Integer" },
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Level.Complete", function(ctx)
     local stars = ctx:GetInput("Stars"):asInt()
@@ -255,8 +255,8 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Level",
     color       = "9A1A1A",
     description = "关卡失败：通知 LevelManager",
-    inputs  = { { name = "In", type = "Flow" } },
-    outputs = { { name = "Out", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Level.Fail", function(ctx)
     local LM = require 'game/level_manager'
@@ -272,8 +272,8 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Level",
     color       = "9A6A1A",
     description = "重试当前关卡",
-    inputs  = { { name = "In", type = "Flow" } },
-    outputs = { { name = "Out", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Level.Retry", function(ctx)
     local LM = require 'game/level_manager'
@@ -289,8 +289,8 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Level",
     color       = "9A6A1A",
     description = "返回主菜单",
-    inputs  = { { name = "In", type = "Flow" } },
-    outputs = { { name = "Out", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Level.BackToMenu", function(ctx)
     local LM = require 'game/level_manager'
@@ -306,9 +306,9 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Level",
     color       = "9A6A1A",
     description = "读取当前关卡运行时数据（刀数、用时）",
-    inputs  = { { name = "In", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
     outputs = {
-        { name = "Out",         type = "Flow"    },
+        { type = "Flow" },
         { name = "CutCount",    type = "Integer" },
         { name = "ElapsedTime", type = "Float"   },
         { name = "IsRunning",   type = "Boolean" },
@@ -336,8 +336,8 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Level",
     color       = "9A1A1A",
     description = "停止关卡 tick（通关/失败后调用，防止重复触发）",
-    inputs  = { { name = "In", type = "Flow" } },
-    outputs = { { name = "Out", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Level.Stop", function(ctx)
     local ctrl = CS.CutRope.Game.LevelController.Current
@@ -356,11 +356,11 @@ Blueprint.RegisterNodeDef({
     color       = "6A3A1A",
     description = "切断指定索引的绳子的第 N 个节点",
     inputs  = {
-        { name = "In",        type = "Flow"    },
+        { type = "Flow" },
         { name = "RopeIndex", type = "Integer" },  -- 第几条绳子
         { name = "NodeIndex", type = "Integer" },  -- 第几个节点处切断
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Rope.Cut", function(ctx)
     local ctrl      = CS.CutRope.Game.LevelController.Current
@@ -381,9 +381,9 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Rope",
     color       = "6A3A1A",
     description = "获取当前关卡绳子数量",
-    inputs  = { { name = "In", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
     outputs = {
-        { name = "Out",   type = "Flow"    },
+        { type = "Flow" },
         { name = "Count", type = "Integer" },
     },
 })
@@ -404,9 +404,9 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Candy",
     color       = "9A3A5A",
     description = "查询糖果当前状态（是否被吃/是否失败）",
-    inputs  = { { name = "In", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
     outputs = {
-        { name = "Out",      type = "Flow"    },
+        { type = "Flow" },
         { name = "IsEaten",  type = "Boolean" },
         { name = "IsFailed", type = "Boolean" },
     },
@@ -435,8 +435,8 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Level",
     color       = "9A6A1A",
     description = "暂停关卡（停止 Tick，打开暂停面板）",
-    inputs  = { { name = "In", type = "Flow" } },
-    outputs = { { name = "Out", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Level.Pause", function(ctx)
     local ctrl = CS.CutRope.Game.LevelController.Current
@@ -453,8 +453,8 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Level",
     color       = "9A6A1A",
     description = "恢复关卡（继续 Tick，关闭暂停面板）",
-    inputs  = { { name = "In", type = "Flow" } },
-    outputs = { { name = "Out", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Level.Resume", function(ctx)
     local ctrl = CS.CutRope.Game.LevelController.Current
@@ -472,11 +472,11 @@ Blueprint.RegisterNodeDef({
     color       = "9A6A1A",
     description = "根据刀数计算星级（≤MaxCuts = 3星；≤MaxCuts*2 = 2星；其余 = 1星）",
     inputs  = {
-        { name = "In",      type = "Flow"    },
+        { type = "Flow" },
         { name = "MaxCuts", type = "Integer" },
     },
     outputs = {
-        { name = "Out",   type = "Flow"    },
+        { type = "Flow" },
         { name = "Stars", type = "Integer" },
     },
 })
@@ -511,7 +511,7 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Event",
     color       = "2A7A5A",
     description = "每次玩家切绳时触发（在 OnTick 里轮询）",
-    inputs  = { { name = "In", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
     outputs = {
         { name = "onCut",    type = "Flow"    },
         { name = "onEmpty",  type = "Flow"    },
@@ -547,7 +547,7 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Event",
     color       = "2A7A5A",
     description = "糖果被怪兽吃掉时触发",
-    inputs  = { { name = "In", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
     outputs = {
         { name = "onEaten", type = "Flow" },
         { name = "onEmpty", type = "Flow" },
@@ -573,7 +573,7 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Event",
     color       = "2A7A5A",
     description = "糖果掉落/出界失败时触发",
-    inputs  = { { name = "In", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
     outputs = {
         { name = "onFailed", type = "Flow" },
         { name = "onEmpty",  type = "Flow" },
@@ -602,11 +602,11 @@ Blueprint.RegisterNodeDef({
     color       = "3A7A3A",
     description = "播放音效（YooAsset address）",
     inputs  = {
-        { name = "In",     type = "Flow"  },
+        { type = "Flow" },
         { name = "Clip",   type = "String" },
         { name = "Volume", type = "Float"  },
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Audio.Play", function(ctx)
     local clip   = ctx:GetInput("Clip"):asString()
@@ -630,11 +630,11 @@ Blueprint.RegisterNodeDef({
     color       = "3A7A3A",
     description = "播放背景音乐（淡入替换当前 BGM）",
     inputs  = {
-        { name = "In",       type = "Flow"   },
+        { type = "Flow" },
         { name = "Clip",     type = "String" },
         { name = "FadeTime", type = "Float"  },
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Audio.PlayBGM", function(ctx)
     local clip     = ctx:GetInput("Clip"):asString()
@@ -654,10 +654,10 @@ Blueprint.RegisterNodeDef({
     color       = "3A7A3A",
     description = "停止背景音乐",
     inputs  = {
-        { name = "In",       type = "Flow"  },
+        { type = "Flow" },
         { name = "FadeTime", type = "Float" },
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Audio.Stop", function(ctx)
     local fadeTime = ctx:GetInput("FadeTime"):asFloat()
@@ -678,7 +678,7 @@ Blueprint.RegisterNodeDef({
     color       = "4A4A9A",
     description = "延迟节点：每帧推进，Duration 秒后触发 onDone（在 OnTick 里驱动）",
     inputs  = {
-        { name = "In",        type = "Flow"    },
+        { type = "Flow" },
         { name = "TimerId",   type = "String"  },
         { name = "Duration",  type = "Float"   },
         { name = "DeltaTime", type = "Float"   },
@@ -722,10 +722,10 @@ Blueprint.RegisterNodeDef({
     color       = "4A4A9A",
     description = "手动重置指定 Timer 的计时",
     inputs  = {
-        { name = "In",      type = "Flow"   },
+        { type = "Flow" },
         { name = "TimerId", type = "String" },
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Timer.Reset", function(ctx)
     local id = ctx:GetInput("TimerId"):asString()
@@ -744,9 +744,9 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Star",
     color       = "9A8A1A",
     description = "获取当前关卡星星总数和已收集数",
-    inputs  = { { name = "In", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
     outputs = {
-        { name = "Out",       type = "Flow"    },
+        { type = "Flow" },
         { name = "Total",     type = "Integer" },
         { name = "Collected", type = "Integer" },
     },
@@ -766,7 +766,7 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Event",
     color       = "2A7A5A",
     description = "收集到星星时触发（OnTick 里轮询）",
-    inputs  = { { name = "In", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
     outputs = {
         { name = "onCollected", type = "Flow"    },
         { name = "onEmpty",     type = "Flow"    },
@@ -803,13 +803,13 @@ Blueprint.RegisterNodeDef({
     color       = "8A1A1A",
     description = "启动/停止障碍物移动（蓝图驱动障碍物行为）",
     inputs  = {
-        { name = "In",        type = "Flow"    },
+        { type = "Flow" },
         { name = "Name",      type = "String"  },  -- GameObject 名字
         { name = "Moving",    type = "Boolean" },
         { name = "Speed",     type = "Float"   },
         { name = "Range",     type = "Float"   },
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Obstacle.SetMoving", function(ctx)
     local name    = ctx:GetInput("Name"):asString()
@@ -839,11 +839,11 @@ Blueprint.RegisterNodeDef({
     color       = "3A5A8A",
     description = "摄像机震屏（切绳/通关/失败时反馈）",
     inputs  = {
-        { name = "In",        type = "Flow"  },
+        { type = "Flow" },
         { name = "Intensity", type = "Float" },  -- 震动强度（默认 0.3）
         { name = "Duration",  type = "Float" },  -- 持续时间（默认 0.2）
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 
 local _shakeCoroutine = nil
@@ -875,10 +875,10 @@ Blueprint.RegisterNodeDef({
     color       = "5A6A9A",
     description = "更新 HUD 分数显示",
     inputs  = {
-        { name = "In",    type = "Flow"    },
+        { type = "Flow" },
         { name = "Score", type = "Integer" },
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("HUD.SetScore", function(ctx)
     local score = ctx:GetInput("Score"):asInt()
@@ -899,11 +899,11 @@ Blueprint.RegisterNodeDef({
     color       = "5A6A9A",
     description = "更新 HUD 星星显示（★☆☆）",
     inputs  = {
-        { name = "In",        type = "Flow"    },
+        { type = "Flow" },
         { name = "Collected", type = "Integer" },
         { name = "Total",     type = "Integer" },
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("HUD.SetStars", function(ctx)
     local collected = ctx:GetInput("Collected"):asInt()
@@ -926,10 +926,10 @@ Blueprint.RegisterNodeDef({
     color       = "5A6A9A",
     description = "更新 HUD 刀数显示",
     inputs  = {
-        { name = "In",   type = "Flow"    },
+        { type = "Flow" },
         { name = "Cuts", type = "Integer" },
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("HUD.SetCuts", function(ctx)
     local cuts = ctx:GetInput("Cuts"):asInt()
@@ -952,10 +952,10 @@ Blueprint.RegisterNodeDef({
     color       = "5A6A9A",
     description = "一次性从 LevelController 读取状态，更新 HUD 分数+星星+刀数",
     inputs  = {
-        { name = "In",    type = "Flow"    },
+        { type = "Flow" },
         { name = "Score", type = "Integer" },  -- 外部传入分数
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("HUD.Sync", function(ctx)
     local score = ctx:GetInput("Score"):asInt()
@@ -987,10 +987,10 @@ Blueprint.RegisterNodeDef({
     color       = "6A3A1A",
     description = "生成第 RopeIndex 条绳子，末端连接到 Candy",
     inputs  = {
-        { name = "In",        type = "Flow"    },
+        { type = "Flow" },
         { name = "RopeIndex", type = "Integer" },  -- 默认 0
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Rope.Spawn", function(ctx)
     local ctrl = CS.CutRope.Game.LevelController.Current
@@ -1014,9 +1014,9 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Rope",
     color       = "6A3A1A",
     description = "生成场景中所有绳子，末端全部连接到 Candy",
-    inputs  = { { name = "In", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
     outputs = {
-        { name = "Out",   type = "Flow"    },
+        { type = "Flow" },
         { name = "Count", type = "Integer" },  -- 实际生成数量
     },
 })
@@ -1046,9 +1046,9 @@ Blueprint.RegisterNodeDef({
     category    = "Game/Level",
     color       = "9A6A1A",
     description = "按收集到的星星数直接返回星级（收集数即星级，最少1星）",
-    inputs  = { { name = "In", type = "Flow" } },
+    inputs  = { { type = "Flow" } },
     outputs = {
-        { name = "Out",       type = "Flow"    },
+        { type = "Flow" },
         { name = "Stars",     type = "Integer" },
         { name = "Collected", type = "Integer" },
         { name = "Total",     type = "Integer" },
@@ -1074,13 +1074,13 @@ Blueprint.RegisterNodeDef({
     color       = "9A6A1A",
     description = "计算分数：Base + Collected×StarBonus - Cuts×CutPenalty",
     inputs  = {
-        { name = "In",         type = "Flow"    },
+        { type = "Flow" },
         { name = "Base",       type = "Integer" },  -- 基础分，默认 100
         { name = "StarBonus",  type = "Integer" },  -- 每颗星加分，默认 50
         { name = "CutPenalty", type = "Integer" },  -- 每刀扣分，默认 10
     },
     outputs = {
-        { name = "Out",   type = "Flow"    },
+        { type = "Flow" },
         { name = "Score", type = "Integer" },
     },
 })
@@ -1110,11 +1110,11 @@ Blueprint.RegisterNodeDef({
     color       = "9A6A1A",
     description = "把 Stars / Score 写入通关面板（在 UI.Open LevelComplete 之前调用）",
     inputs  = {
-        { name = "In",    type = "Flow"    },
+        { type = "Flow" },
         { name = "Stars", type = "Integer" },
         { name = "Score", type = "Integer" },
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Level.SetResult", function(ctx)
     local stars = ctx:GetInput("Stars"):asInt()
@@ -1145,11 +1145,11 @@ Blueprint.RegisterNodeDef({
     color       = "4A7A4A",
     description = "设置蓝图全局变量（布尔 / 数字 / 字符串）",
     inputs  = {
-        { name = "In",    type = "Flow"   },
+        { type = "Flow" },
         { name = "Key",   type = "String" },
         { name = "Value", type = "String" },  -- 用字符串传输，支持 '1'/'0'/'true'/'false' 和数字字符串
     },
-    outputs = { { name = "Out", type = "Flow" } },
+    outputs = { { type = "Flow" } },
 })
 Blueprint.RegisterHandler("Var.Set", function(ctx)
     local key = ctx:GetInput("Key"):asString()
@@ -1167,11 +1167,11 @@ Blueprint.RegisterNodeDef({
     color       = "4A7A4A",
     description = "读取蓝图变量（返回布尔），用于 Timer.Wait 的 Enabled 引脚等门控场景",
     inputs  = {
-        { name = "In",  type = "Flow"   },
+        { type = "Flow" },
         { name = "Key", type = "String" },
     },
     outputs = {
-        { name = "Out",   type = "Flow"    },
+        { type = "Flow" },
         { name = "Value", type = "Boolean" },
     },
 })
