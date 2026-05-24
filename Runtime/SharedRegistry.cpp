@@ -8,7 +8,6 @@ namespace Runtime {
 // =============================================================================
 // HandlerRegistry
 // =============================================================================
-
 HandlerRegistry& HandlerRegistry::Instance()
 {
     static HandlerRegistry inst;
@@ -17,13 +16,24 @@ HandlerRegistry& HandlerRegistry::Instance()
 
 // 进程退出时 registry 可能先于 LuaScriptEngine 析构。
 // 析构后把 s_dead 置 true，Unregister 检查后直接跳过，避免 use-after-free。
-static bool s_handlerRegistryDead = false;
+static bool s_handlerRegistryNotDead = true;
 struct HandlerRegistryDeadFlag {
-    ~HandlerRegistryDeadFlag() { s_handlerRegistryDead = true; }
+    ~HandlerRegistryDeadFlag() { s_handlerRegistryNotDead = false; }
 };
 static HandlerRegistryDeadFlag s_handlerRegistryDeadFlag;
 
-bool HandlerRegistry::IsAlive() { return !s_handlerRegistryDead; }
+static int s_handlerRegistryIndex = 0;
+HandlerRegistry::HandlerRegistry()
+{
+    s_handlerRegistryIndex++;
+}
+HandlerRegistry::~HandlerRegistry()
+{
+    s_handlerRegistryIndex--;
+    s_handlerRegistryNotDead = false;
+}
+
+bool HandlerRegistry::IsAlive() { return s_handlerRegistryNotDead; }
 
 void HandlerRegistry::Register(const std::string& defId, NodeHandler handler)
 {
@@ -78,13 +88,24 @@ NodeDefRegistry& NodeDefRegistry::Instance()
     return inst;
 }
 
-static bool s_nodeDefRegistryDead = false;
+static bool s_nodeDefRegistryNotDead = true;
 struct NodeDefRegistryDeadFlag {
-    ~NodeDefRegistryDeadFlag() { s_nodeDefRegistryDead = true; }
+    ~NodeDefRegistryDeadFlag() { s_nodeDefRegistryNotDead = false; }
 };
 static NodeDefRegistryDeadFlag s_nodeDefRegistryDeadFlag;
 
-bool NodeDefRegistry::IsAlive() { return !s_nodeDefRegistryDead; }
+static int s_nodeDefRegistryIndex = 0;
+NodeDefRegistry::NodeDefRegistry()
+{
+    s_nodeDefRegistryIndex++;
+}
+NodeDefRegistry::~NodeDefRegistry()
+{
+    s_nodeDefRegistryIndex--;
+    s_nodeDefRegistryNotDead = false;
+}
+
+bool NodeDefRegistry::IsAlive() { return s_nodeDefRegistryNotDead; }
 
 void NodeDefRegistry::Register(const NodeDefinition& def)
 {

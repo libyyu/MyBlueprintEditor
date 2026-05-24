@@ -67,8 +67,8 @@ public:
     void Clear();
 
 private:
-    HandlerRegistry()  = default;
-    ~HandlerRegistry() = default;
+    HandlerRegistry();
+    ~HandlerRegistry();
     HandlerRegistry(const HandlerRegistry&)            = delete;
     HandlerRegistry& operator=(const HandlerRegistry&) = delete;
 
@@ -105,8 +105,8 @@ public:
     void Clear();
 
 private:
-    NodeDefRegistry()  = default;
-    ~NodeDefRegistry() = default;
+    NodeDefRegistry();
+    ~NodeDefRegistry();
     NodeDefRegistry(const NodeDefRegistry&)            = delete;
     NodeDefRegistry& operator=(const NodeDefRegistry&) = delete;
 
