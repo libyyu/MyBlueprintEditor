@@ -17,6 +17,12 @@ do
         return l_instance
     end
 
+    function FPanelHUD:__constructor()
+        self.m_lblScore = nil
+        self.m_lblStars = nil
+        self.m_lblCuts = nil
+    end
+
     function FPanelHUD:GetResPath() return PREFAB_PATH end
 
     function FPanelHUD:OnCreate()
@@ -24,20 +30,20 @@ do
 
         -- lbl_score（分数，居中）
         local lblTr = root:Find("TopBar/lbl_score")
-        self.m_lblScore = lblTr and lblTr:GetComponent(typeof(TMPro.TMP_Text)) or nil
+        self.m_lblScore = lblTr and lblTr:GetComponent(typeof(CS.TMPro.TMP_Text)) or nil
 
         -- lbl_stars（星星，左侧）
         local starTr = root:Find("TopBar/lbl_stars")
-        self.m_lblStars = starTr and starTr:GetComponent(typeof(TMPro.TMP_Text)) or nil
+        self.m_lblStars = starTr and starTr:GetComponent(typeof(CS.TMPro.TMP_Text)) or nil
 
         -- lbl_cuts（刀数，分数右侧）
         local cutTr = root:Find("TopBar/lbl_cuts")
-        self.m_lblCuts = cutTr and cutTr:GetComponent(typeof(TMPro.TMP_Text)) or nil
+        self.m_lblCuts = cutTr and cutTr:GetComponent(typeof(CS.TMPro.TMP_Text)) or nil
 
         -- btn_pause
         local btnPause = root:Find("TopBar/btn_pause")
         if btnPause then
-            btnPause:GetComponent(typeof(UnityEngine.UI.Button)).onClick:AddListener(function()
+            btnPause:GetComponent(typeof(CS.UnityEngine.UI.Button)).onClick:AddListener(function()
                 self:OnClickPause()
             end)
         end

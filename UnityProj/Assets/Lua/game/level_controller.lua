@@ -9,8 +9,7 @@
 -- 所有游戏逻辑（星级计算、分数、通关条件）全部在 bjson 里用节点实现。
 -- 本文件不再依赖 levels/<id>.lua，levels/ 目录可保留但不会被 require。
 
-local LM  = require 'game/level_manager'
-local BPR = CS.CutRope.Framework.BlueprintRunner
+local LM  = require 'game.level_manager'
 
 local M = {}
 local _ctrl    = nil
