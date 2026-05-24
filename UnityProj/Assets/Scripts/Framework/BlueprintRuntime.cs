@@ -1190,6 +1190,20 @@ namespace BlueprintRuntime
             BPRunner.InitDefaultHttpClient();
         }
 
+        /// <summary>在 Lua VM 已创建但尚未运行入口脚本时，提前把 Blueprint.* 绑定注入到 lua_State。
+        /// 必须在 GameLogic.lua 执行之前调用，否则 RegisterHandler / RegisterNodeDef 无效。</summary>
+        public void InjectLuaBindings(IntPtr L)
+        {
+            if (L == IntPtr.Zero) return;
+            // 创建一个临时 runner 仅用于把 Blueprint.* 注入 VM。
+            // 后续所有真正的 Runner（由 BlueprintBehaviour.Awake 创建）
+            // 通过 LuaScriptEngineRegistry::GetDefault() 共享同一个已初始化的 Engine，
+            // 所以 RegisterHandler / RegisterNodeDef 的注册结果全局可见。
+            var warmup = new BPRunner();
+            warmup.SetExternalLuaState(L);
+            Debug.Log("[BlueprintService] Blueprint.* bindings injected into xLua VM");
+        }
+
         /// <summary>创建一个新 Runner。服务会自动每帧 Tick 它。</summary>
         public BPRunner CreateRunner()
         {
