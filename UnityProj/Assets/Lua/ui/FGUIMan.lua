@@ -116,13 +116,13 @@ do
 
 		local tag = "UIRoot"
 		print("GUIMan:InitUIRoot Tag = ", tag)
-		
+
 		local object = GameObject.FindGameObjectWithTag(tag)
 		if IsValidObject(object) then
 			self.m_UIRoot = object
+			self.m_UGUIRoot = self.m_UIRoot.transform:Find("UIRoot(2D)/Canvas").transform
 			return
 		end
-
 		if not IsValidObject(self.m_UIRoot) then
 			self.m_UIRoot = NewGameObject("UIRootContainer")
 		    self.m_UIRoot.transform.localPosition = Vector3(0, 0, 0)

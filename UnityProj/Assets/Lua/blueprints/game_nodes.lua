@@ -42,6 +42,12 @@ local function _getPanel(address)
         print('[UI] No Instance() on: ' .. modPath)
         return nil
     end
+
+    --确保FGUIMain初始化
+    local FGUIMan = require "ui.FGUIMan"
+    FGUIMan.Instance():InitUIRoot()
+
+    
     return mod.Instance()
 end
 
