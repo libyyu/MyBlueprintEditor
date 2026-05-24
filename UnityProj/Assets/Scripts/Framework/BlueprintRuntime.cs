@@ -1214,18 +1214,18 @@ namespace BlueprintRuntime
                 }
             };
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            r.EnableLogging(true);
-            r.OnLog += (lv, msg) =>
-            {
-                switch (lv)
-                {
-                    case BPLogLevel.Warning: Debug.LogWarning($"[BP:dbg] {msg}"); break;
-                    case BPLogLevel.Error: Debug.LogError($"[BP:dbg] {msg}"); break;
-                    default: Debug.Log($"[BP:dbg] {msg}"); break;
-                }
-            };
-#endif
+//#if UNITY_EDITOR || DEVELOPMENT_BUILD
+//            r.EnableLogging(true);
+//            r.OnLog += (lv, msg) =>
+//            {
+//                switch (lv)
+//                {
+//                    case BPLogLevel.Warning: Debug.LogWarning($"[BP:dbg] {msg}"); break;
+//                    case BPLogLevel.Error: Debug.LogError($"[BP:dbg] {msg}"); break;
+//                    default: Debug.Log($"[BP:dbg] {msg}"); break;
+//                }
+//            };
+//#endif
 
             return r;
         }

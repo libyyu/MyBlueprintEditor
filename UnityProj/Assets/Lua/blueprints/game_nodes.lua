@@ -1021,8 +1021,11 @@ Blueprint.RegisterNodeDef({
     },
 })
 Blueprint.RegisterHandler("Rope.SpawnAll", function(ctx)
+    print('[Rope.SpawnAll] start')
+    CS.UnityEngine.Debug.Log("[Rope.SpawnAll] start")
     local ctrl = CS.CutRope.Game.LevelController.Current
     if not ctrl then
+        print('[Rope.SpawnAll] LevelController not found')
         ctx:SetOutput("Count", 0)
         return true
     end
