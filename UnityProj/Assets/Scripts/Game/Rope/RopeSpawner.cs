@@ -52,9 +52,17 @@ namespace CutRope.Game
         {
             if (segmentPrefab == null)
             {
-                Debug.LogError("[RopeSpawner] segmentPrefab is null");
+                Debug.LogError($"[RopeSpawner] segmentPrefab is null on GameObject '{gameObject.name}'. " +
+                               "请在 Inspector 中为 RopeSpawner 的 segmentPrefab 字段拖入 RopeSegment 预制体！");
                 return;
             }
+            if (candy == null)
+            {
+                Debug.LogError($"[RopeSpawner] candy is null on '{gameObject.name}'. " +
+                               "LevelController 未能找到场景中的 Candy 对象，检查 Candy 组件是否挂载。");
+                return;
+            }
+            Debug.Log($"[RopeSpawner] Spawning rope on '{gameObject.name}', segments={segmentCount}, candy='{candy.gameObject.name}'");
 
             // 优先使用 RopeRenderer（高质量），否则 fallback 到 LineRenderer
             if (ropeRenderer == null)

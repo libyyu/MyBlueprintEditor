@@ -16,6 +16,7 @@ using CutRope.Framework;
 namespace CutRope.Game
 {
     [LuaCallCSharp]
+    [DefaultExecutionOrder(10)]  // BlueprintBehaviour 默认为 0，+10 确保 LevelController.Start() 在其后执行
     public class LevelController : MonoBehaviour
     {
         // ── 单例 ──────────────────────────────────────────────────────
@@ -102,11 +103,17 @@ namespace CutRope.Game
             Debug.Log($"[LevelController] Stars in scene: {_stars.Count}");
 
             IsRunning = true;
+        }
 
-            // 延一帧再触发 Ready：确保 BlueprintBehaviour 也已 Start 完毕，
-            // Execute() 的 OnBeginPlay 在 Lua 侧调用 Rope.SpawnAll 时 candy 已初始化
-            //Invoke(nameof(FireReady), 0.1f);
-            FireReady();
+        private void Start()
+        {
+            // Start() 里触发 Ready，保证两件事同时成立：
+            //   1. 所有 Awake() 已完成（BlueprintBehaviour.Awake 已加载蓝图）
+            //   2. BlueprintBehaviour.Start() 已执行 Runner.Execute()，OnBeginPlay 已触发
+            // 注意：MonoBehaviour 的 Start() 调用顺序不保证，
+            // 若 BlueprintBehaviour.Start() 晚于 LevelController.Start()，
+            // 则延一帧确保安全。
+            Invoke(nameof(FireReady), 0f);  // 延一帧：等所有 Start() 跑完
         }
 
         private void FireReady()
