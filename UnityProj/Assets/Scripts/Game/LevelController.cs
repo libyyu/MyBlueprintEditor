@@ -57,8 +57,11 @@ namespace CutRope.Game
         {
             Current = this;
             // 自动收集
+            // 清除 Inspector 里可能存在的空引用（prefab 实例化后引用丢失的情况）
+            ropes.RemoveAll(r => r == null);
             if (ropes.Count == 0)
                 ropes.AddRange(FindObjectsByType<RopeSpawner>(FindObjectsSortMode.None));
+            Debug.Log($"[LevelController] Ropes found: {ropes.Count}");
             if (candy == null)
                 candy = FindFirstObjectByType<Candy>();
             if (cutInput == null)
