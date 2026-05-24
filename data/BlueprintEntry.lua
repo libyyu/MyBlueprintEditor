@@ -23,10 +23,20 @@ if not ok then
     end
 end
 
-package.path = package.path .. ";" .. _G.DataPath .. "\\UnityProj\\Assets\\Lua\\?.lua"
+-- my_dir 是 data/ 的绝对路径（末尾有 /），往上一级就是项目根
+-- 同时兼容 Windows 反斜杠和 Unix 正斜杠
+local sep = package.config:sub(1,1)  -- OS 路径分隔符（\ 或 /）
+local proj_root = my_dir:match("^(.*[/\\])data[/\\]?$") or (my_dir .. ".." .. sep)
+-- Lua require 用 '.' 作模块分隔符，loader 需要把 '.' 替换成 '/'（或 sep）
+-- 为了兼容，同时添加正斜杠和反斜杠两种 pattern
+local lua_root = proj_root .. "UnityProj" .. sep .. "Assets" .. sep .. "Lua" .. sep
+package.path = package.path
+    .. ";" .. lua_root .. "?.lua"
+    .. ";" .. lua_root .. "?" .. sep .. "init.lua"
+print("[BlueprintEntry] Added Lua path: " .. lua_root)
 local ok, err = pcall(require, "blueprints.BlueprintEntry")
 if not ok then
-    print('[GameLogic] Warning: BlueprintEntry load failed: ' .. tostring(err))
+    print('[BlueprintEntry] Warning: blueprints.BlueprintEntry load failed: ' .. tostring(err))
 end
 
 -- ── 注册自定义节点：LuaAgent.RunReAct ─────────────────────────────────────
