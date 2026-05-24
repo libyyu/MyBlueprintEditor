@@ -1201,29 +1201,6 @@ namespace BlueprintRuntime
             // BR 不拥有此 VM，不会在 Dispose 时 lua_close
             r.SetExternalLuaState(LuaState);
 
-            // SetExternalLuaState 后 __blueprint_runner 已切换到 r。
-            // 重新执行 BlueprintEntry 把节点注册到新 runner。
-            // 用 package.loaded 删除缓存，下次 require 才会重跑。
-            try
-            {
-                var env = LuaManager.Instance?.ActiveLuaEnv;
-                if (env != null)
-                {
-                    env.DoString(
-                        "package.loaded['blueprints.BlueprintEntry'] = nil\n" +
-                        "package.loaded['blueprints.game_nodes']     = nil\n" +
-                        "package.loaded['blueprints.game_extensions'] = nil\n" +
-                        "require 'blueprints.BlueprintEntry'"
-                    );
-                    UnityEngine.Debug.Log("[BlueprintService] Re-registered blueprint nodes on new runner.");
-                }
-            }
-            catch (System.Exception e)
-            {
-                UnityEngine.Debug.LogWarning($"[BlueprintService] Node re-register failed: {e.Message}");
-            }
-
-
             string dumpDir = System.IO.Path.Combine(UnityEngine.Application.dataPath, "../CrashDumps");
             BPRunner.SetCrashDumpDir(dumpDir);
             
