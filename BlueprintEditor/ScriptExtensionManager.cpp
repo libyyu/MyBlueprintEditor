@@ -5,6 +5,9 @@
 
 #include "ScriptExtensionManager.h"
 #include "../Runtime/BlueprintRunner.h"
+#ifdef BLUEPRINT_HAS_LUA
+#include "../Runtime/LuaScriptEngine.h"
+#endif
 #include "BpLogger.h"
 #include <filesystem>
 #include <algorithm>
@@ -132,15 +135,9 @@ bool ScriptExtensionManager::LoadScript(const std::string& filePath)
         return false;
     }
 
-    // 记录文件（去重）
+    // 记录文件（去重）— mtime 由 engine 内部跟踪，不再双写
     if (std::find(m_loadedFiles.begin(), m_loadedFiles.end(), filePath) == m_loadedFiles.end())
         m_loadedFiles.push_back(filePath);
-
-    // 记录修改时间
-    try {
-        auto t = fs::last_write_time(filePath);
-        m_fileModTimes[filePath] = t.time_since_epoch().count();
-    } catch (...) {}
 
     m_lastError.clear();
     return true;
@@ -160,16 +157,7 @@ bool ScriptExtensionManager::ReloadAll()
         return false;
     }
 
-    // ReloadExtensionScript 内部重新加载所有已加载脚本
-    // 同步编辑器侧修改时间
-    for (const auto& f : m_loadedFiles)
-    {
-        try {
-            auto t = fs::last_write_time(f);
-            m_fileModTimes[f] = t.time_since_epoch().count();
-        } catch (...) {}
-    }
-
+    // ReloadExtensionScript 内部重新加载所有已加载脚本，mtime 由 engine 跟踪
     m_lastError.clear();
     return true;
 }
@@ -192,7 +180,6 @@ void ScriptExtensionManager::UnregisterAll()
 {
     if (m_runner) m_runner->UnregisterAllScriptedNodes();
     m_loadedFiles.clear();
-    m_fileModTimes.clear();
 }
 
 // ============================================================================
@@ -206,23 +193,30 @@ void ScriptExtensionManager::PollFileChanges(float deltaTime)
     m_pollAccum = 0.0f;
 
     // ── 热重载：检测已加载脚本变更 ────────────────────────────────────────
-    if (m_autoReload && !m_loadedFiles.empty())
+    // 对比磁盘 mtime 与 engine 中记录的 mtime，不一致则触发重载
+    if (m_autoReload && m_runner && !m_loadedFiles.empty())
     {
-        for (const auto& f : m_loadedFiles)
+#ifdef BLUEPRINT_HAS_LUA
+        auto* engine = m_runner->GetLuaEngine();
+        if (engine)
         {
-            try {
-                auto t = fs::last_write_time(f);
-                int64_t tval = t.time_since_epoch().count();
-                auto it = m_fileModTimes.find(f);
-                if (it == m_fileModTimes.end() || it->second != tval)
-                {
-                    if (m_logCallback)
-                        m_logCallback(0, "[Script] Hot-reload: " + f);
-                    ReloadFile(f);
-                    break;  // ReloadAll 已处理全部文件，退出循环
-                }
-            } catch (...) {}
+            for (const auto& f : m_loadedFiles)
+            {
+                try {
+                    auto t = fs::last_write_time(f);
+                    int64_t diskMtime = t.time_since_epoch().count();
+                    int64_t engineMtime = engine->GetFileMtime(f);
+                    if (engineMtime != 0 && engineMtime != diskMtime)
+                    {
+                        if (m_logCallback)
+                            m_logCallback(0, "[Script] Hot-reload: " + f);
+                        ReloadFile(f);
+                        break;  // ReloadAll 已处理全部文件，退出循环
+                    }
+                } catch (...) {}
+            }
         }
+#endif
     }
 
     // ── Entry Script Watcher：轮询待加载入口脚本 ──────────────────────────

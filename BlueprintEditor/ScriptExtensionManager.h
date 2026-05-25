@@ -24,8 +24,6 @@
 
 #include <string>
 #include <vector>
-#include <unordered_map>
-#include <unordered_set>
 #include <functional>
 
 namespace NodeEditor { namespace Runtime {
@@ -95,8 +93,6 @@ private:
 
     // 工程扩展脚本列表（工程文件中的 scriptExtensions）
     std::vector<std::string>                m_loadedFiles;
-    // 文件修改时间（热重载用）
-    std::unordered_map<std::string, int64_t> m_fileModTimes;
 
     bool    m_autoReload      = true;
     float   m_pollIntervalSec = 1.0f;
