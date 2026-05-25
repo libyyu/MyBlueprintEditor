@@ -82,6 +82,10 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Misc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Network.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_AI.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_AI_JSON.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_AI_LLM.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_AI_Tool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_AI_Agent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_File.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Server.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Crypto.cpp
