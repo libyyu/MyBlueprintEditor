@@ -12,6 +12,26 @@ namespace NodeEditor {
 namespace Runtime {
 
 // ============================================================================
+// 引脚类型字符串解析（公共工具函数）
+// 供 LuaBindings / ScriptNodeLoader / 任何需要从字符串解析 PinDataType 的地方使用。
+// ============================================================================
+
+inline PinDataType ParsePinTypeStr(const std::string& typeStr, bool& isExec)
+{
+    isExec = false;
+    if (typeStr == "Flow")    { isExec = true; return PinDataType::Unknown; }
+    if (typeStr == "Integer") return PinDataType::Integer;
+    if (typeStr == "Float")   return PinDataType::Float;
+    if (typeStr == "Boolean") return PinDataType::Boolean;
+    if (typeStr == "String")  return PinDataType::String;
+    if (typeStr == "Array")   return PinDataType::Array;
+    if (typeStr == "Map")     return PinDataType::Map;
+    if (typeStr == "Set")     return PinDataType::Set;
+    if (typeStr == "Object")  return PinDataType::Object;
+    return PinDataType::Any;
+}
+
+// ============================================================================
 // 引脚定义（用于节点模板）
 // ============================================================================
 

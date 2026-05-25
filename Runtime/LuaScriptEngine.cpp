@@ -59,8 +59,7 @@ LuaScriptEngine& LuaScriptEngine::operator=(LuaScriptEngine&& other) noexcept
 }
 static std::string _luaArgsToString(lua_State* L)
 {
-    static std::string msg;
-    msg.clear();
+    std::string msg;
 	int n = lua_gettop(L);
 	lua_getglobal(L, "tostring");
 	for (int i = 1; i <= n; ++i)
@@ -113,49 +112,32 @@ bool LuaScriptEngine::Initialize(BlueprintRunner* runner)
     // 这样 Lua 脚本里的 print() 输出能在编辑器控制台和 runtime-example 都能看到
     if (!m_runner)
     {
-        // 把 runner 指针存入 Lua registry，供 print 覆盖函数访问
-        // （__blueprint_runner 已由 RegisterLuaBindings 设置，此处直接复用）
-        lua_pushcfunction(m_L, [](lua_State* L)->int {
-			std::string msg = _luaArgsToString(L);
-			// 通过 runner PrintCallback 输出
-			lua_getfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
-			auto* r = static_cast<BlueprintRunner*>(lua_touserdata(L, -1));
-			lua_pop(L, 1);
-			if (r)
-				r->Print(msg);
-			else
-				fprintf(stdout, "%s\n", msg.c_str());
-			return 0;
-        });
-        lua_setglobal(m_L, "print");
-		
-        lua_pushcfunction(m_L, [](lua_State* L)->int {
-			std::string msg = _luaArgsToString(L);
-			// 通过 runner PrintCallback 输出
-			lua_getfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
-			auto* r = static_cast<BlueprintRunner*>(lua_touserdata(L, -1));
-			lua_pop(L, 1);
-			if (r)
-				r->Print(msg, LogLevel::Warning);
-			else
-				fprintf(stdout, "%s\n", msg.c_str());
-			return 0;
-        });
-		lua_setglobal(m_L, "warn");
+        // 通用 print 实现：upvalue[1] = LogLevel（int），通过 __blueprint_runner 路由输出
+        static auto luaPrintImpl = [](lua_State* L) -> int {
+            int level = static_cast<int>(lua_tointeger(L, lua_upvalueindex(1)));
+            std::string msg = _luaArgsToString(L);
+            lua_getfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
+            auto* r = static_cast<BlueprintRunner*>(lua_touserdata(L, -1));
+            lua_pop(L, 1);
+            if (r)
+                r->Print(msg, static_cast<LogLevel>(level));
+            else
+                fprintf(level >= static_cast<int>(LogLevel::Error) ? stderr : stdout, "%s\n", msg.c_str());
+            return 0;
+        };
 
-        lua_pushcfunction(m_L, [](lua_State* L)->int {
-			std::string msg = _luaArgsToString(L);
-			// 通过 runner PrintCallback 输出
-			lua_getfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
-			auto* r = static_cast<BlueprintRunner*>(lua_touserdata(L, -1));
-			lua_pop(L, 1);
-			if (r)
-				r->Print(msg, LogLevel::Error);
-			else
-				fprintf(stderr, "%s\n", msg.c_str());
-			return 0;
-        });
-		lua_setglobal(m_L, "printerror");
+        // print → Info, warn → Warning, printerror → Error
+        lua_pushinteger(m_L, static_cast<lua_Integer>(LogLevel::Info));
+        lua_pushcclosure(m_L, luaPrintImpl, 1);
+        lua_setglobal(m_L, "print");
+
+        lua_pushinteger(m_L, static_cast<lua_Integer>(LogLevel::Warning));
+        lua_pushcclosure(m_L, luaPrintImpl, 1);
+        lua_setglobal(m_L, "warn");
+
+        lua_pushinteger(m_L, static_cast<lua_Integer>(LogLevel::Error));
+        lua_pushcclosure(m_L, luaPrintImpl, 1);
+        lua_setglobal(m_L, "printerror");
     }
 
     m_lastError.clear();

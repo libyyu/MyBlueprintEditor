@@ -597,32 +597,7 @@ public:
     // deltaSeconds：距上次调用的秒数。
     void TickScriptExtensions(double deltaSeconds);
 
-    // ----------------------------------------------------------------------
-    // 旧名保留：[[deprecated]] 别名，逐步淘汰（CAPI / 第三方代码兼容）
-    // 新代码请使用上面 ExtensionScript / Scripted / ScriptEngine 命名版本。
-    // ----------------------------------------------------------------------
-    [[deprecated("use LoadExtensionScript")]]
-    bool LoadLuaScript(const std::string& filePath) { return LoadExtensionScript(filePath); }
-    [[deprecated("use LoadExtensionScriptString")]]
-    bool LoadLuaString(const std::string& code, const std::string& name = "=string") { return LoadExtensionScriptString(code, name); }
-    [[deprecated("use ReloadExtensionScript")]]
-    bool ReloadLuaScript(const std::string& filePath) { return ReloadExtensionScript(filePath); }
-    [[deprecated("use UnregisterAllScriptedNodes")]]
-    void UnregisterAllLuaNodes() { UnregisterAllScriptedNodes(); }
-    [[deprecated("use AddScriptSearchPath")]]
-    void AddLuaPath(const std::string& dir) { AddScriptSearchPath(dir); }
-    [[deprecated("use GetScriptRegisteredNodeIds")]]
-    const std::unordered_set<std::string>& GetLuaRegisteredNodeIds() const { return GetScriptRegisteredNodeIds(); }
-    [[deprecated("use GetLoadedExtensionScripts")]]
-    const std::vector<std::string>& GetLuaLoadedFiles() const { return GetLoadedExtensionScripts(); }
-    [[deprecated("use MarkScriptRegisteredNode")]]
-    void MarkLuaRegisteredNode(const std::string& id) { MarkScriptRegisteredNode(id); }
-    [[deprecated("use UnmarkScriptRegisteredNode")]]
-    void UnmarkLuaRegisteredNode(const std::string& id) { UnmarkScriptRegisteredNode(id); }
-    [[deprecated("use EnsureScriptEngine")]]
-    bool EnsureLuaEngine() { return EnsureScriptEngine(); }
-    [[deprecated("use TickScriptExtensions")]]
-    void TickLua(double deltaSeconds) { TickScriptExtensions(deltaSeconds); }
+
 
     // 获取底层 Lua 引擎实例（高级用途：注册自定义 C 函数 / 接入外部 xLua 等）
     // 这是少数明确暴露 Lua 后端的 API，仅供 host 集成时使用，编辑器不应调用。

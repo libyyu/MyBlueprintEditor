@@ -15,16 +15,7 @@ namespace Runtime {
 
 static PinDataType ParsePinType(const std::string& typeStr, bool& isExec)
 {
-    isExec = false;
-    if (typeStr == "Flow")      { isExec = true; return PinDataType::Unknown; }
-    if (typeStr == "Integer")   return PinDataType::Integer;
-    if (typeStr == "Float")     return PinDataType::Float;
-    if (typeStr == "Boolean")   return PinDataType::Boolean;
-    if (typeStr == "String")    return PinDataType::String;
-    if (typeStr == "Array")     return PinDataType::Array;
-    if (typeStr == "Map")       return PinDataType::Map;
-    if (typeStr == "Object")    return PinDataType::Object;
-    return PinDataType::Any;
+    return ParsePinTypeStr(typeStr, isExec);
 }
 
 int LoadCustomNodesFromFile(INodeRegistry& registry, const std::string& filePath)

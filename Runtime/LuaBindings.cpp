@@ -719,17 +719,7 @@ static int l_hasHandler(lua_State* L)
 
 static PinDataType luaParsePinType(const std::string& t, bool& isExec)
 {
-    isExec = false;
-    if (t == "Flow")    { isExec = true; return PinDataType::Unknown; }
-    if (t == "Integer") return PinDataType::Integer;
-    if (t == "Float")   return PinDataType::Float;
-    if (t == "Boolean") return PinDataType::Boolean;
-    if (t == "String")  return PinDataType::String;
-    if (t == "Array")   return PinDataType::Array;
-    if (t == "Map")     return PinDataType::Map;
-    if (t == "Set")     return PinDataType::Set;
-    if (t == "Object")  return PinDataType::Object;
-    return PinDataType::Any;
+    return ParsePinTypeStr(t, isExec);
 }
 
 static void parsePinArray(lua_State* L, int tableIdx, PinKind kind,
