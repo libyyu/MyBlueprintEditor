@@ -341,428 +341,14 @@ void BlueprintEditor::ShowLeftPane(float /*paneWidth*/)
 
 void BlueprintEditor::OnFrame(float deltaTime)
 {
-    // 扩展脚本热重载轮询（内部按 m_pollIntervalSec 节流；无脚本后端时为空操作）
-    if (m_scriptExtensions.IsInitialized() && m_scriptExtensions.GetAutoReload())
-    {
-        size_t countBefore = m_extensionRunner.GetScriptRegisteredNodeIds().size();
-        m_scriptExtensions.PollFileChanges(deltaTime);
-        size_t countAfter = m_extensionRunner.GetScriptRegisteredNodeIds().size();
-        if (countAfter != countBefore)
-            SyncScriptedDefsToRegistry();
-        size_t newCount = m_NodeRegistry.getAllNodeDefinitions().size();
-        if (newCount != m_CachedDefCount)
-            m_CachedDefCount = 0;
-    }
-    // 驱动扩展脚本的 OnGlobalTick(dt)（无脚本后端时 Tick 为空操作）
-    if (m_scriptExtensions.IsInitialized())
-        m_scriptExtensions.Tick(deltaTime);
+    OnFrame_PreTick(deltaTime);
+    OnFrame_DrawMenuBar();
 
-    // 驱动所有文档的计时器
-    for (auto& doc : m_Documents)
-        doc->persistentRunner.Tick(deltaTime);
-
-    // 每帧 drain MainThreadDispatcher 队列（驱动 FireEvent 等异步 Post 的任务）
-    ::NodeEditor::Runtime::MainThreadDispatcher::Get().DrainQueue();
-
-    // UserInput.Wait：检测 pending 标志，渲染居中输入弹框
-    for (auto& doc : m_Documents)
-    {
-        if (!doc->isExecuting) continue;
-        std::string pending = doc->persistentRunner.GetVariable("__userinput_pending").asString();
-        if (pending == "1")
-        {
-            std::string prompt = doc->persistentRunner.GetVariable("__userinput_prompt").asString();
-            std::string defVal = doc->persistentRunner.GetVariable("__userinput_default").asString();
-
-            ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(),
-                                    ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-            ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Always);
-            bool open = true;
-            if (ImGui::Begin("##UserInputDialog", &open,
-                             ImGuiWindowFlags_NoTitleBar  |
-                             ImGuiWindowFlags_NoResize    |
-                             ImGuiWindowFlags_NoMove      |
-                             ImGuiWindowFlags_NoScrollbar |
-                             ImGuiWindowFlags_AlwaysAutoResize))
-            {
-                ImGui::TextWrapped("%s", prompt.c_str());
-                ImGui::Spacing();
-
-                static char s_UIDlgBuf[1024] = {};
-                static std::string s_UIDlgLastPrompt;
-                if (s_UIDlgLastPrompt != prompt) {
-                    s_UIDlgLastPrompt = prompt;
-                    strncpy(s_UIDlgBuf, defVal.c_str(), sizeof(s_UIDlgBuf) - 1);
-                    s_UIDlgBuf[sizeof(s_UIDlgBuf)-1] = '\0';
-                    ImGui::SetKeyboardFocusHere();
-                }
-
-                bool confirmed = ImGui::InputText("##uidlg", s_UIDlgBuf,
-                                                  sizeof(s_UIDlgBuf),
-                                                  ImGuiInputTextFlags_EnterReturnsTrue);
-                ImGui::SameLine();
-                if (ImGui::Button("OK") || confirmed) {
-                    doc->persistentRunner.SetVariable("__userinput_result",
-                                                      ::NodeEditor::Runtime::Variant(std::string(s_UIDlgBuf)));
-                    doc->persistentRunner.SetVariable("__userinput_pending",
-                                                      ::NodeEditor::Runtime::Variant(std::string("0")));
-                    s_UIDlgLastPrompt.clear();
-                }
-            }
-            ImGui::End();
-            break; // 每帧只处理第一个 pending doc
-        }
-    }
-
-    // OnTick 事件驱动：对正在执行且有 OnTick 事件源的文档，每帧触发 DispatchEvent
-    for (auto& doc : m_Documents)
-    {
-        if (!doc->isExecuting) continue;
-        if (doc->blueprintClass == RTBlueprintClass::FunctionLibrary) continue;
-        // 已暂停于断点时跳过 DispatchEvent（避免覆盖暂停状态）
-        if (doc->persistentRunner.IsPaused()) continue;
-        // 注入 deltaTime，OnTick handler 通过 GetVariable("__DeltaTime") 读取
-        doc->persistentRunner.SetVariable("__DeltaTime", ::NodeEditor::Runtime::Variant(static_cast<double>(deltaTime)));
-        auto tickResult = doc->persistentRunner.DispatchEvent("OnTick");
-        // 检查 OnTick 链上是否命中断点
-        if (doc->persistentRunner.IsPaused())
-        {
-            // 将命中的节点加入高亮（与 OnBeginPlay 路径一致）
-            for (auto nid : tickResult.executedNodeIds)
-            {
-                auto& hl = doc->executedNodeHighlight[nid];
-                hl.timeLeft = 2.0f;
-                hl.color    = ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
-            }
-        }
-    }
-
-    // 衰减执行高亮
-    for (auto& doc : m_Documents)
-    {
-        for (auto it = doc->executedNodeHighlight.begin(); it != doc->executedNodeHighlight.end();)
-        {
-            it->second.timeLeft -= deltaTime;
-            if (it->second.timeLeft <= 0.0f)
-                it = doc->executedNodeHighlight.erase(it);
-            else
-                ++it;
-        }
-    }
-
-    // 当前活跃文档的 UpdateTouch
-    if (ActiveDoc())
-        UpdateTouch();
-
-    // 动态更新 OS 窗口标题（仅在 dirty 状态或文件变化时重建，避免每帧调用 OS API）
-    if (ActiveDoc())
-    {
-        std::string baseName;
-        if (ActiveDoc()->filePath.empty())
-            baseName = "[New]";
-        else
-            baseName = BpPath::BaseName(ActiveDoc()->filePath);
-        std::string windowTitle = "Blueprint Editor - " + baseName;
-        if (ActiveDoc()->isDirty)
-            windowTitle += " *";
-
-        // 只在标题变化时调用 SetTitle（避免每帧 OS 调用）
-        static std::string s_lastWindowTitle;
-        if (windowTitle != s_lastWindowTitle)
-        {
-            SetTitle(windowTitle.c_str());
-            s_lastWindowTitle = windowTitle;
-        }
-    }
-
+    // io 引用：DockLayout 主块内部多处用到（节点拖拽 undo 等）；
+    // 子方法 DrawMenuBar 内部已独立声明本地 io。
     auto& io = ImGui::GetIO();
+    (void)io;  // 标记为可能未使用以避免某些编译器警告
 
-    // ================================================================
-    // 菜单栏
-    // ================================================================
-    if (ImGui::BeginMenuBar())
-    {
-        bool hasProj = m_Project.IsOpen();
-        bool hasDoc  = (ActiveDoc() != nullptr);
-
-        if (ImGui::BeginMenu(ICON_FA_FILE " File"))
-        {
-            // ── 工程 ──────────────────────────────────────────────────────
-            if (ImGui::MenuItem(ICON_FA_DIAGRAM_PROJECT " New Project"))
-                NewProject();
-            if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Open Project..."))
-                OpenProject();
-            // 最近工程（始终显示，排除当前已打开的工程）
-            if (ImGui::BeginMenu(ICON_FA_CLOCK_ROTATE_LEFT " Recent Projects"))
-            {
-                DrawRecentProjectsMenu();
-                ImGui::EndMenu();
-            }
-            if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK " Save Project", nullptr, false, hasProj))
-                SaveProject();
-            if (ImGui::MenuItem(ICON_FA_FILE_EXPORT " Save Project As...", nullptr, false, hasProj))
-                SaveProjectAs();
-            // ── 蓝图（仅有工程时显示）─────────────────────────────────────
-            if (hasProj)
-            {
-                ImGui::Separator();
-                if (ImGui::MenuItem(ICON_FA_FILE " New Actor Blueprint", "Ctrl+N"))
-                    NewFile(RTBlueprintClass::Actor);
-                if (ImGui::MenuItem(ICON_FA_CUBE " New Function Library"))
-                    NewFile(RTBlueprintClass::FunctionLibrary);
-                if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Open Blueprint...", "Ctrl+O"))
-                    OpenFile();
-                if (ImGui::BeginMenu(ICON_FA_CLOCK_ROTATE_LEFT " Recent Files"))
-                {
-                    DrawRecentFilesMenu();
-                    ImGui::EndMenu();
-                }
-                ImGui::Separator();
-                if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK " Save", "Ctrl+S", false, hasDoc))
-                    SaveFile();
-                if (ImGui::MenuItem(ICON_FA_FILE_EXPORT " Save As...", "Ctrl+Shift+S", false, hasDoc))
-                    SaveFileAs();
-                ImGui::Separator();
-                if (ImGui::MenuItem(ICON_FA_XMARK " Close Tab", "Ctrl+W", false, hasDoc))
-                {
-                    if (ActiveDoc()->isDirty)
-                    {
-                        m_PendingCloseTabIndex = m_ActiveDocIndex;
-                        m_ShowUnsavedDialog = true;
-                    }
-                    else
-                        CloseDocument(m_ActiveDocIndex);
-                }
-            }
-            ImGui::EndMenu();
-        }
-
-        // Edit 菜单：完全依赖文档，无文档时整体禁用
-        if (ImGui::BeginMenu(ICON_FA_PEN " Edit", hasDoc))
-        {
-            if (ImGui::MenuItem(ICON_FA_ARROW_ROTATE_LEFT " Undo", "Ctrl+Z", false, CanUndo()))
-                Undo();
-            if (ImGui::MenuItem(ICON_FA_ARROWS_ROTATE " Redo", "Ctrl+Y", false, CanRedo()))
-                Redo();
-            ImGui::Separator();
-            if (ImGui::MenuItem(ICON_FA_COPY " Copy", "Ctrl+C"))
-                CopySelectedNodes();
-            if (ImGui::MenuItem(ICON_FA_PASTE " Paste", "Ctrl+V"))
-            {
-                ImVec2 canvasPos = ed::ScreenToCanvas(ImGui::GetMousePos());
-                PasteNodes(canvasPos);
-            }
-            if (ImGui::MenuItem(ICON_FA_SCISSORS " Cut", "Ctrl+X"))
-                CutSelectedNodes();
-            if (ImGui::MenuItem(ICON_FA_CLONE " Duplicate", "Ctrl+D"))
-                DuplicateSelectedNodes();
-            ImGui::Separator();
-            if (ImGui::MenuItem(ICON_FA_OBJECT_GROUP " Select All", "Ctrl+A"))
-            {
-                for (auto& node : ActiveDoc()->nodes)
-                    ed::SelectNode(node.ID, true);
-            }
-            ImGui::Separator();
-            if (ImGui::BeginMenu(ICON_FA_ALIGN_LEFT " Align Selected"))
-            {
-                if (ImGui::MenuItem(ICON_FA_ALIGN_LEFT " Align Left"))    AlignSelectedNodes(AlignMode::Left);
-                if (ImGui::MenuItem(ICON_FA_ALIGN_RIGHT " Align Right"))   AlignSelectedNodes(AlignMode::Right);
-                if (ImGui::MenuItem(ICON_FA_ARROW_UP " Align Top"))     AlignSelectedNodes(AlignMode::Top);
-                if (ImGui::MenuItem(ICON_FA_ARROW_DOWN " Align Bottom"))  AlignSelectedNodes(AlignMode::Bottom);
-                ImGui::Separator();
-                if (ImGui::MenuItem(ICON_FA_ALIGN_CENTER " Center Horizontally"))  AlignSelectedNodes(AlignMode::CenterH);
-                if (ImGui::MenuItem(ICON_FA_ALIGN_CENTER " Center Vertically"))    AlignSelectedNodes(AlignMode::CenterV);
-                ImGui::EndMenu();
-            }
-            ImGui::Separator();
-            if (ImGui::MenuItem(ICON_FA_MAGNIFYING_GLASS " Find...", "Ctrl+F"))
-                OpenSearchOverlay();
-            ImGui::EndMenu();
-        }
-
-        // View 菜单：部分条目依赖文档
-        if (ImGui::BeginMenu(ICON_FA_EYE " View"))
-        {
-            if (hasDoc)
-            {
-                ImGui::MenuItem(ICON_FA_LIST " Node List", nullptr, &m_ShowNodeListWindow);
-                ImGui::MenuItem(ICON_FA_TERMINAL " Execution Output", nullptr, &m_ShowExecutionWindow);
-                ImGui::MenuItem(ICON_FA_STOPWATCH " Timer Monitor", nullptr, &m_ShowTimerWindow);
-                ImGui::MenuItem(ICON_FA_MAP " Minimap", nullptr, &m_ShowMinimap);
-                ImGui::MenuItem(ICON_FA_LAYER_GROUP " Node Library", nullptr, &m_ShowLibraryWindow);
-                ImGui::MenuItem(ICON_FA_TABLE_CELLS " Show Ordinals", nullptr, &m_ShowOrdinals);
-                ImGui::Separator();
-                if (ImGui::MenuItem(ICON_FA_EXPAND " Zoom to Content"))
-                    ed::NavigateToContent();
-                ImGui::Separator();
-            }
-            if (ImGui::MenuItem(ICON_FA_PALETTE " Style Editor"))
-                m_ShowStyleEditorWindow = true;
-            ImGui::EndMenu();
-        }
-
-        // Run 菜单：整体依赖文档
-        if (ImGui::BeginMenu(ICON_FA_BOLT " Run", hasDoc))
-        {
-            if (ImGui::MenuItem(ICON_FA_PLAY " Execute Blueprint", "F5"))
-                ExecuteBlueprint();
-            ImGui::Separator();
-            ImGui::MenuItem(ICON_FA_STOPWATCH " Timer Monitor", nullptr, &m_ShowTimerWindow);
-            if (ImGui::MenuItem(ICON_FA_ERASER " Clear Execution Highlight"))
-                ActiveDoc()->executedNodeHighlight.clear();
-            ImGui::EndMenu();
-        }
-
-        if (ImGui::BeginMenu(ICON_FA_CIRCLE_QUESTION " Help"))
-        {
-            ImGui::TextColored(ImVec4(0.45f, 0.70f, 0.95f, 1.00f), ICON_FA_KEYBOARD " Keyboard Shortcuts");
-            ImGui::Separator();
-            ImGui::TextDisabled("File");
-            ImGui::BulletText("Ctrl+N         New File");
-            ImGui::BulletText("Ctrl+O         Open File");
-            ImGui::BulletText("Ctrl+S         Save");
-            ImGui::BulletText("Ctrl+Shift+S   Save As");
-            ImGui::BulletText("Ctrl+W         Close Tab");
-            ImGui::Spacing();
-            ImGui::TextDisabled("Edit");
-            ImGui::BulletText("Ctrl+C         Copy");
-            ImGui::BulletText("Ctrl+V         Paste");
-            ImGui::BulletText("Ctrl+X         Cut");
-            ImGui::BulletText("Ctrl+D         Duplicate");
-            ImGui::BulletText("Ctrl+A         Select All");
-            ImGui::BulletText("Ctrl+F         Find Nodes");
-            ImGui::BulletText("Delete         Delete Selected");
-            ImGui::Spacing();
-            ImGui::TextDisabled("View");
-            ImGui::BulletText("F              Zoom to Content");
-            ImGui::BulletText("F5             Execute Blueprint");
-            ImGui::BulletText("Right Click    Context Menu");
-            ImGui::BulletText("Double Click   Open Sub-Blueprint");
-            ImGui::EndMenu();
-        }
-        ImGui::Separator();
-
-        // 显示当前文件名
-        if (hasDoc)
-        {
-            if (!ActiveDoc()->filePath.empty())
-            {
-                std::string displayName = BpPath::BaseName(ActiveDoc()->filePath)
-                                        + BpPath::Extension(ActiveDoc()->filePath);
-                if (ActiveDoc()->isDirty)
-                    displayName += " \xe2\x80\xa2";  // bullet
-                ImGui::TextColored(ImVec4(0.55f, 0.75f, 1.0f, 0.90f), "%s", displayName.c_str());
-                ImGui::Separator();
-            }
-            else
-            {
-                ImGui::TextColored(ImVec4(0.55f, 0.55f, 0.60f, 0.90f), "[New]");
-                ImGui::Separator();
-            }
-        }
-
-        // FPS（低调灰色）
-        ImGui::TextColored(ImVec4(0.50f, 0.52f, 0.58f, 0.90f),
-            "%.0f fps", io.Framerate);
-
-        // 节点/链接统计
-        if (ActiveDoc())
-        {
-            ImGui::Separator();
-            ImGui::TextColored(ImVec4(0.42f, 0.60f, 0.42f, 0.85f), "N:%d  L:%d",
-                               static_cast<int>(ActiveDoc()->nodes.size()), static_cast<int>(ActiveDoc()->links.size()));
-        }
-
-        // 菜单栏最右侧：侧边栏切换按钮（点击显示/隐藏左侧面板）
-        {
-            float btnW = ImGui::CalcTextSize(ICON_FA_LIST).x + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f;
-            float avail = ImGui::GetContentRegionAvail().x;
-            if (avail > btnW + 4.0f)
-                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - btnW - 4.0f);
-            ImGui::PushStyleColor(ImGuiCol_Button,        m_ShowNodeListWindow ? IM_COL32(0, 122, 204, 80) : IM_COL32(0,0,0,0));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(0, 122, 204, 50));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(0, 122, 204, 120));
-            ImGui::PushStyleColor(ImGuiCol_Text,          m_ShowNodeListWindow ? IM_COL32(100, 190, 255, 255) : IM_COL32(160, 165, 175, 220));
-            if (ImGui::Button(ICON_FA_LIST "##toggleSidebar"))
-                m_ShowNodeListWindow = !m_ShowNodeListWindow;
-            ImGui::PopStyleColor(4);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(m_ShowNodeListWindow ? "Hide Side Panel" : "Show Side Panel");
-        }
-
-        ImGui::EndMenuBar();
-    }
-
-    // 键盘快捷键 - 文件操作
-    // 当用户正在输入文本（搜索框/重命名框等）时，不触发快捷键
-    const bool canDoShortcut = !io.WantTextInput;
-
-    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_N))
-        NewFile(RTBlueprintClass::Actor); // Ctrl+N 默认新建 Actor 蓝图
-    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_O))
-        OpenFile();
-    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_S))
-        SaveFile();
-    if (canDoShortcut && io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_S))
-        SaveFileAs();
-    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_W))
-    {
-        if (!m_Documents.empty())
-        {
-            if (ActiveDoc() && ActiveDoc()->isDirty)
-            {
-                m_PendingCloseTabIndex = m_ActiveDocIndex;
-                m_ShowUnsavedDialog = true;
-            }
-            else
-                CloseDocument(m_ActiveDocIndex);
-        }
-    }
-
-    // 键盘快捷键 - 编辑操作
-    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_C))
-        CopySelectedNodes();
-    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_V))
-    {
-        ImVec2 canvasPos = ed::ScreenToCanvas(ImGui::GetMousePos());
-        PasteNodes(canvasPos);
-    }
-    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_X))
-        CutSelectedNodes();
-    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_D))
-        DuplicateSelectedNodes();
-    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z))
-        Undo();
-    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Y))
-        Redo();
-    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_F))
-        OpenSearchOverlay();
-    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A))
-    {
-        if (ActiveDoc())
-        {
-            for (auto& node : ActiveDoc()->nodes)
-                ed::SelectNode(node.ID, true);
-        }
-    }
-
-    // F5: 执行蓝图
-    if (canDoShortcut && ImGui::IsKeyPressed(ImGuiKey_F5))
-        ExecuteBlueprint();
-
-    // 确保有活跃文档
-    if (!m_Documents.empty() && !ActiveDoc())
-        return;
-
-    // 提前设置编辑器上下文（左侧面板 DrawNodeListPanel 需要 ed:: 函数）
-    if (ActiveDoc())
-    {
-        ed::SetCurrentEditor(ActiveDoc()->editorContext);
-        // 延迟应用 NodeEditor style（OnStart 时 ed context 尚未激活）
-        ThemeManager::Get().ApplyPendingNodeEditorStyle();
-    }
-
-    // ================================================================
     // VSCode 风格固定面板布局
     // ================================================================
     //
@@ -1825,6 +1411,450 @@ void BlueprintEditor::OnFrame(float deltaTime)
     if (ActiveDoc() && editorMax.x > editorMin.x)
         DrawZoomBar(editorMin, editorMax);
 
+    OnFrame_DrawDebugToolbar(editorMin, editorMax);
+
+    // Inline: DrawSearchOverlay (Ctrl+F canvas node search)
+    DrawSearchOverlay();
+
+    OnFrame_DrawBottomStatusBar(editorMin, editorMax);
+    OnFrame_DrawDialogsAndFloatingPanels();
+}
+
+// ============================================================================
+void BlueprintEditor::OnFrame_PreTick(float deltaTime)
+{
+    // 扩展脚本热重载轮询（内部按 m_pollIntervalSec 节流；无脚本后端时为空操作）
+    if (m_scriptExtensions.IsInitialized() && m_scriptExtensions.GetAutoReload())
+    {
+        size_t countBefore = m_extensionRunner.GetScriptRegisteredNodeIds().size();
+        m_scriptExtensions.PollFileChanges(deltaTime);
+        size_t countAfter = m_extensionRunner.GetScriptRegisteredNodeIds().size();
+        if (countAfter != countBefore)
+            SyncScriptedDefsToRegistry();
+        size_t newCount = m_NodeRegistry.getAllNodeDefinitions().size();
+        if (newCount != m_CachedDefCount)
+            m_CachedDefCount = 0;
+    }
+    // 驱动扩展脚本的 OnGlobalTick(dt)（无脚本后端时 Tick 为空操作）
+    if (m_scriptExtensions.IsInitialized())
+        m_scriptExtensions.Tick(deltaTime);
+
+    // 驱动所有文档的计时器
+    for (auto& doc : m_Documents)
+        doc->persistentRunner.Tick(deltaTime);
+
+    // 每帧 drain MainThreadDispatcher 队列（驱动 FireEvent 等异步 Post 的任务）
+    ::NodeEditor::Runtime::MainThreadDispatcher::Get().DrainQueue();
+
+    // UserInput.Wait：检测 pending 标志，渲染居中输入弹框
+    for (auto& doc : m_Documents)
+    {
+        if (!doc->isExecuting) continue;
+        std::string pending = doc->persistentRunner.GetVariable("__userinput_pending").asString();
+        if (pending == "1")
+        {
+            std::string prompt = doc->persistentRunner.GetVariable("__userinput_prompt").asString();
+            std::string defVal = doc->persistentRunner.GetVariable("__userinput_default").asString();
+
+            ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(),
+                                    ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+            ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Always);
+            bool open = true;
+            if (ImGui::Begin("##UserInputDialog", &open,
+                             ImGuiWindowFlags_NoTitleBar  |
+                             ImGuiWindowFlags_NoResize    |
+                             ImGuiWindowFlags_NoMove      |
+                             ImGuiWindowFlags_NoScrollbar |
+                             ImGuiWindowFlags_AlwaysAutoResize))
+            {
+                ImGui::TextWrapped("%s", prompt.c_str());
+                ImGui::Spacing();
+
+                static char s_UIDlgBuf[1024] = {};
+                static std::string s_UIDlgLastPrompt;
+                if (s_UIDlgLastPrompt != prompt) {
+                    s_UIDlgLastPrompt = prompt;
+                    strncpy(s_UIDlgBuf, defVal.c_str(), sizeof(s_UIDlgBuf) - 1);
+                    s_UIDlgBuf[sizeof(s_UIDlgBuf)-1] = '\0';
+                    ImGui::SetKeyboardFocusHere();
+                }
+
+                bool confirmed = ImGui::InputText("##uidlg", s_UIDlgBuf,
+                                                  sizeof(s_UIDlgBuf),
+                                                  ImGuiInputTextFlags_EnterReturnsTrue);
+                ImGui::SameLine();
+                if (ImGui::Button("OK") || confirmed) {
+                    doc->persistentRunner.SetVariable("__userinput_result",
+                                                      ::NodeEditor::Runtime::Variant(std::string(s_UIDlgBuf)));
+                    doc->persistentRunner.SetVariable("__userinput_pending",
+                                                      ::NodeEditor::Runtime::Variant(std::string("0")));
+                    s_UIDlgLastPrompt.clear();
+                }
+            }
+            ImGui::End();
+            break; // 每帧只处理第一个 pending doc
+        }
+    }
+
+    // OnTick 事件驱动：对正在执行且有 OnTick 事件源的文档，每帧触发 DispatchEvent
+    for (auto& doc : m_Documents)
+    {
+        if (!doc->isExecuting) continue;
+        if (doc->blueprintClass == RTBlueprintClass::FunctionLibrary) continue;
+        // 已暂停于断点时跳过 DispatchEvent（避免覆盖暂停状态）
+        if (doc->persistentRunner.IsPaused()) continue;
+        // 注入 deltaTime，OnTick handler 通过 GetVariable("__DeltaTime") 读取
+        doc->persistentRunner.SetVariable("__DeltaTime", ::NodeEditor::Runtime::Variant(static_cast<double>(deltaTime)));
+        auto tickResult = doc->persistentRunner.DispatchEvent("OnTick");
+        // 检查 OnTick 链上是否命中断点
+        if (doc->persistentRunner.IsPaused())
+        {
+            // 将命中的节点加入高亮（与 OnBeginPlay 路径一致）
+            for (auto nid : tickResult.executedNodeIds)
+            {
+                auto& hl = doc->executedNodeHighlight[nid];
+                hl.timeLeft = 2.0f;
+                hl.color    = ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
+            }
+        }
+    }
+
+    // 衰减执行高亮
+    for (auto& doc : m_Documents)
+    {
+        for (auto it = doc->executedNodeHighlight.begin(); it != doc->executedNodeHighlight.end();)
+        {
+            it->second.timeLeft -= deltaTime;
+            if (it->second.timeLeft <= 0.0f)
+                it = doc->executedNodeHighlight.erase(it);
+            else
+                ++it;
+        }
+    }
+
+    // 当前活跃文档的 UpdateTouch
+    if (ActiveDoc())
+        UpdateTouch();
+
+    // 动态更新 OS 窗口标题（仅在 dirty 状态或文件变化时重建，避免每帧调用 OS API）
+    if (ActiveDoc())
+    {
+        std::string baseName;
+        if (ActiveDoc()->filePath.empty())
+            baseName = "[New]";
+        else
+            baseName = BpPath::BaseName(ActiveDoc()->filePath);
+        std::string windowTitle = "Blueprint Editor - " + baseName;
+        if (ActiveDoc()->isDirty)
+            windowTitle += " *";
+
+        // 只在标题变化时调用 SetTitle（避免每帧 OS 调用）
+        static std::string s_lastWindowTitle;
+        if (windowTitle != s_lastWindowTitle)
+        {
+            SetTitle(windowTitle.c_str());
+            s_lastWindowTitle = windowTitle;
+        }
+    }
+
+    auto& io = ImGui::GetIO();
+}
+
+// ============================================================================
+void BlueprintEditor::OnFrame_DrawMenuBar()
+{
+    auto& io = ImGui::GetIO();   // 菜单栏内多处用到（快捷键检测 / FPS 显示）
+
+    // ================================================================
+    // 菜单栏
+    // ================================================================
+    if (ImGui::BeginMenuBar())
+    {
+        bool hasProj = m_Project.IsOpen();
+        bool hasDoc  = (ActiveDoc() != nullptr);
+
+        if (ImGui::BeginMenu(ICON_FA_FILE " File"))
+        {
+            // ── 工程 ──────────────────────────────────────────────────────
+            if (ImGui::MenuItem(ICON_FA_DIAGRAM_PROJECT " New Project"))
+                NewProject();
+            if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Open Project..."))
+                OpenProject();
+            // 最近工程（始终显示，排除当前已打开的工程）
+            if (ImGui::BeginMenu(ICON_FA_CLOCK_ROTATE_LEFT " Recent Projects"))
+            {
+                DrawRecentProjectsMenu();
+                ImGui::EndMenu();
+            }
+            if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK " Save Project", nullptr, false, hasProj))
+                SaveProject();
+            if (ImGui::MenuItem(ICON_FA_FILE_EXPORT " Save Project As...", nullptr, false, hasProj))
+                SaveProjectAs();
+            // ── 蓝图（仅有工程时显示）─────────────────────────────────────
+            if (hasProj)
+            {
+                ImGui::Separator();
+                if (ImGui::MenuItem(ICON_FA_FILE " New Actor Blueprint", "Ctrl+N"))
+                    NewFile(RTBlueprintClass::Actor);
+                if (ImGui::MenuItem(ICON_FA_CUBE " New Function Library"))
+                    NewFile(RTBlueprintClass::FunctionLibrary);
+                if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Open Blueprint...", "Ctrl+O"))
+                    OpenFile();
+                if (ImGui::BeginMenu(ICON_FA_CLOCK_ROTATE_LEFT " Recent Files"))
+                {
+                    DrawRecentFilesMenu();
+                    ImGui::EndMenu();
+                }
+                ImGui::Separator();
+                if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK " Save", "Ctrl+S", false, hasDoc))
+                    SaveFile();
+                if (ImGui::MenuItem(ICON_FA_FILE_EXPORT " Save As...", "Ctrl+Shift+S", false, hasDoc))
+                    SaveFileAs();
+                ImGui::Separator();
+                if (ImGui::MenuItem(ICON_FA_XMARK " Close Tab", "Ctrl+W", false, hasDoc))
+                {
+                    if (ActiveDoc()->isDirty)
+                    {
+                        m_PendingCloseTabIndex = m_ActiveDocIndex;
+                        m_ShowUnsavedDialog = true;
+                    }
+                    else
+                        CloseDocument(m_ActiveDocIndex);
+                }
+            }
+            ImGui::EndMenu();
+        }
+
+        // Edit 菜单：完全依赖文档，无文档时整体禁用
+        if (ImGui::BeginMenu(ICON_FA_PEN " Edit", hasDoc))
+        {
+            if (ImGui::MenuItem(ICON_FA_ARROW_ROTATE_LEFT " Undo", "Ctrl+Z", false, CanUndo()))
+                Undo();
+            if (ImGui::MenuItem(ICON_FA_ARROWS_ROTATE " Redo", "Ctrl+Y", false, CanRedo()))
+                Redo();
+            ImGui::Separator();
+            if (ImGui::MenuItem(ICON_FA_COPY " Copy", "Ctrl+C"))
+                CopySelectedNodes();
+            if (ImGui::MenuItem(ICON_FA_PASTE " Paste", "Ctrl+V"))
+            {
+                ImVec2 canvasPos = ed::ScreenToCanvas(ImGui::GetMousePos());
+                PasteNodes(canvasPos);
+            }
+            if (ImGui::MenuItem(ICON_FA_SCISSORS " Cut", "Ctrl+X"))
+                CutSelectedNodes();
+            if (ImGui::MenuItem(ICON_FA_CLONE " Duplicate", "Ctrl+D"))
+                DuplicateSelectedNodes();
+            ImGui::Separator();
+            if (ImGui::MenuItem(ICON_FA_OBJECT_GROUP " Select All", "Ctrl+A"))
+            {
+                for (auto& node : ActiveDoc()->nodes)
+                    ed::SelectNode(node.ID, true);
+            }
+            ImGui::Separator();
+            if (ImGui::BeginMenu(ICON_FA_ALIGN_LEFT " Align Selected"))
+            {
+                if (ImGui::MenuItem(ICON_FA_ALIGN_LEFT " Align Left"))    AlignSelectedNodes(AlignMode::Left);
+                if (ImGui::MenuItem(ICON_FA_ALIGN_RIGHT " Align Right"))   AlignSelectedNodes(AlignMode::Right);
+                if (ImGui::MenuItem(ICON_FA_ARROW_UP " Align Top"))     AlignSelectedNodes(AlignMode::Top);
+                if (ImGui::MenuItem(ICON_FA_ARROW_DOWN " Align Bottom"))  AlignSelectedNodes(AlignMode::Bottom);
+                ImGui::Separator();
+                if (ImGui::MenuItem(ICON_FA_ALIGN_CENTER " Center Horizontally"))  AlignSelectedNodes(AlignMode::CenterH);
+                if (ImGui::MenuItem(ICON_FA_ALIGN_CENTER " Center Vertically"))    AlignSelectedNodes(AlignMode::CenterV);
+                ImGui::EndMenu();
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem(ICON_FA_MAGNIFYING_GLASS " Find...", "Ctrl+F"))
+                OpenSearchOverlay();
+            ImGui::EndMenu();
+        }
+
+        // View 菜单：部分条目依赖文档
+        if (ImGui::BeginMenu(ICON_FA_EYE " View"))
+        {
+            if (hasDoc)
+            {
+                ImGui::MenuItem(ICON_FA_LIST " Node List", nullptr, &m_ShowNodeListWindow);
+                ImGui::MenuItem(ICON_FA_TERMINAL " Execution Output", nullptr, &m_ShowExecutionWindow);
+                ImGui::MenuItem(ICON_FA_STOPWATCH " Timer Monitor", nullptr, &m_ShowTimerWindow);
+                ImGui::MenuItem(ICON_FA_MAP " Minimap", nullptr, &m_ShowMinimap);
+                ImGui::MenuItem(ICON_FA_LAYER_GROUP " Node Library", nullptr, &m_ShowLibraryWindow);
+                ImGui::MenuItem(ICON_FA_TABLE_CELLS " Show Ordinals", nullptr, &m_ShowOrdinals);
+                ImGui::Separator();
+                if (ImGui::MenuItem(ICON_FA_EXPAND " Zoom to Content"))
+                    ed::NavigateToContent();
+                ImGui::Separator();
+            }
+            if (ImGui::MenuItem(ICON_FA_PALETTE " Style Editor"))
+                m_ShowStyleEditorWindow = true;
+            ImGui::EndMenu();
+        }
+
+        // Run 菜单：整体依赖文档
+        if (ImGui::BeginMenu(ICON_FA_BOLT " Run", hasDoc))
+        {
+            if (ImGui::MenuItem(ICON_FA_PLAY " Execute Blueprint", "F5"))
+                ExecuteBlueprint();
+            ImGui::Separator();
+            ImGui::MenuItem(ICON_FA_STOPWATCH " Timer Monitor", nullptr, &m_ShowTimerWindow);
+            if (ImGui::MenuItem(ICON_FA_ERASER " Clear Execution Highlight"))
+                ActiveDoc()->executedNodeHighlight.clear();
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu(ICON_FA_CIRCLE_QUESTION " Help"))
+        {
+            ImGui::TextColored(ImVec4(0.45f, 0.70f, 0.95f, 1.00f), ICON_FA_KEYBOARD " Keyboard Shortcuts");
+            ImGui::Separator();
+            ImGui::TextDisabled("File");
+            ImGui::BulletText("Ctrl+N         New File");
+            ImGui::BulletText("Ctrl+O         Open File");
+            ImGui::BulletText("Ctrl+S         Save");
+            ImGui::BulletText("Ctrl+Shift+S   Save As");
+            ImGui::BulletText("Ctrl+W         Close Tab");
+            ImGui::Spacing();
+            ImGui::TextDisabled("Edit");
+            ImGui::BulletText("Ctrl+C         Copy");
+            ImGui::BulletText("Ctrl+V         Paste");
+            ImGui::BulletText("Ctrl+X         Cut");
+            ImGui::BulletText("Ctrl+D         Duplicate");
+            ImGui::BulletText("Ctrl+A         Select All");
+            ImGui::BulletText("Ctrl+F         Find Nodes");
+            ImGui::BulletText("Delete         Delete Selected");
+            ImGui::Spacing();
+            ImGui::TextDisabled("View");
+            ImGui::BulletText("F              Zoom to Content");
+            ImGui::BulletText("F5             Execute Blueprint");
+            ImGui::BulletText("Right Click    Context Menu");
+            ImGui::BulletText("Double Click   Open Sub-Blueprint");
+            ImGui::EndMenu();
+        }
+        ImGui::Separator();
+
+        // 显示当前文件名
+        if (hasDoc)
+        {
+            if (!ActiveDoc()->filePath.empty())
+            {
+                std::string displayName = BpPath::BaseName(ActiveDoc()->filePath)
+                                        + BpPath::Extension(ActiveDoc()->filePath);
+                if (ActiveDoc()->isDirty)
+                    displayName += " \xe2\x80\xa2";  // bullet
+                ImGui::TextColored(ImVec4(0.55f, 0.75f, 1.0f, 0.90f), "%s", displayName.c_str());
+                ImGui::Separator();
+            }
+            else
+            {
+                ImGui::TextColored(ImVec4(0.55f, 0.55f, 0.60f, 0.90f), "[New]");
+                ImGui::Separator();
+            }
+        }
+
+        // FPS（低调灰色）
+        ImGui::TextColored(ImVec4(0.50f, 0.52f, 0.58f, 0.90f),
+            "%.0f fps", io.Framerate);
+
+        // 节点/链接统计
+        if (ActiveDoc())
+        {
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(0.42f, 0.60f, 0.42f, 0.85f), "N:%d  L:%d",
+                               static_cast<int>(ActiveDoc()->nodes.size()), static_cast<int>(ActiveDoc()->links.size()));
+        }
+
+        // 菜单栏最右侧：侧边栏切换按钮（点击显示/隐藏左侧面板）
+        {
+            float btnW = ImGui::CalcTextSize(ICON_FA_LIST).x + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f;
+            float avail = ImGui::GetContentRegionAvail().x;
+            if (avail > btnW + 4.0f)
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - btnW - 4.0f);
+            ImGui::PushStyleColor(ImGuiCol_Button,        m_ShowNodeListWindow ? IM_COL32(0, 122, 204, 80) : IM_COL32(0,0,0,0));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(0, 122, 204, 50));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(0, 122, 204, 120));
+            ImGui::PushStyleColor(ImGuiCol_Text,          m_ShowNodeListWindow ? IM_COL32(100, 190, 255, 255) : IM_COL32(160, 165, 175, 220));
+            if (ImGui::Button(ICON_FA_LIST "##toggleSidebar"))
+                m_ShowNodeListWindow = !m_ShowNodeListWindow;
+            ImGui::PopStyleColor(4);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(m_ShowNodeListWindow ? "Hide Side Panel" : "Show Side Panel");
+        }
+
+        ImGui::EndMenuBar();
+    }
+
+    // 键盘快捷键 - 文件操作
+    // 当用户正在输入文本（搜索框/重命名框等）时，不触发快捷键
+    const bool canDoShortcut = !io.WantTextInput;
+
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_N))
+        NewFile(RTBlueprintClass::Actor); // Ctrl+N 默认新建 Actor 蓝图
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_O))
+        OpenFile();
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_S))
+        SaveFile();
+    if (canDoShortcut && io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_S))
+        SaveFileAs();
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_W))
+    {
+        if (!m_Documents.empty())
+        {
+            if (ActiveDoc() && ActiveDoc()->isDirty)
+            {
+                m_PendingCloseTabIndex = m_ActiveDocIndex;
+                m_ShowUnsavedDialog = true;
+            }
+            else
+                CloseDocument(m_ActiveDocIndex);
+        }
+    }
+
+    // 键盘快捷键 - 编辑操作
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_C))
+        CopySelectedNodes();
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_V))
+    {
+        ImVec2 canvasPos = ed::ScreenToCanvas(ImGui::GetMousePos());
+        PasteNodes(canvasPos);
+    }
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_X))
+        CutSelectedNodes();
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_D))
+        DuplicateSelectedNodes();
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z))
+        Undo();
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Y))
+        Redo();
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_F))
+        OpenSearchOverlay();
+    if (canDoShortcut && io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A))
+    {
+        if (ActiveDoc())
+        {
+            for (auto& node : ActiveDoc()->nodes)
+                ed::SelectNode(node.ID, true);
+        }
+    }
+
+    // F5: 执行蓝图
+    if (canDoShortcut && ImGui::IsKeyPressed(ImGuiKey_F5))
+        ExecuteBlueprint();
+
+    // 确保有活跃文档
+    if (!m_Documents.empty() && !ActiveDoc())
+        return;
+
+    // 提前设置编辑器上下文（左侧面板 DrawNodeListPanel 需要 ed:: 函数）
+    if (ActiveDoc())
+    {
+        ed::SetCurrentEditor(ActiveDoc()->editorContext);
+        // 延迟应用 NodeEditor style（OnStart 时 ed context 尚未激活）
+        ThemeManager::Get().ApplyPendingNodeEditorStyle();
+    }
+
+}
+
+// ============================================================================
+void BlueprintEditor::OnFrame_DrawDebugToolbar(const ImVec2& editorMin, const ImVec2& editorMax)
+{
 
     // ================================================================
     // 调试工具条（浮动，画布顶部中央）
@@ -2189,12 +2219,11 @@ void BlueprintEditor::OnFrame(float deltaTime)
         ImGui::End();
         } // end else (非 FunctionLibrary 隐藏工具条)
     }
+}
 
-    // ================================================================
-    // 画布节点搜索覆盖层（Ctrl+F）
-    // ================================================================
-    DrawSearchOverlay();
-
+// ============================================================================
+void BlueprintEditor::OnFrame_DrawBottomStatusBar(const ImVec2& editorMin, const ImVec2& editorMax)
+{
     // ================================================================
     // 编辑器区域底部状态栏（覆盖在编辑器之上）
     // ================================================================
@@ -2289,7 +2318,11 @@ void BlueprintEditor::OnFrame(float deltaTime)
             dl->AddText(ImVec2(rightX, textY), statusCol, statusLabel.c_str());
         }
     }
+}
 
+// ============================================================================
+void BlueprintEditor::OnFrame_DrawDialogsAndFloatingPanels()
+{
     // ================================================================
     // 未保存修改确认对话框
     // ================================================================
@@ -2322,6 +2355,7 @@ void BlueprintEditor::OnFrame(float deltaTime)
         ImGui::End();
     }
 }
+
 
 
 // ShowUnsavedChangesDialog, DrawSaveNameDialog → 已移至 Dialogs.cpp

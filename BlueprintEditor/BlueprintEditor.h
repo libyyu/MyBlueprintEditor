@@ -720,6 +720,24 @@ struct BlueprintEditor : public Application
     ImGuiWindowFlags GetWindowFlags() const override;
 
     // ------------------------------------------------------------------
+    // OnFrame 子步骤（拆分自原 1986 行的 OnFrame，提升可维护性）
+    // 这些方法仅由 OnFrame 直接调用，不要在其他地方调用。
+    // ------------------------------------------------------------------
+private:
+    // 帧前置：脚本热重载轮询、Tick 驱动、OnTick 事件分发、执行高亮衰减、窗口标题更新
+    void OnFrame_PreTick(float deltaTime);
+    // 顶部主菜单栏（File/Edit/View/...）+ 键盘快捷键处理
+    void OnFrame_DrawMenuBar();
+    // 浮动调试工具条（Run/Pause/Resume/Step/Stop/状态指示）
+    void OnFrame_DrawDebugToolbar(const ImVec2& editorMin, const ImVec2& editorMax);
+    // 编辑器底部状态栏（Nodes/Links 计数、运行状态、缩放等）
+    void OnFrame_DrawBottomStatusBar(const ImVec2& editorMin, const ImVec2& editorMax);
+    // 各类对话框 + 浮动面板（UnsavedChanges/SaveName/StyleEditor/NodeLibrary）
+    void OnFrame_DrawDialogsAndFloatingPanels();
+
+public:
+
+    // ------------------------------------------------------------------
     // 成员变量（全局共享，不随文档变化）
     // ------------------------------------------------------------------
     int                  m_Argc = 0;
