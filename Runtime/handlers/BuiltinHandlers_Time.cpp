@@ -10,14 +10,12 @@ void RegisterHandlers_Time(
     std::unordered_map<std::string, NodeHandler>& handlers)
 {
     handlers["GetTime"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         double seconds = static_cast<double>(FrameTimerManager::GetCurrentUnixTime());
         ctx.SetOutputValue("Seconds", Variant(seconds));
         return true;
     };
 
     handlers["DeltaTime"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         // 从 __DeltaTime 变量读取 Tick() 注入的真实帧时间
         double dt = ctx.GetVariable("__DeltaTime").asFloat();
         if (dt <= 0.0) dt = 0.016; // 未注入时降级为 ~60fps
@@ -26,7 +24,6 @@ void RegisterHandlers_Time(
     };
 
     handlers["TimeSince"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         double timestamp = ctx.GetInputValue("Timestamp").asFloat();
         double now = static_cast<double>(FrameTimerManager::GetCurrentUnixTime());
         ctx.SetOutputValue("Elapsed", Variant(now - timestamp));
@@ -34,7 +31,6 @@ void RegisterHandlers_Time(
     };
 
     handlers["BreakTime"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         double seconds = ctx.GetInputValue("Seconds").asFloat();
         int totalSec = static_cast<int>(seconds);
         std::time_t ts = static_cast<std::time_t>(totalSec);
@@ -60,7 +56,6 @@ void RegisterHandlers_Time(
     };
 
     handlers["FormatTime"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         double seconds = ctx.GetInputValue("Seconds").asFloat();
 		std::string format = ctx.GetInputValue("Format").asString();
         // 转换为本地时间（或使用 gmtime 得 UTC）

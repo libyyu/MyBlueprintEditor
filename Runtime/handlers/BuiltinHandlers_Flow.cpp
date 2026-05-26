@@ -14,7 +14,6 @@ void RegisterHandlers_Flow(
     std::unordered_map<std::string, NodeHandler>& handlers)
 {
     handlers["Branch"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         bool condition = ctx.GetInputValue("Condition").asBool();
         ctx.Log("  Condition = " + std::string(condition ? "True" : "False"));
         if (condition)
@@ -25,7 +24,6 @@ void RegisterHandlers_Flow(
     };
 
     handlers["DoN"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         int64_t n = ctx.GetInputValue("N").asInt();
 
         // 使用节点 ID 作为变量键的一部分，避免多个 DoN 实例的状态冲突
@@ -247,7 +245,6 @@ void RegisterHandlers_Flow(
     };
 
     handlers["ForLoop"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         int64_t first = ctx.GetInputValue("First Index").asInt();
         int64_t last = ctx.GetInputValue("Last Index").asInt();
         ctx.Log("  [ForLoop] " + std::to_string(first) + " to " + std::to_string(last));
@@ -262,7 +259,6 @@ void RegisterHandlers_Flow(
     };
 
     handlers["WhileLoop"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         ctx.Log("  [WhileLoop] Starting");
         int iterations = 0;
         const int maxIterations = 10000;
@@ -326,7 +322,6 @@ void RegisterHandlers_Flow(
     };
 
     handlers["FlipFlop"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         // 使用节点 ID 作为变量键的一部分，避免多个 FlipFlop 实例的状态冲突
         auto* node = ctx.GetCurrentNode();
         std::string nodeIdStr = node ? std::to_string(node->id) : "0";
@@ -344,7 +339,6 @@ void RegisterHandlers_Flow(
     };
 
     handlers["Gate"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         // 使用节点 ID 作为变量键的一部分，避免多个 Gate 实例的状态冲突
         auto* node = ctx.GetCurrentNode();
         std::string nodeIdStr = node ? std::to_string(node->id) : "0";
@@ -381,7 +375,6 @@ void RegisterHandlers_Flow(
     };
 
     handlers["DoOnce"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         std::string nodeIdStr = node ? std::to_string(node->id) : "0";
         std::string stateKey = "__doonce_fired_" + nodeIdStr;
@@ -410,7 +403,6 @@ void RegisterHandlers_Flow(
     };
 
     handlers["FlowSequence"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         ctx.Log("  [Sequence] Executing all outputs in order");
         auto* node = ctx.GetCurrentNode();
         if (node)
@@ -425,7 +417,6 @@ void RegisterHandlers_Flow(
     };
 
     handlers["Select"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         bool cond = ctx.GetInputValue("Condition").asBool();
         auto a = ctx.GetInputValue("A");
         auto b = ctx.GetInputValue("B");
@@ -434,7 +425,6 @@ void RegisterHandlers_Flow(
     };
 
     handlers["SwitchOnInt"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         int64_t sel = ctx.GetInputValue("Selection").asInt();
         ctx.Log("  [SwitchOnInt] Selection=" + std::to_string(sel));
         std::string pinName = std::to_string(sel);
@@ -459,7 +449,6 @@ void RegisterHandlers_Flow(
 
     // MultiGate — 依次激活多个输出（可选循环和随机）
     handlers["MultiGate"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         std::string nodeIdStr = node ? std::to_string(node->id) : "0";
         std::string indexKey = "__multigate_index_" + nodeIdStr;
@@ -517,7 +506,6 @@ void RegisterHandlers_Flow(
 
     // ForLoopWithBreak — 可中断的 For 循环
     handlers["ForLoopWithBreak"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         std::string nodeIdStr = node ? std::to_string(node->id) : "0";
         std::string breakKey = "__forloopbreak_" + nodeIdStr;
@@ -555,7 +543,6 @@ void RegisterHandlers_Flow(
 
     // ── SwitchOnBool ───────────────────────────────────────────────────────
     handlers["SwitchOnBool"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         bool cond = ctx.GetInputValue("Condition").asBool();
         ctx.ActivateOutputFlow(cond ? "True" : "False");
         return true;
@@ -563,7 +550,6 @@ void RegisterHandlers_Flow(
 
     // ── SwitchOnString ─────────────────────────────────────────────────────
     handlers["SwitchOnString"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         std::string sel = ctx.GetInputValue("Selection").asString();
         // 动态扫描所有 "Case N" 输入引脚，找到匹配的激活对应输出
         const auto* node = ctx.GetCurrentNode();
@@ -589,7 +575,6 @@ void RegisterHandlers_Flow(
 
     // ── Retry.Backoff ──────────────────────────────────────────────────────────
     handlers["Retry.Backoff"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         int64_t maxRetries        = ctx.GetInputValue("MaxRetries").asInt();
         double  initialDelayMs    = ctx.GetInputValue("InitialDelayMs").asFloat();
         double  backoffMultiplier = ctx.GetInputValue("BackoffMultiplier").asFloat();

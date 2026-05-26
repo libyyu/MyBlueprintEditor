@@ -469,7 +469,6 @@ void RegisterHandlers_Socket(
     // out: exec, Success(Bool), ErrorMessage(String)
     // ========================================================================
     handlers["TCP.Send"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         std::string connId = ctx.GetInputValue("ConnId").asString();
         std::string data   = ctx.GetInputValue("Data").asString();
 
@@ -517,7 +516,6 @@ void RegisterHandlers_Socket(
     // out: exec
     // ========================================================================
     handlers["TCP.Disconnect"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         std::string connId = ctx.GetInputValue("ConnId").asString();
 
         // Server 侧
@@ -556,7 +554,6 @@ void RegisterHandlers_Socket(
     // out: exec
     // ========================================================================
     handlers["TCP.Stop"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         std::string serverKey = ctx.GetInputValue("ServerKey").asString();
         if (serverKey.empty())
             serverKey = ctx.GetVariable("__tcp_server_key").asString();
@@ -692,7 +689,6 @@ void RegisterHandlers_Socket(
     // out: exec, Success(Bool), ErrorMessage(String)
     // ========================================================================
     handlers["UDP.Send"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         std::string host = ctx.GetInputValue("Host").asString();
         int port         = static_cast<int>(ctx.GetInputValue("Port").asInt());
         std::string data = ctx.GetInputValue("Data").asString();
@@ -730,7 +726,6 @@ void RegisterHandlers_Socket(
     // out: exec
     // ========================================================================
     handlers["UDP.Close"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         int port = static_cast<int>(ctx.GetInputValue("Port").asInt());
         std::string bindKey = ctx.GetVariable("__udp_key_" + std::to_string(port)).asString();
         

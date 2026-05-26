@@ -62,7 +62,6 @@ void RegisterHandlers_Agent(
     // out: exec
     // ========================================================================
     handlers["Memory.Store"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         std::string key   = ctx.GetInputValue("Key").asString();
         std::string value = ctx.GetInputValue("Value").asString();
         double ttl        = ctx.GetInputValue("TTL").asFloat();
@@ -92,7 +91,6 @@ void RegisterHandlers_Agent(
     // out: Value(String), Found(Bool), AllMatches(String JSON object)
     // ========================================================================
     handlers["Memory.Recall"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         std::string key    = ctx.GetInputValue("Key").asString();
         std::string prefix = ctx.GetInputValue("Prefix").asString();
 
@@ -129,7 +127,6 @@ void RegisterHandlers_Agent(
     // out: exec, RemovedCount(Integer)
     // ========================================================================
     handlers["Memory.Clear"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         std::string prefix = ctx.GetInputValue("Prefix").asString();
         std::lock_guard<std::mutex> lk(s_memMutex);
         int64_t removed = 0;

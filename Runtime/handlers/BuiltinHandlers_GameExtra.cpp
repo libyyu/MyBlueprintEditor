@@ -363,7 +363,6 @@ void RegisterHandlers_GameExtra(
     // Easing.Apply — 对 t ∈ [0,1] 应用指定缓动曲线，输出 EasedT
     // ========================================================================
     handlers["Easing.Apply"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         std::string curve = ctx.GetInputValue("Curve").asString();
         double t = ctx.GetInputValue("T").asFloat();
         ctx.SetOutputValue("EasedT", Variant(Easing::apply(curve, t)));
@@ -375,7 +374,6 @@ void RegisterHandlers_GameExtra(
     //   Result = From + (To - From) * Easing(T)
     // ========================================================================
     handlers["Easing.Lerp"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         std::string curve = ctx.GetInputValue("Curve").asString();
         double from = ctx.GetInputValue("From").asFloat();
         double to   = ctx.GetInputValue("To").asFloat();

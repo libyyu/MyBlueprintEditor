@@ -28,7 +28,6 @@ void RegisterHandlers_AI_LLM(
     // 异步：通过 RunAsync(dispatcher, onComplete) 实现跨平台异步。
     // ========================================================================
     handlers["LLM.Chat"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
 
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
@@ -152,7 +151,6 @@ void RegisterHandlers_AI_LLM(
     //        Provider(String), ErrorMessage(String)
     // ================================================================
     handlers["LLM.Auto"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient registered")));
@@ -365,7 +363,6 @@ void RegisterHandlers_AI_LLM(
     //   out: Token / FullText / ToolCallsJSON / UsedProvider / ErrorMessage
     // ================================================================
     handlers["LLM.AutoStream"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         auto* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient registered")));
@@ -654,7 +651,6 @@ void RegisterHandlers_AI_LLM(
     //   逐 token 激活 onChunk，最后激活 onDone。完全复用已有 RunAsync 机制。
     // ================================================================
     handlers["LLM.StreamChat"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         auto* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("Token",        Variant(std::string("")));

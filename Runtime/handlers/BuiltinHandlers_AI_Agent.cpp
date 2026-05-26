@@ -8,7 +8,6 @@ void RegisterHandlers_AI_Agent(
     std::unordered_map<std::string, NodeHandler>& handlers)
 {
     handlers["Agent.Plan"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
 
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
@@ -135,7 +134,6 @@ void RegisterHandlers_AI_Agent(
     // 让 LLM 评估输出是否满足评判标准（Criteria），输出 pass/fail + Feedback
     // ========================================================================
     handlers["Agent.Reflect"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
 
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
@@ -256,7 +254,6 @@ void RegisterHandlers_AI_Agent(
     // 保留最近 KeepRecent 条消息，用 LLM 摘要更早的内容，防止 context 溢出
     // ========================================================================
     handlers["Context.Compress"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
 
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
@@ -398,7 +395,6 @@ void RegisterHandlers_AI_Agent(
     //      Output(String JSON), ErrorMessage(String)
     // ========================================================================
     handlers["LLM.StructuredOutput"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient registered")));
@@ -490,7 +486,6 @@ void RegisterHandlers_AI_Agent(
     //      IsValid(Bool), ErrorMessage(String)
     // ========================================================================
     handlers["Schema.Validate"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         std::string jsonStr   = ctx.GetInputValue("JSON").asString();
         std::string schemaStr = ctx.GetInputValue("Schema").asString();
 
@@ -580,7 +575,6 @@ void RegisterHandlers_AI_Agent(
     //      SelectedRoute(Integer), SelectedLabel(String), ErrorMessage(String)
     // ========================================================================
     handlers["LLM.Route"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient")));
@@ -736,7 +730,6 @@ void RegisterHandlers_AI_Agent(
     //      Intent(String), Confidence(String), ErrorMessage(String)
     // ========================================================================
     handlers["Intent.Classify"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient")));
@@ -964,7 +957,6 @@ void RegisterHandlers_AI_Agent(
     //      CompletedCount(Integer)
     // ========================================================================
     handlers["Agent.Join"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         int64_t required = ctx.GetInputValue("Count").asInt();
         double  timeout  = ctx.GetInputValue("Timeout").asFloat();
         if (required <= 0) required = 1;

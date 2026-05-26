@@ -12,7 +12,6 @@ void RegisterHandlers_Action(
     // 注意：FireConnectedNode 通过 ctx.FireConnectedNode() 调用，
     //       这样在子蓝图中使用时会在正确的 runner 上查找节点
     handlers["SetTimer"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         double time = ctx.GetInputValue("Time").asFloat();
         bool looping = ctx.GetInputValue("Looping").asBool();
         float interval = static_cast<float>(time);
@@ -96,7 +95,6 @@ void RegisterHandlers_Action(
     };
 
     handlers["OutputAction"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         double sample = ctx.GetInputValue("Sample").asFloat();
         ctx.Log("  Sample = " + std::to_string(sample));
         ctx.SetOutputValue("Condition", Variant(sample > 0.5));
@@ -104,20 +102,17 @@ void RegisterHandlers_Action(
     };
 
     handlers["InputActionFire"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         ctx.Log("  [InputAction] Fire triggered");
         return true;
     };
 
     handlers["CustomEvent"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         ctx.Log("  [CustomEvent] triggered");
         ctx.ActivateOutputFlow("Exec");
         return true;
     };
 
     handlers["TraceByChannel"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         ctx.Log("  [Trace] Line trace performed");
         ctx.SetOutputValue("Return Value", Variant(true));
         return true;
@@ -128,14 +123,12 @@ void RegisterHandlers_Action(
     // ============================================================================
 
     handlers["OnBeginPlay"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         ctx.Log("  [OnBeginPlay] triggered");
         ctx.ActivateOutputFlow("");
         return true;
     };
 
     handlers["OnTick"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         // 从 __DeltaTime 变量读取编辑器注入的真实帧时间
         double dt = ctx.GetVariable("__DeltaTime").asFloat();
         ctx.SetOutputValue("DeltaTime", Variant(dt));
@@ -144,7 +137,6 @@ void RegisterHandlers_Action(
     };
 
     handlers["CustomEventNode"] = [](ExecutionContext& ctx) {
-        auto* runner = ctx.GetRunner(); (void)runner;
         ctx.Log("  [CustomEvent] triggered");
         ctx.SetOutputValue("EventName", Variant(std::string("")));
         ctx.ActivateOutputFlow("");

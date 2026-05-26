@@ -49,7 +49,6 @@ void RegisterHandlers_Network(
     //   - 两个平台 onComplete 都在 Tick → DrainQueue 上下文执行，安全访问 ctx。
     // ========================================================================
     handlers["HTTP.Request"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
 
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
@@ -137,7 +136,6 @@ void RegisterHandlers_Network(
     //       如需写文件请在蓝图中用 File.Write 节点衔接。
     // ========================================================================
     handlers["HTTP.Download"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
 
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
@@ -216,7 +214,6 @@ void RegisterHandlers_Network(
     // 输出：Value(String), Found(Boolean)
     // ========================================================================
     handlers["JSON.GetPath"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         std::string json = ctx.GetInputValue("JSON").asString();
         std::string path = ctx.GetInputValue("Path").asString();
 
@@ -280,7 +277,6 @@ void RegisterHandlers_Network(
     // HTTP.Get — 快捷 GET 节点
     // ========================================================================
     handlers["HTTP.Get"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("StatusCode",   Variant(static_cast<int64_t>(0)));
@@ -328,7 +324,6 @@ void RegisterHandlers_Network(
     // HTTP.Post — 快捷 POST 节点
     // ========================================================================
     handlers["HTTP.Post"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("StatusCode",   Variant(static_cast<int64_t>(0)));
@@ -382,7 +377,6 @@ void RegisterHandlers_Network(
     // 跨平台：native + WebGL（同 HTTP.Get，底层走 IHttpClient）
     // ========================================================================
     handlers["Web.Search"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("Results",     Variant(std::string("[]")));
@@ -538,7 +532,6 @@ void RegisterHandlers_Network(
     // Code.Run — 执行子进程命令（native only，WebGL 走 onError）
     // ========================================================================
     handlers["Code.Run"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
 #ifdef __EMSCRIPTEN__
         ctx.SetOutputValue("Stdout",       Variant(std::string("")));
         ctx.SetOutputValue("Stderr",       Variant(std::string("")));
@@ -840,7 +833,6 @@ void RegisterHandlers_Network(
     // RetryOnStatus: 逗号分隔的需要重试的 HTTP 状态码，如 "429,503"；空=只重试网络错误
     // ========================================================================
     handlers["HTTP.Retry"] = [](ExecutionContext& ctx) -> bool {
-        auto* runner = ctx.GetRunner(); (void)runner;
 
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
