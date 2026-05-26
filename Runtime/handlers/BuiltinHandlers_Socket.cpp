@@ -759,8 +759,7 @@ namespace NodeEditor {
 namespace Runtime {
 
 void RegisterHandlers_Socket(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner&)
+    std::unordered_map<std::string, NodeHandler>& handlers)
 {
     auto webglStub = [](const std::string& name) {
         return [name](ExecutionContext& ctx) -> bool {
