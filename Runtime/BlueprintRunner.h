@@ -396,6 +396,11 @@ public:
     // 获取蓝图文件所在目录（LoadFromFile/LoadFromFileWithDeps 时记录）
     const std::string& GetLoadedFileDir() const { return m_loadedFileDir; }
 
+    // 显式设置文件所在目录（用于 LoadFromJson / 编辑器 persistentRunner 等
+    // 没有走 LoadFromFile 但仍需让 ExecuteBlueprint / Function.CallLibrary
+    // 等节点正确解析相对路径的场景）
+    void SetLoadedFileDir(const std::string& dir) { m_loadedFileDir = dir; }
+
     bool IsWithEditor() const;
 
     // ------------------------------------------------------------------

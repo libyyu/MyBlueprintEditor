@@ -59,14 +59,17 @@ void BlueprintEditor::InitRunnerForDoc(BlueprintDocument* doc,
         capturedDoc->executionLogDirty = true;
     });
 
-    // RegisterBuiltinHandlers（含 basePath）
+    // 编辑器侧：persistentRunner 没有走 LoadFromFile（蓝图数据在内存中），
+    // 显式设置 loadedFileDir，确保 ExecuteBlueprint / Function.CallLibrary 等节点
+    // 能正确解析相对路径
     std::string bp = basePath;
     if (bp.empty()) {
         bp = BpPath::ParentDir(doc->filePath);
         if (bp.empty()) bp = ".";
     }
+    doc->persistentRunner.SetLoadedFileDir(bp);
 
-    ::NodeEditor::Runtime::RegisterBuiltinHandlers(doc->persistentRunner, bp, &m_HandlerRegistry);
+    ::NodeEditor::Runtime::RegisterBuiltinHandlers(doc->persistentRunner, std::string(), &m_HandlerRegistry);
 
     // 扩展脚本集成：让 persistentRunner 拥有自己的脚本引擎绑定，重新加载已加载的全部扩展脚本。
     // 这样脚本 handler 内的 Blueprint.AcquireAsync/ReleaseAsync 打到 persistentRunner，

@@ -10,9 +10,8 @@
 void BlueprintEditor::RegisterBuiltinHandlers()
 {
     // 注册时仅填充 m_HandlerRegistry 映射表
-    // 实际的 runner 和 filePath 在 ExecuteBlueprint 时才使用
+    // 实际的 runner 和路径在 ExecuteBlueprint 时才使用
     static RTBlueprintRunner dummyRunner;
-    static std::string dummyPath;
     ::NodeEditor::Runtime::RegisterBuiltinHandlers(
-        dummyRunner, dummyPath, &m_HandlerRegistry);
+        dummyRunner, std::string(), &m_HandlerRegistry);
 }

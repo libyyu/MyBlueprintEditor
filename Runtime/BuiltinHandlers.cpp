@@ -53,6 +53,12 @@ void RegisterBuiltinHandlers(
     const std::string& basePath,
     std::unordered_map<std::string, NodeHandler>* outHandlers)
 {
+    // basePath 参数已废弃：handler 现在通过 ctx.GetRunner()->GetLoadedFileDir()
+    // 动态获取路径。为保持向后兼容：若调用方传了非空 basePath 且 runner 尚未
+    // 设置 loadedFileDir，自动同步过去（避免 LoadFromJson 等场景丢失路径）。
+    if (!basePath.empty() && runner.GetLoadedFileDir().empty())
+        runner.SetLoadedFileDir(basePath);
+
     std::unordered_map<std::string, NodeHandler> allHandlers;
 
     RegisterHandlers_Flow(allHandlers);

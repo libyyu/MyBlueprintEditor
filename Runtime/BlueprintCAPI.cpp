@@ -53,12 +53,11 @@ struct RunnerWrapper
 {
     BlueprintRunner runner;
     std::string     lastError;
-    std::string     basePath;   // 蓝图文件所在目录，供 ExecuteBlueprint 相对路径解析
 
-    // 重新注册内置 handler，使用当前 basePath
+    // 重新注册内置 handler（handler 全局共享，重复注册仅刷新映射；保留以兼容旧路径）
     void refreshHandlers()
     {
-        RegisterBuiltinHandlers(runner, basePath);
+        RegisterBuiltinHandlers(runner);
     }
 
     // 静默加载 BlueprintEntry.lua
@@ -80,7 +79,8 @@ struct RunnerWrapper
                 candidates.push_back(s_globalLuaEntry);
         }
 
-        // 2. 蓝图文件所在目录
+        // 2. 蓝图文件所在目录（从 runner 读取，保证与 ExecuteBlueprint 解析路径一致）
+        const std::string& basePath = runner.GetLoadedFileDir();
         if (!basePath.empty())
             candidates.push_back(basePath + "/BlueprintEntry.lua");
 
@@ -228,8 +228,10 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromJsonWithBaseDir(
         w->lastError = w->runner.GetLastError();
         return 1;
     }
-    // 设置 basePath 供 ExecuteBlueprint 节点解析相对路径
-    w->basePath = baseDirStr;
+    // 设置 loadedFileDir 供 ExecuteBlueprint 节点解析相对路径
+    // （LoadFromJsonWithDeps 内部已设置，这里仅为 baseDir 为空时兜底）
+    if (!baseDirStr.empty() && w->runner.GetLoadedFileDir().empty())
+        w->runner.SetLoadedFileDir(baseDirStr);
     w->refreshHandlers();
     // 静默加载 BlueprintEntry.lua
     w->tryLoadBlueprintEntry();
@@ -248,10 +250,8 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromFile(BP_Runner runner, 
         w->lastError = std::string("LoadFromFile failed: ") + filePath;
         return 1;
     }
-    // 自动提取文件目录作为 basePath，供 ExecuteBlueprint 节点解析相对路径
-    std::string fp(filePath);
-    size_t sl = fp.find_last_of("/\\");
-    w->basePath = (sl != std::string::npos) ? fp.substr(0, sl) : "";
+    // basePath 已由 LoadFromFileWithDeps 自动设置到 runner.m_loadedFileDir，
+    // 不再需要在 wrapper 层冗余保存
     w->refreshHandlers();
     // 静默加载 BlueprintEntry.lua（蓝图目录优先，次选 DLL 目录）
     w->tryLoadBlueprintEntry();
@@ -263,8 +263,9 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetBasePath(BP_Runner runner, 
 {
     if (!runner) return;
     auto* w = asWrapper(runner);
-    w->basePath = (basePath && *basePath) ? std::string(basePath) : std::string("");
-    w->refreshHandlers();
+    w->runner.SetLoadedFileDir((basePath && *basePath) ? std::string(basePath) : std::string(""));
+    // 不再调用 refreshHandlers：handler 在全局 HandlerRegistry 中共享，
+    // 且 basePath 由 handler 通过 runner.GetLoadedFileDir() 动态读取
 }
 
 /// Manually load an extension script file into the runner's script engine.
