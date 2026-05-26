@@ -62,6 +62,7 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/SharedRegistry.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintExporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintRunner.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintRunner_Lua.cpp   # Lua extension methods (conditional on BLUEPRINT_HAS_LUA)
     ${CMAKE_CURRENT_SOURCE_DIR}/FrameTimerManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MainThreadDispatcher.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinNodeDefs.cpp
