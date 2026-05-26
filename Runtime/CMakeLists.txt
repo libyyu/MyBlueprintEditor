@@ -61,6 +61,12 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/NodeDefinition.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SharedRegistry.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintExporter.cpp
+    # JsonBlueprintExporter – split by section
+    ${CMAKE_CURRENT_SOURCE_DIR}/exporter/BlueprintExporter_RuntimeExport.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/exporter/BlueprintExporter_EditorExport.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/exporter/BlueprintExporter_RuntimeImport.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/exporter/BlueprintExporter_EditorImport.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/exporter/BlueprintExporter_Util.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintRunner.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BlueprintRunner_Lua.cpp   # Lua extension methods (conditional on BLUEPRINT_HAS_LUA)
     ${CMAKE_CURRENT_SOURCE_DIR}/FrameTimerManager.cpp
