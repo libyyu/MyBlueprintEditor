@@ -65,6 +65,32 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/FrameTimerManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MainThreadDispatcher.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinNodeDefs.cpp
+    # BuiltinNodeDefs – split by category
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Flow.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Action.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Math.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Debug.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_String.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Array.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Map.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Time.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Data.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Tree.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Houdini.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Misc.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Conversion.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Event.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Function.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_EventBus.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Retry.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_File.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Network.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_AI.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Game.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Save.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_GameMath.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Socket.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_GameExtra.cpp
     # BuiltinHandlers – split by category
     ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinHandlers.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/handlers/BuiltinHandlers_Flow.cpp
