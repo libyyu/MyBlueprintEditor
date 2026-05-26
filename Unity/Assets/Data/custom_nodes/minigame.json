@@ -1,0 +1,440 @@
+{
+  "nodes": [
+    {
+      "id": "Quest.Give",
+      "name": "Quest Give",
+      "category": "Game/Quest",
+      "color": "E8A838",
+      "description": "NPC 给玩家发任务",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "QuestId", "type": "String"},
+        {"name": "Title", "type": "String"},
+        {"name": "Description", "type": "String"},
+        {"name": "NpcId", "type": "String"},
+        {"name": "RewardDescription", "type": "String"},
+        {"name": "TargetCount", "type": "Integer"}
+      ],
+      "outputs": [
+        {"name": "onSuccess", "type": "Flow", "isExec": true},
+        {"name": "onDuplicate", "type": "Flow", "isExec": true}
+      ]
+    },
+    {
+      "id": "Quest.Complete",
+      "name": "Quest Complete",
+      "category": "Game/Quest",
+      "color": "E8A838",
+      "description": "完成一个任务",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "QuestId", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "onSuccess", "type": "Flow", "isExec": true},
+        {"name": "onNotFound", "type": "Flow", "isExec": true}
+      ]
+    },
+    {
+      "id": "Quest.Progress",
+      "name": "Quest Progress",
+      "category": "Game/Quest",
+      "color": "E8A838",
+      "description": "推进任务进度",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "QuestId", "type": "String"},
+        {"name": "Amount", "type": "Integer"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true}
+      ]
+    },
+    {
+      "id": "Quest.Check",
+      "name": "Quest Check",
+      "category": "Game/Quest",
+      "color": "E8A838",
+      "description": "检查任务状态（纯数据节点）",
+      "inputs": [
+        {"name": "QuestId", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "IsActive", "type": "Boolean"},
+        {"name": "IsComplete", "type": "Boolean"},
+        {"name": "Title", "type": "String"},
+        {"name": "Progress", "type": "Integer"},
+        {"name": "Target", "type": "Integer"}
+      ]
+    },
+    {
+      "id": "Item.Give",
+      "name": "Item Give",
+      "category": "Game/Item",
+      "color": "4A90D9",
+      "description": "给玩家添加物品到背包",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "ItemId", "type": "String"},
+        {"name": "Count", "type": "Integer"}
+      ],
+      "outputs": [
+        {"name": "onSuccess", "type": "Flow", "isExec": true},
+        {"name": "onFull", "type": "Flow", "isExec": true},
+        {"name": "Added", "type": "Integer"}
+      ]
+    },
+    {
+      "id": "Item.Remove",
+      "name": "Item Remove",
+      "category": "Game/Item",
+      "color": "4A90D9",
+      "description": "从背包移除物品",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "ItemId", "type": "String"},
+        {"name": "Count", "type": "Integer"}
+      ],
+      "outputs": [
+        {"name": "onSuccess", "type": "Flow", "isExec": true},
+        {"name": "onInsufficient", "type": "Flow", "isExec": true},
+        {"name": "Removed", "type": "Integer"}
+      ]
+    },
+    {
+      "id": "Item.Check",
+      "name": "Item Check",
+      "category": "Game/Item",
+      "color": "4A90D9",
+      "description": "检查玩家是否拥有指定物品（纯数据节点）",
+      "inputs": [
+        {"name": "ItemId", "type": "String"},
+        {"name": "RequiredCount", "type": "Integer"}
+      ],
+      "outputs": [
+        {"name": "Count", "type": "Integer"},
+        {"name": "HasItem", "type": "Boolean"}
+      ]
+    },
+    {
+      "id": "Item.Use",
+      "name": "Item Use",
+      "category": "Game/Item",
+      "color": "4A90D9",
+      "description": "使用一个物品（消耗 1 个）",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "ItemId", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "onUsed", "type": "Flow", "isExec": true},
+        {"name": "onNotFound", "type": "Flow", "isExec": true}
+      ]
+    },
+    {
+      "id": "WeChat.Share",
+      "name": "WeChat Share",
+      "category": "Platform/WeChat",
+      "color": "07C160",
+      "description": "触发微信分享（仅小游戏环境有效）",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "Title", "type": "String"},
+        {"name": "ImageUrl", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true}
+      ]
+    },
+    {
+      "id": "WeChat.Login",
+      "name": "WeChat Login",
+      "category": "Platform/WeChat",
+      "color": "07C160",
+      "description": "微信登录获取 code",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true}
+      ],
+      "outputs": [
+        {"name": "onSuccess", "type": "Flow", "isExec": true},
+        {"name": "onFail", "type": "Flow", "isExec": true},
+        {"name": "Code", "type": "String"}
+      ]
+    },
+    {
+      "id": "WeChat.Toast",
+      "name": "WeChat Toast",
+      "category": "Platform/WeChat",
+      "color": "07C160",
+      "description": "显示微信原生 Toast 提示",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "Message", "type": "String"},
+        {"name": "Icon", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true}
+      ]
+    },
+    {
+      "id": "WeChat.RewardedAd",
+      "name": "WeChat Rewarded Ad",
+      "category": "Platform/WeChat",
+      "color": "07C160",
+      "description": "播放激励视频广告",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "AdUnitId", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "onRewarded", "type": "Flow", "isExec": true},
+        {"name": "onClosed", "type": "Flow", "isExec": true},
+        {"name": "onError", "type": "Flow", "isExec": true}
+      ]
+    },
+    {
+      "id": "Tutorial.Start",
+      "name": "Tutorial Start",
+      "category": "Game/Tutorial",
+      "color": "9B59B6",
+      "description": "开始新手引导序列",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true}
+      ]
+    },
+    {
+      "id": "Tutorial.ShowStep",
+      "name": "Tutorial Show Step",
+      "category": "Game/Tutorial",
+      "color": "9B59B6",
+      "description": "显示指定引导步骤",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "StepId", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true}
+      ]
+    },
+    {
+      "id": "Tutorial.Complete",
+      "name": "Tutorial Complete",
+      "category": "Game/Tutorial",
+      "color": "9B59B6",
+      "description": "标记指定步骤为已完成",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "StepId", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true}
+      ]
+    },
+    {
+      "id": "Tutorial.Check",
+      "name": "Tutorial Check",
+      "category": "Game/Tutorial",
+      "color": "9B59B6",
+      "description": "检查引导步骤完成状态（纯数据节点）",
+      "inputs": [
+        {"name": "StepId", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "IsDone", "type": "Boolean"},
+        {"name": "AllDone", "type": "Boolean"}
+      ]
+    },
+    {
+      "id": "Shop.Buy",
+      "name": "Shop Buy",
+      "category": "Game/Shop",
+      "color": "F39C12",
+      "description": "从 NPC 商店购买物品",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "NpcId", "type": "String"},
+        {"name": "ItemId", "type": "String"},
+        {"name": "Count", "type": "Integer"}
+      ],
+      "outputs": [
+        {"name": "onSuccess", "type": "Flow", "isExec": true},
+        {"name": "onPoor", "type": "Flow", "isExec": true},
+        {"name": "onNotFound", "type": "Flow", "isExec": true},
+        {"name": "onError", "type": "Flow", "isExec": true},
+        {"name": "Cost", "type": "Integer"}
+      ]
+    },
+    {
+      "id": "Shop.Sell",
+      "name": "Shop Sell",
+      "category": "Game/Shop",
+      "color": "F39C12",
+      "description": "向 NPC 商店卖出物品",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "NpcId", "type": "String"},
+        {"name": "ItemId", "type": "String"},
+        {"name": "Count", "type": "Integer"}
+      ],
+      "outputs": [
+        {"name": "onSuccess", "type": "Flow", "isExec": true},
+        {"name": "onInsufficient", "type": "Flow", "isExec": true},
+        {"name": "onError", "type": "Flow", "isExec": true},
+        {"name": "Revenue", "type": "Integer"}
+      ]
+    },
+    {
+      "id": "Shop.GetPrice",
+      "name": "Shop Get Price",
+      "category": "Game/Shop",
+      "color": "F39C12",
+      "description": "查询商品买卖价格（纯数据节点）",
+      "inputs": [
+        {"name": "NpcId", "type": "String"},
+        {"name": "ItemId", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "BuyPrice", "type": "Integer"},
+        {"name": "SellPrice", "type": "Integer"}
+      ]
+    },
+    {
+      "id": "Shop.ListItems",
+      "name": "Shop List Items",
+      "category": "Game/Shop",
+      "color": "F39C12",
+      "description": "列出商店所有商品（纯数据节点）",
+      "inputs": [
+        {"name": "NpcId", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "ItemList", "type": "String"},
+        {"name": "Count", "type": "Integer"}
+      ]
+    },
+    {
+      "id": "Memory.AddAffinity",
+      "name": "Memory Add Affinity",
+      "category": "Game/Memory",
+      "color": "E74C3C",
+      "description": "修改 NPC 好感度（正值增加，负值减少）",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "NpcId", "type": "String"},
+        {"name": "Delta", "type": "Integer"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true},
+        {"name": "NewAffinity", "type": "Integer"}
+      ]
+    },
+    {
+      "id": "Memory.RememberFact",
+      "name": "Memory Remember Fact",
+      "category": "Game/Memory",
+      "color": "E74C3C",
+      "description": "让 NPC 记住一个事实（永久保存）",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "NpcId", "type": "String"},
+        {"name": "Fact", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true}
+      ]
+    },
+    {
+      "id": "Memory.GetAffinity",
+      "name": "Memory Get Affinity",
+      "category": "Game/Memory",
+      "color": "E74C3C",
+      "description": "获取 NPC 好感度和见面次数（纯数据节点）",
+      "inputs": [
+        {"name": "NpcId", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "Affinity", "type": "Integer"},
+        {"name": "MeetCount", "type": "Integer"},
+        {"name": "IsFirstMeet", "type": "Boolean"}
+      ]
+    },
+    {
+      "id": "Memory.ClearHistory",
+      "name": "Memory Clear History",
+      "category": "Game/Memory",
+      "color": "E74C3C",
+      "description": "清除 NPC 的对话历史记录",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "NpcId", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true}
+      ]
+    },
+    {
+      "id": "Player.AddGold",
+      "name": "Player Add Gold",
+      "category": "Game/Player",
+      "color": "F1C40F",
+      "description": "增减玩家金币",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "Amount", "type": "Integer"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true},
+        {"name": "NewGold", "type": "Integer"}
+      ]
+    },
+    {
+      "id": "Player.AddExp",
+      "name": "Player Add Exp",
+      "category": "Game/Player",
+      "color": "F1C40F",
+      "description": "增加玩家经验（可能触发升级）",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "Amount", "type": "Integer"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true},
+        {"name": "onLevelUp", "type": "Flow", "isExec": true},
+        {"name": "NewExp", "type": "Integer"},
+        {"name": "NewLevel", "type": "Integer"},
+        {"name": "LeveledUp", "type": "Boolean"}
+      ]
+    },
+    {
+      "id": "Player.GetStats",
+      "name": "Player Get Stats",
+      "category": "Game/Player",
+      "color": "F1C40F",
+      "description": "获取玩家属性（纯数据节点）",
+      "inputs": [],
+      "outputs": [
+        {"name": "Gold", "type": "Integer"},
+        {"name": "Level", "type": "Integer"},
+        {"name": "Exp", "type": "Integer"},
+        {"name": "Name", "type": "String"}
+      ]
+    },
+    {
+      "id": "Player.SetName",
+      "name": "Player Set Name",
+      "category": "Game/Player",
+      "color": "F1C40F",
+      "description": "设置玩家名字",
+      "inputs": [
+        {"name": "", "type": "Flow", "isExec": true},
+        {"name": "Name", "type": "String"}
+      ],
+      "outputs": [
+        {"name": "Out", "type": "Flow", "isExec": true}
+      ]
+    }
+  ]
+}

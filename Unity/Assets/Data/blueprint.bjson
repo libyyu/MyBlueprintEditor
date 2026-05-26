@@ -1,0 +1,124 @@
+{
+    "fileType": "runtime",
+    "metadata": {
+        "name": "MathPipeline",
+        "description": "A simple math computation pipeline",
+        "version": "1.0"
+    },
+    "nodes": [
+        {
+            "id": 1,
+            "definitionId": "constant_float",
+            "name": "Constant A",
+            "pins": [
+                {
+                    "id": 101,
+                    "name": "Value",
+                    "kind": "output",
+                    "dataType": 3,
+                    "allowMultiple": false,
+                    "isExec": false
+                }
+            ],
+            "isEnabled": true,
+            "nodeData": {
+                "value": 10.000000
+            }
+        },
+        {
+            "id": 2,
+            "definitionId": "constant_float",
+            "name": "Constant B",
+            "pins": [
+                {
+                    "id": 201,
+                    "name": "Value",
+                    "kind": "output",
+                    "dataType": 3,
+                    "allowMultiple": false,
+                    "isExec": false
+                }
+            ],
+            "isEnabled": true,
+            "nodeData": {
+                "value": 3.000000
+            }
+        },
+        {
+            "id": 3,
+            "definitionId": "math_add",
+            "name": "Add",
+            "pins": [
+                {
+                    "id": 301,
+                    "name": "A",
+                    "kind": "input",
+                    "dataType": 3,
+                    "allowMultiple": false,
+                    "isExec": false
+                },
+                {
+                    "id": 302,
+                    "name": "B",
+                    "kind": "input",
+                    "dataType": 3,
+                    "allowMultiple": false,
+                    "isExec": false
+                },
+                {
+                    "id": 303,
+                    "name": "Result",
+                    "kind": "output",
+                    "dataType": 3,
+                    "allowMultiple": false,
+                    "isExec": false
+                }
+            ],
+            "isEnabled": true
+        },
+        {
+            "id": 4,
+            "definitionId": "output_display",
+            "name": "Display Result",
+            "pins": [
+                {
+                    "id": 401,
+                    "name": "Input",
+                    "kind": "input",
+                    "dataType": 3,
+                    "allowMultiple": false,
+                    "isExec": false
+                }
+            ],
+            "isEnabled": true
+        }
+    ],
+    "links": [
+        {
+            "id": 1001,
+            "startPinId": 101,
+            "endPinId": 301,
+            "isEnabled": true
+        },
+        {
+            "id": 1002,
+            "startPinId": 201,
+            "endPinId": 302,
+            "isEnabled": true
+        },
+        {
+            "id": 1003,
+            "startPinId": 303,
+            "endPinId": 401,
+            "isEnabled": true
+        }
+    ],
+    "variables": [
+        {
+            "name": "Speed",
+            "dataType": 3,
+            "isExposed": true,
+            "defaultValue": 1.500000
+        }
+    ]
+}

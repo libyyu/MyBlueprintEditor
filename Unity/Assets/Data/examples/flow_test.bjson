@@ -1,0 +1,148 @@
+{
+  "metadata": {
+    "schemaVersion": 1,
+    "name": "FlowTest",
+    "description": "Flow nodes test: Branch, ForLoop, SetVariable/GetVariable, Map"
+  },
+  "nodes": [
+    {
+      "id": 1,
+      "definitionId": "SetVariable",
+      "definitionVersion": 1,
+      "name": "",
+      "position": {"x": 0, "y": 0},
+      "pins": [
+        {"id": 101, "kind": 0, "dataType": 0, "isExec": true},
+        {"id": 102, "kind": 0, "dataType": 4, "name": "Name",  "defaultValue": "counter"},
+        {"id": 103, "kind": 0, "dataType": 2, "name": "Value", "defaultValue": 0},
+        {"id": 104, "kind": 1, "dataType": 0, "isExec": true}
+      ]
+    },
+    {
+      "id": 2,
+      "definitionId": "ForLoop",
+      "definitionVersion": 1,
+      "name": "",
+      "position": {"x": 200, "y": 0},
+      "pins": [
+        {"id": 201, "kind": 0, "dataType": 0, "isExec": true},
+        {"id": 202, "kind": 0, "dataType": 2, "name": "First Index",  "defaultValue": 0},
+        {"id": 203, "kind": 0, "dataType": 2, "name": "Last Index",   "defaultValue": 4},
+        {"id": 204, "kind": 1, "dataType": 0, "name": "Loop Body", "isExec": true},
+        {"id": 205, "kind": 1, "dataType": 2, "name": "Index"},
+        {"id": 206, "kind": 1, "dataType": 0, "name": "Completed", "isExec": true}
+      ]
+    },
+    {
+      "id": 3,
+      "definitionId": "Add",
+      "definitionVersion": 1,
+      "name": "",
+      "position": {"x": 400, "y": 50},
+      "pins": [
+        {"id": 301, "kind": 0, "dataType": 2, "name": "A"},
+        {"id": 302, "kind": 0, "dataType": 2, "name": "B"},
+        {"id": 303, "kind": 1, "dataType": 2, "name": "Result"}
+      ]
+    },
+    {
+      "id": 4,
+      "definitionId": "GetVariable",
+      "definitionVersion": 1,
+      "name": "",
+      "position": {"x": 200, "y": 150},
+      "pins": [
+        {"id": 401, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "counter"},
+        {"id": 402, "kind": 1, "dataType": 0, "name": "Value"}
+      ]
+    },
+    {
+      "id": 5,
+      "definitionId": "SetVariable",
+      "definitionVersion": 1,
+      "name": "UpdateCounter",
+      "position": {"x": 600, "y": 0},
+      "pins": [
+        {"id": 501, "kind": 0, "dataType": 0, "isExec": true},
+        {"id": 502, "kind": 0, "dataType": 4, "name": "Name",  "defaultValue": "counter"},
+        {"id": 503, "kind": 0, "dataType": 2, "name": "Value"},
+        {"id": 504, "kind": 1, "dataType": 0, "isExec": true}
+      ]
+    },
+    {
+      "id": 6,
+      "definitionId": "PrintString",
+      "definitionVersion": 1,
+      "name": "",
+      "position": {"x": 800, "y": 0},
+      "pins": [
+        {"id": 601, "kind": 0, "dataType": 0, "isExec": true},
+        {"id": 602, "kind": 0, "dataType": 4, "name": "In String"},
+        {"id": 603, "kind": 1, "dataType": 0, "isExec": true}
+      ]
+    },
+    {
+      "id": 7,
+      "definitionId": "GetVariable",
+      "definitionVersion": 1,
+      "name": "GetFinalCounter",
+      "position": {"x": 600, "y": 150},
+      "pins": [
+        {"id": 701, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "counter"},
+        {"id": 702, "kind": 1, "dataType": 0, "name": "Value"}
+      ]
+    },
+    {
+      "id": 8,
+      "definitionId": "Branch",
+      "definitionVersion": 1,
+      "name": "",
+      "position": {"x": 1000, "y": 0},
+      "pins": [
+        {"id": 801, "kind": 0, "dataType": 0, "isExec": true},
+        {"id": 802, "kind": 0, "dataType": 1, "name": "Condition"},
+        {"id": 803, "kind": 1, "dataType": 0, "name": "True",  "isExec": true},
+        {"id": 804, "kind": 1, "dataType": 0, "name": "False", "isExec": true}
+      ]
+    },
+    {
+      "id": 9,
+      "definitionId": "PrintString",
+      "definitionVersion": 1,
+      "name": "PrintTrue",
+      "position": {"x": 1200, "y": -50},
+      "pins": [
+        {"id": 901, "kind": 0, "dataType": 0, "isExec": true},
+        {"id": 902, "kind": 0, "dataType": 4, "name": "In String", "defaultValue": "counter >= 10: TRUE"},
+        {"id": 903, "kind": 1, "dataType": 0, "isExec": true}
+      ]
+    },
+    {
+      "id": 10,
+      "definitionId": "PrintString",
+      "definitionVersion": 1,
+      "name": "PrintFalse",
+      "position": {"x": 1200, "y": 50},
+      "pins": [
+        {"id": 1001, "kind": 0, "dataType": 0, "isExec": true},
+        {"id": 1002, "kind": 0, "dataType": 4, "name": "In String", "defaultValue": "counter < 10: FALSE"},
+        {"id": 1003, "kind": 1, "dataType": 0, "isExec": true}
+      ]
+    }
+  ],
+  "links": [
+    {"id": 1001, "startPinId": 104, "endPinId": 201},
+    {"id": 1002, "startPinId": 204, "endPinId": 501},
+    {"id": 1003, "startPinId": 205, "endPinId": 301},
+    {"id": 1004, "startPinId": 402, "endPinId": 302},
+    {"id": 1005, "startPinId": 303, "endPinId": 503},
+    {"id": 1006, "startPinId": 504, "endPinId": 601},
+    {"id": 1007, "startPinId": 702, "endPinId": 802},
+    {"id": 1008, "startPinId": 206, "endPinId": 801},
+    {"id": 1009, "startPinId": 803, "endPinId": 901},
+    {"id": 1010, "startPinId": 804, "endPinId": 1001}
+  ],
+  "variables": [
+    {"name": "counter", "dataType": 2, "defaultValue": 0}
+  ]
+}

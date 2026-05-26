@@ -1,0 +1,384 @@
+{
+  "runtime": {
+    "fileType": "runtime",
+    "metadata": {
+      "schemaVersion": 2,
+      "blueprintClass": 0,
+      "name": "ReflectAgent",
+      "description": "Demonstrates Agent.Reflect: LLM generates content, Reflect evaluates it, onFail triggers retry with feedback. Variables: ApiKey, BaseURL, Model, Topic, Criteria, MaxRetries.",
+      "version": "1.0"
+    },
+    "nodes": [
+      {
+        "id": 1,
+        "definitionId": "OnBeginPlay",
+        "name": "On Begin Play",
+        "pins": [
+          { "id": 2, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 10,
+        "definitionId": "SetVariable",
+        "name": "Init retry count",
+        "pins": [
+          { "id": 100, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 101, "kind": 0, "dataType": 4, "name": "Name",  "defaultValue": "retryCount" },
+          { "id": 102, "kind": 0, "dataType": 2, "name": "Value", "defaultValue": 0 },
+          { "id": 103, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 11,
+        "definitionId": "SetVariable",
+        "name": "Init feedback",
+        "pins": [
+          { "id": 110, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 111, "kind": 0, "dataType": 4, "name": "Name",  "defaultValue": "feedback" },
+          { "id": 112, "kind": 0, "dataType": 4, "name": "Value", "defaultValue": "" },
+          { "id": 113, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 20,
+        "definitionId": "GetVariable",
+        "name": "Get ApiKey",
+        "pins": [
+          { "id": 200, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "ApiKey" },
+          { "id": 201, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 21,
+        "definitionId": "GetVariable",
+        "name": "Get BaseURL",
+        "pins": [
+          { "id": 210, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "BaseURL" },
+          { "id": 211, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 22,
+        "definitionId": "GetVariable",
+        "name": "Get Model",
+        "pins": [
+          { "id": 220, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Model" },
+          { "id": 221, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 23,
+        "definitionId": "GetVariable",
+        "name": "Get Topic",
+        "pins": [
+          { "id": 230, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Topic" },
+          { "id": 231, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 24,
+        "definitionId": "GetVariable",
+        "name": "Get Criteria",
+        "pins": [
+          { "id": 240, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Criteria" },
+          { "id": 241, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 25,
+        "definitionId": "GetVariable",
+        "name": "Get feedback",
+        "pins": [
+          { "id": 250, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "feedback" },
+          { "id": 251, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+      {
+        "id": 30,
+        "definitionId": "FormatString",
+        "name": "Build Prompt",
+        "pins": [
+          { "id": 300, "kind": 0, "dataType": 4, "name": "Format",
+            "defaultValue": "Write a short paragraph about: {0}. Previous feedback to address: {1}" },
+          { "id": 301, "kind": 0, "dataType": 4, "name": "topic" },
+          { "id": 302, "kind": 0, "dataType": 4, "name": "prev_feedback" },
+          { "id": 303, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+      {
+        "id": 31,
+        "definitionId": "JSON.MakeMessage",
+        "name": "Make User Msg",
+        "pins": [
+          { "id": 310, "kind": 0, "dataType": 4, "name": "Role",       "defaultValue": "user" },
+          { "id": 311, "kind": 0, "dataType": 4, "name": "Content" },
+          { "id": 312, "kind": 0, "dataType": 4, "name": "ToolCallId", "defaultValue": "" },
+          { "id": 313, "kind": 1, "dataType": 4, "name": "Message" }
+        ]
+      },
+      {
+        "id": 32,
+        "definitionId": "JSON.ArrayPush",
+        "name": "Make Messages",
+        "pins": [
+          { "id": 320, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 321, "kind": 0, "dataType": 4, "name": "JSON",    "defaultValue": "[]" },
+          { "id": 322, "kind": 0, "dataType": 9, "name": "Element" },
+          { "id": 323, "kind": 1, "dataType": 0, "isExec": true },
+          { "id": 324, "kind": 1, "dataType": 4, "name": "JSON" },
+          { "id": 325, "kind": 1, "dataType": 2, "name": "Length" }
+        ]
+      },
+      {
+        "id": 40,
+        "definitionId": "LLM.Chat",
+        "name": "LLM Generate",
+        "pins": [
+          { "id": 400, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 401, "kind": 0, "dataType": 4, "name": "BaseURL",      "defaultValue": "https://open.bigmodel.cn/api/paas/v4" },
+          { "id": 402, "kind": 0, "dataType": 4, "name": "ApiKey",       "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf" },
+          { "id": 403, "kind": 0, "dataType": 4, "name": "Model",        "defaultValue": "glm-4-flash" },
+          { "id": 404, "kind": 0, "dataType": 4, "name": "Messages" },
+          { "id": 405, "kind": 0, "dataType": 4, "name": "SystemPrompt", "defaultValue": "You are a helpful writer. Write clear, concise content." },
+          { "id": 406, "kind": 0, "dataType": 2, "name": "MaxTokens",    "defaultValue": 512 },
+          { "id": 407, "kind": 0, "dataType": 3, "name": "Temperature",  "defaultValue": 0.7 },
+          { "id": 408, "kind": 0, "dataType": 4, "name": "Tools",        "defaultValue": "" },
+          { "id": 409, "kind": 1, "dataType": 0, "name": "onReply",    "isExec": true },
+          { "id": 410, "kind": 1, "dataType": 0, "name": "onToolCall", "isExec": true },
+          { "id": 411, "kind": 1, "dataType": 0, "name": "onError",    "isExec": true },
+          { "id": 412, "kind": 1, "dataType": 4, "name": "Reply" },
+          { "id": 413, "kind": 1, "dataType": 4, "name": "ToolCallsJSON" },
+          { "id": 414, "kind": 1, "dataType": 4, "name": "FinishReason" },
+          { "id": 415, "kind": 1, "dataType": 4, "name": "FullResponse" },
+          { "id": 416, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
+        ]
+      },
+      {
+        "id": 50,
+        "definitionId": "Agent.Reflect",
+        "name": "Reflect",
+        "pins": [
+          { "id": 500, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 501, "kind": 0, "dataType": 4, "name": "BaseURL" },
+          { "id": 502, "kind": 0, "dataType": 4, "name": "ApiKey" },
+          { "id": 503, "kind": 0, "dataType": 4, "name": "Model" },
+          { "id": 504, "kind": 0, "dataType": 4, "name": "Output" },
+          { "id": 505, "kind": 0, "dataType": 4, "name": "Criteria" },
+          { "id": 506, "kind": 0, "dataType": 2, "name": "MaxTokens", "defaultValue": 256 },
+          { "id": 507, "kind": 1, "dataType": 0, "name": "onPass",  "isExec": true },
+          { "id": 508, "kind": 1, "dataType": 0, "name": "onFail",  "isExec": true },
+          { "id": 509, "kind": 1, "dataType": 0, "name": "onError", "isExec": true },
+          { "id": 510, "kind": 1, "dataType": 4, "name": "Feedback" },
+          { "id": 511, "kind": 1, "dataType": 4, "name": "Score" },
+          { "id": 512, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
+        ]
+      },
+      {
+        "id": 60,
+        "definitionId": "PrintString",
+        "name": "Print Pass",
+        "pins": [
+          { "id": 600, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 601, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 602, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 61,
+        "definitionId": "GetVariable",
+        "name": "Get retryCount",
+        "pins": [
+          { "id": 610, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "retryCount" },
+          { "id": 611, "kind": 1, "dataType": 2, "name": "Value" }
+        ]
+      },
+      {
+        "id": 62,
+        "definitionId": "GetVariable",
+        "name": "Get MaxRetries",
+        "pins": [
+          { "id": 620, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "MaxRetries" },
+          { "id": 621, "kind": 1, "dataType": 2, "name": "Value" }
+        ]
+      },
+      {
+        "id": 63,
+        "definitionId": "Less",
+        "name": "retryCount < MaxRetries",
+        "pins": [
+          { "id": 630, "kind": 0, "dataType": 2, "name": "A" },
+          { "id": 631, "kind": 0, "dataType": 2, "name": "B" },
+          { "id": 632, "kind": 1, "dataType": 1, "name": "Result" }
+        ]
+      },
+      {
+        "id": 64,
+        "definitionId": "Branch",
+        "name": "Can Retry?",
+        "pins": [
+          { "id": 640, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 641, "kind": 0, "dataType": 1, "name": "Condition" },
+          { "id": 642, "kind": 1, "dataType": 0, "name": "True",  "isExec": true },
+          { "id": 643, "kind": 1, "dataType": 0, "name": "False", "isExec": true }
+        ]
+      },
+      {
+        "id": 65,
+        "definitionId": "Add",
+        "name": "retryCount + 1",
+        "pins": [
+          { "id": 650, "kind": 0, "dataType": 2, "name": "A" },
+          { "id": 651, "kind": 0, "dataType": 2, "name": "B", "defaultValue": 1 },
+          { "id": 652, "kind": 1, "dataType": 2, "name": "Result" }
+        ]
+      },
+      {
+        "id": 66,
+        "definitionId": "SetVariable",
+        "name": "Save retryCount",
+        "pins": [
+          { "id": 660, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 661, "kind": 0, "dataType": 4, "name": "Name",  "defaultValue": "retryCount" },
+          { "id": 662, "kind": 0, "dataType": 2, "name": "Value" },
+          { "id": 663, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 67,
+        "definitionId": "SetVariable",
+        "name": "Save feedback",
+        "pins": [
+          { "id": 670, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 671, "kind": 0, "dataType": 4, "name": "Name",  "defaultValue": "feedback" },
+          { "id": 672, "kind": 0, "dataType": 4, "name": "Value" },
+          { "id": 673, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 68,
+        "definitionId": "FireEvent",
+        "name": "Retry Loop",
+        "pins": [
+          { "id": 680, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 681, "kind": 0, "dataType": 4, "name": "EventName", "defaultValue": "DoGenerate" },
+          { "id": 682, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 69,
+        "definitionId": "CustomEventNode",
+        "name": "DoGenerate",
+        "nodeData": { "EventName": "DoGenerate" },
+        "pins": [
+          { "id": 690, "kind": 1, "dataType": 0, "isExec": true },
+          { "id": 691, "kind": 1, "dataType": 4, "name": "EventName" }
+        ]
+      },
+      {
+        "id": 70,
+        "definitionId": "PrintString",
+        "name": "Print MaxRetry",
+        "pins": [
+          { "id": 700, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 701, "kind": 0, "dataType": 4, "name": "In String",
+            "defaultValue": "[ReflectAgent] Max retries reached, output not approved." },
+          { "id": 702, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+      {
+        "id": 71,
+        "definitionId": "PrintString",
+        "name": "Print Error",
+        "pins": [
+          { "id": 710, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 711, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 712, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      }
+    ],
+    "links": [
+      { "id": 1,  "startPinId": 2,   "endPinId": 100, "isEnabled": true },
+      { "id": 2,  "startPinId": 103, "endPinId": 110, "isEnabled": true },
+      { "id": 3,  "startPinId": 113, "endPinId": 680, "isEnabled": true },
+      { "id": 4,  "startPinId": 690, "endPinId": 320, "isEnabled": true },
+      { "id": 5,  "startPinId": 231, "endPinId": 301, "isEnabled": true },
+      { "id": 6,  "startPinId": 251, "endPinId": 302, "isEnabled": true },
+      { "id": 7,  "startPinId": 303, "endPinId": 311, "isEnabled": true },
+      { "id": 8,  "startPinId": 313, "endPinId": 322, "isEnabled": true },
+      { "id": 9,  "startPinId": 323, "endPinId": 400, "isEnabled": true },
+      { "id": 10, "startPinId": 324, "endPinId": 404, "isEnabled": true },
+      { "id": 11, "startPinId": 211, "endPinId": 401, "isEnabled": true },
+      { "id": 12, "startPinId": 211, "endPinId": 501, "isEnabled": true },
+      { "id": 13, "startPinId": 201, "endPinId": 502, "isEnabled": true },
+      { "id": 14, "startPinId": 221, "endPinId": 403, "isEnabled": true },
+      { "id": 15, "startPinId": 221, "endPinId": 503, "isEnabled": true },
+      { "id": 16, "startPinId": 409, "endPinId": 500, "isEnabled": true },
+      { "id": 17, "startPinId": 412, "endPinId": 504, "isEnabled": true },
+      { "id": 18, "startPinId": 241, "endPinId": 505, "isEnabled": true },
+      { "id": 19, "startPinId": 507, "endPinId": 600, "isEnabled": true },
+      { "id": 20, "startPinId": 412, "endPinId": 601, "isEnabled": true },
+      { "id": 21, "startPinId": 508, "endPinId": 640, "isEnabled": true },
+      { "id": 22, "startPinId": 611, "endPinId": 630, "isEnabled": true },
+      { "id": 23, "startPinId": 621, "endPinId": 631, "isEnabled": true },
+      { "id": 24, "startPinId": 632, "endPinId": 641, "isEnabled": true },
+      { "id": 25, "startPinId": 642, "endPinId": 660, "isEnabled": true },
+      { "id": 26, "startPinId": 611, "endPinId": 650, "isEnabled": true },
+      { "id": 27, "startPinId": 652, "endPinId": 662, "isEnabled": true },
+      { "id": 28, "startPinId": 663, "endPinId": 670, "isEnabled": true },
+      { "id": 29, "startPinId": 510, "endPinId": 672, "isEnabled": true },
+      { "id": 30, "startPinId": 673, "endPinId": 680, "isEnabled": true },
+      { "id": 31, "startPinId": 643, "endPinId": 700, "isEnabled": true },
+      { "id": 32, "startPinId": 411, "endPinId": 710, "isEnabled": true },
+      { "id": 33, "startPinId": 509, "endPinId": 710, "isEnabled": true },
+      { "id": 34, "startPinId": 416, "endPinId": 711, "isEnabled": true },
+      { "id": 35, "startPinId": 512, "endPinId": 711, "isEnabled": true },
+      { "id": 36, "startPinId": 201, "endPinId": 402, "isEnabled": true }
+    ],
+    "variables": [
+      { "name": "ApiKey",     "dataType": 4, "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf" },
+      { "name": "BaseURL",    "dataType": 4, "defaultValue": "https://open.bigmodel.cn/api/paas/v4" },
+      { "name": "Model",      "dataType": 4, "defaultValue": "glm-4-flash" },
+      { "name": "Topic",      "dataType": 4, "defaultValue": "the benefits of daily exercise" },
+      { "name": "Criteria",   "dataType": 4, "defaultValue": "The paragraph must mention at least 3 specific health benefits and be under 100 words." },
+      { "name": "MaxRetries", "dataType": 2, "defaultValue": 3 },
+      { "name": "retryCount", "dataType": 2, "defaultValue": 0 },
+      { "name": "feedback",   "dataType": 4, "defaultValue": "" }
+    ]
+  },
+  "editor": {
+    "fileType": "editor",
+    "metadata": { "author": "", "createdAt": "", "updatedAt": "" },
+    "nodes": [
+      { "id": 1,  "position": { "x": -800, "y": 0    }, "size": { "width": 161,  "height": 72  } },
+      { "id": 10, "position": { "x": -580, "y": 0    }, "size": { "width": 246,  "height": 131 } },
+      { "id": 11, "position": { "x": -280, "y": 0    }, "size": { "width": 246,  "height": 131 } },
+      { "id": 69, "position": { "x": 0,    "y": 200  }, "size": { "width": 200,  "height": 71  } },
+      { "id": 20, "position": { "x": 0,    "y": 400  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 21, "position": { "x": 0,    "y": 460  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 22, "position": { "x": 0,    "y": 520  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 23, "position": { "x": 0,    "y": 580  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 24, "position": { "x": 0,    "y": 640  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 25, "position": { "x": 0,    "y": 700  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 30, "position": { "x": 260,  "y": 580  }, "size": { "width": 380,  "height": 105 } },
+      { "id": 31, "position": { "x": 700,  "y": 580  }, "size": { "width": 340,  "height": 105 } },
+      { "id": 32, "position": { "x": 260,  "y": 200  }, "size": { "width": 260,  "height": 128 } },
+      { "id": 40, "position": { "x": 580,  "y": 100  }, "size": { "width": 400,  "height": 317 } },
+      { "id": 50, "position": { "x": 1040, "y": 100  }, "size": { "width": 360,  "height": 240 } },
+      { "id": 60, "position": { "x": 1460, "y": 0    }, "size": { "width": 200,  "height": 100 } },
+      { "id": 61, "position": { "x": 1040, "y": 400  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 62, "position": { "x": 1040, "y": 460  }, "size": { "width": 200,  "height": 43  } },
+      { "id": 63, "position": { "x": 1300, "y": 400  }, "size": { "width": 180,  "height": 71  } },
+      { "id": 64, "position": { "x": 1540, "y": 400  }, "size": { "width": 200,  "height": 115 } },
+      { "id": 65, "position": { "x": 1300, "y": 540  }, "size": { "width": 160,  "height": 71  } },
+      { "id": 66, "position": { "x": 1800, "y": 400  }, "size": { "width": 246,  "height": 131 } },
+      { "id": 67, "position": { "x": 1800, "y": 580  }, "size": { "width": 246,  "height": 131 } },
+      { "id": 68, "position": { "x": -280, "y": 200  }, "size": { "width": 246,  "height": 100 } },
+      { "id": 70, "position": { "x": 1800, "y": 760  }, "size": { "width": 340,  "height": 100 } },
+      { "id": 71, "position": { "x": 1040, "y": 600  }, "size": { "width": 193,  "height": 100 } }
+    ],
+    "viewInfo": {
+      "viewPosition": { "x": -400, "y": -100 },
+      "viewScale": 0.5
+    }
+  }
+}

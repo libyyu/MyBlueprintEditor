@@ -1,0 +1,594 @@
+{
+  "runtime": {
+    "fileType": "runtime",
+    "metadata": {
+      "schemaVersion": 2,
+      "blueprintClass": 0,
+      "name": "AI_NPC_Dialog",
+      "description": "Blueprint Editor file",
+      "version": ""
+    },
+    "nodes": [
+      {
+        "id": 1,
+        "definitionId": "OnBeginPlay",
+        "definitionVersion": 1,
+        "name": "On Begin Play",
+        "pins": [
+          {
+            "id": 2,
+            "kind": 1,
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "definitionId": "GetVariable",
+        "definitionVersion": 1,
+        "name": "Get PlayerInput",
+        "pins": [
+          {
+            "id": 4,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Name",
+            "defaultValue": "PlayerInput"
+          },
+          {
+            "id": 5,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Value"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "definitionId": "JSON.MakeMessage",
+        "definitionVersion": 1,
+        "name": "Make User Msg",
+        "pins": [
+          {
+            "id": 7,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Role",
+            "defaultValue": "user"
+          },
+          {
+            "id": 8,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Content",
+            "defaultValue": ""
+          },
+          {
+            "id": 9,
+            "kind": 0,
+            "dataType": 4,
+            "name": "ToolCallId",
+            "defaultValue": ""
+          },
+          {
+            "id": 10,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Message"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "definitionId": "FormatString",
+        "definitionVersion": 1,
+        "name": "Wrap Messages Array",
+        "pins": [
+          {
+            "id": 12,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Format",
+            "defaultValue": "[{0}]"
+          },
+          {
+            "id": 13,
+            "kind": 0,
+            "dataType": 4,
+            "name": "0",
+            "defaultValue": ""
+          },
+          {
+            "id": 14,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Result"
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "definitionId": "GetVariable",
+        "definitionVersion": 1,
+        "name": "Get Personality",
+        "pins": [
+          {
+            "id": 16,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Name",
+            "defaultValue": "Personality"
+          },
+          {
+            "id": 17,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Value"
+          }
+        ]
+      },
+      {
+        "id": 18,
+        "definitionId": "GetVariable",
+        "definitionVersion": 1,
+        "name": "Get BaseURL",
+        "pins": [
+          {
+            "id": 19,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Name",
+            "defaultValue": "BaseURL"
+          },
+          {
+            "id": 20,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Value"
+          }
+        ]
+      },
+      {
+        "id": 21,
+        "definitionId": "GetVariable",
+        "definitionVersion": 1,
+        "name": "Get ApiKey",
+        "pins": [
+          {
+            "id": 22,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Name",
+            "defaultValue": "ApiKey"
+          },
+          {
+            "id": 23,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Value"
+          }
+        ]
+      },
+      {
+        "id": 24,
+        "definitionId": "GetVariable",
+        "definitionVersion": 1,
+        "name": "Get Model",
+        "pins": [
+          {
+            "id": 25,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Name",
+            "defaultValue": "Model"
+          },
+          {
+            "id": 26,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Value"
+          }
+        ]
+      },
+      {
+        "id": 27,
+        "definitionId": "LLM.Chat",
+        "definitionVersion": 1,
+        "name": "Chat with NPC",
+        "pins": [
+          {
+            "id": 28,
+            "kind": 0,
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 29,
+            "kind": 0,
+            "dataType": 4,
+            "name": "BaseURL",
+            "defaultValue": "https://open.bigmodel.cn/api/paas/v4"
+          },
+          {
+            "id": 30,
+            "kind": 0,
+            "dataType": 4,
+            "name": "ApiKey",
+            "defaultValue": ""
+          },
+          {
+            "id": 31,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Model",
+            "defaultValue": "glm-4-flash"
+          },
+          {
+            "id": 32,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Messages",
+            "defaultValue": ""
+          },
+          {
+            "id": 33,
+            "kind": 0,
+            "dataType": 4,
+            "name": "SystemPrompt",
+            "defaultValue": ""
+          },
+          {
+            "id": 34,
+            "kind": 0,
+            "dataType": 2,
+            "name": "MaxTokens",
+            "defaultValue": 300
+          },
+          {
+            "id": 35,
+            "kind": 0,
+            "dataType": 3,
+            "name": "Temperature",
+            "defaultValue": 0.8
+          },
+          {
+            "id": 36,
+            "kind": 0,
+            "dataType": 4,
+            "name": "Tools",
+            "defaultValue": ""
+          },
+          {
+            "id": 37,
+            "kind": 1,
+            "dataType": 0,
+            "name": "onReply",
+            "isExec": true
+          },
+          {
+            "id": 38,
+            "kind": 1,
+            "dataType": 0,
+            "name": "onToolCall",
+            "isExec": true
+          },
+          {
+            "id": 39,
+            "kind": 1,
+            "dataType": 0,
+            "name": "onError",
+            "isExec": true
+          },
+          {
+            "id": 40,
+            "kind": 1,
+            "dataType": 4,
+            "name": "Reply"
+          },
+          {
+            "id": 41,
+            "kind": 1,
+            "dataType": 4,
+            "name": "ToolCallsJSON"
+          },
+          {
+            "id": 42,
+            "kind": 1,
+            "dataType": 4,
+            "name": "FinishReason"
+          },
+          {
+            "id": 43,
+            "kind": 1,
+            "dataType": 4,
+            "name": "FullResponse"
+          },
+          {
+            "id": 44,
+            "kind": 1,
+            "dataType": 4,
+            "name": "ErrorMessage"
+          }
+        ]
+      },
+      {
+        "id": 45,
+        "definitionId": "PrintString",
+        "definitionVersion": 1,
+        "name": "Show NPC Reply",
+        "pins": [
+          {
+            "id": 46,
+            "kind": 0,
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 47,
+            "kind": 0,
+            "dataType": 4,
+            "name": "In String",
+            "defaultValue": ""
+          },
+          {
+            "id": 48,
+            "kind": 1,
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      },
+      {
+        "id": 49,
+        "definitionId": "PrintString",
+        "definitionVersion": 1,
+        "name": "Show Error",
+        "pins": [
+          {
+            "id": 50,
+            "kind": 0,
+            "dataType": 0,
+            "isExec": true
+          },
+          {
+            "id": 51,
+            "kind": 0,
+            "dataType": 4,
+            "name": "In String",
+            "defaultValue": ""
+          },
+          {
+            "id": 52,
+            "kind": 1,
+            "dataType": 0,
+            "isExec": true
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "id": 53,
+        "startPinId": 2,
+        "endPinId": 28,
+        "isEnabled": true
+      },
+      {
+        "id": 54,
+        "startPinId": 5,
+        "endPinId": 8,
+        "isEnabled": true
+      },
+      {
+        "id": 55,
+        "startPinId": 10,
+        "endPinId": 13,
+        "isEnabled": true
+      },
+      {
+        "id": 56,
+        "startPinId": 14,
+        "endPinId": 32,
+        "isEnabled": true
+      },
+      {
+        "id": 57,
+        "startPinId": 17,
+        "endPinId": 33,
+        "isEnabled": true
+      },
+      {
+        "id": 58,
+        "startPinId": 20,
+        "endPinId": 29,
+        "isEnabled": true
+      },
+      {
+        "id": 59,
+        "startPinId": 23,
+        "endPinId": 30,
+        "isEnabled": true
+      },
+      {
+        "id": 60,
+        "startPinId": 26,
+        "endPinId": 31,
+        "isEnabled": true
+      },
+      {
+        "id": 61,
+        "startPinId": 37,
+        "endPinId": 46,
+        "isEnabled": true
+      },
+      {
+        "id": 62,
+        "startPinId": 40,
+        "endPinId": 47,
+        "isEnabled": true
+      },
+      {
+        "id": 63,
+        "startPinId": 39,
+        "endPinId": 50,
+        "isEnabled": true
+      },
+      {
+        "id": 64,
+        "startPinId": 44,
+        "endPinId": 51,
+        "isEnabled": true
+      }
+    ]
+  },
+  "editor": {
+    "fileType": "editor",
+    "metadata": {
+      "author": "",
+      "createdAt": "",
+      "updatedAt": ""
+    },
+    "nodes": [
+      {
+        "id": 1,
+        "position": {
+          "x": -400,
+          "y": 0
+        },
+        "size": {
+          "width": 213,
+          "height": 72
+        },
+        "isCollapsed": false
+      },
+      {
+        "id": 3,
+        "position": {
+          "x": -50,
+          "y": -240
+        },
+        "size": {
+          "width": 279,
+          "height": 43
+        },
+        "isCollapsed": false
+      },
+      {
+        "id": 6,
+        "position": {
+          "x": 300,
+          "y": -60
+        },
+        "size": {
+          "width": 559,
+          "height": 132
+        },
+        "isCollapsed": false
+      },
+      {
+        "id": 11,
+        "position": {
+          "x": 392,
+          "y": 264
+        },
+        "size": {
+          "width": 565,
+          "height": 100
+        },
+        "isCollapsed": false
+      },
+      {
+        "id": 15,
+        "position": {
+          "x": -50,
+          "y": -120
+        },
+        "size": {
+          "width": 276,
+          "height": 43
+        },
+        "isCollapsed": false
+      },
+      {
+        "id": 18,
+        "position": {
+          "x": -50,
+          "y": 0
+        },
+        "size": {
+          "width": 252,
+          "height": 43
+        },
+        "isCollapsed": false
+      },
+      {
+        "id": 21,
+        "position": {
+          "x": -50,
+          "y": 120
+        },
+        "size": {
+          "width": 236,
+          "height": 43
+        },
+        "isCollapsed": false
+      },
+      {
+        "id": 24,
+        "position": {
+          "x": -50,
+          "y": 240
+        },
+        "size": {
+          "width": 231,
+          "height": 43
+        },
+        "isCollapsed": false
+      },
+      {
+        "id": 27,
+        "position": {
+          "x": 1160,
+          "y": 56
+        },
+        "size": {
+          "width": 460,
+          "height": 364
+        },
+        "isCollapsed": false
+      },
+      {
+        "id": 45,
+        "position": {
+          "x": 1848,
+          "y": 28
+        },
+        "size": {
+          "width": 238,
+          "height": 104
+        },
+        "isCollapsed": false
+      },
+      {
+        "id": 49,
+        "position": {
+          "x": 1848,
+          "y": 148
+        },
+        "size": {
+          "width": 183,
+          "height": 104
+        },
+        "isCollapsed": false
+      }
+    ],
+    "viewInfo": {
+      "viewPosition": {
+        "x": 0,
+        "y": 0
+      },
+      "viewScale": 1
+    }
+  }
+}

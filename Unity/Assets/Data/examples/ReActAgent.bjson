@@ -1,0 +1,2340 @@
+{
+    "runtime": {
+    "fileType": "runtime",
+    "metadata": {
+        "schemaVersion": 2,
+        "blueprintClass": 0,
+        "name": "ReActAgent",
+        "description": "Blueprint Editor file",
+        "version": ""
+    },
+    "nodes": [
+        {
+            "id": 1,
+            "definitionId": "OnBeginPlay",
+            "definitionVersion": 1,
+            "name": "On Begin Play",
+            "pins": [
+                {
+                    "id": 2,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get User Query",
+            "pins": [
+                {
+                    "id": 4,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "UserQuery"
+                },
+                {
+                    "id": 5,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "definitionId": "JSON.MakeMessage",
+            "definitionVersion": 1,
+            "name": "Make User Message",
+            "pins": [
+                {
+                    "id": 7,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Role",
+                    "defaultValue": "user"
+                },
+                {
+                    "id": 8,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Content",
+                    "defaultValue": "What's the weather in Beijing and Shanghai today, and any recent AI news?"
+                },
+                {
+                    "id": 9,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "ToolCallId",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 10,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Message"
+                }
+            ]
+        },
+        {
+            "id": 11,
+            "definitionId": "JSON.ArrayPush",
+            "definitionVersion": 1,
+            "name": "Push User Msg",
+            "pins": [
+                {
+                    "id": 12,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 13,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "JSON",
+                    "defaultValue": "[]"
+                },
+                {
+                    "id": 14,
+                    "kind": 0,
+                    "dataType": 9,
+                    "name": "Element"
+                },
+                {
+                    "id": 15,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 16,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "JSON"
+                },
+                {
+                    "id": 17,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "Length"
+                }
+            ]
+        },
+        {
+            "id": 18,
+            "definitionId": "SetVariable",
+            "definitionVersion": 1,
+            "name": "Save messages",
+            "pins": [
+                {
+                    "id": 19,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 20,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "messages"
+                },
+                {
+                    "id": 21,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Value",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 22,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 23,
+            "definitionId": "FireEvent",
+            "definitionVersion": 1,
+            "name": "Start Agent Loop",
+            "pins": [
+                {
+                    "id": 24,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 25,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "EventName",
+                    "defaultValue": "AgentLoop"
+                },
+                {
+                    "id": 26,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 27,
+            "definitionId": "CustomEventNode",
+            "definitionVersion": 1,
+            "name": "AgentLoop",
+            "pins": [
+                {
+                    "id": 28,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 29,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "EventName"
+                }
+            ],
+            "nodeData": {
+                "EventName": "AgentLoop"
+            }
+        },
+        {
+            "id": 30,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get messages",
+            "pins": [
+                {
+                    "id": 31,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "messages"
+                },
+                {
+                    "id": 32,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 33,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get ApiKey",
+            "pins": [
+                {
+                    "id": 34,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "ApiKey"
+                },
+                {
+                    "id": 35,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 36,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get BaseURL",
+            "pins": [
+                {
+                    "id": 37,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "BaseURL"
+                },
+                {
+                    "id": 38,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 39,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get Model",
+            "pins": [
+                {
+                    "id": 40,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "Model"
+                },
+                {
+                    "id": 41,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 42,
+            "definitionId": "LLM.Chat",
+            "definitionVersion": 1,
+            "name": "LLM Call",
+            "pins": [
+                {
+                    "id": 43,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 44,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "BaseURL",
+                    "defaultValue": "https://open.bigmodel.cn/api/paas/v4"
+                },
+                {
+                    "id": 45,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "ApiKey",
+                    "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf"
+                },
+                {
+                    "id": 46,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Model",
+                    "defaultValue": "glm-4-flash"
+                },
+                {
+                    "id": 47,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Messages",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 48,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "SystemPrompt",
+                    "defaultValue": "You are a helpful assistant with access to weather and web search tools. Use tools when needed."
+                },
+                {
+                    "id": 49,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "MaxTokens",
+                    "defaultValue": 1024
+                },
+                {
+                    "id": 50,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Temperature",
+                    "defaultValue": 0.69999999999999996
+                },
+                {
+                    "id": 51,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Tools",
+                    "defaultValue": "[{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"description\":\"Get current weather for a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name in English\"}},\"required\":[\"location\"]}}},{\"type\":\"function\",\"function\":{\"name\":\"web_search\",\"description\":\"Search the web for recent information\",\"parameters\":{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"Search query\"}},\"required\":[\"query\"]}}}]"
+                },
+                {
+                    "id": 52,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onReply",
+                    "isExec": true
+                },
+                {
+                    "id": 53,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onToolCall",
+                    "isExec": true
+                },
+                {
+                    "id": 54,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onError",
+                    "isExec": true
+                },
+                {
+                    "id": 55,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Reply"
+                },
+                {
+                    "id": 56,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "ToolCallsJSON"
+                },
+                {
+                    "id": 57,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "FinishReason"
+                },
+                {
+                    "id": 58,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "FullResponse"
+                },
+                {
+                    "id": 59,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "ErrorMessage"
+                }
+            ]
+        },
+        {
+            "id": 60,
+            "definitionId": "SetVariable",
+            "definitionVersion": 1,
+            "name": "Save Final Reply",
+            "pins": [
+                {
+                    "id": 61,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 62,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "finalReply"
+                },
+                {
+                    "id": 63,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Value",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 64,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 65,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print Final Answer",
+            "pins": [
+                {
+                    "id": 66,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 67,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 68,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 69,
+            "definitionId": "Tool.ForEach",
+            "definitionVersion": 1,
+            "name": "For Each Tool Call",
+            "pins": [
+                {
+                    "id": 70,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 71,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "ToolCallsJSON",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 72,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onTool",
+                    "isExec": true
+                },
+                {
+                    "id": 73,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onDone",
+                    "isExec": true
+                },
+                {
+                    "id": 74,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "ToolName"
+                },
+                {
+                    "id": 75,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Arguments"
+                },
+                {
+                    "id": 76,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "ToolCallId"
+                },
+                {
+                    "id": 77,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "Index"
+                }
+            ]
+        },
+        {
+            "id": 78,
+            "definitionId": "Tool.Match",
+            "definitionVersion": 1,
+            "name": "Route Tool",
+            "pins": [
+                {
+                    "id": 79,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 80,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "ToolName",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 81,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Case0",
+                    "defaultValue": "get_weather"
+                },
+                {
+                    "id": 82,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Case1",
+                    "defaultValue": "web_search"
+                },
+                {
+                    "id": 83,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Case2",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 84,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Case3",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 85,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Case4",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 86,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Case5",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 87,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Case6",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 88,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Case7",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 89,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "Match0",
+                    "isExec": true
+                },
+                {
+                    "id": 90,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "Match1",
+                    "isExec": true
+                },
+                {
+                    "id": 91,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "Match2",
+                    "isExec": true
+                },
+                {
+                    "id": 92,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "Match3",
+                    "isExec": true
+                },
+                {
+                    "id": 93,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "Match4",
+                    "isExec": true
+                },
+                {
+                    "id": 94,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "Match5",
+                    "isExec": true
+                },
+                {
+                    "id": 95,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "Match6",
+                    "isExec": true
+                },
+                {
+                    "id": 96,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "Match7",
+                    "isExec": true
+                },
+                {
+                    "id": 97,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "Default",
+                    "isExec": true
+                },
+                {
+                    "id": 98,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "MatchedIndex"
+                }
+            ]
+        },
+        {
+            "id": 99,
+            "definitionId": "JSON.GetPath",
+            "definitionVersion": 1,
+            "name": "Get Location Arg",
+            "pins": [
+                {
+                    "id": 100,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "JSON",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 101,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Path",
+                    "defaultValue": "location"
+                },
+                {
+                    "id": 102,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                },
+                {
+                    "id": 103,
+                    "kind": 1,
+                    "dataType": 1,
+                    "name": "Found"
+                }
+            ]
+        },
+        {
+            "id": 104,
+            "definitionId": "FormatString",
+            "definitionVersion": 1,
+            "name": "Build wttr.in URL",
+            "pins": [
+                {
+                    "id": 105,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Format",
+                    "defaultValue": "https://wttr.in/{0}?format=3"
+                },
+                {
+                    "id": 106,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "city",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 107,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Result"
+                }
+            ]
+        },
+        {
+            "id": 108,
+            "definitionId": "HTTP.Get",
+            "definitionVersion": 1,
+            "name": "Get Weather Data",
+            "pins": [
+                {
+                    "id": 109,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 110,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "URL",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 111,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Headers",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 112,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "TimeoutSeconds",
+                    "defaultValue": 10
+                },
+                {
+                    "id": 113,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onSuccess",
+                    "isExec": true
+                },
+                {
+                    "id": 114,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onError",
+                    "isExec": true
+                },
+                {
+                    "id": 115,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "StatusCode"
+                },
+                {
+                    "id": 116,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "ResponseBody"
+                },
+                {
+                    "id": 117,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "ErrorMessage"
+                }
+            ]
+        },
+        {
+            "id": 118,
+            "definitionId": "SetVariable",
+            "definitionVersion": 1,
+            "name": "Save Weather Result",
+            "pins": [
+                {
+                    "id": 119,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 120,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "__tool_result"
+                },
+                {
+                    "id": 121,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Value",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 122,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 123,
+            "definitionId": "FormatString",
+            "definitionVersion": 1,
+            "name": "Weather Error Msg",
+            "pins": [
+                {
+                    "id": 124,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Format",
+                    "defaultValue": "Weather fetch failed: {0}"
+                },
+                {
+                    "id": 125,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "err",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 126,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Result"
+                }
+            ]
+        },
+        {
+            "id": 127,
+            "definitionId": "SetVariable",
+            "definitionVersion": 1,
+            "name": "Save Weather Error",
+            "pins": [
+                {
+                    "id": 128,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 129,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "__tool_result"
+                },
+                {
+                    "id": 130,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Value",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 131,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 132,
+            "definitionId": "JSON.GetPath",
+            "definitionVersion": 1,
+            "name": "Get Search Query",
+            "pins": [
+                {
+                    "id": 133,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "JSON",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 134,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Path",
+                    "defaultValue": "query"
+                },
+                {
+                    "id": 135,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                },
+                {
+                    "id": 136,
+                    "kind": 1,
+                    "dataType": 1,
+                    "name": "Found"
+                }
+            ]
+        },
+        {
+            "id": 137,
+            "definitionId": "Web.Search",
+            "definitionVersion": 1,
+            "name": "DuckDuckGo Search",
+            "pins": [
+                {
+                    "id": 138,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 139,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Query",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 140,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "MaxResults",
+                    "defaultValue": 5
+                },
+                {
+                    "id": 141,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onSuccess",
+                    "isExec": true
+                },
+                {
+                    "id": 142,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onError",
+                    "isExec": true
+                },
+                {
+                    "id": 143,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Results"
+                },
+                {
+                    "id": 144,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "ResultText"
+                },
+                {
+                    "id": 145,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "ErrorMessage"
+                }
+            ]
+        },
+        {
+            "id": 146,
+            "definitionId": "SetVariable",
+            "definitionVersion": 1,
+            "name": "Save Search Result",
+            "pins": [
+                {
+                    "id": 147,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 148,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "__tool_result"
+                },
+                {
+                    "id": 149,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Value",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 150,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 151,
+            "definitionId": "FormatString",
+            "definitionVersion": 1,
+            "name": "Search Error Msg",
+            "pins": [
+                {
+                    "id": 152,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Format",
+                    "defaultValue": "Search failed: {0}"
+                },
+                {
+                    "id": 153,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "err",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 154,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Result"
+                }
+            ]
+        },
+        {
+            "id": 155,
+            "definitionId": "SetVariable",
+            "definitionVersion": 1,
+            "name": "Save Search Error",
+            "pins": [
+                {
+                    "id": 156,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 157,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "__tool_result"
+                },
+                {
+                    "id": 158,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Value",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 159,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 160,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get Tool Result",
+            "pins": [
+                {
+                    "id": 161,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "__tool_result"
+                },
+                {
+                    "id": 162,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 163,
+            "definitionId": "JSON.MakeMessage",
+            "definitionVersion": 1,
+            "name": "Make Tool Message",
+            "pins": [
+                {
+                    "id": 164,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Role",
+                    "defaultValue": "tool"
+                },
+                {
+                    "id": 165,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Content",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 166,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "ToolCallId",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 167,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Message"
+                }
+            ]
+        },
+        {
+            "id": 168,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get messages for push",
+            "pins": [
+                {
+                    "id": 169,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "messages"
+                },
+                {
+                    "id": 170,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 171,
+            "definitionId": "JSON.ArrayPush",
+            "definitionVersion": 1,
+            "name": "Append Tool Result",
+            "pins": [
+                {
+                    "id": 172,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 173,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "JSON",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 174,
+                    "kind": 0,
+                    "dataType": 9,
+                    "name": "Element"
+                },
+                {
+                    "id": 175,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 176,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "JSON"
+                },
+                {
+                    "id": 177,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "Length"
+                }
+            ]
+        },
+        {
+            "id": 178,
+            "definitionId": "SetVariable",
+            "definitionVersion": 1,
+            "name": "Update messages",
+            "pins": [
+                {
+                    "id": 179,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 180,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "messages"
+                },
+                {
+                    "id": 181,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Value",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 182,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 183,
+            "definitionId": "FireEvent",
+            "definitionVersion": 1,
+            "name": "Next Agent Round",
+            "pins": [
+                {
+                    "id": 184,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 185,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "EventName",
+                    "defaultValue": "AgentLoop"
+                },
+                {
+                    "id": 186,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 187,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print Error",
+            "pins": [
+                {
+                    "id": 188,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 189,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 190,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 191,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print Unknown Tool",
+            "pins": [
+                {
+                    "id": 192,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 193,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 194,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 195,
+            "definitionId": "JSON.GetPath",
+            "definitionVersion": 1,
+            "name": "Get Assistant Msg",
+            "pins": [
+                {
+                    "id": 196,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "JSON",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 197,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Path",
+                    "defaultValue": "choices[0].message"
+                },
+                {
+                    "id": 198,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                },
+                {
+                    "id": 199,
+                    "kind": 1,
+                    "dataType": 1,
+                    "name": "Found"
+                }
+            ]
+        },
+        {
+            "id": 200,
+            "definitionId": "GetVariable",
+            "definitionVersion": 1,
+            "name": "Get messages before tool",
+            "pins": [
+                {
+                    "id": 201,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "messages"
+                },
+                {
+                    "id": 202,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Value"
+                }
+            ]
+        },
+        {
+            "id": 203,
+            "definitionId": "JSON.ArrayPush",
+            "definitionVersion": 1,
+            "name": "Push Assistant Msg",
+            "pins": [
+                {
+                    "id": 204,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 205,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "JSON",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 206,
+                    "kind": 0,
+                    "dataType": 9,
+                    "name": "Element"
+                },
+                {
+                    "id": 207,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 208,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "JSON"
+                },
+                {
+                    "id": 209,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "Length"
+                }
+            ]
+        },
+        {
+            "id": 210,
+            "definitionId": "SetVariable",
+            "definitionVersion": 1,
+            "name": "Save messages with assistant",
+            "pins": [
+                {
+                    "id": 211,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 212,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "messages"
+                },
+                {
+                    "id": 213,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Value",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 214,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        }
+    ],
+    "links": [
+        {
+            "id": 215,
+            "startPinId": 2,
+            "endPinId": 12,
+            "isEnabled": true
+        },
+        {
+            "id": 216,
+            "startPinId": 5,
+            "endPinId": 8,
+            "isEnabled": true
+        },
+        {
+            "id": 217,
+            "startPinId": 10,
+            "endPinId": 14,
+            "isEnabled": true
+        },
+        {
+            "id": 218,
+            "startPinId": 15,
+            "endPinId": 19,
+            "isEnabled": true
+        },
+        {
+            "id": 219,
+            "startPinId": 16,
+            "endPinId": 21,
+            "isEnabled": true
+        },
+        {
+            "id": 220,
+            "startPinId": 22,
+            "endPinId": 24,
+            "isEnabled": true
+        },
+        {
+            "id": 221,
+            "startPinId": 28,
+            "endPinId": 43,
+            "isEnabled": true
+        },
+        {
+            "id": 222,
+            "startPinId": 32,
+            "endPinId": 47,
+            "isEnabled": true
+        },
+        {
+            "id": 223,
+            "startPinId": 35,
+            "endPinId": 45,
+            "isEnabled": true
+        },
+        {
+            "id": 224,
+            "startPinId": 38,
+            "endPinId": 44,
+            "isEnabled": true
+        },
+        {
+            "id": 225,
+            "startPinId": 41,
+            "endPinId": 46,
+            "isEnabled": true
+        },
+        {
+            "id": 226,
+            "startPinId": 52,
+            "endPinId": 61,
+            "isEnabled": true
+        },
+        {
+            "id": 227,
+            "startPinId": 55,
+            "endPinId": 63,
+            "isEnabled": true
+        },
+        {
+            "id": 228,
+            "startPinId": 64,
+            "endPinId": 66,
+            "isEnabled": true
+        },
+        {
+            "id": 229,
+            "startPinId": 55,
+            "endPinId": 67,
+            "isEnabled": true
+        },
+        {
+            "id": 230,
+            "startPinId": 53,
+            "endPinId": 204,
+            "isEnabled": true
+        },
+        {
+            "id": 231,
+            "startPinId": 56,
+            "endPinId": 71,
+            "isEnabled": true
+        },
+        {
+            "id": 232,
+            "startPinId": 58,
+            "endPinId": 196,
+            "isEnabled": true
+        },
+        {
+            "id": 233,
+            "startPinId": 198,
+            "endPinId": 206,
+            "isEnabled": true
+        },
+        {
+            "id": 234,
+            "startPinId": 202,
+            "endPinId": 205,
+            "isEnabled": true
+        },
+        {
+            "id": 235,
+            "startPinId": 207,
+            "endPinId": 211,
+            "isEnabled": true
+        },
+        {
+            "id": 236,
+            "startPinId": 208,
+            "endPinId": 213,
+            "isEnabled": true
+        },
+        {
+            "id": 237,
+            "startPinId": 214,
+            "endPinId": 70,
+            "isEnabled": true
+        },
+        {
+            "id": 238,
+            "startPinId": 72,
+            "endPinId": 79,
+            "isEnabled": true
+        },
+        {
+            "id": 239,
+            "startPinId": 74,
+            "endPinId": 80,
+            "isEnabled": true
+        },
+        {
+            "id": 240,
+            "startPinId": 75,
+            "endPinId": 100,
+            "isEnabled": true
+        },
+        {
+            "id": 241,
+            "startPinId": 102,
+            "endPinId": 106,
+            "isEnabled": true
+        },
+        {
+            "id": 242,
+            "startPinId": 107,
+            "endPinId": 110,
+            "isEnabled": true
+        },
+        {
+            "id": 243,
+            "startPinId": 89,
+            "endPinId": 109,
+            "isEnabled": true
+        },
+        {
+            "id": 244,
+            "startPinId": 116,
+            "endPinId": 121,
+            "isEnabled": true
+        },
+        {
+            "id": 245,
+            "startPinId": 113,
+            "endPinId": 119,
+            "isEnabled": true
+        },
+        {
+            "id": 246,
+            "startPinId": 117,
+            "endPinId": 125,
+            "isEnabled": true
+        },
+        {
+            "id": 247,
+            "startPinId": 126,
+            "endPinId": 130,
+            "isEnabled": true
+        },
+        {
+            "id": 248,
+            "startPinId": 114,
+            "endPinId": 128,
+            "isEnabled": true
+        },
+        {
+            "id": 249,
+            "startPinId": 75,
+            "endPinId": 133,
+            "isEnabled": true
+        },
+        {
+            "id": 250,
+            "startPinId": 135,
+            "endPinId": 139,
+            "isEnabled": true
+        },
+        {
+            "id": 251,
+            "startPinId": 90,
+            "endPinId": 138,
+            "isEnabled": true
+        },
+        {
+            "id": 252,
+            "startPinId": 144,
+            "endPinId": 149,
+            "isEnabled": true
+        },
+        {
+            "id": 253,
+            "startPinId": 141,
+            "endPinId": 147,
+            "isEnabled": true
+        },
+        {
+            "id": 254,
+            "startPinId": 145,
+            "endPinId": 153,
+            "isEnabled": true
+        },
+        {
+            "id": 255,
+            "startPinId": 154,
+            "endPinId": 158,
+            "isEnabled": true
+        },
+        {
+            "id": 256,
+            "startPinId": 142,
+            "endPinId": 156,
+            "isEnabled": true
+        },
+        {
+            "id": 257,
+            "startPinId": 162,
+            "endPinId": 165,
+            "isEnabled": true
+        },
+        {
+            "id": 258,
+            "startPinId": 76,
+            "endPinId": 166,
+            "isEnabled": true
+        },
+        {
+            "id": 259,
+            "startPinId": 170,
+            "endPinId": 173,
+            "isEnabled": true
+        },
+        {
+            "id": 260,
+            "startPinId": 167,
+            "endPinId": 174,
+            "isEnabled": true
+        },
+        {
+            "id": 261,
+            "startPinId": 122,
+            "endPinId": 172,
+            "isEnabled": true
+        },
+        {
+            "id": 262,
+            "startPinId": 131,
+            "endPinId": 172,
+            "isEnabled": true
+        },
+        {
+            "id": 263,
+            "startPinId": 150,
+            "endPinId": 172,
+            "isEnabled": true
+        },
+        {
+            "id": 264,
+            "startPinId": 159,
+            "endPinId": 172,
+            "isEnabled": true
+        },
+        {
+            "id": 265,
+            "startPinId": 176,
+            "endPinId": 181,
+            "isEnabled": true
+        },
+        {
+            "id": 266,
+            "startPinId": 175,
+            "endPinId": 179,
+            "isEnabled": true
+        },
+        {
+            "id": 267,
+            "startPinId": 182,
+            "endPinId": 184,
+            "isEnabled": true
+        },
+        {
+            "id": 268,
+            "startPinId": 54,
+            "endPinId": 188,
+            "isEnabled": true
+        },
+        {
+            "id": 269,
+            "startPinId": 59,
+            "endPinId": 189,
+            "isEnabled": true
+        },
+        {
+            "id": 270,
+            "startPinId": 97,
+            "endPinId": 192,
+            "isEnabled": true
+        },
+        {
+            "id": 271,
+            "startPinId": 74,
+            "endPinId": 193,
+            "isEnabled": true
+        }
+    ],
+    "variables": [
+        {
+            "name": "messages",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": "[]"
+        },
+        {
+            "name": "finalReply",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": ""
+        },
+        {
+            "name": "ApiKey",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": "8a58cef363e14a6595bf1283c3a325ea.aHD2GwiwJTqxKhdf"
+        },
+        {
+            "name": "BaseURL",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": "https://open.bigmodel.cn/api/paas/v4"
+        },
+        {
+            "name": "Model",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": "glm-4-flash"
+        },
+        {
+            "name": "UserQuery",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": "What's the weather in Beijing and Shanghai today, and any recent AI news?"
+        },
+        {
+            "name": "__tool_result",
+            "dataType": 4,
+            "isExposed": true,
+            "defaultValue": ""
+        }
+    ]
+},
+    "editor": {
+    "fileType": "editor",
+    "metadata": {
+        "author": "",
+        "createdAt": "",
+        "updatedAt": ""
+    },
+    "nodes": [
+        {
+            "id": 1,
+            "position": {
+                "x": -1000,
+                "y": 0
+            },
+            "size": {
+                "width": 158,
+                "height": 72
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 3,
+            "position": {
+                "x": -1000,
+                "y": -100
+            },
+            "size": {
+                "width": 210,
+                "height": 40
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 6,
+            "position": {
+                "x": -760,
+                "y": -100
+            },
+            "size": {
+                "width": 476,
+                "height": 102
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 11,
+            "position": {
+                "x": -240,
+                "y": 0
+            },
+            "size": {
+                "width": 294,
+                "height": 131
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 18,
+            "position": {
+                "x": 120,
+                "y": 0
+            },
+            "size": {
+                "width": 164,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 23,
+            "position": {
+                "x": 368,
+                "y": -4
+            },
+            "size": {
+                "width": 280,
+                "height": 103
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 27,
+            "position": {
+                "x": -368,
+                "y": 200
+            },
+            "size": {
+                "width": 139,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 30,
+            "position": {
+                "x": -368,
+                "y": 340
+            },
+            "size": {
+                "width": 200,
+                "height": 40
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 33,
+            "position": {
+                "x": -368,
+                "y": 420
+            },
+            "size": {
+                "width": 182,
+                "height": 40
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 36,
+            "position": {
+                "x": -368,
+                "y": 480
+            },
+            "size": {
+                "width": 193,
+                "height": 40
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 39,
+            "position": {
+                "x": -368,
+                "y": 540
+            },
+            "size": {
+                "width": 179,
+                "height": 40
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 42,
+            "position": {
+                "x": -8,
+                "y": 200
+            },
+            "size": {
+                "width": 403,
+                "height": 308
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 60,
+            "position": {
+                "x": 984,
+                "y": 112
+            },
+            "size": {
+                "width": 172,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 65,
+            "position": {
+                "x": 1368,
+                "y": 112
+            },
+            "size": {
+                "width": 184,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 69,
+            "position": {
+                "x": 1260,
+                "y": 360
+            },
+            "size": {
+                "width": 272,
+                "height": 212
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 78,
+            "position": {
+                "x": 1848,
+                "y": 360
+            },
+            "size": {
+                "width": 345,
+                "height": 348
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 99,
+            "position": {
+                "x": 1260,
+                "y": 760
+            },
+            "size": {
+                "width": 284,
+                "height": 103
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 104,
+            "position": {
+                "x": 1620,
+                "y": 760
+            },
+            "size": {
+                "width": 417,
+                "height": 71
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 108,
+            "position": {
+                "x": 2488,
+                "y": 276
+            },
+            "size": {
+                "width": 397,
+                "height": 184
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 118,
+            "position": {
+                "x": 3071,
+                "y": 272
+            },
+            "size": {
+                "width": 201,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 123,
+            "position": {
+                "x": 2376,
+                "y": 957
+            },
+            "size": {
+                "width": 432,
+                "height": 71
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 127,
+            "position": {
+                "x": 3112,
+                "y": 448
+            },
+            "size": {
+                "width": 192,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 132,
+            "position": {
+                "x": 2184,
+                "y": 736
+            },
+            "size": {
+                "width": 284,
+                "height": 103
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 137,
+            "position": {
+                "x": 2440,
+                "y": 544
+            },
+            "size": {
+                "width": 357,
+                "height": 184
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 146,
+            "position": {
+                "x": 3288,
+                "y": 780
+            },
+            "size": {
+                "width": 189,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 151,
+            "position": {
+                "x": 2740,
+                "y": 826
+            },
+            "size": {
+                "width": 420,
+                "height": 71
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 155,
+            "position": {
+                "x": 3124,
+                "y": 608
+            },
+            "size": {
+                "width": 180,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 160,
+            "position": {
+                "x": 3197,
+                "y": 1052
+            },
+            "size": {
+                "width": 209,
+                "height": 40
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 163,
+            "position": {
+                "x": 3400,
+                "y": 938
+            },
+            "size": {
+                "width": 438,
+                "height": 99
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 168,
+            "position": {
+                "x": 2760,
+                "y": 500
+            },
+            "size": {
+                "width": 258,
+                "height": 40
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 171,
+            "position": {
+                "x": 3485,
+                "y": 356
+            },
+            "size": {
+                "width": 203,
+                "height": 128
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 178,
+            "position": {
+                "x": 3820,
+                "y": 360
+            },
+            "size": {
+                "width": 182,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 183,
+            "position": {
+                "x": 4120,
+                "y": 360
+            },
+            "size": {
+                "width": 280,
+                "height": 103
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 187,
+            "position": {
+                "x": 624,
+                "y": 108
+            },
+            "size": {
+                "width": 152,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 191,
+            "position": {
+                "x": 2468,
+                "y": 1228
+            },
+            "size": {
+                "width": 196,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 195,
+            "position": {
+                "x": 424,
+                "y": 560
+            },
+            "size": {
+                "width": 284,
+                "height": 103
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 200,
+            "position": {
+                "x": -301,
+                "y": 652
+            },
+            "size": {
+                "width": 277,
+                "height": 40
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 203,
+            "position": {
+                "x": 552,
+                "y": 356
+            },
+            "size": {
+                "width": 203,
+                "height": 128
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 210,
+            "position": {
+                "x": 856,
+                "y": 364
+            },
+            "size": {
+                "width": 256,
+                "height": 100
+            },
+            "isCollapsed": false
+        }
+    ],
+    "viewInfo": {
+        "viewPosition": { "x": 0, "y": 0 },
+        "viewScale": 1
+    }
+}
+}

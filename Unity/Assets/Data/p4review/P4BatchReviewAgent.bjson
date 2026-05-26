@@ -1,0 +1,546 @@
+{
+  "runtime": {
+    "metadata": { "blueprintClass": 0, "name": "P4BatchReviewAgent", "schemaVersion": 2 },
+    "_comment": "批量审查指定用户在某分支上 startCL 之后的所有提交。变量注入：UserQuery(如 'batch review //depot/branch/ username 12345'), P4Client, ApiKey, BaseURL, Model, OutputDir, WorkDir",
+
+    "nodes": [
+      { "id": 1, "definitionId": "OnBeginPlay", "name": "On Begin Play",
+        "pins": [{ "id": 1001, "kind": 1, "dataType": 0, "isExec": true }] },
+
+      { "id": 2, "definitionId": "GetVariable", "name": "Get UserQuery",
+        "pins": [
+          { "id": 2001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "UserQuery" },
+          { "id": 2010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+
+      { "id": 3, "definitionId": "String.Regex", "name": "Parse Batch Args",
+        "pins": [
+          { "id": 3001, "kind": 0, "dataType": 4, "name": "String" },
+          { "id": 3002, "kind": 0, "dataType": 4, "name": "Pattern",
+            "defaultValue": "batch\\s+review\\s+(\\S+)\\s+(\\S+)\\s+(\\d+)" },
+          { "id": 3003, "kind": 0, "dataType": 4, "name": "Replacement", "defaultValue": "" },
+          { "id": 3004, "kind": 0, "dataType": 4, "name": "Mode", "defaultValue": "match" },
+          { "id": 3010, "kind": 1, "dataType": 1, "name": "Found" },
+          { "id": 3011, "kind": 1, "dataType": 4, "name": "Match0" },
+          { "id": 3012, "kind": 1, "dataType": 4, "name": "Match1" },
+          { "id": 3013, "kind": 1, "dataType": 4, "name": "Match2" },
+          { "id": 3014, "kind": 1, "dataType": 4, "name": "Match3" },
+          { "id": 3015, "kind": 1, "dataType": 6, "name": "Matches" },
+          { "id": 3016, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+
+      { "id": 4, "definitionId": "Branch", "name": "Branch: Parsed?",
+        "pins": [
+          { "id": 4001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 4002, "kind": 0, "dataType": 1, "name": "Condition" },
+          { "id": 4010, "kind": 1, "dataType": 0, "isExec": true, "name": "True" },
+          { "id": 4011, "kind": 1, "dataType": 0, "isExec": true, "name": "False" }
+        ]
+      },
+
+      { "id": 5, "definitionId": "PrintString", "name": "Print Parse Error",
+        "pins": [
+          { "id": 5001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 5002, "kind": 0, "dataType": 4, "name": "In String",
+            "defaultValue": "❌ 格式错误，请使用：batch review //depot/branch/ username 12345" },
+          { "id": 5010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      { "id": 6, "definitionId": "SetVariable", "name": "Set BranchPath",
+        "pins": [
+          { "id": 6001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 6002, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "BranchPath" },
+          { "id": 6003, "kind": 0, "dataType": 9, "name": "Value" },
+          { "id": 6010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      { "id": 7, "definitionId": "SetVariable", "name": "Set P4User",
+        "pins": [
+          { "id": 7001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 7002, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "P4User" },
+          { "id": 7003, "kind": 0, "dataType": 9, "name": "Value" },
+          { "id": 7010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      { "id": 8, "definitionId": "SetVariable", "name": "Set StartCL",
+        "pins": [
+          { "id": 8001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 8002, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "StartCL" },
+          { "id": 8003, "kind": 0, "dataType": 9, "name": "Value" },
+          { "id": 8010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      { "id": 9, "definitionId": "GetVariable", "name": "Get P4Client",
+        "pins": [
+          { "id": 9001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "P4Client" },
+          { "id": 9010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+
+      { "id": 10, "definitionId": "GetVariable", "name": "Get BranchPath",
+        "pins": [
+          { "id": 10001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "BranchPath" },
+          { "id": 10010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+
+      { "id": 11, "definitionId": "GetVariable", "name": "Get P4User",
+        "pins": [
+          { "id": 11001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "P4User" },
+          { "id": 11010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+
+      { "id": 12, "definitionId": "GetVariable", "name": "Get StartCL",
+        "pins": [
+          { "id": 12001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "StartCL" },
+          { "id": 12010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+
+      { "id": 13, "definitionId": "FormatString", "name": "Build p4 changes cmd",
+        "pins": [
+          { "id": 13001, "kind": 0, "dataType": 4, "name": "Format",
+            "defaultValue": "cmd /c \"chcp 65001 >nul && p4 -c {0} changes -u {1} -s submitted -l {2}/...@{3},@now\"" },
+          { "id": 13002, "kind": 0, "dataType": 9, "name": "Arg 0" },
+          { "id": 13003, "kind": 0, "dataType": 9, "name": "Arg 1" },
+          { "id": 13004, "kind": 0, "dataType": 9, "name": "Arg 2" },
+          { "id": 13005, "kind": 0, "dataType": 9, "name": "Arg 3" },
+          { "id": 13010, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+
+      { "id": 14, "definitionId": "Code.Run", "name": "p4 changes",
+        "pins": [
+          { "id": 14001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 14002, "kind": 0, "dataType": 4, "name": "Command" },
+          { "id": 14003, "kind": 0, "dataType": 4, "name": "WorkDir" },
+          { "id": 14004, "kind": 0, "dataType": 2, "name": "TimeoutSeconds", "defaultValue": 60 },
+          { "id": 14010, "kind": 1, "dataType": 0, "isExec": true, "name": "onSuccess" },
+          { "id": 14011, "kind": 1, "dataType": 0, "isExec": true, "name": "onError" },
+          { "id": 14020, "kind": 1, "dataType": 4, "name": "Stdout" },
+          { "id": 14021, "kind": 1, "dataType": 4, "name": "Stderr" },
+          { "id": 14022, "kind": 1, "dataType": 2, "name": "ExitCode" }
+        ]
+      },
+
+      { "id": 15, "definitionId": "String.Regex", "name": "Extract CL List",
+        "pins": [
+          { "id": 15001, "kind": 0, "dataType": 4, "name": "String" },
+          { "id": 15002, "kind": 0, "dataType": 4, "name": "Pattern", "defaultValue": "Change (\\d+) on" },
+          { "id": 15003, "kind": 0, "dataType": 4, "name": "Replacement", "defaultValue": "" },
+          { "id": 15004, "kind": 0, "dataType": 4, "name": "Mode", "defaultValue": "findall" },
+          { "id": 15010, "kind": 1, "dataType": 1, "name": "Found" },
+          { "id": 15011, "kind": 1, "dataType": 4, "name": "Match0" },
+          { "id": 15012, "kind": 1, "dataType": 4, "name": "Match1" },
+          { "id": 15013, "kind": 1, "dataType": 4, "name": "Match2" },
+          { "id": 15014, "kind": 1, "dataType": 4, "name": "Match3" },
+          { "id": 15015, "kind": 1, "dataType": 6, "name": "Matches" },
+          { "id": 15016, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+
+      { "id": 16, "definitionId": "SetVariable", "name": "Set CLList",
+        "pins": [
+          { "id": 16001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 16002, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "CLList" },
+          { "id": 16003, "kind": 0, "dataType": 9, "name": "Value" },
+          { "id": 16010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      { "id": 17, "definitionId": "GetVariable", "name": "Get CLList",
+        "pins": [
+          { "id": 17001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "CLList" },
+          { "id": 17010, "kind": 1, "dataType": 6, "name": "Value" }
+        ]
+      },
+
+      { "id": 18, "definitionId": "FormatString", "name": "Build Confirm Msg",
+        "pins": [
+          { "id": 18001, "kind": 0, "dataType": 4, "name": "Format",
+            "defaultValue": "📋 找到以下CL待审查（共{0}个）：\n{1}\n\n⏳ 开始批量审查..." },
+          { "id": 18002, "kind": 0, "dataType": 9, "name": "Arg 0" },
+          { "id": 18003, "kind": 0, "dataType": 9, "name": "Arg 1" },
+          { "id": 18010, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+
+      { "id": 19, "definitionId": "PrintString", "name": "Print CL List",
+        "pins": [
+          { "id": 19001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 19002, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 19010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      { "id": 20, "definitionId": "JSON.ArrayPush", "name": "ArrayLen trick",
+        "_comment": "用于获取 CLList 数组长度",
+        "pins": [
+          { "id": 20001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 20002, "kind": 0, "dataType": 4, "name": "JSON", "defaultValue": "[]" },
+          { "id": 20003, "kind": 0, "dataType": 9, "name": "Element", "defaultValue": "" },
+          { "id": 20010, "kind": 1, "dataType": 0, "isExec": true },
+          { "id": 20020, "kind": 1, "dataType": 4, "name": "JSON" },
+          { "id": 20021, "kind": 1, "dataType": 2, "name": "Length" }
+        ]
+      },
+
+      { "id": 21, "definitionId": "ForEachLoop", "name": "For Each CL",
+        "pins": [
+          { "id": 21001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 21002, "kind": 0, "dataType": 6, "name": "Array" },
+          { "id": 21010, "kind": 1, "dataType": 0, "isExec": true, "name": "Loop Body" },
+          { "id": 21011, "kind": 1, "dataType": 0, "isExec": true, "name": "Completed" },
+          { "id": 21020, "kind": 1, "dataType": 9, "name": "Array Element" },
+          { "id": 21021, "kind": 1, "dataType": 2, "name": "Array Index" }
+        ]
+      },
+
+      { "id": 22, "definitionId": "SetVariable", "name": "Set CurrentCL",
+        "pins": [
+          { "id": 22001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 22002, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "CLInput" },
+          { "id": 22003, "kind": 0, "dataType": 9, "name": "Value" },
+          { "id": 22010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      { "id": 23, "definitionId": "FormatString", "name": "Add submitted keyword",
+        "pins": [
+          { "id": 23001, "kind": 0, "dataType": 4, "name": "Format",
+            "defaultValue": "review {0} submitted" },
+          { "id": 23002, "kind": 0, "dataType": 9, "name": "Arg 0" },
+          { "id": 23010, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+
+      { "id": 24, "definitionId": "SetVariable", "name": "Set CLInputFull",
+        "pins": [
+          { "id": 24001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 24002, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "CLInput" },
+          { "id": 24003, "kind": 0, "dataType": 9, "name": "Value" },
+          { "id": 24010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      { "id": 25, "definitionId": "FireEvent", "name": "Fire: ReviewOne",
+        "pins": [
+          { "id": 25001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 25002, "kind": 0, "dataType": 4, "name": "EventName", "defaultValue": "ReviewOne" },
+          { "id": 25010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      { "id": 26, "definitionId": "CustomEventNode", "name": "Event: ReviewOne",
+        "nodeData": { "EventName": "ReviewOne" },
+        "pins": [
+          { "id": 26010, "kind": 1, "dataType": 0, "isExec": true },
+          { "id": 26011, "kind": 1, "dataType": 4, "name": "EventName" }
+        ]
+      },
+
+      { "id": 27, "definitionId": "GetVariable", "name": "Get CLInput for review",
+        "pins": [
+          { "id": 27001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "CLInput" },
+          { "id": 27010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+
+      { "id": 28, "definitionId": "GetVariable", "name": "Get P4Client2",
+        "pins": [
+          { "id": 28001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "P4Client" },
+          { "id": 28010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+
+      { "id": 29, "definitionId": "String.Regex", "name": "Extract CL from input",
+        "pins": [
+          { "id": 29001, "kind": 0, "dataType": 4, "name": "String" },
+          { "id": 29002, "kind": 0, "dataType": 4, "name": "Pattern", "defaultValue": "(\\d{4,8})" },
+          { "id": 29003, "kind": 0, "dataType": 4, "name": "Replacement", "defaultValue": "" },
+          { "id": 29004, "kind": 0, "dataType": 4, "name": "Mode", "defaultValue": "match" },
+          { "id": 29010, "kind": 1, "dataType": 1, "name": "Found" },
+          { "id": 29011, "kind": 1, "dataType": 4, "name": "Match0" },
+          { "id": 29012, "kind": 1, "dataType": 4, "name": "Match1" }
+        ]
+      },
+
+      { "id": 30, "definitionId": "FormatString", "name": "Build describe cmd",
+        "pins": [
+          { "id": 30001, "kind": 0, "dataType": 4, "name": "Format",
+            "defaultValue": "cmd /c \"chcp 65001 >nul && p4 -c {0} describe -s {1}\"" },
+          { "id": 30002, "kind": 0, "dataType": 9, "name": "Arg 0" },
+          { "id": 30003, "kind": 0, "dataType": 9, "name": "Arg 1" },
+          { "id": 30010, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+
+      { "id": 31, "definitionId": "Code.Run", "name": "p4 describe one CL",
+        "pins": [
+          { "id": 31001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 31002, "kind": 0, "dataType": 4, "name": "Command" },
+          { "id": 31003, "kind": 0, "dataType": 4, "name": "WorkDir" },
+          { "id": 31004, "kind": 0, "dataType": 2, "name": "TimeoutSeconds", "defaultValue": 60 },
+          { "id": 31010, "kind": 1, "dataType": 0, "isExec": true, "name": "onSuccess" },
+          { "id": 31011, "kind": 1, "dataType": 0, "isExec": true, "name": "onError" },
+          { "id": 31020, "kind": 1, "dataType": 4, "name": "Stdout" }
+        ]
+      },
+
+      { "id": 32, "definitionId": "FormatString", "name": "Build diff2 cmd",
+        "pins": [
+          { "id": 32001, "kind": 0, "dataType": 4, "name": "Format",
+            "defaultValue": "cmd /c \"chcp 65001 >nul && p4 -c {0} diff2 -u ...@{1} ...@{1}\"" },
+          { "id": 32002, "kind": 0, "dataType": 9, "name": "Arg 0" },
+          { "id": 32003, "kind": 0, "dataType": 9, "name": "Arg 1" },
+          { "id": 32010, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+
+      { "id": 33, "definitionId": "Code.Run", "name": "p4 diff2",
+        "pins": [
+          { "id": 33001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 33002, "kind": 0, "dataType": 4, "name": "Command" },
+          { "id": 33003, "kind": 0, "dataType": 4, "name": "WorkDir" },
+          { "id": 33004, "kind": 0, "dataType": 2, "name": "TimeoutSeconds", "defaultValue": 60 },
+          { "id": 33010, "kind": 1, "dataType": 0, "isExec": true, "name": "onSuccess" },
+          { "id": 33011, "kind": 1, "dataType": 0, "isExec": true, "name": "onError" },
+          { "id": 33020, "kind": 1, "dataType": 4, "name": "Stdout" }
+        ]
+      },
+
+      { "id": 34, "definitionId": "GetVariable", "name": "Get WorkDir",
+        "pins": [
+          { "id": 34001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "WorkDir" },
+          { "id": 34010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+
+      { "id": 35, "definitionId": "LLM.Chat", "name": "LLM Review One CL",
+        "pins": [
+          { "id": 35001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 35002, "kind": 0, "dataType": 4, "name": "BaseURL" },
+          { "id": 35003, "kind": 0, "dataType": 4, "name": "ApiKey" },
+          { "id": 35004, "kind": 0, "dataType": 4, "name": "Model" },
+          { "id": 35005, "kind": 0, "dataType": 4, "name": "Messages" },
+          { "id": 35006, "kind": 0, "dataType": 4, "name": "SystemPrompt",
+            "defaultValue": "你是资深代码审查专家，请用中文输出详细的Markdown格式审查报告，包含：问题清单（Critical/Warning/Info）、评分（X/10）和审查结论（✅通过/⚠️有条件通过/❌不通过）。" },
+          { "id": 35007, "kind": 0, "dataType": 2, "name": "MaxTokens", "defaultValue": 4096 },
+          { "id": 35010, "kind": 1, "dataType": 0, "isExec": true, "name": "onReply" },
+          { "id": 35011, "kind": 1, "dataType": 0, "isExec": true, "name": "onToolCall" },
+          { "id": 35012, "kind": 1, "dataType": 0, "isExec": true, "name": "onError" },
+          { "id": 35020, "kind": 1, "dataType": 4, "name": "Reply" },
+          { "id": 35021, "kind": 1, "dataType": 4, "name": "ErrorMessage" }
+        ]
+      },
+
+      { "id": 36, "definitionId": "FormatString", "name": "Build review prompt",
+        "pins": [
+          { "id": 36001, "kind": 0, "dataType": 4, "name": "Format",
+            "defaultValue": "请审查 CL {0}：\n\n== CL描述 ==\n{1}\n\n== Diff ==\n{2}" },
+          { "id": 36002, "kind": 0, "dataType": 9, "name": "Arg 0" },
+          { "id": 36003, "kind": 0, "dataType": 9, "name": "Arg 1" },
+          { "id": 36004, "kind": 0, "dataType": 9, "name": "Arg 2" },
+          { "id": 36010, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+
+      { "id": 37, "definitionId": "JSON.MakeMessage", "name": "Make User Msg",
+        "pins": [
+          { "id": 37001, "kind": 0, "dataType": 4, "name": "Role", "defaultValue": "user" },
+          { "id": 37002, "kind": 0, "dataType": 4, "name": "Content" },
+          { "id": 37003, "kind": 0, "dataType": 4, "name": "ToolCallId", "defaultValue": "" },
+          { "id": 37010, "kind": 1, "dataType": 4, "name": "Message" }
+        ]
+      },
+
+      { "id": 38, "definitionId": "JSON.ArrayPush", "name": "Push Msg",
+        "pins": [
+          { "id": 38001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 38002, "kind": 0, "dataType": 4, "name": "JSON", "defaultValue": "[]" },
+          { "id": 38003, "kind": 0, "dataType": 9, "name": "Element" },
+          { "id": 38010, "kind": 1, "dataType": 0, "isExec": true },
+          { "id": 38020, "kind": 1, "dataType": 4, "name": "JSON" },
+          { "id": 38021, "kind": 1, "dataType": 2, "name": "Length" }
+        ]
+      },
+
+      { "id": 39, "definitionId": "GetVariable", "name": "Get OutputDir",
+        "pins": [
+          { "id": 39001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "OutputDir" },
+          { "id": 39010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+
+      { "id": 40, "definitionId": "GetVariable", "name": "Get P4User2",
+        "pins": [
+          { "id": 40001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "P4User" },
+          { "id": 40010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+
+      { "id": 41, "definitionId": "FormatString", "name": "Build Write Script",
+        "pins": [
+          { "id": 41001, "kind": 0, "dataType": 4, "name": "Format",
+            "defaultValue": "powershell -Command \"$dir = '{0}\\{1}'; if (-not (Test-Path $dir)) {{ New-Item -ItemType Directory -Path $dir | Out-Null }}; [System.IO.File]::WriteAllText((Join-Path $dir 'CL{2}_Review.md'), @'\n{3}\n'@, [System.Text.Encoding]::UTF8)\"" },
+          { "id": 41002, "kind": 0, "dataType": 9, "name": "Arg 0" },
+          { "id": 41003, "kind": 0, "dataType": 9, "name": "Arg 1" },
+          { "id": 41004, "kind": 0, "dataType": 9, "name": "Arg 2" },
+          { "id": 41005, "kind": 0, "dataType": 9, "name": "Arg 3" },
+          { "id": 41010, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+
+      { "id": 42, "definitionId": "Code.Run", "name": "Write Report File",
+        "pins": [
+          { "id": 42001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 42002, "kind": 0, "dataType": 4, "name": "Command" },
+          { "id": 42003, "kind": 0, "dataType": 4, "name": "WorkDir" },
+          { "id": 42004, "kind": 0, "dataType": 2, "name": "TimeoutSeconds", "defaultValue": 30 },
+          { "id": 42010, "kind": 1, "dataType": 0, "isExec": true, "name": "onSuccess" },
+          { "id": 42011, "kind": 1, "dataType": 0, "isExec": true, "name": "onError" },
+          { "id": 42020, "kind": 1, "dataType": 4, "name": "Stdout" }
+        ]
+      },
+
+      { "id": 43, "definitionId": "FormatString", "name": "Print CL Done",
+        "pins": [
+          { "id": 43001, "kind": 0, "dataType": 4, "name": "Format",
+            "defaultValue": "✅ CL{0} 审查完成" },
+          { "id": 43002, "kind": 0, "dataType": 9, "name": "Arg 0" },
+          { "id": 43010, "kind": 1, "dataType": 4, "name": "Result" }
+        ]
+      },
+
+      { "id": 44, "definitionId": "PrintString", "name": "Print Done",
+        "pins": [
+          { "id": 44001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 44002, "kind": 0, "dataType": 4, "name": "In String" },
+          { "id": 44010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      { "id": 45, "definitionId": "PrintString", "name": "Print All Done",
+        "pins": [
+          { "id": 45001, "kind": 0, "dataType": 0, "isExec": true },
+          { "id": 45002, "kind": 0, "dataType": 4, "name": "In String",
+            "defaultValue": "🎉 批量审查全部完成！" },
+          { "id": 45010, "kind": 1, "dataType": 0, "isExec": true }
+        ]
+      },
+
+      { "id": 50, "definitionId": "GetVariable", "name": "Get BaseURL",
+        "pins": [
+          { "id": 50001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "BaseURL" },
+          { "id": 50010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+
+      { "id": 51, "definitionId": "GetVariable", "name": "Get ApiKey",
+        "pins": [
+          { "id": 51001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "ApiKey" },
+          { "id": 51010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      },
+
+      { "id": 52, "definitionId": "GetVariable", "name": "Get Model",
+        "pins": [
+          { "id": 52001, "kind": 0, "dataType": 4, "name": "Name", "defaultValue": "Model" },
+          { "id": 52010, "kind": 1, "dataType": 4, "name": "Value" }
+        ]
+      }
+    ],
+
+    "links": [
+      { "id": 1,  "startPinId": 1001,  "endPinId": 4001,  "isEnabled": true },
+      { "id": 2,  "startPinId": 2010,  "endPinId": 3001,  "isEnabled": true },
+      { "id": 3,  "startPinId": 3010,  "endPinId": 4002,  "isEnabled": true },
+      { "id": 4,  "startPinId": 3011,  "endPinId": 6003,  "isEnabled": true },
+      { "id": 5,  "startPinId": 3012,  "endPinId": 7003,  "isEnabled": true },
+      { "id": 6,  "startPinId": 3013,  "endPinId": 8003,  "isEnabled": true },
+      { "id": 7,  "startPinId": 4011,  "endPinId": 5001,  "isEnabled": true },
+      { "id": 8,  "startPinId": 4010,  "endPinId": 6001,  "isEnabled": true },
+      { "id": 9,  "startPinId": 6010,  "endPinId": 7001,  "isEnabled": true },
+      { "id": 10, "startPinId": 7010,  "endPinId": 8001,  "isEnabled": true },
+      { "id": 11, "startPinId": 8010,  "endPinId": 14001, "isEnabled": true },
+      { "id": 12, "startPinId": 9010,  "endPinId": 13002, "isEnabled": true },
+      { "id": 13, "startPinId": 10010, "endPinId": 13004, "isEnabled": true },
+      { "id": 14, "startPinId": 11010, "endPinId": 13003, "isEnabled": true },
+      { "id": 15, "startPinId": 12010, "endPinId": 13005, "isEnabled": true },
+      { "id": 16, "startPinId": 13010, "endPinId": 14002, "isEnabled": true },
+      { "id": 17, "startPinId": 34010, "endPinId": 14003, "isEnabled": true },
+      { "id": 18, "startPinId": 14020, "endPinId": 15001, "isEnabled": true },
+      { "id": 19, "startPinId": 14010, "endPinId": 16001, "isEnabled": true },
+      { "id": 20, "startPinId": 15015, "endPinId": 16003, "isEnabled": true },
+      { "id": 21, "startPinId": 16010, "endPinId": 17001, "isEnabled": true },
+      { "id": 22, "startPinId": 17010, "endPinId": 18002, "isEnabled": true },
+      { "id": 23, "startPinId": 15010, "endPinId": 18003, "isEnabled": true },
+      { "id": 24, "startPinId": 15015, "endPinId": 18003, "isEnabled": true },
+      { "id": 25, "startPinId": 18010, "endPinId": 19001, "isEnabled": true },
+      { "id": 26, "startPinId": 18010, "endPinId": 19002, "isEnabled": true },
+      { "id": 27, "startPinId": 19010, "endPinId": 21001, "isEnabled": true },
+      { "id": 28, "startPinId": 17010, "endPinId": 21002, "isEnabled": true },
+      { "id": 29, "startPinId": 21010, "endPinId": 22001, "isEnabled": true },
+      { "id": 30, "startPinId": 21020, "endPinId": 23002, "isEnabled": true },
+      { "id": 31, "startPinId": 23010, "endPinId": 24003, "isEnabled": true },
+      { "id": 32, "startPinId": 22010, "endPinId": 24001, "isEnabled": true },
+      { "id": 33, "startPinId": 24010, "endPinId": 25001, "isEnabled": true },
+      { "id": 34, "startPinId": 21011, "endPinId": 45001, "isEnabled": true },
+      { "id": 35, "startPinId": 26010, "endPinId": 27001, "isEnabled": true },
+      { "id": 36, "startPinId": 27010, "endPinId": 29001, "isEnabled": true },
+      { "id": 37, "startPinId": 29012, "endPinId": 30003, "isEnabled": true },
+      { "id": 38, "startPinId": 28010, "endPinId": 30002, "isEnabled": true },
+      { "id": 39, "startPinId": 30010, "endPinId": 31002, "isEnabled": true },
+      { "id": 40, "startPinId": 31010, "endPinId": 31001, "isEnabled": true },
+      { "id": 41, "startPinId": 31020, "endPinId": 36003, "isEnabled": true },
+      { "id": 42, "startPinId": 28010, "endPinId": 32002, "isEnabled": true },
+      { "id": 43, "startPinId": 29012, "endPinId": 32003, "isEnabled": true },
+      { "id": 44, "startPinId": 32010, "endPinId": 33002, "isEnabled": true },
+      { "id": 45, "startPinId": 34010, "endPinId": 33003, "isEnabled": true },
+      { "id": 46, "startPinId": 31010, "endPinId": 33001, "isEnabled": true },
+      { "id": 47, "startPinId": 33020, "endPinId": 36004, "isEnabled": true },
+      { "id": 48, "startPinId": 33010, "endPinId": 36001, "isEnabled": true },
+      { "id": 49, "startPinId": 29012, "endPinId": 36002, "isEnabled": true },
+      { "id": 50, "startPinId": 36010, "endPinId": 37002, "isEnabled": true },
+      { "id": 51, "startPinId": 37010, "endPinId": 38003, "isEnabled": true },
+      { "id": 52, "startPinId": 33010, "endPinId": 38001, "isEnabled": true },
+      { "id": 53, "startPinId": 38020, "endPinId": 35005, "isEnabled": true },
+      { "id": 54, "startPinId": 38010, "endPinId": 35001, "isEnabled": true },
+      { "id": 55, "startPinId": 50010, "endPinId": 35002, "isEnabled": true },
+      { "id": 56, "startPinId": 51010, "endPinId": 35003, "isEnabled": true },
+      { "id": 57, "startPinId": 52010, "endPinId": 35004, "isEnabled": true },
+      { "id": 58, "startPinId": 35010, "endPinId": 42001, "isEnabled": true },
+      { "id": 59, "startPinId": 39010, "endPinId": 41002, "isEnabled": true },
+      { "id": 60, "startPinId": 40010, "endPinId": 41003, "isEnabled": true },
+      { "id": 61, "startPinId": 29012, "endPinId": 41004, "isEnabled": true },
+      { "id": 62, "startPinId": 35020, "endPinId": 41005, "isEnabled": true },
+      { "id": 63, "startPinId": 41010, "endPinId": 42002, "isEnabled": true },
+      { "id": 64, "startPinId": 34010, "endPinId": 42003, "isEnabled": true },
+      { "id": 65, "startPinId": 42010, "endPinId": 44001, "isEnabled": true },
+      { "id": 66, "startPinId": 29012, "endPinId": 43002, "isEnabled": true },
+      { "id": 67, "startPinId": 43010, "endPinId": 44002, "isEnabled": true }
+    ],
+
+    "variables": [
+      { "name": "UserQuery",  "dataType": 4, "defaultValue": "" },
+      { "name": "BranchPath", "dataType": 4, "defaultValue": "" },
+      { "name": "P4User",     "dataType": 4, "defaultValue": "" },
+      { "name": "StartCL",    "dataType": 4, "defaultValue": "" },
+      { "name": "CLList",     "dataType": 6, "defaultValue": "[]" },
+      { "name": "CLInput",    "dataType": 4, "defaultValue": "" },
+      { "name": "P4Client",   "dataType": 4, "defaultValue": "" },
+      { "name": "OutputDir",  "dataType": 4, "defaultValue": "G:\\CodeReviewResult" },
+      { "name": "WorkDir",    "dataType": 4, "defaultValue": "" },
+      { "name": "ApiKey",     "dataType": 4, "defaultValue": "" },
+      { "name": "BaseURL",    "dataType": 4, "defaultValue": "https://api.openai.com/v1" },
+      { "name": "Model",      "dataType": 4, "defaultValue": "gpt-4o" }
+    ]
+  }
+}
