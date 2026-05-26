@@ -93,6 +93,10 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_File.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Network.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_AI.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_AI_JSON.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_AI_LLM.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_AI_Tool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_AI_Agent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Game.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_Save.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/nodedefs/BuiltinNodeDefs_GameMath.cpp

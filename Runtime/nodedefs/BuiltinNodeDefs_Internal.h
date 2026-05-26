@@ -108,6 +108,12 @@ void RegisterNodeDefs_Retry(INodeRegistry& registry);
 void RegisterNodeDefs_File(INodeRegistry& registry);
 void RegisterNodeDefs_Network(INodeRegistry& registry);
 void RegisterNodeDefs_AI(INodeRegistry& registry);
+// AI sub-categories — implemented in BuiltinNodeDefs_AI_{JSON,LLM,Tool,Agent}.cpp;
+// dispatched from RegisterNodeDefs_AI(). Not meant to be called directly.
+void RegisterNodeDefs_AI_JSON(INodeRegistry& registry);
+void RegisterNodeDefs_AI_LLM(INodeRegistry& registry);
+void RegisterNodeDefs_AI_Tool(INodeRegistry& registry);
+void RegisterNodeDefs_AI_Agent(INodeRegistry& registry);
 void RegisterNodeDefs_Game(INodeRegistry& registry);
 void RegisterNodeDefs_Save(INodeRegistry& registry);
 void RegisterNodeDefs_GameMath(INodeRegistry& registry);
