@@ -150,7 +150,7 @@ void RegisterHandlers_Flow(
 
         ExecutionContext* pCtx = &ctx;
         auto alive = runner->GetAliveFlag();
-        ctx.Delay(0.0f, [pCtx, &runner, sharedData, completedPinId, resolvedPath, alive, paramsStr]() {
+        ctx.Delay(0.0f, [pCtx, runner, sharedData, completedPinId, resolvedPath, alive, paramsStr]() {
             if (!alive->load(std::memory_order_acquire)) return;
             pCtx->Log("  [ExecuteBlueprint] Async: executing \"" + resolvedPath + "\"...");
 

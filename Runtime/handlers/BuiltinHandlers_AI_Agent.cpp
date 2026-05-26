@@ -938,7 +938,7 @@ void RegisterHandlers_AI_Agent(
         auto sharedEventName = std::make_shared<std::string>(eventName);
         auto sharedSpawnId   = std::make_shared<std::string>(spawnId);
 
-        auto onComplete = [donePinId, errorPinId, sharedSpawnId, &runner, sharedFilePath,
+        auto onComplete = [donePinId, errorPinId, sharedSpawnId, sharedFilePath,
                            sharedParamsStr, sharedEventName]
                           (ExecutionContext& c) mutable
         {
