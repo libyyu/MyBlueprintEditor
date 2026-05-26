@@ -36,8 +36,7 @@ namespace NodeEditor {
 namespace Runtime {
 
 void RegisterHandlers_Game(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner)
+    std::unordered_map<std::string, NodeHandler>& handlers)
 {
     // ========================================================================
     // ── 行为树结果约定 ────────────────────────────────────────────────────

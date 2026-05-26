@@ -5,8 +5,7 @@ namespace NodeEditor {
 namespace Runtime {
 
 void RegisterHandlers_AI_Tool(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner)
+    std::unordered_map<std::string, NodeHandler>& handlers)
 {
     // JSON.ParseToolCall
     //   从 LLM 返回的 tool_calls 数组中取出指定位置的调用信息

@@ -8,9 +8,7 @@ namespace NodeEditor {
 namespace Runtime {
 
 void RegisterHandlers_Flow(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner,
-    const std::string& basePath);
+    std::unordered_map<std::string, NodeHandler>& handlers);
 
 } // namespace Runtime
 } // namespace NodeEditor

@@ -10,8 +10,7 @@ namespace Runtime {
 // Memory.Store / Memory.Recall / Tool.Register
 // Trigger.Cron / Trigger.FileWatch
 void RegisterHandlers_Agent(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner);
+    std::unordered_map<std::string, NodeHandler>& handlers);
 
 } // namespace Runtime
 } // namespace NodeEditor

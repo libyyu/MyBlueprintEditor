@@ -5,8 +5,7 @@ namespace NodeEditor {
 namespace Runtime {
 
 void RegisterHandlers_AI_Agent(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner)
+    std::unordered_map<std::string, NodeHandler>& handlers)
 {
     handlers["Agent.Plan"] = [](ExecutionContext& ctx) -> bool {
         auto* runner = ctx.GetRunner(); (void)runner;

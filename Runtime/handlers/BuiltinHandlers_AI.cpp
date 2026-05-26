@@ -1,4 +1,4 @@
-﻿// Runtime/handlers/BuiltinHandlers_AI.cpp
+// Runtime/handlers/BuiltinHandlers_AI.cpp
 // AI 相关节点处理器 — 共享辅助函数实现 + 入口注册函数
 // Handler 实现分布在：
 //   BuiltinHandlers_AI_JSON.cpp  — JSON.* / String.Template
@@ -275,13 +275,12 @@ HttpRequest BuildLLMRequest(ExecutionContext& ctx)
 // RegisterHandlers_AI — 入口：分发到 4 个子注册函数
 // ============================================================================
 void RegisterHandlers_AI(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner)
+    std::unordered_map<std::string, NodeHandler>& handlers)
 {
-    RegisterHandlers_AI_JSON(handlers, runner);
-    RegisterHandlers_AI_LLM(handlers, runner);
-    RegisterHandlers_AI_Tool(handlers, runner);
-    RegisterHandlers_AI_Agent(handlers, runner);
+    RegisterHandlers_AI_JSON(handlers);
+    RegisterHandlers_AI_LLM(handlers);
+    RegisterHandlers_AI_Tool(handlers);
+    RegisterHandlers_AI_Agent(handlers);
 }
 
 } // namespace Runtime

@@ -53,8 +53,7 @@ static void memPurgeExpired()
 
 // ============================================================================
 void RegisterHandlers_Agent(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner)
+    std::unordered_map<std::string, NodeHandler>& handlers)
 {
     // ========================================================================
     // Memory.Store

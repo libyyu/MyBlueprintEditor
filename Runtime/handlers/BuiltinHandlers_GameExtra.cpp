@@ -173,8 +173,7 @@ namespace Easing {
 // 注册所有 GameExtra handler
 // ============================================================================
 void RegisterHandlers_GameExtra(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner)
+    std::unordered_map<std::string, NodeHandler>& handlers)
 {
     // ========================================================================
     // Random.SetSeed — 设置随机种子（影响本 runner 后续所有 Random.* 操作）

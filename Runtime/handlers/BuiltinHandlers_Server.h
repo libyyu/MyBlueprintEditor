@@ -5,6 +5,5 @@
 
 namespace NodeEditor { namespace Runtime {
     void RegisterHandlers_Server(
-        std::unordered_map<std::string, NodeHandler>& handlers,
-        BlueprintRunner& runner);
+        std::unordered_map<std::string, NodeHandler>& handlers);
 } }

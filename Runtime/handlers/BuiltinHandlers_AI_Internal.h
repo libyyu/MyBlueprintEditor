@@ -35,10 +35,10 @@ HttpRequest BuildLLMRequest(ExecutionContext& ctx,
 HttpRequest BuildLLMRequest(ExecutionContext& ctx);
 
 // 子注册函数
-void RegisterHandlers_AI_JSON(std::unordered_map<std::string, NodeHandler>& handlers, BlueprintRunner& runner);
-void RegisterHandlers_AI_LLM(std::unordered_map<std::string, NodeHandler>& handlers, BlueprintRunner& runner);
-void RegisterHandlers_AI_Tool(std::unordered_map<std::string, NodeHandler>& handlers, BlueprintRunner& runner);
-void RegisterHandlers_AI_Agent(std::unordered_map<std::string, NodeHandler>& handlers, BlueprintRunner& runner);
+void RegisterHandlers_AI_JSON(std::unordered_map<std::string, NodeHandler>& handlers);
+void RegisterHandlers_AI_LLM(std::unordered_map<std::string, NodeHandler>& handlers);
+void RegisterHandlers_AI_Tool(std::unordered_map<std::string, NodeHandler>& handlers);
+void RegisterHandlers_AI_Agent(std::unordered_map<std::string, NodeHandler>& handlers);
 
 } // namespace Runtime
 } // namespace NodeEditor

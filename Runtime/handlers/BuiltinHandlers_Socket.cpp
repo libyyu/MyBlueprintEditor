@@ -184,8 +184,7 @@ static SockFd connectTcp(const std::string& host, int port, int timeoutMs = 5000
 // RegisterHandlers_Socket
 // ============================================================================
 void RegisterHandlers_Socket(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner)
+    std::unordered_map<std::string, NodeHandler>& handlers)
 {
     // ========================================================================
     // TCP.Listen

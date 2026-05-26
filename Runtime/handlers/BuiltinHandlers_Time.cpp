@@ -7,8 +7,7 @@ namespace NodeEditor {
 namespace Runtime {
 
 void RegisterHandlers_Time(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner)
+    std::unordered_map<std::string, NodeHandler>& handlers)
 {
     handlers["GetTime"] = [](ExecutionContext& ctx) {
         auto* runner = ctx.GetRunner(); (void)runner;

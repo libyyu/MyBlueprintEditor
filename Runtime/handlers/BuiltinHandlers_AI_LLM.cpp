@@ -5,8 +5,7 @@ namespace NodeEditor {
 namespace Runtime {
 
 void RegisterHandlers_AI_LLM(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner)
+    std::unordered_map<std::string, NodeHandler>& handlers)
 {
 
     // ========================================================================

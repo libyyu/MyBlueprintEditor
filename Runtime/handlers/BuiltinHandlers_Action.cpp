@@ -6,8 +6,7 @@ namespace NodeEditor {
 namespace Runtime {
 
 void RegisterHandlers_Action(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner)
+    std::unordered_map<std::string, NodeHandler>& handlers)
 {
     // SetTimer — 依赖：runner（timer 管理器）
     // 注意：FireConnectedNode 通过 ctx.FireConnectedNode() 调用，

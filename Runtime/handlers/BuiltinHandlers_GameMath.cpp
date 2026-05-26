@@ -137,8 +137,7 @@ static float computeStat(const StatEntry& e)
 
 // ============================================================================
 void RegisterHandlers_GameMath(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner)
+    std::unordered_map<std::string, NodeHandler>& handlers)
 {
     // ========================================================================
     // ── Vec2 ─────────────────────────────────────────────────────────────

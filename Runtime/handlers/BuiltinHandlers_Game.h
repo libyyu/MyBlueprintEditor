@@ -9,8 +9,7 @@ namespace Runtime {
 
 // 行为树（BT.*）、状态机（FSM.*）节点
 void RegisterHandlers_Game(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner);
+    std::unordered_map<std::string, NodeHandler>& handlers);
 
 } // namespace Runtime
 } // namespace NodeEditor

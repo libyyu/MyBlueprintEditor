@@ -118,8 +118,7 @@ static std::unordered_map<std::string, WsServerState*>         s_wsServers;
 // RegisterHandlers_Server
 // ============================================================================
 void RegisterHandlers_Server(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& /*runner*/)
+    std::unordered_map<std::string, NodeHandler>& handlers)
 {
     // ========================================================================
     // HTTP.Listen
@@ -635,8 +634,7 @@ void RegisterHandlers_Server(
 
 namespace NodeEditor { namespace Runtime {
 void RegisterHandlers_Server(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& /*runner*/)
+    std::unordered_map<std::string, NodeHandler>& handlers)
 {
     auto webglErr = [](const std::string& name) {
         return [name](ExecutionContext& ctx) -> bool {

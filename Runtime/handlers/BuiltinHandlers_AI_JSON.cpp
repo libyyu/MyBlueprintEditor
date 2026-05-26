@@ -1,11 +1,10 @@
-﻿// Auto-generated from BuiltinHandlers_AI.cpp split
+// Auto-generated from BuiltinHandlers_AI.cpp split
 #include "BuiltinHandlers_AI_Internal.h"
 
 namespace NodeEditor {
 namespace Runtime {
 void RegisterHandlers_AI_JSON(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner)
+    std::unordered_map<std::string, NodeHandler>& handlers)
 {
 {
     // ========================================================================

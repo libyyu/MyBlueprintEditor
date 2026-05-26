@@ -55,39 +55,39 @@ void RegisterBuiltinHandlers(
 {
     std::unordered_map<std::string, NodeHandler> allHandlers;
 
-    RegisterHandlers_Flow(allHandlers, runner, basePath);
-    RegisterHandlers_Action(allHandlers, runner);
+    RegisterHandlers_Flow(allHandlers);
+    RegisterHandlers_Action(allHandlers);
     RegisterHandlers_Math(allHandlers);
     RegisterHandlers_Debug(allHandlers);
     RegisterHandlers_String(allHandlers);
     RegisterHandlers_Map(allHandlers);
     RegisterHandlers_Array(allHandlers);
     RegisterHandlers_Set(allHandlers);
-    RegisterHandlers_Time(allHandlers, runner);
+    RegisterHandlers_Time(allHandlers);
     RegisterHandlers_Data(allHandlers);
     RegisterHandlers_Tree(allHandlers);
     RegisterHandlers_Houdini(allHandlers);
     RegisterHandlers_Misc(allHandlers);
-    RegisterHandlers_Network(allHandlers, runner);
-    RegisterHandlers_AI(allHandlers, runner);
+    RegisterHandlers_Network(allHandlers);
+    RegisterHandlers_AI(allHandlers);
     RegisterHandlers_File(allHandlers);
-    RegisterHandlers_Server(allHandlers, runner);
+    RegisterHandlers_Server(allHandlers);
     RegisterHandlers_Crypto(allHandlers);
     RegisterHandlers_Proto(allHandlers);
-    RegisterHandlers_Agent(allHandlers, runner);
-    RegisterHandlers_Game(allHandlers, runner);
+    RegisterHandlers_Agent(allHandlers);
+    RegisterHandlers_Game(allHandlers);
     RegisterHandlers_Save(allHandlers);
-    RegisterHandlers_GameMath(allHandlers, runner);
-    RegisterHandlers_Socket(allHandlers, runner);
-    RegisterHandlers_GameExtra(allHandlers, runner);
+    RegisterHandlers_GameMath(allHandlers);
+    RegisterHandlers_Socket(allHandlers);
+    RegisterHandlers_GameExtra(allHandlers);
 
-    // 设置默认处理器
+    // 设置默认处理器（per-runner 配置，保留 runner 参数的唯一用途）
     runner.SetDefaultHandler([](ExecutionContext& ctx) {
         ctx.Log("  [Default Handler] pass-through");
         return true;
     });
 
-    // 批量注册到 runner
+    // 批量注册到全局 HandlerRegistry
     runner.RegisterHandlers(allHandlers);
 
     // 如果调用者需要 handlers 映射表（供 Editor 层保存或传递给子蓝图）

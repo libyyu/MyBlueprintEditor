@@ -12,8 +12,7 @@ class ExecutionContext;
 using NodeHandler = std::function<bool(ExecutionContext&)>;
 
 void RegisterHandlers_Network(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner);
+    std::unordered_map<std::string, NodeHandler>& handlers);
 
 } // namespace Runtime
 } // namespace NodeEditor

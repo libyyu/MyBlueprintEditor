@@ -11,8 +11,7 @@ namespace Runtime {
 //   TCP.Listen  / TCP.Connect / TCP.Send / TCP.Receive / TCP.Disconnect / TCP.Stop
 //   UDP.Bind    / UDP.Send    / UDP.Receive / UDP.Close
 void RegisterHandlers_Socket(
-    std::unordered_map<std::string, NodeHandler>& handlers,
-    BlueprintRunner& runner);
+    std::unordered_map<std::string, NodeHandler>& handlers);
 
 } // namespace Runtime
 } // namespace NodeEditor
