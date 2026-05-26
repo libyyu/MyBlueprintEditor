@@ -57,7 +57,19 @@ build_err.txt
 build_proto_err.txt
 build_server_err.txt
 test_out.txt
+test_err.txt
+uni_err.txt
 test_simple.bjson
+
+# Distribution / 发布产物（编译产出，不应入仓）
+dist/
+
+# CI 日志（临时下载，不提交）
+ci_logs.zip
+job-logs.txt
+
+# 历史误生成的空标记文件
+/Emscripten
 
 # Python 编译缓存
 __pycache__/
