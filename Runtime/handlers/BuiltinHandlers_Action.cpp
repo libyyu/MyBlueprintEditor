@@ -13,6 +13,7 @@ void RegisterHandlers_Action(
     // 注意：FireConnectedNode 通过 ctx.FireConnectedNode() 调用，
     //       这样在子蓝图中使用时会在正确的 runner 上查找节点
     handlers["SetTimer"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         double time = ctx.GetInputValue("Time").asFloat();
         bool looping = ctx.GetInputValue("Looping").asBool();
         float interval = static_cast<float>(time);
@@ -39,7 +40,8 @@ void RegisterHandlers_Action(
     };
 
     // RemoveTimer — 依赖：runner（timer 管理器）
-    handlers["RemoveTimer"] = [&runner](ExecutionContext& ctx) {
+    handlers["RemoveTimer"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         int64_t handleVal = ctx.GetInputValue("TimerHandle").asInt();
         auto handle = static_cast<TimerHandle>(handleVal);
 
@@ -47,7 +49,7 @@ void RegisterHandlers_Action(
 
         bool success = false;
         if (handle != 0)
-            success = runner.GetTimerManager().ClearTimer(handle);
+            success = runner->GetTimerManager().ClearTimer(handle);
 
         ctx.SetOutputValue("Success", Variant(success));
         ctx.Log("  [RemoveTimer] " + std::string(success ? "Removed" : "Not found or invalid"));
@@ -57,7 +59,8 @@ void RegisterHandlers_Action(
     };
 
     // PauseTimer — 依赖：runner（timer 管理器）
-    handlers["PauseTimer"] = [&runner](ExecutionContext& ctx) {
+    handlers["PauseTimer"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         int64_t handleVal = ctx.GetInputValue("TimerHandle").asInt();
         auto handle = static_cast<TimerHandle>(handleVal);
 
@@ -65,7 +68,7 @@ void RegisterHandlers_Action(
 
         bool success = false;
         if (handle != 0)
-            success = runner.GetTimerManager().PauseTimer(handle);
+            success = runner->GetTimerManager().PauseTimer(handle);
 
         ctx.SetOutputValue("Success", Variant(success));
         ctx.Log("  [PauseTimer] " + std::string(success ? "Paused" : "Not found or invalid"));
@@ -75,7 +78,8 @@ void RegisterHandlers_Action(
     };
 
     // ResumeTimer — 依赖：runner（timer 管理器）
-    handlers["ResumeTimer"] = [&runner](ExecutionContext& ctx) {
+    handlers["ResumeTimer"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         int64_t handleVal = ctx.GetInputValue("TimerHandle").asInt();
         auto handle = static_cast<TimerHandle>(handleVal);
 
@@ -83,7 +87,7 @@ void RegisterHandlers_Action(
 
         bool success = false;
         if (handle != 0)
-            success = runner.GetTimerManager().ResumeTimer(handle);
+            success = runner->GetTimerManager().ResumeTimer(handle);
 
         ctx.SetOutputValue("Success", Variant(success));
         ctx.Log("  [ResumeTimer] " + std::string(success ? "Resumed" : "Not found or invalid"));
@@ -93,6 +97,7 @@ void RegisterHandlers_Action(
     };
 
     handlers["OutputAction"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         double sample = ctx.GetInputValue("Sample").asFloat();
         ctx.Log("  Sample = " + std::to_string(sample));
         ctx.SetOutputValue("Condition", Variant(sample > 0.5));
@@ -100,17 +105,20 @@ void RegisterHandlers_Action(
     };
 
     handlers["InputActionFire"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         ctx.Log("  [InputAction] Fire triggered");
         return true;
     };
 
     handlers["CustomEvent"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         ctx.Log("  [CustomEvent] triggered");
         ctx.ActivateOutputFlow("Exec");
         return true;
     };
 
     handlers["TraceByChannel"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         ctx.Log("  [Trace] Line trace performed");
         ctx.SetOutputValue("Return Value", Variant(true));
         return true;
@@ -121,12 +129,14 @@ void RegisterHandlers_Action(
     // ============================================================================
 
     handlers["OnBeginPlay"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         ctx.Log("  [OnBeginPlay] triggered");
         ctx.ActivateOutputFlow("");
         return true;
     };
 
     handlers["OnTick"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         // 从 __DeltaTime 变量读取编辑器注入的真实帧时间
         double dt = ctx.GetVariable("__DeltaTime").asFloat();
         ctx.SetOutputValue("DeltaTime", Variant(dt));
@@ -135,6 +145,7 @@ void RegisterHandlers_Action(
     };
 
     handlers["CustomEventNode"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         ctx.Log("  [CustomEvent] triggered");
         ctx.SetOutputValue("EventName", Variant(std::string("")));
         ctx.ActivateOutputFlow("");
@@ -146,18 +157,18 @@ void RegisterHandlers_Action(
     // 维持 HasPendingAsync()==true，确保编辑器 OnFrame 继续驱动 DrainQueue，
     // 直到事件真正被消费。这样既避免同步重入（拓扑有环时会递归爆栈），
     // 又不会因 isExecuting 提前变 false 导致 DrainQueue 停止调用。
-    handlers["FireEvent"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["FireEvent"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string eventName = ctx.GetInputValue("EventName").asString();
         ctx.Log("  [FireEvent] triggering event: " + eventName);
         ctx.ActivateOutputFlow("");
         if (!eventName.empty()) {
             // 先 Acquire，让 isExecuting 保持 true（OnFrame 继续调 DrainQueue）
-            runner.AcquireAsync();
+            runner->AcquireAsync();
             ctx.Log("  [FireEvent] async acquired, posting to dispatcher");
-            auto* r = &runner;
+            auto* r = runner;
             MainThreadDispatcher::Get().Post([r, eventName]() {
                 r->DispatchEvent(eventName);
-                // 消费完毕后 Release，计数归零时 isExecuting 才可能变 false
                 r->ReleaseAsync();
             });
         }

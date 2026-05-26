@@ -393,6 +393,9 @@ public:
     std::shared_ptr<IFileSystem> GetFileSystem() const { return m_fileSystem; }
     void SetFileSystem(std::shared_ptr<IFileSystem> fs) { m_fileSystem = fs ? std::move(fs) : GetDefaultFileSystem(); }
 
+    // 获取蓝图文件所在目录（LoadFromFile/LoadFromFileWithDeps 时记录）
+    const std::string& GetLoadedFileDir() const { return m_loadedFileDir; }
+
     bool IsWithEditor() const;
 
     // ------------------------------------------------------------------

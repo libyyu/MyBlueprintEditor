@@ -9,6 +9,7 @@
 //   Trigger.FileWatch  — 文件变化触发（轮询 mtime）
 
 #include "BuiltinHandlers_Agent.h"
+#include "../SharedRegistry.h"
 #include "../BlueprintRunner.h"
 #include "../BlueprintExporter.h"
 #include "../../Utils/Json/crude_json.h"
@@ -62,6 +63,7 @@ void RegisterHandlers_Agent(
     // out: exec
     // ========================================================================
     handlers["Memory.Store"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string key   = ctx.GetInputValue("Key").asString();
         std::string value = ctx.GetInputValue("Value").asString();
         double ttl        = ctx.GetInputValue("TTL").asFloat();
@@ -91,6 +93,7 @@ void RegisterHandlers_Agent(
     // out: Value(String), Found(Bool), AllMatches(String JSON object)
     // ========================================================================
     handlers["Memory.Recall"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string key    = ctx.GetInputValue("Key").asString();
         std::string prefix = ctx.GetInputValue("Prefix").asString();
 
@@ -127,6 +130,7 @@ void RegisterHandlers_Agent(
     // out: exec, RemovedCount(Integer)
     // ========================================================================
     handlers["Memory.Clear"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string prefix = ctx.GetInputValue("Prefix").asString();
         std::lock_guard<std::mutex> lk(s_memMutex);
         int64_t removed = 0;
@@ -156,7 +160,8 @@ void RegisterHandlers_Agent(
     // in:  exec, Name(String), FilePath(String), Description(String)
     // out: exec, ErrorMessage(String)
     // ========================================================================
-    handlers["Tool.Register"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["Tool.Register"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string name        = ctx.GetInputValue("Name").asString();
         std::string filePath    = ctx.GetInputValue("FilePath").asString();
         std::string description = ctx.GetInputValue("Description").asString();
@@ -181,12 +186,13 @@ void RegisterHandlers_Agent(
         // 同时注册一个 handler：当 Tool.CallByName 调用 name 时，
         // 路由到对应子蓝图执行（同步简化版）
         // Handler 全局共享（HandlerRegistry），无需快照
-        runner.RegisterHandler("__dyntool_" + name,
-            [&runner, name, filePath](ExecutionContext& c) -> bool {
+        HandlerRegistry::Instance().Register("__dyntool_" + name,
+            [name, filePath](ExecutionContext& c) -> bool {
+                auto* r = c.GetRunner();
                 std::string args = c.GetInputValue("Arguments").asString();
                 // 创建子 runner；handler 全局共享
-                auto subRunner = std::make_unique<BlueprintRunner>(runner.GetFileSystem());
-                subRunner->SetParentTimerManager(runner.GetTimerManagerPtr());
+                auto subRunner = std::make_unique<BlueprintRunner>(r->GetFileSystem());
+                subRunner->SetParentTimerManager(r->GetTimerManagerPtr());
                 subRunner->SetLogCallback([&c](LogLevel, const std::string& m){ c.Log(m); });
                 if (!subRunner->LoadFromFileWithDeps(filePath)) {
                     c.SetOutputValue("Result", Variant(std::string("[Error] cannot load: " + filePath)));
@@ -227,7 +233,8 @@ void RegisterHandlers_Agent(
     // out: onTick(exec), onDone(exec)
     //      TickCount(Integer)
     // ========================================================================
-    handlers["Trigger.Cron"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["Trigger.Cron"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         double  interval  = ctx.GetInputValue("IntervalSec").asFloat();
         int64_t maxCount  = ctx.GetInputValue("MaxCount").asInt();
         std::string event = ctx.GetInputValue("EventName").asString();
@@ -246,7 +253,7 @@ void RegisterHandlers_Agent(
         ctx.MarkDownstreamAsHandled("onDone");
 
         ExecutionContext* pCtx = &ctx;
-        auto alive = runner.GetAliveFlag();
+        auto alive = runner->GetAliveFlag();
 
         ctx.SetTimer(static_cast<float>(interval), -1,
             [pCtx, maxCount, countKey, tickPinId, donePinId, alive]() -> bool {
@@ -275,7 +282,8 @@ void RegisterHandlers_Agent(
     // out: onChanged(exec), onError(exec)
     //      FilePath(String) — 变化的文件路径
     // ========================================================================
-    handlers["Trigger.FileWatch"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["Trigger.FileWatch"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
 #ifdef __EMSCRIPTEN__
         ctx.SetOutputValue("FilePath", Variant(std::string("")));
         ctx.LogError("[Trigger.FileWatch] not supported on WebGL");
@@ -317,7 +325,7 @@ void RegisterHandlers_Agent(
         ctx.MarkDownstreamAsHandled("onError");
 
         ExecutionContext* pCtx = &ctx;
-        auto alive = runner.GetAliveFlag();
+        auto alive = runner->GetAliveFlag();
 
         ctx.SetTimer(static_cast<float>(pollInterval), -1,
             [pCtx, filePath, mtimeKey, changedPinId, errorPinId, alive]() -> bool {

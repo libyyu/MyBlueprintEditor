@@ -197,7 +197,8 @@ void RegisterHandlers_Socket(
     //      onDisconnect(exec)— 连接断开时触发
     //      ConnId(String), PeerAddr(String), PeerPort(Int), Data(String)
     // ========================================================================
-    handlers["TCP.Listen"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["TCP.Listen"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string host  = ctx.GetInputValue("Host").asString();
         int port          = static_cast<int>(ctx.GetInputValue("Port").asInt());
         int bufSize       = static_cast<int>(ctx.GetInputValue("BufferSize").asInt());
@@ -305,7 +306,7 @@ void RegisterHandlers_Socket(
         ctx.MarkDownstreamAsHandled("onDisconnect");
 
         ExecutionContext* pCtx = &ctx;
-        auto alive = runner.GetAliveFlag();
+        auto alive = runner->GetAliveFlag();
 
         ctx.SetTimer(0.016f, -1, [pCtx, serverKey, acceptPin, dataPin, discPin, alive]() -> bool {
             if (!alive->load(std::memory_order_acquire)) return false;
@@ -352,7 +353,8 @@ void RegisterHandlers_Socket(
     // out: onConnected(exec), onData(exec), onDisconnect(exec), onError(exec)
     //      ConnId(String), Data(String), ErrorMessage(String)
     // ========================================================================
-    handlers["TCP.Connect"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["TCP.Connect"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string host = ctx.GetInputValue("Host").asString();
         int port         = static_cast<int>(ctx.GetInputValue("Port").asInt());
         int bufSize      = static_cast<int>(ctx.GetInputValue("BufferSize").asInt());
@@ -380,7 +382,7 @@ void RegisterHandlers_Socket(
         }
 
         ExecutionContext* pCtx = &ctx;
-        auto alive = runner.GetAliveFlag();
+        auto alive = runner->GetAliveFlag();
 
         // 后台连接线程
         state->recvThread = std::thread([state, host, port, bufSize]() {
@@ -468,6 +470,7 @@ void RegisterHandlers_Socket(
     // out: exec, Success(Bool), ErrorMessage(String)
     // ========================================================================
     handlers["TCP.Send"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string connId = ctx.GetInputValue("ConnId").asString();
         std::string data   = ctx.GetInputValue("Data").asString();
 
@@ -515,6 +518,7 @@ void RegisterHandlers_Socket(
     // out: exec
     // ========================================================================
     handlers["TCP.Disconnect"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string connId = ctx.GetInputValue("ConnId").asString();
 
         // Server 侧
@@ -553,6 +557,7 @@ void RegisterHandlers_Socket(
     // out: exec
     // ========================================================================
     handlers["TCP.Stop"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string serverKey = ctx.GetInputValue("ServerKey").asString();
         if (serverKey.empty())
             serverKey = ctx.GetVariable("__tcp_server_key").asString();
@@ -582,7 +587,8 @@ void RegisterHandlers_Socket(
     //      onData(exec) — 收到数据时触发
     //      FromAddr(String), FromPort(Int), Data(String)
     // ========================================================================
-    handlers["UDP.Bind"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["UDP.Bind"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string host = ctx.GetInputValue("Host").asString();
         int port         = static_cast<int>(ctx.GetInputValue("Port").asInt());
         int bufSize      = static_cast<int>(ctx.GetInputValue("BufferSize").asInt());
@@ -645,7 +651,7 @@ void RegisterHandlers_Socket(
         PinId dataPin = ctx.GetPinId("onData");
         ctx.MarkDownstreamAsHandled("onData");
         ExecutionContext* pCtx = &ctx;
-        auto alive = runner.GetAliveFlag();
+        auto alive = runner->GetAliveFlag();
 
         ctx.SetTimer(0.016f, -1, [pCtx, bindKey, dataPin, alive]() -> bool {
             if (!alive->load(std::memory_order_acquire)) return false;
@@ -687,6 +693,7 @@ void RegisterHandlers_Socket(
     // out: exec, Success(Bool), ErrorMessage(String)
     // ========================================================================
     handlers["UDP.Send"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string host = ctx.GetInputValue("Host").asString();
         int port         = static_cast<int>(ctx.GetInputValue("Port").asInt());
         std::string data = ctx.GetInputValue("Data").asString();
@@ -724,6 +731,7 @@ void RegisterHandlers_Socket(
     // out: exec
     // ========================================================================
     handlers["UDP.Close"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         int port = static_cast<int>(ctx.GetInputValue("Port").asInt());
         std::string bindKey = ctx.GetVariable("__udp_key_" + std::to_string(port)).asString();
         

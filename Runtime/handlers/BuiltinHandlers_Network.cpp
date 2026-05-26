@@ -49,7 +49,8 @@ void RegisterHandlers_Network(
     //     emscripten_fetch 在浏览器异步完成后调 resolve()。
     //   - 两个平台 onComplete 都在 Tick → DrainQueue 上下文执行，安全访问 ctx。
     // ========================================================================
-    handlers["HTTP.Request"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["HTTP.Request"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
 
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
@@ -136,7 +137,8 @@ void RegisterHandlers_Network(
     // 注意：二进制数据存在 std::string（按字节长度，非 null-terminated 语义），
     //       如需写文件请在蓝图中用 File.Write 节点衔接。
     // ========================================================================
-    handlers["HTTP.Download"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["HTTP.Download"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
 
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
@@ -215,6 +217,7 @@ void RegisterHandlers_Network(
     // 输出：Value(String), Found(Boolean)
     // ========================================================================
     handlers["JSON.GetPath"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string json = ctx.GetInputValue("JSON").asString();
         std::string path = ctx.GetInputValue("Path").asString();
 
@@ -277,7 +280,8 @@ void RegisterHandlers_Network(
     // ========================================================================
     // HTTP.Get — 快捷 GET 节点
     // ========================================================================
-    handlers["HTTP.Get"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["HTTP.Get"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("StatusCode",   Variant(static_cast<int64_t>(0)));
@@ -324,7 +328,8 @@ void RegisterHandlers_Network(
     // ========================================================================
     // HTTP.Post — 快捷 POST 节点
     // ========================================================================
-    handlers["HTTP.Post"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["HTTP.Post"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("StatusCode",   Variant(static_cast<int64_t>(0)));
@@ -377,7 +382,8 @@ void RegisterHandlers_Network(
     //   <td class="result-snippet"> 提取摘要。
     // 跨平台：native + WebGL（同 HTTP.Get，底层走 IHttpClient）
     // ========================================================================
-    handlers["Web.Search"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["Web.Search"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("Results",     Variant(std::string("[]")));
@@ -532,7 +538,8 @@ void RegisterHandlers_Network(
     // ========================================================================
     // Code.Run — 执行子进程命令（native only，WebGL 走 onError）
     // ========================================================================
-    handlers["Code.Run"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["Code.Run"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
 #ifdef __EMSCRIPTEN__
         ctx.SetOutputValue("Stdout",       Variant(std::string("")));
         ctx.SetOutputValue("Stderr",       Variant(std::string("")));
@@ -833,7 +840,8 @@ void RegisterHandlers_Network(
     // RetryDelaySec: 每次重试等待秒数，默认 1.0
     // RetryOnStatus: 逗号分隔的需要重试的 HTTP 状态码，如 "429,503"；空=只重试网络错误
     // ========================================================================
-    handlers["HTTP.Retry"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["HTTP.Retry"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
 
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {

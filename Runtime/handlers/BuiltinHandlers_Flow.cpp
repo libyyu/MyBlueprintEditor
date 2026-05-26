@@ -16,6 +16,7 @@ void RegisterHandlers_Flow(
     const std::string& basePath)
 {
     handlers["Branch"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         bool condition = ctx.GetInputValue("Condition").asBool();
         ctx.Log("  Condition = " + std::string(condition ? "True" : "False"));
         if (condition)
@@ -26,6 +27,7 @@ void RegisterHandlers_Flow(
     };
 
     handlers["DoN"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         int64_t n = ctx.GetInputValue("N").asInt();
 
         // 使用节点 ID 作为变量键的一部分，避免多个 DoN 实例的状态冲突
@@ -64,8 +66,9 @@ void RegisterHandlers_Flow(
     };
 
     // ExecuteBlueprint — 加载并执行另一个蓝图文件（完全异步）
-    // 依赖：basePath（路径解析）、runner（获取 handlers + timer）
-    handlers["ExecuteBlueprint"] = [&runner, basePath](ExecutionContext& ctx) {
+    handlers["ExecuteBlueprint"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
+        std::string basePath = runner ? runner->GetLoadedFileDir() : std::string();
         auto filePath  = ctx.GetInputValue("File").asString();
         auto paramsStr = ctx.GetInputValue("Params").asString();  // optional JSON object
         ctx.Log("  [ExecuteBlueprint] File: \"" + filePath + "\"");
@@ -107,7 +110,7 @@ void RegisterHandlers_Flow(
         ctx.Log("  [ExecuteBlueprint] Resolved: \"" + resolvedPath + "\"");
 
         // 加载子蓝图
-        JsonBlueprintExporter exporter(runner.GetFileSystem());
+        JsonBlueprintExporter exporter(runner->GetFileSystem());
         auto importResult = exporter.importRuntimeFromFile(resolvedPath);
 
         if (!importResult.success)
@@ -148,13 +151,13 @@ void RegisterHandlers_Flow(
         auto sharedData = std::make_shared<BlueprintData>(std::move(importResult.data));
 
         ExecutionContext* pCtx = &ctx;
-        auto alive = runner.GetAliveFlag();
+        auto alive = runner->GetAliveFlag();
         ctx.Delay(0.0f, [pCtx, &runner, sharedData, completedPinId, resolvedPath, alive, paramsStr]() {
             if (!alive->load(std::memory_order_acquire)) return;
             pCtx->Log("  [ExecuteBlueprint] Async: executing \"" + resolvedPath + "\"...");
 
-            auto subRunner = std::make_shared<BlueprintRunner>(runner.GetFileSystem());
-            subRunner->SetParentTimerManager(runner.GetTimerManagerPtr());
+            auto subRunner = std::make_shared<BlueprintRunner>(runner->GetFileSystem());
+            subRunner->SetParentTimerManager(runner->GetTimerManagerPtr());
 
             auto subLog = std::make_shared<std::vector<std::string>>();
             subRunner->SetLogCallback([pCtx](LogLevel lv, const std::string& msg) {
@@ -190,9 +193,9 @@ void RegisterHandlers_Flow(
 
             // 将父 runner 的外部函数库（m_externalFunctions）透传给子 runner，
             // 确保子蓝图中引用的 FuncLib.* 节点能找到对应的函数定义。
-            subRunner->RegisterExternalFunctions(runner.GetExternalFunctions());
+            subRunner->RegisterExternalFunctions(runner->GetExternalFunctions());
             // 同时透传完整 Library 数据（shared_ptr 共享，零拷贝），供 FuncLib.* 节点正确执行
-            subRunner->InheritExternalLibraries(runner.GetExternalLibraries());
+            subRunner->InheritExternalLibraries(runner->GetExternalLibraries());
 
             // 注入调用方传入的参数：解析 Params JSON 并逐个 SetVariable
             if (!paramsStr.empty())
@@ -236,7 +239,7 @@ void RegisterHandlers_Flow(
             pCtx->SetOutputValue("Success", Variant(execResult.success));
             pCtx->SetOutputValue("Output", Variant(outputText));
 
-            runner.KeepAlive(subRunner);
+            runner->KeepAlive(subRunner);
 
             if (completedPinId != 0)
                 pCtx->ActivateOutputFlow(completedPinId);
@@ -246,6 +249,7 @@ void RegisterHandlers_Flow(
     };
 
     handlers["ForLoop"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         int64_t first = ctx.GetInputValue("First Index").asInt();
         int64_t last = ctx.GetInputValue("Last Index").asInt();
         ctx.Log("  [ForLoop] " + std::to_string(first) + " to " + std::to_string(last));
@@ -260,6 +264,7 @@ void RegisterHandlers_Flow(
     };
 
     handlers["WhileLoop"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         ctx.Log("  [WhileLoop] Starting");
         int iterations = 0;
         const int maxIterations = 10000;
@@ -281,7 +286,8 @@ void RegisterHandlers_Flow(
     };
 
     // Delay — 依赖：runner 的 timer
-    handlers["Delay"] = [&runner](ExecutionContext& ctx) {
+    handlers["Delay"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         double dur = ctx.GetInputValue("Duration").asFloat();
         float duration = static_cast<float>(dur);
         auto currentTime = FrameTimerManager::GetCurrentUnixTime();
@@ -305,7 +311,7 @@ void RegisterHandlers_Flow(
 
         ExecutionContext* pCtx = &ctx;
         // 捕获 alive 标志，在回调时检查 runner 是否仍存活
-        auto alive = runner.GetAliveFlag();
+        auto alive = runner->GetAliveFlag();
         auto timerHandle = ctx.Delay(duration, [pCtx, completedPinId, alive]() {
             // 检查 runner 是否已析构
             if (!alive->load(std::memory_order_acquire)) return;
@@ -322,6 +328,7 @@ void RegisterHandlers_Flow(
     };
 
     handlers["FlipFlop"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         // 使用节点 ID 作为变量键的一部分，避免多个 FlipFlop 实例的状态冲突
         auto* node = ctx.GetCurrentNode();
         std::string nodeIdStr = node ? std::to_string(node->id) : "0";
@@ -339,6 +346,7 @@ void RegisterHandlers_Flow(
     };
 
     handlers["Gate"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         // 使用节点 ID 作为变量键的一部分，避免多个 Gate 实例的状态冲突
         auto* node = ctx.GetCurrentNode();
         std::string nodeIdStr = node ? std::to_string(node->id) : "0";
@@ -375,6 +383,7 @@ void RegisterHandlers_Flow(
     };
 
     handlers["DoOnce"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         std::string nodeIdStr = node ? std::to_string(node->id) : "0";
         std::string stateKey = "__doonce_fired_" + nodeIdStr;
@@ -403,6 +412,7 @@ void RegisterHandlers_Flow(
     };
 
     handlers["FlowSequence"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         ctx.Log("  [Sequence] Executing all outputs in order");
         auto* node = ctx.GetCurrentNode();
         if (node)
@@ -417,6 +427,7 @@ void RegisterHandlers_Flow(
     };
 
     handlers["Select"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         bool cond = ctx.GetInputValue("Condition").asBool();
         auto a = ctx.GetInputValue("A");
         auto b = ctx.GetInputValue("B");
@@ -425,6 +436,7 @@ void RegisterHandlers_Flow(
     };
 
     handlers["SwitchOnInt"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         int64_t sel = ctx.GetInputValue("Selection").asInt();
         ctx.Log("  [SwitchOnInt] Selection=" + std::to_string(sel));
         std::string pinName = std::to_string(sel);
@@ -449,6 +461,7 @@ void RegisterHandlers_Flow(
 
     // MultiGate — 依次激活多个输出（可选循环和随机）
     handlers["MultiGate"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         std::string nodeIdStr = node ? std::to_string(node->id) : "0";
         std::string indexKey = "__multigate_index_" + nodeIdStr;
@@ -506,6 +519,7 @@ void RegisterHandlers_Flow(
 
     // ForLoopWithBreak — 可中断的 For 循环
     handlers["ForLoopWithBreak"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         std::string nodeIdStr = node ? std::to_string(node->id) : "0";
         std::string breakKey = "__forloopbreak_" + nodeIdStr;
@@ -543,6 +557,7 @@ void RegisterHandlers_Flow(
 
     // ── SwitchOnBool ───────────────────────────────────────────────────────
     handlers["SwitchOnBool"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         bool cond = ctx.GetInputValue("Condition").asBool();
         ctx.ActivateOutputFlow(cond ? "True" : "False");
         return true;
@@ -550,6 +565,7 @@ void RegisterHandlers_Flow(
 
     // ── SwitchOnString ─────────────────────────────────────────────────────
     handlers["SwitchOnString"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string sel = ctx.GetInputValue("Selection").asString();
         // 动态扫描所有 "Case N" 输入引脚，找到匹配的激活对应输出
         const auto* node = ctx.GetCurrentNode();
@@ -575,6 +591,7 @@ void RegisterHandlers_Flow(
 
     // ── Retry.Backoff ──────────────────────────────────────────────────────────
     handlers["Retry.Backoff"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         int64_t maxRetries        = ctx.GetInputValue("MaxRetries").asInt();
         double  initialDelayMs    = ctx.GetInputValue("InitialDelayMs").asFloat();
         double  backoffMultiplier = ctx.GetInputValue("BackoffMultiplier").asFloat();

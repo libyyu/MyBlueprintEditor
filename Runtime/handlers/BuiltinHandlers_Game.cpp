@@ -56,6 +56,7 @@ void RegisterHandlers_Game(
     //      FailedIndex(Int) — 第几个子节点失败（-1=全成功）
     // ========================================================================
     handlers["BT.Sequence"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         std::string nodeId = node ? std::to_string(node->id) : "0";
 
@@ -107,6 +108,7 @@ void RegisterHandlers_Game(
     //      SucceededIndex(Int)
     // ========================================================================
     handlers["BT.Selector"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         std::string nodeId = node ? std::to_string(node->id) : "0";
 
@@ -156,6 +158,7 @@ void RegisterHandlers_Game(
     //      SuccessCount(Int), FailureCount(Int)
     // ========================================================================
     handlers["BT.Parallel"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         std::string nodeId = node ? std::to_string(node->id) : "0";
         std::string policy = ctx.GetInputValue("Policy").asString();
@@ -204,6 +207,7 @@ void RegisterHandlers_Game(
     // out: onChild(exec), onSuccess(exec), onFailure(exec)
     // ========================================================================
     handlers["BT.Inverter"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         std::string nodeId = node ? std::to_string(node->id) : "0";
         PinId childPin = ctx.GetPinId("onChild");
@@ -231,6 +235,7 @@ void RegisterHandlers_Game(
     //      Iterations(Int)
     // ========================================================================
     handlers["BT.Repeat"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         std::string nodeId = node ? std::to_string(node->id) : "0";
         int64_t count       = ctx.GetInputValue("Count").asInt();
@@ -273,6 +278,7 @@ void RegisterHandlers_Game(
     // out: onChild(exec), onSuccess(exec), onFailure(exec), onCooldown(exec)
     // ========================================================================
     handlers["BT.Cooldown"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         double duration  = ctx.GetInputValue("Duration").asFloat();
         std::string key  = ctx.GetInputValue("Key").asString();
@@ -315,7 +321,8 @@ void RegisterHandlers_Game(
     // in:  exec, Duration(Float)
     // out: onDone(exec)
     // ========================================================================
-    handlers["BT.Wait"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["BT.Wait"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         float duration = static_cast<float>(ctx.GetInputValue("Duration").asFloat());
         if (duration <= 0.0f) duration = 0.0f;
@@ -325,7 +332,7 @@ void RegisterHandlers_Game(
         ctx.MarkDownstreamAsHandled("onDone");
         ctx.SetVariable("__bt_result_" + nodeId, Variant(true));
 
-        auto alive = runner.GetAliveFlag();
+        auto alive = runner->GetAliveFlag();
         ExecutionContext* pCtx = &ctx;
         ctx.Delay(duration, [pCtx, donePinId, nodeId, alive]() {
             if (!alive->load(std::memory_order_acquire)) return;
@@ -343,6 +350,7 @@ void RegisterHandlers_Game(
     //      Result(Bool)
     // ========================================================================
     handlers["BT.Condition"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         std::string nodeId = node ? std::to_string(node->id) : "0";
 
@@ -365,6 +373,7 @@ void RegisterHandlers_Game(
     // 黑板读写（语义别名，底层等同 SetVariable/GetVariable，便于 BT 识别）
     // ========================================================================
     handlers["BT.SetBlackboard"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string key = ctx.GetInputValue("Key").asString();
         Variant val     = ctx.GetInputValue("Value");
         ctx.SetVariable(key, val);
@@ -374,6 +383,7 @@ void RegisterHandlers_Game(
     };
 
     handlers["BT.GetBlackboard"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string key = ctx.GetInputValue("Key").asString();
         Variant val     = ctx.GetVariable(key);
         bool found      = (val.type != PinDataType::Unknown);
@@ -389,6 +399,7 @@ void RegisterHandlers_Game(
     // out: exec
     // ========================================================================
     handlers["BT.Log"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         std::string nodeId = node ? std::to_string(node->id) : "0";
         std::string msg    = ctx.GetInputValue("Message").asString();
@@ -409,6 +420,7 @@ void RegisterHandlers_Game(
     // 强制修改子节点结果
     // ========================================================================
     handlers["BT.AlwaysSuccess"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         std::string nodeId = node ? std::to_string(node->id) : "0";
         PinId childPin = ctx.GetPinId("onChild");
@@ -421,6 +433,7 @@ void RegisterHandlers_Game(
     };
 
     handlers["BT.AlwaysFailure"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto* node = ctx.GetCurrentNode();
         std::string nodeId = node ? std::to_string(node->id) : "0";
         PinId childPin = ctx.GetPinId("onChild");
@@ -447,6 +460,7 @@ void RegisterHandlers_Game(
     //      IsActive(Bool)
     // ========================================================================
     handlers["FSM.State"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string stateName = ctx.GetInputValue("StateName").asString();
         std::string machineId = ctx.GetInputValue("MachineId").asString();
         if (machineId.empty()) {
@@ -485,6 +499,7 @@ void RegisterHandlers_Game(
     //      Changed(Bool)
     // ========================================================================
     handlers["FSM.Transition"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         bool condition      = ctx.GetInputValue("Condition").asBool();
         std::string from    = ctx.GetInputValue("From").asString();
         std::string to      = ctx.GetInputValue("To").asString();
@@ -525,6 +540,7 @@ void RegisterHandlers_Game(
     // out: State(String)
     // ========================================================================
     handlers["FSM.GetState"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string machineId = ctx.GetInputValue("MachineId").asString();
         if (machineId.empty()) machineId = "default";
         std::string state = ctx.GetVariable("__fsm_" + machineId + "_state").asString();
@@ -540,6 +556,7 @@ void RegisterHandlers_Game(
     //      PrevState(String)
     // ========================================================================
     handlers["FSM.SetState"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string newState  = ctx.GetInputValue("State").asString();
         std::string machineId = ctx.GetInputValue("MachineId").asString();
         if (machineId.empty()) machineId = "default";
@@ -569,6 +586,7 @@ void RegisterHandlers_Game(
     // out: Result(Bool)
     // ========================================================================
     handlers["FSM.IsInState"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string state     = ctx.GetInputValue("State").asString();
         std::string machineId = ctx.GetInputValue("MachineId").asString();
         if (machineId.empty()) machineId = "default";
@@ -580,6 +598,7 @@ void RegisterHandlers_Game(
     // 替换现有桩实现，让旧蓝图不崩溃
     handlers["Sequence"]   = handlers["BT.Sequence"];
     handlers["MoveTo"]     = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         ctx.Log("[BT] MoveTo: TargetX=" + ctx.GetInputValue("TargetX").asString()
                 + " TargetY=" + ctx.GetInputValue("TargetY").asString());
         auto* node = ctx.GetCurrentNode();
@@ -589,6 +608,7 @@ void RegisterHandlers_Game(
         return true;
     };
     handlers["RandomWait"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         double minT = ctx.GetInputValue("Min").asFloat();
         double maxT = ctx.GetInputValue("Max").asFloat();
         if (maxT <= minT) maxT = minT + 1.0;

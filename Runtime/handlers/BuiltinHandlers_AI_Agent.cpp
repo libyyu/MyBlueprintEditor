@@ -1,4 +1,4 @@
-﻿// BuiltinHandlers_AI_Agent.cpp - Agent/Context/LLM.StructuredOutput/Schema/Route/Intent handlers
+// BuiltinHandlers_AI_Agent.cpp - Agent/Context/LLM.StructuredOutput/Schema/Route/Intent handlers
 #include "BuiltinHandlers_AI_Internal.h"
 
 namespace NodeEditor {
@@ -8,7 +8,8 @@ void RegisterHandlers_AI_Agent(
     std::unordered_map<std::string, NodeHandler>& handlers,
     BlueprintRunner& runner)
 {
-    handlers["Agent.Plan"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["Agent.Plan"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
 
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
@@ -134,7 +135,8 @@ void RegisterHandlers_AI_Agent(
     // Agent.Reflect
     // 让 LLM 评估输出是否满足评判标准（Criteria），输出 pass/fail + Feedback
     // ========================================================================
-    handlers["Agent.Reflect"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["Agent.Reflect"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
 
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
@@ -254,7 +256,8 @@ void RegisterHandlers_AI_Agent(
     // Context.Compress
     // 保留最近 KeepRecent 条消息，用 LLM 摘要更早的内容，防止 context 溢出
     // ========================================================================
-    handlers["Context.Compress"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["Context.Compress"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
 
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
@@ -395,7 +398,8 @@ void RegisterHandlers_AI_Agent(
     // out: onSuccess(exec), onError(exec)
     //      Output(String JSON), ErrorMessage(String)
     // ========================================================================
-    handlers["LLM.StructuredOutput"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["LLM.StructuredOutput"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient registered")));
@@ -487,6 +491,7 @@ void RegisterHandlers_AI_Agent(
     //      IsValid(Bool), ErrorMessage(String)
     // ========================================================================
     handlers["Schema.Validate"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string jsonStr   = ctx.GetInputValue("JSON").asString();
         std::string schemaStr = ctx.GetInputValue("Schema").asString();
 
@@ -575,7 +580,8 @@ void RegisterHandlers_AI_Agent(
     // out: onRoute0..onRoute7(exec), onError(exec)
     //      SelectedRoute(Integer), SelectedLabel(String), ErrorMessage(String)
     // ========================================================================
-    handlers["LLM.Route"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["LLM.Route"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient")));
@@ -730,7 +736,8 @@ void RegisterHandlers_AI_Agent(
     // out: onMatched(exec), onUnknown(exec), onError(exec)
     //      Intent(String), Confidence(String), ErrorMessage(String)
     // ========================================================================
-    handlers["Intent.Classify"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["Intent.Classify"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("ErrorMessage", Variant(std::string("No HttpClient")));
@@ -865,7 +872,8 @@ void RegisterHandlers_AI_Agent(
     //      Output(String)  — 子蓝图完成后所有变量的 JSON 快照
     //      ErrorMessage(String)
     // ========================================================================
-    handlers["Agent.Spawn"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["Agent.Spawn"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string filePath  = ctx.GetInputValue("FilePath").asString();
         std::string paramsStr = ctx.GetInputValue("Params").asString();
         std::string eventName = ctx.GetInputValue("EventName").asString();
@@ -887,18 +895,18 @@ void RegisterHandlers_AI_Agent(
         ctx.MarkDownstreamAsHandled("onDone");
         ctx.MarkDownstreamAsHandled("onError");
 
-        auto alive = runner.GetAliveFlag();
+        auto alive = runner->GetAliveFlag();
         // Handler 全局共享（HandlerRegistry），子 runner 自动可用，无需快照
 
         // 在异步线程中创建子 runner 并执行
-        auto dispatcher = [&runner, filePath, paramsStr, eventName, spawnId, alive]
+        auto dispatcher = [runner, filePath, paramsStr, eventName, spawnId, alive]
                           (ExecutionContext::AsyncResolve resolve) mutable
         {
             if (!alive->load(std::memory_order_acquire)) { resolve(); return; }
 
             // 子 runner 继承 timer manager；handler 全局共享
-            auto subRunner = std::make_shared<BlueprintRunner>(runner.GetFileSystem());
-            subRunner->SetParentTimerManager(runner.GetTimerManagerPtr());
+            auto subRunner = std::make_shared<BlueprintRunner>(runner->GetFileSystem());
+            subRunner->SetParentTimerManager(runner->GetTimerManagerPtr());
             subRunner->SetLogCallback([](LogLevel, const std::string&){});
 
             bool loaded = subRunner->LoadFromFileWithDeps(filePath);
@@ -956,7 +964,8 @@ void RegisterHandlers_AI_Agent(
     // out: onDone(exec), onTimeout(exec)
     //      CompletedCount(Integer)
     // ========================================================================
-    handlers["Agent.Join"] = [&runner](ExecutionContext& ctx) -> bool {
+    handlers["Agent.Join"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         int64_t required = ctx.GetInputValue("Count").asInt();
         double  timeout  = ctx.GetInputValue("Timeout").asFloat();
         if (required <= 0) required = 1;

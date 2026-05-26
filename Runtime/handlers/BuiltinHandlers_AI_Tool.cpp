@@ -1,4 +1,4 @@
-﻿// BuiltinHandlers_AI_Tool.cpp - Tool/MCP/Memory/UserInput handlers
+// BuiltinHandlers_AI_Tool.cpp - Tool/MCP/Memory/UserInput handlers
 #include "BuiltinHandlers_AI_Internal.h"
 
 namespace NodeEditor {
@@ -15,6 +15,7 @@ void RegisterHandlers_AI_Tool(
     //   纯数据节点（无 exec flow）
     // ================================================================
     handlers["JSON.ParseToolCall"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string json = ctx.GetInputValue("ToolCallsJSON").asString();
         int index = (int)ctx.GetInputValue("Index").asInt();
 
@@ -48,6 +49,7 @@ void RegisterHandlers_AI_Tool(
     //   纯数据节点（无 exec flow）
     // ================================================================
     handlers["JSON.MakeToolResult"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string toolCallId = ctx.GetInputValue("ToolCallID").asString();
         std::string content    = ctx.GetInputValue("Content").asString();
 
@@ -71,6 +73,7 @@ void RegisterHandlers_AI_Tool(
     // WebGL：直接走 onNew，返回空数组（无磁盘可用）
     // ================================================================
     handlers["Memory.LoadHistory"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string path = ctx.GetInputValue("Path").asString();
         int maxMsg = (int)ctx.GetInputValue("MaxMessages").asInt();
 
@@ -145,6 +148,7 @@ void RegisterHandlers_AI_Tool(
     // WebGL：直接走 onSuccess（no-op）
     // ================================================================
     handlers["Memory.SaveHistory"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string path     = ctx.GetInputValue("Path").asString();
         std::string messages = ctx.GetInputValue("Messages").asString();
         int maxMsg = (int)ctx.GetInputValue("MaxMessages").asInt();
@@ -203,6 +207,7 @@ void RegisterHandlers_AI_Tool(
     //         Index     integer       — 0-based 索引
     // ========================================================================
     handlers["Tool.ForEach"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto tcJson = ctx.GetInputValue("ToolCallsJSON").asString();
         if (tcJson.empty()) {
             ctx.ActivateOutputFlow("onDone");
@@ -264,6 +269,7 @@ void RegisterHandlers_AI_Tool(
     //       Tool.CallByName（后者已支持 FuncLib 动态路由）。
     // ========================================================================
     handlers["Tool.ForEachParallel"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("ResultsJSON", Variant(std::string("[]")));
@@ -349,6 +355,7 @@ void RegisterHandlers_AI_Tool(
     // 纯数据节点（无 exec flow）
     // ========================================================================
     handlers["JSON.ToolCallCount"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto json = ctx.GetInputValue("ToolCallsJSON").asString();
         int64_t count = 0;
         if (!json.empty()) {
@@ -393,7 +400,8 @@ void RegisterHandlers_AI_Tool(
     // 约定：被调用的 FuncLib 函数需有一个名为 "Result" 的输出变量；
     //       Arguments JSON 对象的 key 会作为同名变量注入函数。
     // ========================================================================
-    handlers["Tool.CallByName"] = [&runner](ExecutionContext& ctx) {
+    handlers["Tool.CallByName"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string toolName   = ctx.GetInputValue("ToolName").asString();
         std::string argsJson   = ctx.GetInputValue("Arguments").asString();
         std::string toolCallId = ctx.GetInputValue("ToolCallId").asString();
@@ -408,7 +416,7 @@ void RegisterHandlers_AI_Tool(
 
         // 在已注册的外部函数中查找同名函数
         // GetExternalFunctions() 返回 vector<FunctionDefinition>
-        auto extFuncs = runner.GetExternalFunctions();
+        auto extFuncs = runner->GetExternalFunctions();
         const ::NodeEditor::Runtime::FunctionDefinition* funcDefPtr = nullptr;
         for (const auto& fd : extFuncs) {
             if (fd.name == toolName || fd.id == toolName) {
@@ -426,7 +434,7 @@ void RegisterHandlers_AI_Tool(
         }
 
         // 构建函数子图
-        const auto& extLibs = runner.GetExternalLibraries();
+        const auto& extLibs = runner->GetExternalLibraries();
         auto libIt = extLibs.find(funcDefPtr->id);
         if (libIt == extLibs.end() || !libIt->second) {
             ctx.Log("[Tool.CallByName] library data not found for '" + toolName + "'",
@@ -515,7 +523,7 @@ void RegisterHandlers_AI_Tool(
         }
 
         // 构造子 runner，继承父 runner 的全部配置（含 SetParentTimerManager + SetNodePreExecuteCallback）
-        auto subRunner = runner.CreateChildRunner();
+        auto subRunner = runner->CreateChildRunner();
 
         // 加载并执行
         if (subRunner->Load(miniActor)) {
@@ -544,6 +552,7 @@ void RegisterHandlers_AI_Tool(
     //         MatchedIndex integer — 匹配到的索引，-1=无匹配
     // ========================================================================
     handlers["Tool.Match"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto toolName = ctx.GetInputValue("ToolName").asString();
         int matched = -1;
         for (int i = 0; i < 8; ++i) {
@@ -570,6 +579,7 @@ void RegisterHandlers_AI_Tool(
     //         Found boolean — 是否找到代码块
     // ========================================================================
     handlers["JSON.Extract"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto text = ctx.GetInputValue("Text").asString();
 
         // 尝试提取 ```json ... ``` 或 ``` ... ```
@@ -630,6 +640,7 @@ void RegisterHandlers_AI_Tool(
     //         ErrorMessage string
     // ========================================================================
     handlers["JSON.Validate"] = [](ExecutionContext& ctx) {
+        auto* runner = ctx.GetRunner(); (void)runner;
         auto jsonStr     = ctx.GetInputValue("JSON").asString();
         auto requiredRaw = ctx.GetInputValue("RequiredKeys").asString();
 
@@ -697,6 +708,7 @@ void RegisterHandlers_AI_Tool(
     //   与 ImGui UserInput 弹框的 OK 逻辑完全在同一线程，无竞争问题。
     // ========================================================================
     handlers["UserInput.Wait"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string prompt = ctx.GetInputValue("Prompt").asString();
         std::string defVal = ctx.GetInputValue("DefaultValue").asString();
         if (prompt.empty()) prompt = "Input:";
@@ -741,6 +753,7 @@ void RegisterHandlers_AI_Tool(
     // Tool.Define — 构建单个 OpenAI function calling tool JSON
     // ========================================================================
     handlers["Tool.Define"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         std::string name  = ctx.GetInputValue("Name").asString();
         std::string desc  = ctx.GetInputValue("Description").asString();
         Variant paramNames = ctx.GetInputValue("ParamNames");
@@ -797,6 +810,7 @@ void RegisterHandlers_AI_Tool(
     //   响应：直接把 body 作为 Result
     // ========================================================================
     handlers["MCP.Call"] = [](ExecutionContext& ctx) -> bool {
+        auto* runner = ctx.GetRunner(); (void)runner;
         IHttpClient* client = BP_GetHttpClient();
         if (!client) {
             ctx.SetOutputValue("Result",       Variant(std::string("")));
