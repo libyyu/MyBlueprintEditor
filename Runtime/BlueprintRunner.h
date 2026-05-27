@@ -21,9 +21,11 @@
 #include "NodeDefinition.h"
 #include "FrameTimerManager.h"
 #include "FileSystem.h"
-#ifdef BLUEPRINT_HAS_LUA
-#include "LuaScriptEngine.h"
-#endif
+// Note: LuaScriptEngine 仅以 std::shared_ptr<LuaScriptEngine> 形式使用，
+// 完整声明只在 .cpp 中需要（BlueprintRunner.cpp / BlueprintRunner_Lua.cpp /
+// LuaBindings.cpp / ScriptExtensionManager.cpp / BlueprintCAPI.cpp）。
+// 这里保留前向声明（line 50 处）即可，不再 include 头文件，
+// 避免向所有消费 BlueprintRunner.h 的 24+ TU 传播 211 行的 LuaScriptEngine.h 依赖。
 #include <string>
 #include <vector>
 #include <unordered_map>

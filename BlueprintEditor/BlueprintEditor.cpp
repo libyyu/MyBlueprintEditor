@@ -1,5 +1,6 @@
 // BlueprintEditor.cpp -- 蓝图编辑器核心逻辑
 #include "BlueprintEditor.h"
+#include "BpLogger.h"   // BP_LOGE / BP_LOGW (BlueprintEditor.h 不再 transitive include)
 #include "ThemeManager.h"
 #include "PathUtils.h"
 #include <map>

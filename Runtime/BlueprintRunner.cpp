@@ -4,6 +4,9 @@
 #include "BlueprintExporter.h"
 #include "SharedRegistry.h"
 #include "MainThreadDispatcher.h"
+#ifdef BLUEPRINT_HAS_LUA
+#  include "LuaScriptEngine.h"   // ~BlueprintRunner() 析构 m_luaEngine 需要完整类型
+#endif
 #include <sstream>
 #include <chrono>
 #include <algorithm>

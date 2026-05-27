@@ -21,7 +21,9 @@
 #include "FunctionLibrary.h"
 #include "EventBus.h"
 #include "BpProject.h"
-#include "BpLogger.h"
+// BpLogger.h: 不在 BlueprintEditor.h 中使用（之前为传染 include）。
+// 它会拉入 <thread>/<mutex>/<condition_variable>/<fstream> 等重型 STL 头，
+// 通过 BlueprintEditor.h 传染到 24+ TU。需要 BpLogger 的 cpp 自己显式 include。
 #include "ScriptExtensionManager.h"
 #include "TextEditor.h"
 
@@ -32,11 +34,9 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <array>
-#include <algorithm>
-#include <utility>
-#include <sstream>
-#include <chrono>
 #include <functional>
+// Removed (verified unused in this header; cpp users that need them must
+// include explicitly): <algorithm> <utility> <sstream> <chrono>
 
 namespace ed   = ax::NodeEditor;
 namespace util = ax::NodeEditor::Utilities;

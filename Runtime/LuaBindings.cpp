@@ -13,6 +13,7 @@
 
 #include "LuaBindings.h"
 #include "BlueprintRunner.h"
+#include "LuaScriptEngine.h"   // 此处需要完整类型（GetLuaEngine() 等方法调用）
 #include "Http/IHttpClient.h"
 #include "../../Utils/Json/crude_json.h"
 
