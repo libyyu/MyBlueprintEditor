@@ -45,6 +45,7 @@ add_executable(blueprint_tests
     test_any_type.cpp
     test_map_set_type.cpp
     test_object_type.cpp
+    test_node_consistency.cpp
 )
 
 target_link_libraries(blueprint_tests

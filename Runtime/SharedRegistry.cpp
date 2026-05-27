@@ -72,6 +72,16 @@ size_t HandlerRegistry::Size() const
     return m_handlers.size();
 }
 
+std::vector<std::string> HandlerRegistry::GetAllIds() const
+{
+    std::lock_guard<std::mutex> lk(m_mutex);
+    std::vector<std::string> ids;
+    ids.reserve(m_handlers.size());
+    for (const auto& kv : m_handlers)
+        ids.push_back(kv.first);
+    return ids;
+}
+
 void HandlerRegistry::Clear()
 {
     std::lock_guard<std::mutex> lk(m_mutex);

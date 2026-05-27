@@ -63,6 +63,9 @@ public:
     // 调试用：当前已注册的 handler 数
     size_t Size() const;
 
+    // 调试 / 一致性测试用：枚举所有已注册的 handler id（拷贝快照，避免持有内部锁）
+    std::vector<std::string> GetAllIds() const;
+
     // 清空（仅用于测试或进程退出前的显式清理）
     void Clear();
 

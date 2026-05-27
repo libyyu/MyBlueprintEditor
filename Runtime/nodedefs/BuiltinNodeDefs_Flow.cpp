@@ -152,6 +152,17 @@ void RegisterNodeDefs_Flow(INodeRegistry& registry)
         { MakeFlowPin("Case 0"), MakeFlowPin("Case 1"),
           MakeFlowPin("Case 2"), MakeFlowPin("Case 3"),
           MakeFlowPin("Case 4"), MakeFlowPin("Case 5"), MakeFlowPin("Default") });
+
+    // Switch on Int — 整数多分支（与 SwitchOnBool / SwitchOnString 对称）
+    // Handler 在 BuiltinHandlers_Flow.cpp::handlers["SwitchOnInt"] 早已存在，
+    // 但此前漏注册 NodeDef 导致用户在 Library 面板看不到、无法添加节点。
+    // Handler 行为：按 Selection 整数找 name == std::to_string(sel) 的 exec 输出，
+    // 找不到则走 "Default"。这里输出引脚命名 "0".."5" 与 handler 完全对应。
+    reg("SwitchOnInt", "Switch on Int", "Flow",
+        { MakeFlowPin(""), MakePin("Selection", PinDataType::Integer) },
+        { MakeFlowPin("0"), MakeFlowPin("1"),
+          MakeFlowPin("2"), MakeFlowPin("3"),
+          MakeFlowPin("4"), MakeFlowPin("5"), MakeFlowPin("Default") });
 }
 
 
