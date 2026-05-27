@@ -40,6 +40,7 @@ struct MemoryEntry {
 static std::mutex                              s_memMutex;
 static std::unordered_map<std::string, MemoryEntry> s_memStore;
 
+// PRECONDITION: caller MUST hold s_memMutex (this helper does NOT lock).
 static void memPurgeExpired()
 {
     double now = static_cast<double>(FrameTimerManager::GetCurrentUnixTime());
