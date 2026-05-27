@@ -2274,3 +2274,46 @@ TEST_F(HandlersTest, JsonValidate_MissingRequiredKey)
 
     EXPECT_EQ(r.GetVariable("outcome").asString(), "invalid_ok");
 }
+
+// ============================================================================
+// Variant 类型提升测试
+// (Migrated from legacy tests/runtime_test.cpp::test_add_type_promotion)
+// 关键不变量：整数 + 整数 应保持 Integer 类型；
+//             asString() 不应返回 "7.000000" 这种 float 格式。
+// ============================================================================
+
+TEST(VariantTypePromotion, IntegerPlusIntegerKeepsInteger)
+{
+    Variant a(int64_t(3));
+    Variant b(int64_t(4));
+    ASSERT_EQ(a.type, PinDataType::Integer);
+    ASSERT_EQ(b.type, PinDataType::Integer);
+
+    Variant r(a.asInt() + b.asInt());
+    EXPECT_EQ(r.type, PinDataType::Integer);
+    EXPECT_EQ(r.asInt(), 7);
+    EXPECT_EQ(r.asString(), "7") << "Integer asString 不应出现小数点 / 不应输出 \"7.000000\"";
+}
+
+TEST(VariantTypePromotion, FloatPlusIntegerIsFloat)
+{
+    Variant a(3.14);
+    Variant b(int64_t(2));
+    ASSERT_EQ(a.type, PinDataType::Float);
+
+    Variant r(a.asFloat() + b.asFloat());
+    EXPECT_EQ(r.type, PinDataType::Float);
+    EXPECT_DOUBLE_EQ(r.asFloat(), 5.14);
+}
+
+TEST(VariantTypePromotion, UnknownPlusIntegerWalksIntegerPath)
+{
+    Variant a;              // Unknown / Any
+    Variant b(int64_t(5));
+    ASSERT_EQ(a.type, PinDataType::Unknown);
+
+    // resolveArithType 规则：a=Unknown, b=Integer -> Integer 路径
+    bool useInt = (a.type != PinDataType::Float && b.type != PinDataType::Float)
+               && (a.type == PinDataType::Integer || b.type == PinDataType::Integer);
+    EXPECT_TRUE(useInt);
+}

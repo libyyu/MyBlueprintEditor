@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 #include "BlueprintData.h"
 #include "BlueprintExporter.h"
+#include "../Utils/Json/crude_json.h"
 
 using namespace NodeEditor::Runtime;
 
@@ -152,3 +153,46 @@ TEST(SerializationTest, MalformedJsonDoesNotCrash)
     ImportResult result = exporter.importRuntimeFromString("{invalid json{{");
     EXPECT_FALSE(result.success);  // 应返回失败，而不是崩溃
 }
+
+// ── UTF-8 / 中文字符串字段 ─────────────────────────────────────────────────────
+// (Migrated from legacy tests/runtime_test.cpp::test_crude_json_utf8)
+// 验证 crude_json 作为底层 JSON 库能正确 pass-through 中文等多字节序列
+// （蓝图节点描述、变量名等会出现中文）。
+//
+// 注意：所有 \xHH 转义后用 "" 断开字符串字面量，避免 MSVC 把 \x 转义
+// 与后续 hex/ASCII 字符合并（如 \xaaF -> \xaaf -> 超大字符 C2022）。
+
+// "蓝图测试" 的 UTF-8 字节序列
+#define UTF8_LANTU_CESHI \
+    "\xe8\x93\x9d" "\xe5\x9b\xbe" "\xe6\xb5\x8b" "\xe8\xaf\x95"
+
+// "这是一个ForLoop节点" 的 UTF-8 字节序列
+#define UTF8_FORLOOP_DESC \
+    "\xe8\xbf\x99" "\xe6\x98\xaf" "\xe4\xb8\x80" "\xe4\xb8\xaa" "ForLoop" "\xe8\x8a\x82" "\xe7\x82\xb9"
+
+TEST(SerializationTest, CrudeJsonParsesChineseStrings)
+{
+    const char* json_utf8 = "{\"name\": \"" UTF8_LANTU_CESHI "\", \"value\": 42}";
+    auto v = crude_json::value::parse(json_utf8);
+    ASSERT_FALSE(v.is_discarded()) << "包含中文的 JSON 应解析成功";
+    ASSERT_EQ(v.type(), crude_json::type_t::object);
+
+    auto& nameVal = v["name"];
+    ASSERT_EQ(nameVal.type(), crude_json::type_t::string);
+    EXPECT_EQ(nameVal.get<std::string>(), std::string(UTF8_LANTU_CESHI));
+
+    auto& valNum = v["value"];
+    ASSERT_EQ(valNum.type(), crude_json::type_t::number);
+    EXPECT_DOUBLE_EQ(valNum.get<double>(), 42.0);
+}
+
+TEST(SerializationTest, CrudeJsonHandlesChineseDescriptionField)
+{
+    const char* json_desc = "{\"description\": \"" UTF8_FORLOOP_DESC "\"}";
+    auto v = crude_json::value::parse(json_desc);
+    ASSERT_FALSE(v.is_discarded());
+    EXPECT_EQ(v["description"].get<std::string>(), std::string(UTF8_FORLOOP_DESC));
+}
+
+#undef UTF8_LANTU_CESHI
+#undef UTF8_FORLOOP_DESC

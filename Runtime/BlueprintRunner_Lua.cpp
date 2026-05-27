@@ -57,7 +57,17 @@ bool BlueprintRunner::LoadExtensionScript(const std::string& filePath)
         namespace fs = std::filesystem;
         auto t = fs::last_write_time(filePath);
         m_luaEngine->SetFileMtime(filePath, t.time_since_epoch().count());
-    } catch (...) {}
+    } catch (const std::exception& ex) {
+        // 读取 mtime 失败：本次跳过热重载注册（不阻塞脚本加载）；
+        // 多在网络盘 / 文件正被外部进程写入时发生，verbose 级别避免干扰。
+        Log(std::string("[Script] last_write_time failed for ") + filePath +
+            ": " + ex.what() + " (hot-reload tracking disabled for this file)",
+            LogLevel::Verbose);
+    } catch (...) {
+        Log(std::string("[Script] last_write_time threw unknown exception for ") +
+            filePath + " (hot-reload tracking disabled for this file)",
+            LogLevel::Verbose);
+    }
 #endif
 
     Log("[Script] Loaded OK: " + filePath, LogLevel::Verbose);

@@ -213,7 +213,17 @@ void ScriptExtensionManager::PollFileChanges(float deltaTime)
                         ReloadFile(f);
                         break;  // ReloadAll 已处理全部文件，退出循环
                     }
-                } catch (...) {}
+                } catch (const std::exception& ex) {
+                    // mtime 读取失败（文件被锁/删除/网络盘故障）；本帧跳过，下一帧再试。
+                    // 仅 verbose 级别，避免每帧刷屏（轮询周期约 1 秒）。
+                    if (m_logCallback)
+                        m_logCallback(/*verbose*/2,
+                            "[Script] Hot-reload poll failed for " + f + ": " + ex.what());
+                } catch (...) {
+                    if (m_logCallback)
+                        m_logCallback(/*verbose*/2,
+                            "[Script] Hot-reload poll: unknown exception for " + f);
+                }
             }
         }
 #endif
@@ -229,7 +239,16 @@ void ScriptExtensionManager::PollFileChanges(float deltaTime)
                 LoadEntrySilent(w.filePath, w.chunkName);
                 w.loaded = true;
             }
-        } catch (...) {}
+        } catch (const std::exception& ex) {
+            // fs::exists 抛异常通常意味着路径无效或权限问题；本帧跳过，下一帧重试。
+            if (m_logCallback)
+                m_logCallback(/*verbose*/2,
+                    "[Script] Entry-watch poll failed for " + w.filePath + ": " + ex.what());
+        } catch (...) {
+            if (m_logCallback)
+                m_logCallback(/*verbose*/2,
+                    "[Script] Entry-watch poll: unknown exception for " + w.filePath);
+        }
     }
 }
 
