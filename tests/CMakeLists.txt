@@ -43,6 +43,7 @@ add_executable(blueprint_tests
     test_game_extra.cpp
     test_crypto_and_math.cpp
     test_any_type.cpp
+    test_map_set_type.cpp
 )
 
 target_link_libraries(blueprint_tests
