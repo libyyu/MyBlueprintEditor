@@ -73,6 +73,10 @@ function FPanelBaseUI:__constructor()
 	---@type userdata
 	self.m_msgHandler = nil
 
+	--- 事件桥接器：UGUI = UILuaBehaviour, UITK = UITKLuaBridge
+	--- Lua 面板通过 self.m_bridge 访问，无需关心后端类型
+	self.m_bridge = nil
+
 	---@type number
 	self.m_invisibleFlag = PanelInVisibleMask.None
 
@@ -288,8 +292,14 @@ function FPanelBaseUI:DestroyPanelRaw()
 	FGUIMan.Instance():UnRegisterPanelObj(self.m_panel)
 	self:UnloadPanel()			
 	
-	--清除 msgHandler
+	--清除事件桥接器
+	if self.m_isuitk and self.m_bridge then
+		-- UITKLuaBridge 需要手动清理监听器（防止内存泄漏）
+		self.m_bridge:ClearAllListeners()
+	end
 	self.m_msgHandler = nil
+	self.m_bridge = nil
+	self.m_backend = nil
 	
 	self.m_disappearing = false
 	self.m_destroying = false
@@ -368,6 +378,29 @@ function FPanelBaseUI:TouchMsgHandler()
 		end
 		return nil
 	end
+
+	-- ── UI Toolkit 分支 ───────────────────────────────────────────────────
+	if self.m_isuitk then
+		-- 从 backend 拿到 UITKLuaBridge
+		if not self.m_backend then return end
+		local bridge = self.m_backend:GetEventBridge()
+		if not bridge then return end
+		self.m_bridge = bridge
+		self.m_msgHandler = bridge  -- 兼容旧代码对 m_msgHandler 的引用
+
+		-- 如果 Lua 面板定义了 OnClick，自动扫描所有 Button 元素
+		-- 参数为 name string，与 UGUI 的对齐方案一致
+		local func = getFunc("OnClick")
+		if func then
+			local mst = {
+				onClick = function(name) self:OnClick(name) end
+			}
+			bridge:TouchAllButtons(mst)
+		end
+		return
+	end
+
+	-- ── 现有 UGUI / FairyGUI 分支（不变）─────────────────────────────
 	if not self.m_isfgui or not self.m_isfguiWindow then
 		if IsValidObject(self.m_msgHandler) then
 			return
@@ -381,6 +414,9 @@ function FPanelBaseUI:TouchMsgHandler()
 		if not self.m_msgHandler then
 			self.m_msgHandler = obj:AddComponent(typeof(CS.UILuaBehaviour))
 		end
+		-- UGUI 后端：m_bridge 指向同一个 UILuaBehaviour
+		self.m_bridge = self.m_msgHandler
+
 		local mst = {
 			onDestroy = function() self:DestroyPanelRaw() end,
 			onBecameVisible = function(...) self:_BecameVisible(...) end,
@@ -398,14 +434,6 @@ function FPanelBaseUI:TouchMsgHandler()
 		if func then
 			mst.onTextChange = function(...) self:OnChange(...) end
 		end 
-		-- func = getFunc("OnStepTweenFinish")
-		-- if func then
-		-- 	mst.onStepTweenFinish = function(...) self:OnStepTweenFinish(...) end
-		-- end 
-		-- func = getFunc("OnScroll")
-		-- if func then
-		-- 	mst.onScroll = function(...) self:OnScroll(...) end
-		-- end 
 
 		self.m_msgHandler:TouchGUIMsg(mst)
 
@@ -487,7 +515,13 @@ function FPanelBaseUI:_SetPanelToLayerMaxDepth()
 	self:_RemovePanelFromLayer()
 
 	local real_depth = GetLayerNextTopDepth(self:GetDepthLayer())
-	if self.m_isfgui then
+	if self.m_isuitk then
+		-- UI Toolkit：通过 backend 设置 UIDocument.sortingOrder
+		if self.m_backend and self.m_backend.IsValid then
+			self.m_backend:SetSortingOrder(real_depth)
+			self:_AddPanelToLayerDepth(real_depth)
+		end
+	elseif self.m_isfgui then
 		if self.m_isfguiWindow then
 			self.m_panel:SetSortingOrder(real_depth, true)
 			self:_AddPanelToLayerDepth(real_depth)
@@ -511,7 +545,12 @@ function FPanelBaseUI:_SetPanelToLayerMinDepth()
 
 	local real_depth = GetLayerNextBottomDepth(self:GetDepthLayer())
 
-	if self.m_isfgui then
+	if self.m_isuitk then
+		if self.m_backend and self.m_backend.IsValid then
+			self.m_backend:SetSortingOrder(real_depth)
+			self:_AddPanelToLayerDepth(real_depth)
+		end
+	elseif self.m_isfgui then
 		if self.m_isfguiWindow then
 			self.m_panel:SetSortingOrder(real_depth, true)
 			self:_AddPanelToLayerDepth(real_depth)

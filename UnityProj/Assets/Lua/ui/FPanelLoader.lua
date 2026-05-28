@@ -15,6 +15,10 @@ do
 		--界面名
 		self.m_panelName = ""
 		self.m_panel = nil
+		--后端适配层（IUIPanelBackend），同时支持 UGUI 和 UI Toolkit
+		self.m_backend = nil
+		--是否 UI Toolkit 面板
+		self.m_isuitk = false
 		--是否fairygui
 		self.m_isfgui = false
 		self.m_isfguiWindow = false
@@ -126,6 +130,11 @@ do
 		end
 	end
 
+	-- 判断是否为 UI Toolkit 资源（.uxml 后缀）
+	local function isUIToolkitRes(resName)
+		return resName:find("\.uxml$") ~= nil
+	end
+
 	local function parseResource(resName)
 		if false and resName:find(DefaultFGUISeparator) then
 			local arr = resName:split(DefaultFGUISeparator)
@@ -142,7 +151,8 @@ do
 			return true, abName, componentName, packageName, window
 		else
 			local prefabName
-			local i, j, cap = resName:find("/([%w_]+)%.prefab$")
+			-- 同时识别 .prefab 和 .uxml
+			local i, j, cap = resName:find("/([%w_]+)%.[pu][rx][em][fl][ab]*$")
 			if cap then
 				prefabName = cap
 			else
@@ -169,8 +179,13 @@ do
 			return
 		end
 		self.m_isLoading = true
+
+		-- 检测是否为 UI Toolkit (.uxml) 资源
+		local uitk = isUIToolkitRes(resName)
+		self.m_isuitk = uitk
+
 		local isfgui, prefabName, packageName, window = parseResource(resName)
-		print("parseResource", isfgui, resName, abName, prefabName, packageName)
+		print("parseResource", isfgui, uitk, resName, prefabName)
 		self.m_isfgui = isfgui
 		self.m_isfguiWindow = window
 		self.m_assetPath = resName
@@ -184,6 +199,10 @@ do
 			if not panel then
 				onCreateFinish(false)
 				return 
+			elseif uitk then
+				-- UI Toolkit 路径：panel 是 UITKPanelBackend（C# 对象）
+				self.m_backend = panel
+				self:SetPanelObject(panel.RootGameObject)
 			elseif not isfgui then
 				self:SetPanelObject(panel)
 			elseif window then
@@ -216,12 +235,21 @@ do
 				return
 			end
 
-			if not isfgui then
+			if uitk then
+				-- UI Toolkit 分支：obj 是 VisualTreeAsset
+				local UITKBackend = CS.CutRope.Framework.UITKPanelBackend
+				local backend = UITKBackend.Create(
+					obj,
+					nil,  -- panelSettings: 用项目默认
+					parentObj.transform,
+					prefabName
+				)
+				onResourceLoaded(backend)
+			elseif not isfgui then
 				local panel = Instantiate(obj, self.m_panelName, parentObj)
 				panel.transform.localPosition = Vector3(0, 0, 0)
 				panel.transform.localScale = Vector3(1, 1, 1)
 				panel.layer = UnityEngine.LayerMask.NameToLayer("UI")
-				--panel.tag = "UI"
 				onResourceLoaded(panel)
 			elseif window then
 				print("CreateWindow", packageName, prefabName)
@@ -252,7 +280,7 @@ do
 			end
 		end
 		
-		LoadPanelPackage(resName, onLoad, isfgui)
+		LoadPanelPackage(resName, onLoad, isfgui and not uitk)
 	end
 
 	--TODO:
