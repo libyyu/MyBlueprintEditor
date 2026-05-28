@@ -240,10 +240,13 @@ do
 				local UITKBackend = CS.CutRope.Framework.UITKPanelBackend
 				-- 把深度层传入，让 Create() 自动选择 Game/Overlay PanelSettings
 				local sortOrder = self:GetDepthLayer and self:GetDepthLayer() or 0
+				-- parentObj 在 UGUI 下是 Transform（GetUGUIRoot() 返回 Canvas.transform）
+				-- UITKPanelBackend.Create 需要 Transform，直接传 parentObj
+				local uitkParent = parentObj
 				local backend = UITKBackend.Create(
 					obj,
 					nil,		-- panelSettings: 由 GameLauncher.Instance 根据 sortOrder 自动选择
-					parentObj.transform,
+					uitkParent,
 					prefabName,
 					sortOrder
 				)

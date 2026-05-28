@@ -26,6 +26,7 @@ namespace CutRope.Framework
         {
             public VisualElement element;
             public EventCallback<ClickEvent> callback;
+            public LuaFunction luaCallback;  // RegisterClick 模式下持有，Dispose 用
         }
 
         private UIDocument _doc;
@@ -91,9 +92,11 @@ namespace CutRope.Framework
                 return;
             }
 
-            EventCallback<ClickEvent> cb = _ => callback.Call(name);
+            // 捕获 callback 引用，存入 entry 以便 Dispose
+            var captured = callback;
+            EventCallback<ClickEvent> cb = _ => captured.Call(name);
             el.RegisterCallback(cb);
-            _listeners.Add(new ListenerEntry { element = el, callback = cb });
+            _listeners.Add(new ListenerEntry { element = el, callback = cb, luaCallback = captured });
         }
 
         // ── 元素查找 ─────────────────────────────────────────────────────
@@ -191,6 +194,8 @@ namespace CutRope.Framework
             {
                 if (entry.element != null)
                     entry.element.UnregisterCallback(entry.callback);
+                // RegisterClick 模式下释放 LuaFunction
+                entry.luaCallback?.Dispose();
             }
             _listeners.Clear();
 
