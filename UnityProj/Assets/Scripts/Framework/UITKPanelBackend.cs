@@ -86,15 +86,20 @@ namespace CutRope.Framework
 
         /// <summary>
         /// 从 VisualTreeAsset 创建 UITKPanelBackend。
-        /// panelSettings 可为 null，此时使用项目默认 PanelSettings。
-        /// parentTransform 为 UIRoot Transform，宿主 GO 挂在其下。
+        /// panelSettings 优先级：外部传入 > GameLauncher.Instance 自动选择 > null（Unity 默认）。
+        /// sortingOrder >= 90000 自动选择 uitkOverlaySettings，其余选 uitkGameSettings。
         /// </summary>
         public static UITKPanelBackend Create(
             VisualTreeAsset vta,
             PanelSettings   panelSettings,
             Transform       parentTransform,
-            string          panelName)
+            string          panelName,
+            int             sortingOrder = 0)
         {
+            // 自动选择 PanelSettings
+            if (panelSettings == null && GameLauncher.Instance != null)
+                panelSettings = GameLauncher.Instance.GetPanelSettingsForOrder(sortingOrder);
+
             // 1. 创建宿主 GO
             var hostGO = new GameObject($"UITK_{panelName}");
             hostGO.layer = LayerMask.NameToLayer("UI");

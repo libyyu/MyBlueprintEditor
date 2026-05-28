@@ -12,6 +12,7 @@
 using BlueprintRuntime;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace CutRope.Framework
 {
@@ -31,19 +32,46 @@ namespace CutRope.Framework
         [Tooltip("游戏阶段 Lua 入口（require 路径，无 .lua 后缀）")]
         public string gameLuaEntry   = "GameLogic";
 
+        // ── UI Toolkit PanelSettings ─────────────────────────────────
+        [Header("UI Toolkit PanelSettings")]
+        [Tooltip("游戏内常规面板（HUD / 主菜单 / 关卡选择等），sortingOrder 10~50000")]
+        public PanelSettings uitkGameSettings;
+
+        [Tooltip("全局遮罩 / 系统弹窗（加载、错误提示等），sortingOrder 90000+")]
+        public PanelSettings uitkOverlaySettings;
+
+        /// <summary>
+        /// 静态单例，供 Lua 和 UITKPanelBackend 通过
+        /// CS.CutRope.Framework.GameLauncher.Instance 访问 PanelSettings。
+        /// </summary>
+        public static GameLauncher Instance { get; private set; }
+
+        /// <summary>
+        /// 根据 sortingOrder 自动返回对应的 PanelSettings。
+        /// sortingOrder >= 90000 → uitkOverlaySettings；其他 → uitkGameSettings。
+        /// 任一为 null 时降级使用另一个（均为 null 则返回 null 让 Unity 用全局默认）。
+        /// </summary>
+        public PanelSettings GetPanelSettingsForOrder(int sortingOrder)
+        {
+            var target = sortingOrder >= 90000 ? uitkOverlaySettings : uitkGameSettings;
+            return target != null ? target
+                 : (uitkGameSettings ?? uitkOverlaySettings);
+        }
+
         // ── 私有引用 ─────────────────────────────────────────────────
         private YooAssetInitializer _yooInit;
         private LuaManager          _lua;
 
         private void Awake()
         {
+            Instance = this;
             _yooInit = GetComponent<YooAssetInitializer>();
             _lua     = GetComponent<LuaManager>();
         }
 
         private void OnDestroy()
         {
-            
+            if (Instance == this) Instance = null;
         }
 
         private async void Start()

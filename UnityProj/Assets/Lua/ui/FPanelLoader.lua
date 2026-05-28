@@ -238,11 +238,14 @@ do
 			if uitk then
 				-- UI Toolkit 分支：obj 是 VisualTreeAsset
 				local UITKBackend = CS.CutRope.Framework.UITKPanelBackend
+				-- 把深度层传入，让 Create() 自动选择 Game/Overlay PanelSettings
+				local sortOrder = self:GetDepthLayer and self:GetDepthLayer() or 0
 				local backend = UITKBackend.Create(
 					obj,
-					nil,  -- panelSettings: 用项目默认
+					nil,		-- panelSettings: 由 GameLauncher.Instance 根据 sortOrder 自动选择
 					parentObj.transform,
-					prefabName
+					prefabName,
+					sortOrder
 				)
 				onResourceLoaded(backend)
 			elseif not isfgui then
