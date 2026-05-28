@@ -108,6 +108,13 @@ function FPanelBaseUI:IsVisible()
 	if not IsValidObject(self.m_panel) then
 		return false
 	end
+	-- UITK：委托给 backend，以 rootVisualElement.display 为准
+	if self.m_isuitk then
+		if self.m_backend and self.m_backend.IsValid then
+			return self.m_backend:GetVisible()
+		end
+		return false
+	end
 	if self.m_isfgui then
 		if self.m_panel.displayObject then
 			return not not self.m_panel.displayObject.visible
@@ -594,7 +601,12 @@ function FPanelBaseUI:_SetVisibleInner(shouldVisible)
 	end
 
 	if self.m_panel then
-		if self.m_isfgui then
+		if self.m_isuitk then
+			-- UITK：通过 backend 控制，同步 rootVisualElement.display + GO active
+			if self.m_backend and self.m_backend.IsValid then
+				self.m_backend:SetVisible(shouldVisible)
+			end
+		elseif self.m_isfgui then
 			if self.m_panel.displayObject then
 				self.m_panel.displayObject.visible = shouldVisible
 			elseif self.m_panel.gameObject then

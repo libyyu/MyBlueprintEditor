@@ -322,7 +322,13 @@ do
 			if self.m_HideOnDestroy then
 				self:_SetPanelHide(self.m_panel)
 			else
-				if self.m_isfgui then
+				if self.m_isuitk then
+					-- UITK：通过 backend 销毁（清理 UIDocument + 宿主 GO）
+					if self.m_backend then
+						self.m_backend:Destroy()
+						self.m_backend = nil
+					end
+				elseif self.m_isfgui then
 					if self.m_isfguiWindow then
 						FairyGUI.GRoot.inst:RemoveChild(self.m_panel)
 					end
