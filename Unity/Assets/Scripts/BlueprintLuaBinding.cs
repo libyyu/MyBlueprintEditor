@@ -265,7 +265,7 @@ namespace BlueprintRuntime
 
             try
             {
-                _runner.RegisterNodeDef(def);
+                BPRunner.RegisterNodeDef(def);
             }
             catch (Exception ex)
             {
@@ -321,7 +321,7 @@ namespace BlueprintRuntime
         // Blueprint.HasNodeDef(id)
         // ---------------------------------------------------------------------
 
-        private bool LuaHasNodeDef(string id) => _runner.HasNodeDef(id);
+        private bool LuaHasNodeDef(string id) => BPRunner.HasNodeDef(id);
 
         // ---------------------------------------------------------------------
         // Blueprint.RegisterHandler(id, fn)
@@ -337,7 +337,7 @@ namespace BlueprintRuntime
             // luaFunc 由适配器包装为标准 Func<LuaExecutionContext, bool>
             if (luaFunc is Func<LuaExecutionContext, bool> managed)
             {
-                _runner.RegisterHandler(id, ctx =>
+                BPRunner.RegisterHandler(id, ctx =>
                 {
                     try   { return managed(new LuaExecutionContext(ctx)); }
                     catch (Exception ex)
@@ -352,7 +352,7 @@ namespace BlueprintRuntime
             // 兼容：适配器传入的是 ILuaHandler（更灵活）
             if (luaFunc is ILuaHandler handler)
             {
-                _runner.RegisterHandler(id, ctx =>
+                BPRunner.RegisterHandler(id, ctx =>
                 {
                     try   { return handler.Call(new LuaExecutionContext(ctx)); }
                     catch (Exception ex)
@@ -369,9 +369,9 @@ namespace BlueprintRuntime
                            "Wrap it in your ILuaEnv adapter.");
         }
 
-        private bool LuaHasHandler(string id) => _runner.HasNodeDef(id);
+        private bool LuaHasHandler(string id) => BPRunner.HasNodeDef(id);
 
-        private void LuaUnregisterHandler(string id) => _runner.UnregisterHandler(id);
+        private void LuaUnregisterHandler(string id) => BPRunner.UnregisterHandler(id);
 
         // ---------------------------------------------------------------------
         // Helpers
@@ -511,8 +511,9 @@ namespace BlueprintRuntime
         /// <summary>
         /// 注册 Blueprint.* 到 xLua 环境，并自动处理 LuaFunction → ILuaHandler 的包装。
         /// 替代 BlueprintLuaAPI.Register(env)。
+        /// runner 参数保留是为兼容旧签名；handler 注册现在为进程全局，runner 不参与。
         /// </summary>
-        public static void RegisterForXLua(this BlueprintLuaAPI api, LuaEnv luaEnv, BPRunner runner)
+        public static void RegisterForXLua(this BlueprintLuaAPI api, LuaEnv luaEnv, BPRunner runner = null)
         {
             var adapter = new XLuaEnvAdapter(luaEnv);
             api.Register(adapter);
@@ -524,7 +525,7 @@ namespace BlueprintRuntime
             blueprint.Set<string, Action<string, LuaFunction>>("RegisterHandler",
                 (id, fn) =>
                 {
-                    runner.RegisterHandler(id, ctx =>
+                    BPRunner.RegisterHandler(id, ctx =>
                     {
                         try
                         {
@@ -622,7 +623,7 @@ namespace BlueprintRuntime
 
     public static class ToluaBlueprintExtensions
     {
-        public static void RegisterForTolua(this BlueprintLuaAPI api, LuaState luaState, BPRunner runner)
+        public static void RegisterForTolua(this BlueprintLuaAPI api, LuaState luaState, BPRunner runner = null)
         {
             var adapter = new ToluaEnvAdapter(luaState);
             api.Register(adapter);
@@ -633,7 +634,7 @@ namespace BlueprintRuntime
 
             blueprint["RegisterHandler"] = new Action<string, LuaFunction>((id, fn) =>
             {
-                runner.RegisterHandler(id, ctx =>
+                BPRunner.RegisterHandler(id, ctx =>
                 {
                     try
                     {

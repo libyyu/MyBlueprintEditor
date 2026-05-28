@@ -224,6 +224,8 @@ bool BlueprintRunner::LoadFromFileWithDeps(const std::string& filePath)
 
 // ============================================================================
 // 处理器注册（全部转发到全局 HandlerRegistry，多 Runner 共享）
+// 注：这些方法为 static —— runner 实例不参与，仅作为 BlueprintRunner 名称下的
+//     工具函数。详见 BlueprintRunner.h 中的注释。
 // ============================================================================
 
 void BlueprintRunner::RegisterHandler(const std::string& definitionId, NodeHandler handler)
@@ -245,7 +247,7 @@ void BlueprintRunner::UnregisterHandler(const std::string& definitionId)
     HandlerRegistry::Instance().Unregister(definitionId);
 }
 
-bool BlueprintRunner::HasHandler(const std::string& definitionId) const
+bool BlueprintRunner::HasHandler(const std::string& definitionId)
 {
     return HandlerRegistry::Instance().Has(definitionId);
 }
@@ -269,12 +271,12 @@ void BlueprintRunner::UnregisterNodeDef(const std::string& id)
     NodeDefRegistry::Instance().Unregister(id);
 }
 
-bool BlueprintRunner::HasNodeDef(const std::string& id) const
+bool BlueprintRunner::HasNodeDef(const std::string& id)
 {
     return NodeDefRegistry::Instance().Has(id);
 }
 
-const NodeDefinition* BlueprintRunner::GetNodeDef(const std::string& id) const
+const NodeDefinition* BlueprintRunner::GetNodeDef(const std::string& id)
 {
     return NodeDefRegistry::Instance().Find(id);
 }

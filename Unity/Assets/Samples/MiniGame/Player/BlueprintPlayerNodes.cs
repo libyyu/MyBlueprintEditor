@@ -14,7 +14,7 @@ namespace BlueprintRuntime.Samples.MiniGame
         public static void RegisterAll(BPRunner runner)
         {
             // ── Player.AddGold ──────────────────────────────────────
-            runner.RegisterHandler("Player.AddGold", (ctx) =>
+            BPRunner.RegisterHandler("Player.AddGold", (ctx) =>
             {
                 if (PlayerStats.Instance == null) { ctx.LogError("PlayerStats not found"); return false; }
                 int amount = (int)ctx.GetInputInt("Amount");
@@ -29,7 +29,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             });
 
             // ── Player.AddExp ───────────────────────────────────────
-            runner.RegisterHandler("Player.AddExp", (ctx) =>
+            BPRunner.RegisterHandler("Player.AddExp", (ctx) =>
             {
                 if (PlayerStats.Instance == null) { ctx.LogError("PlayerStats not found"); return false; }
                 int amount = (int)ctx.GetInputInt("Amount");
@@ -55,7 +55,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             });
 
             // ── Player.GetStats ─────────────────────────────────────
-            runner.RegisterHandler("Player.GetStats", (ctx) =>
+            BPRunner.RegisterHandler("Player.GetStats", (ctx) =>
             {
                 if (PlayerStats.Instance == null)
                 {
@@ -73,7 +73,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             });
 
             // ── Player.SetName ──────────────────────────────────────
-            runner.RegisterHandler("Player.SetName", (ctx) =>
+            BPRunner.RegisterHandler("Player.SetName", (ctx) =>
             {
                 if (PlayerStats.Instance == null) { ctx.LogError("PlayerStats not found"); return false; }
                 string name = ctx.GetInputString("Name");

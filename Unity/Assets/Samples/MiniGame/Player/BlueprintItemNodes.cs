@@ -15,7 +15,7 @@ namespace BlueprintRuntime.Samples.MiniGame
         public static void RegisterAll(BPRunner runner)
         {
             // ── Item.Give ───────────────────────────────────────────
-            runner.RegisterHandler("Item.Give", (ctx) =>
+            BPRunner.RegisterHandler("Item.Give", (ctx) =>
             {
                 if (Inventory.Instance == null) { ctx.LogError("Inventory not found"); return false; }
                 string id = ctx.GetInputString("ItemId");
@@ -33,7 +33,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             });
 
             // ── Item.Remove ─────────────────────────────────────────
-            runner.RegisterHandler("Item.Remove", (ctx) =>
+            BPRunner.RegisterHandler("Item.Remove", (ctx) =>
             {
                 if (Inventory.Instance == null) { ctx.LogError("Inventory not found"); return false; }
                 string id = ctx.GetInputString("ItemId");
@@ -47,7 +47,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             });
 
             // ── Item.Check ──────────────────────────────────────────
-            runner.RegisterHandler("Item.Check", (ctx) =>
+            BPRunner.RegisterHandler("Item.Check", (ctx) =>
             {
                 if (Inventory.Instance == null)
                 {
@@ -66,7 +66,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             });
 
             // ── Item.Use ────────────────────────────────────────────
-            runner.RegisterHandler("Item.Use", (ctx) =>
+            BPRunner.RegisterHandler("Item.Use", (ctx) =>
             {
                 if (Inventory.Instance == null) { ctx.LogError("Inventory not found"); return false; }
                 string id = ctx.GetInputString("ItemId");

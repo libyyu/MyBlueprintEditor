@@ -48,7 +48,7 @@ namespace BlueprintRuntime.Samples.MiniGame.WeChat
             if (runner == null) return;
 
             // ── WeChat.Share ────────────────────────────────────────
-            runner.RegisterNodeDef(new BPNodeDef {
+            BPRunner.RegisterNodeDef(new BPNodeDef {
                 id       = "WeChat.Share",
                 name     = "WeChat Share",
                 category = "MiniGame/WeChat",
@@ -62,7 +62,7 @@ namespace BlueprintRuntime.Samples.MiniGame.WeChat
                     new BPPinDef { name = "",         dataType = BPPinType.Unknown, isInput = false, isExec = true },
                 },
             });
-            runner.RegisterHandler("WeChat.Share", ctx => {
+            BPRunner.RegisterHandler("WeChat.Share", ctx => {
                 WeChatSDK.Share(
                     ReadString(ctx, "Title"),
                     ReadString(ctx, "ImageUrl"),
@@ -72,7 +72,7 @@ namespace BlueprintRuntime.Samples.MiniGame.WeChat
             });
 
             // ── WeChat.Toast ────────────────────────────────────────
-            runner.RegisterNodeDef(new BPNodeDef {
+            BPRunner.RegisterNodeDef(new BPNodeDef {
                 id       = "WeChat.Toast",
                 name     = "WeChat Toast",
                 category = "MiniGame/WeChat",
@@ -86,7 +86,7 @@ namespace BlueprintRuntime.Samples.MiniGame.WeChat
                     new BPPinDef { name = "",         dataType = BPPinType.Unknown, isInput = false, isExec = true },
                 },
             });
-            runner.RegisterHandler("WeChat.Toast", ctx => {
+            BPRunner.RegisterHandler("WeChat.Toast", ctx => {
                 string icon = ReadString(ctx, "Icon");
                 WeChatSDK.ToastIcon ti = icon switch {
                     "success" => WeChatSDK.ToastIcon.Success,
@@ -103,7 +103,7 @@ namespace BlueprintRuntime.Samples.MiniGame.WeChat
 
             // ── WeChat.IsInWeChat ───────────────────────────────────
             // 纯数据节点（无 exec）
-            runner.RegisterNodeDef(new BPNodeDef {
+            BPRunner.RegisterNodeDef(new BPNodeDef {
                 id       = "WeChat.IsInWeChat",
                 name     = "Is In WeChat",
                 category = "MiniGame/WeChat",
@@ -113,7 +113,7 @@ namespace BlueprintRuntime.Samples.MiniGame.WeChat
                     new BPPinDef { name = "Value", dataType = BPPinType.Boolean, isInput = false },
                 },
             });
-            runner.RegisterHandler("WeChat.IsInWeChat", ctx => {
+            BPRunner.RegisterHandler("WeChat.IsInWeChat", ctx => {
                 ctx.SetOutputBool("Value", WeChatSDK.IsInWeChat);
                 return true;
             });

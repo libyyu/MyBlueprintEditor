@@ -304,12 +304,23 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_NotifyLuaStateClosing(lua_Stat
 #endif
 
 // ---------------------------------------------------------------------------
-// Script node definition registration  (Lua / C# shared)
+// Script node definition registration  (Lua / C# shared) — **PROCESS-GLOBAL**
 // ---------------------------------------------------------------------------
 //
 // Allows Lua scripts and C# code to dynamically register node definitions
 // and execution handlers at runtime, equivalent to what Lua scripts can do
 // via Blueprint.RegisterNodeDef() / Blueprint.RegisterHandler().
+//
+// IMPORTANT — registration is **process-wide**, not per-runner:
+//   * Both NodeDefRegistry and HandlerRegistry are singletons; calling these
+//     functions affects every BlueprintRunner in the process, present and future.
+//   * Node defs / handlers persist until explicitly unregistered (or the
+//     process exits). They survive BP_DestroyRunner().
+//   * Therefore these APIs do NOT take a BP_Runner argument — there is no
+//     per-runner registration table to choose.
+//   * The C# handler must keep its delegate / GCHandle alive for as long as
+//     the handler is registered; do NOT free GCHandles in BPRunner.Dispose
+//     unless you also call BP_UnregisterHandler() first.
 //
 // C# usage example:
 //
@@ -319,10 +330,10 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_NotifyLuaStateClosing(lua_Stat
 //       new BP_PinDef { name="B",      dataType=2 /*Float*/, isInput=1 },
 //       new BP_PinDef { name="Result", dataType=2 /*Float*/, isInput=0 },
 //   };
-//   BP_RegisterNodeDef(runner, "MyAdd", "My Add", "Custom/Math", null, pins, 3);
+//   BP_RegisterNodeDef("MyAdd", "My Add", "Custom/Math", null, pins, 3);
 //
 //   // 2. Register handler
-//   BP_RegisterHandler(runner, "MyAdd", (ctx, ud) => {
+//   BP_RegisterHandler("MyAdd", (ctx, ud) => {
 //       float a = BP_GetInputFloat(ctx, "A");
 //       float b = BP_GetInputFloat(ctx, "B");
 //       BP_SetOutputFloat(ctx, "Result", a + b);
@@ -370,9 +381,9 @@ typedef int (BLUEPRINT_CAPI_CALL *BP_HandlerFn)(BP_Context ctx, void* userdata);
 /// Register a node definition dynamically (equivalent to Blueprint.RegisterNodeDef in Lua).
 /// id/name/category/color may be NULL (name defaults to id, others default to empty).
 /// pins is an array of pinCount BP_PinDef entries; may be NULL if pinCount==0.
+/// Registration is **process-wide** (no runner needed).
 /// Returns 0 on success, non-zero on failure.
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_RegisterNodeDef(
-    BP_Runner       runner,
     const char*     id,
     const char*     name,
     const char*     category,
@@ -381,27 +392,24 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_RegisterNodeDef(
     int             pinCount
 );
 
-/// Unregister a previously registered node definition.
-BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_UnregisterNodeDef(
-    BP_Runner runner, const char* id);
+/// Unregister a previously registered node definition. Process-wide.
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_UnregisterNodeDef(const char* id);
 
-/// Returns 1 if a node def with the given id has been registered, 0 otherwise.
-BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_HasNodeDef(
-    BP_Runner runner, const char* id);
+/// Returns 1 if a node def with the given id has been registered, 0 otherwise. Process-wide.
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_HasNodeDef(const char* id);
 
 /// Register a C handler for a node definition (equivalent to Blueprint.RegisterHandler in Lua).
-/// fn is called each time a node of this type executes.
+/// fn is called each time a node of this type executes (in any runner).
 /// userdata is an arbitrary pointer forwarded to fn (e.g. a GCHandle.ToIntPtr() in C#).
+/// Registration is **process-wide** — see header comments for lifetime guidance.
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_RegisterHandler(
-    BP_Runner    runner,
     const char*  definitionId,
     BP_HandlerFn fn,
     void*        userdata
 );
 
-/// Unregister a handler registered with BP_RegisterHandler.
-BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_UnregisterHandler(
-    BP_Runner runner, const char* definitionId);
+/// Unregister a handler registered with BP_RegisterHandler. Process-wide.
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_UnregisterHandler(const char* definitionId);
 
 // ---------------------------------------------------------------------------
 // ExecutionContext accessors  (valid only inside BP_HandlerFn)

@@ -524,7 +524,6 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_GetLastError(BP_Runner runner, 
 // ---------------------------------------------------------------------------
 
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_RegisterNodeDef(
-    BP_Runner   runner,
     const char* id,
     const char* name,
     const char* category,
@@ -532,8 +531,7 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_RegisterNodeDef(
     BP_PinDef*  pins,
     int         pinCount)
 {
-    if (!runner || !id || id[0] == '\0') return 1;
-    auto* w = asWrapper(runner);
+    if (!id || id[0] == '\0') return 1;
 
     NodeDefinition def;
     def.id       = id;
@@ -567,43 +565,40 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_RegisterNodeDef(
             def.outputPins.push_back(std::move(pin));
     }
 
-    w->runner.RegisterNodeDef(def);
+    BlueprintRunner::RegisterNodeDef(def);
     return 0;
 }
 
-BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_UnregisterNodeDef(BP_Runner runner, const char* id)
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_UnregisterNodeDef(const char* id)
 {
-    if (!runner || !id) return;
-    asWrapper(runner)->runner.UnregisterNodeDef(id);
+    if (!id) return;
+    BlueprintRunner::UnregisterNodeDef(id);
 }
 
-BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_HasNodeDef(BP_Runner runner, const char* id)
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_HasNodeDef(const char* id)
 {
-    if (!runner || !id) return 0;
-    return asWrapper(runner)->runner.HasNodeDef(id) ? 1 : 0;
+    if (!id) return 0;
+    return BlueprintRunner::HasNodeDef(id) ? 1 : 0;
 }
 
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_RegisterHandler(
-    BP_Runner    runner,
     const char*  definitionId,
     BP_HandlerFn fn,
     void*        userdata)
 {
-    if (!runner || !definitionId || !fn) return;
-    auto* w = asWrapper(runner);
+    if (!definitionId || !fn) return;
 
     // 捕获 fn + userdata，包装成 C++ NodeHandler
-    w->runner.RegisterHandler(definitionId,
+    BlueprintRunner::RegisterHandler(definitionId,
         [fn, userdata](ExecutionContext& ctx) -> bool {
             return fn(static_cast<BP_Context>(&ctx), userdata) != 0;
         });
 }
 
-BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_UnregisterHandler(
-    BP_Runner runner, const char* definitionId)
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_UnregisterHandler(const char* definitionId)
 {
-    if (!runner || !definitionId) return;
-    asWrapper(runner)->runner.UnregisterHandler(definitionId);
+    if (!definitionId) return;
+    BlueprintRunner::UnregisterHandler(definitionId);
 }
 
 // ---------------------------------------------------------------------------

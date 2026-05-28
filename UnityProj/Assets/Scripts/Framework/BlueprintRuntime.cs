@@ -19,8 +19,9 @@
 //   runner.Dispose();   // or use `using var runner = new BPRunner();`
 //
 // Script node definition + handler (equivalent to Lua Blueprint.RegisterNodeDef / RegisterHandler):
+// NOTE: registration is **process-global**; affects every BPRunner.
 //
-//   runner.RegisterNodeDef(new BPNodeDef {
+//   BPRunner.RegisterNodeDef(new BPNodeDef {
 //       id       = "MyAdd",
 //       name     = "My Add",
 //       category = "Custom/Math",
@@ -31,7 +32,7 @@
 //       }
 //   });
 //
-//   runner.RegisterHandler("MyAdd", ctx => {
+//   BPRunner.RegisterHandler("MyAdd", ctx => {
 //       float a = (float)ctx.GetInputFloat("A");
 //       float b = (float)ctx.GetInputFloat("B");
 //       ctx.SetOutputFloat("Result", a + b);
@@ -399,10 +400,9 @@ namespace BlueprintRuntime
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
         public static extern int BP_GetLastError(IntPtr runner, IntPtr buf, int bufLen);
 
-        // --- Script node def registration ---
+        // --- Script node def registration --- (process-global; no runner)
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
         public static extern int BP_RegisterNodeDef(
-            IntPtr runner,
             [MarshalAs(UnmanagedType.LPStr)] string id,
             [MarshalAs(UnmanagedType.LPStr)] string name,
             [MarshalAs(UnmanagedType.LPStr)] string category,
@@ -411,22 +411,21 @@ namespace BlueprintRuntime
             int    pinCount);
 
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
-        public static extern void BP_UnregisterNodeDef(IntPtr runner,
+        public static extern void BP_UnregisterNodeDef(
             [MarshalAs(UnmanagedType.LPStr)] string id);
 
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
-        public static extern int BP_HasNodeDef(IntPtr runner,
+        public static extern int BP_HasNodeDef(
             [MarshalAs(UnmanagedType.LPStr)] string id);
 
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
         public static extern void BP_RegisterHandler(
-            IntPtr runner,
             [MarshalAs(UnmanagedType.LPStr)] string definitionId,
             HandlerDelegate fn,
             IntPtr userdata);
 
         [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
-        public static extern void BP_UnregisterHandler(IntPtr runner,
+        public static extern void BP_UnregisterHandler(
             [MarshalAs(UnmanagedType.LPStr)] string definitionId);
 
         // --- ExecutionContext accessors ---
@@ -601,15 +600,30 @@ namespace BlueprintRuntime
         private Native.LogCallbackDelegate _logDelegate;
         private Native.LogCallbackDelegate _printDelegate;
 
-        // Handler book-keeping: keep delegate + GCHandle alive until unregistered.
-        private readonly Dictionary<string, HandlerEntry> _handlers
-            = new Dictionary<string, HandlerEntry>();
-
+        // ─────────────────────────────────────────────────────────────────────
+        // Handler book-keeping —— **PROCESS-GLOBAL**.
+        //
+        // Both NodeDefRegistry and HandlerRegistry on the native side are
+        // singletons; registration affects every runner in the process and
+        // persists until explicit BP_UnregisterHandler() (or process exit).
+        //
+        // The dictionary below tracks the GCHandle / strong delegate refs for
+        // each registered handler so the managed callback object isn't GC'd
+        // while native code still has a function pointer to it. Lifetime
+        // therefore lives at the static level — NOT per-runner. Disposing a
+        // BPRunner instance does NOT free these handles.
+        //
+        // To remove a handler, call BPRunner.UnregisterHandler(id) explicitly,
+        // or call BPRunner.ClearAllHandlers() at process shutdown.
+        // ─────────────────────────────────────────────────────────────────────
         private sealed class HandlerEntry
         {
             public Native.HandlerDelegate NativeDelegate;  // strong ref
             public GCHandle               GCHandle;        // for managed callback closure
         }
+
+        private static readonly Dictionary<string, HandlerEntry> s_handlers
+            = new Dictionary<string, HandlerEntry>();
 
         /// <summary>Fired for internal debug/diagnostic messages (only when logging enabled).</summary>
         public event Action<BPLogLevel, string> OnLog;
@@ -647,13 +661,10 @@ namespace BlueprintRuntime
                     Native.BP_DestroyRunner(_handle);
                     _handle = IntPtr.Zero;
                 }
-                // Release all handler GCHandles
-                foreach (var entry in _handlers.Values)
-                {
-                    if (entry.GCHandle.IsAllocated)
-                        entry.GCHandle.Free();
-                }
-                _handlers.Clear();
+                // NOTE: handler GCHandles live at the static (process) level —
+                // do NOT free them here. Other runners (or future runners) may
+                // still depend on them. To free, call BPRunner.UnregisterHandler
+                // for specific ids, or BPRunner.ClearAllHandlers() at shutdown.
                 _logDelegate   = null;
                 _printDelegate = null;
                 _disposed = true;
@@ -838,7 +849,7 @@ namespace BlueprintRuntime
         }
 
         // ---------------------------------------------------------------------
-        // Script node definition registration
+        // Script node definition registration —— **PROCESS-GLOBAL**
         // (equivalent to Blueprint.RegisterNodeDef in Lua)
         // ---------------------------------------------------------------------
 
@@ -846,10 +857,13 @@ namespace BlueprintRuntime
         /// Register a custom node definition so the editor can display it
         /// and the runtime can execute it (when a matching handler is also registered).
         /// Equivalent to Blueprint.RegisterNodeDef() in Lua.
+        ///
+        /// **This is a process-global registration** — it affects every BPRunner
+        /// (current and future) and persists until UnregisterNodeDef is called
+        /// or the process exits.
         /// </summary>
-        public void RegisterNodeDef(BPNodeDef def)
+        public static void RegisterNodeDef(BPNodeDef def)
         {
-            ThrowIfDisposed();
             if (def == null || string.IsNullOrEmpty(def.id))
                 throw new ArgumentException("BPNodeDef.id is required");
 
@@ -878,7 +892,6 @@ namespace BlueprintRuntime
                 pinnedBytes.Add(hPins);
 
                 int result = Native.BP_RegisterNodeDef(
-                    _handle,
                     def.id,
                     def.name,
                     def.category,
@@ -896,22 +909,22 @@ namespace BlueprintRuntime
             }
         }
 
-        /// <summary>Unregister a previously registered node definition.</summary>
-        public void UnregisterNodeDef(string id)
+        /// <summary>Unregister a previously registered node definition. Process-global.</summary>
+        public static void UnregisterNodeDef(string id)
         {
-            ThrowIfDisposed();
-            Native.BP_UnregisterNodeDef(_handle, id);
+            if (string.IsNullOrEmpty(id)) return;
+            Native.BP_UnregisterNodeDef(id);
         }
 
-        /// <summary>Returns true if a node definition with this id has been registered.</summary>
-        public bool HasNodeDef(string id)
+        /// <summary>Returns true if a node definition with this id has been registered. Process-global.</summary>
+        public static bool HasNodeDef(string id)
         {
-            ThrowIfDisposed();
-            return Native.BP_HasNodeDef(_handle, id) != 0;
+            if (string.IsNullOrEmpty(id)) return false;
+            return Native.BP_HasNodeDef(id) != 0;
         }
 
         // ---------------------------------------------------------------------
-        // Handler registration
+        // Handler registration —— **PROCESS-GLOBAL**
         // (equivalent to Blueprint.RegisterHandler in Lua)
         // ---------------------------------------------------------------------
 
@@ -919,18 +932,21 @@ namespace BlueprintRuntime
         /// Register a C# delegate as the execution handler for a node type.
         /// The delegate receives a BPContext and returns true on success.
         /// Equivalent to Blueprint.RegisterHandler() in Lua.
+        ///
+        /// **This is a process-global registration**. The handler delegate (and
+        /// any objects it captures) must remain valid until UnregisterHandler
+        /// is called. Disposing a BPRunner does NOT remove handlers.
         /// </summary>
-        public void RegisterHandler(string definitionId, Func<BPContext, bool> handler)
+        public static void RegisterHandler(string definitionId, Func<BPContext, bool> handler)
         {
-            ThrowIfDisposed();
             if (string.IsNullOrEmpty(definitionId)) throw new ArgumentNullException(nameof(definitionId));
             if (handler == null) throw new ArgumentNullException(nameof(handler));
 
             // If a handler already exists under this id, release its GCHandle first.
-            if (_handlers.TryGetValue(definitionId, out var old))
+            if (s_handlers.TryGetValue(definitionId, out var old))
             {
                 if (old.GCHandle.IsAllocated) old.GCHandle.Free();
-                _handlers.Remove(definitionId);
+                s_handlers.Remove(definitionId);
             }
 
             // Box the managed delegate so the GCHandle keeps it alive.
@@ -951,21 +967,33 @@ namespace BlueprintRuntime
                 }
             };
 
-            _handlers[definitionId] = entry;
+            s_handlers[definitionId] = entry;
 
-            Native.BP_RegisterHandler(_handle, definitionId, entry.NativeDelegate, IntPtr.Zero);
+            Native.BP_RegisterHandler(definitionId, entry.NativeDelegate, IntPtr.Zero);
         }
 
-        /// <summary>Unregister a handler registered with RegisterHandler.</summary>
-        public void UnregisterHandler(string definitionId)
+        /// <summary>Unregister a handler registered with RegisterHandler. Process-global.</summary>
+        public static void UnregisterHandler(string definitionId)
         {
-            ThrowIfDisposed();
-            Native.BP_UnregisterHandler(_handle, definitionId);
-            if (_handlers.TryGetValue(definitionId, out var entry))
+            if (string.IsNullOrEmpty(definitionId)) return;
+            Native.BP_UnregisterHandler(definitionId);
+            if (s_handlers.TryGetValue(definitionId, out var entry))
             {
                 if (entry.GCHandle.IsAllocated) entry.GCHandle.Free();
-                _handlers.Remove(definitionId);
+                s_handlers.Remove(definitionId);
             }
+        }
+
+        /// <summary>Unregister and free GCHandles for ALL C#-registered handlers.
+        /// Call once at application shutdown if you want clean handle release.</summary>
+        public static void ClearAllHandlers()
+        {
+            foreach (var kv in s_handlers)
+            {
+                Native.BP_UnregisterHandler(kv.Key);
+                if (kv.Value.GCHandle.IsAllocated) kv.Value.GCHandle.Free();
+            }
+            s_handlers.Clear();
         }
 
         // ---------------------------------------------------------------------

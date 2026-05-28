@@ -15,7 +15,7 @@ namespace BlueprintRuntime.Samples.MiniGame
         public static void RegisterAll(BPRunner runner)
         {
             // ── Memory.AddAffinity ──────────────────────────────────
-            runner.RegisterHandler("Memory.AddAffinity", (ctx) =>
+            BPRunner.RegisterHandler("Memory.AddAffinity", (ctx) =>
             {
                 string npcId = ctx.GetInputString("NpcId");
                 int delta = (int)ctx.GetInputInt("Delta");
@@ -40,7 +40,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             });
 
             // ── Memory.RememberFact ─────────────────────────────────
-            runner.RegisterHandler("Memory.RememberFact", (ctx) =>
+            BPRunner.RegisterHandler("Memory.RememberFact", (ctx) =>
             {
                 string npcId = ctx.GetInputString("NpcId");
                 string fact = ctx.GetInputString("Fact");
@@ -58,7 +58,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             });
 
             // ── Memory.GetAffinity ──────────────────────────────────
-            runner.RegisterHandler("Memory.GetAffinity", (ctx) =>
+            BPRunner.RegisterHandler("Memory.GetAffinity", (ctx) =>
             {
                 string npcId = ctx.GetInputString("NpcId");
                 var mem = FindMemory(npcId);
@@ -70,7 +70,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             });
 
             // ── Memory.ClearHistory ─────────────────────────────────
-            runner.RegisterHandler("Memory.ClearHistory", (ctx) =>
+            BPRunner.RegisterHandler("Memory.ClearHistory", (ctx) =>
             {
                 string npcId = ctx.GetInputString("NpcId");
                 var mem = FindMemory(npcId);

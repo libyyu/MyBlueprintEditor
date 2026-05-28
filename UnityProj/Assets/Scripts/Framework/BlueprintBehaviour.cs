@@ -85,10 +85,15 @@ namespace CutRope.Framework
         /// Override this to register custom node definitions and handlers before
         /// the blueprint is loaded. Called at the end of Awake().
         ///
+        /// NOTE: BPRunner.RegisterNodeDef / RegisterHandler are static and register
+        /// process-globally; the `runner` parameter is unused by these calls
+        /// (kept only to avoid breaking the override signature). You only need
+        /// to register each id once per process.
+        ///
         /// Example:
         ///   protected override void RegisterNodes(BPRunner runner)
         ///   {
-        ///       runner.RegisterNodeDef(new BPNodeDef {
+        ///       BPRunner.RegisterNodeDef(new BPNodeDef {
         ///           id = "MyAdd", name = "My Add", category = "Custom",
         ///           pins = new[] {
         ///               new BPPinDef { name="A", dataType=BPPinType.Float, isInput=true  },
@@ -96,7 +101,7 @@ namespace CutRope.Framework
         ///               new BPPinDef { name="R", dataType=BPPinType.Float, isInput=false },
         ///           }
         ///       });
-        ///       runner.RegisterHandler("MyAdd", ctx => {
+        ///       BPRunner.RegisterHandler("MyAdd", ctx => {
         ///           ctx.SetOutputFloat("R", (float)ctx.GetInputFloat("A") + (float)ctx.GetInputFloat("B"));
         ///           return true;
         ///       });

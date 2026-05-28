@@ -22,7 +22,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
         public static void RegisterAll(BPRunner runner)
         {
             // ── Quest.Give ──────────────────────────────────────────
-            runner.RegisterHandler("Quest.Give", (ctx) =>
+            BPRunner.RegisterHandler("Quest.Give", (ctx) =>
             {
                 if (QuestSystem.Instance == null)
                 {
@@ -58,7 +58,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
             });
 
             // ── Quest.Complete ──────────────────────────────────────
-            runner.RegisterHandler("Quest.Complete", (ctx) =>
+            BPRunner.RegisterHandler("Quest.Complete", (ctx) =>
             {
                 if (QuestSystem.Instance == null)
                 {
@@ -88,7 +88,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
             });
 
             // ── Quest.Progress ──────────────────────────────────────
-            runner.RegisterHandler("Quest.Progress", (ctx) =>
+            BPRunner.RegisterHandler("Quest.Progress", (ctx) =>
             {
                 if (QuestSystem.Instance == null) return false;
 
@@ -103,7 +103,7 @@ namespace BlueprintRuntime.Samples.MiniGame.Quest
             });
 
             // ── Quest.Check ─────────────────────────────────────────
-            runner.RegisterHandler("Quest.Check", (ctx) =>
+            BPRunner.RegisterHandler("Quest.Check", (ctx) =>
             {
                 if (QuestSystem.Instance == null)
                 {

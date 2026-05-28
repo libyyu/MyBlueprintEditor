@@ -15,7 +15,7 @@ namespace BlueprintRuntime.Samples.MiniGame
         public static void RegisterAll(BPRunner runner)
         {
             // ── Shop.Buy ────────────────────────────────────────────
-            runner.RegisterHandler("Shop.Buy", (ctx) =>
+            BPRunner.RegisterHandler("Shop.Buy", (ctx) =>
             {
                 string npcId = ctx.GetInputString("NpcId");
                 string itemId = ctx.GetInputString("ItemId");
@@ -64,7 +64,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             });
 
             // ── Shop.Sell ───────────────────────────────────────────
-            runner.RegisterHandler("Shop.Sell", (ctx) =>
+            BPRunner.RegisterHandler("Shop.Sell", (ctx) =>
             {
                 string npcId = ctx.GetInputString("NpcId");
                 string itemId = ctx.GetInputString("ItemId");
@@ -104,7 +104,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             });
 
             // ── Shop.GetPrice ───────────────────────────────────────
-            runner.RegisterHandler("Shop.GetPrice", (ctx) =>
+            BPRunner.RegisterHandler("Shop.GetPrice", (ctx) =>
             {
                 string npcId = ctx.GetInputString("NpcId");
                 string itemId = ctx.GetInputString("ItemId");
@@ -127,7 +127,7 @@ namespace BlueprintRuntime.Samples.MiniGame
             });
 
             // ── Shop.ListItems ──────────────────────────────────────
-            runner.RegisterHandler("Shop.ListItems", (ctx) =>
+            BPRunner.RegisterHandler("Shop.ListItems", (ctx) =>
             {
                 string npcId = ctx.GetInputString("NpcId");
                 var shop = FindShop(npcId);

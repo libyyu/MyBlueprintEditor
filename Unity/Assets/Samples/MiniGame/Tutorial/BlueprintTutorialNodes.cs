@@ -13,7 +13,7 @@ namespace BlueprintRuntime.Samples.MiniGame
     {
         public static void RegisterAll(BPRunner runner)
         {
-            runner.RegisterHandler("Tutorial.Start", (ctx) =>
+            BPRunner.RegisterHandler("Tutorial.Start", (ctx) =>
             {
                 if (TutorialSystem.Instance == null) { ctx.LogError("TutorialSystem not found"); return false; }
                 TutorialSystem.Instance.StartTutorial();
@@ -21,7 +21,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 return true;
             });
 
-            runner.RegisterHandler("Tutorial.ShowStep", (ctx) =>
+            BPRunner.RegisterHandler("Tutorial.ShowStep", (ctx) =>
             {
                 if (TutorialSystem.Instance == null) return false;
                 string id = ctx.GetInputString("StepId");
@@ -30,7 +30,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 return true;
             });
 
-            runner.RegisterHandler("Tutorial.Complete", (ctx) =>
+            BPRunner.RegisterHandler("Tutorial.Complete", (ctx) =>
             {
                 if (TutorialSystem.Instance == null) return false;
                 string id = ctx.GetInputString("StepId");
@@ -39,7 +39,7 @@ namespace BlueprintRuntime.Samples.MiniGame
                 return true;
             });
 
-            runner.RegisterHandler("Tutorial.Check", (ctx) =>
+            BPRunner.RegisterHandler("Tutorial.Check", (ctx) =>
             {
                 if (TutorialSystem.Instance == null)
                 {

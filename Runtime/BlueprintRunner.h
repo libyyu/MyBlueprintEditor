@@ -432,39 +432,57 @@ public:
     bool IsLoaded() const { return m_loaded; }
 
     // ------------------------------------------------------------------
-    // 脚本动态节点定义注册（Lua / C# 共用）
+    // 脚本动态节点定义注册 —— **进程级全局**（Lua / C# / C++ 共用）
+    // ------------------------------------------------------------------
+    //
+    // 这些注册写入进程级单例 NodeDefRegistry，对所有 BlueprintRunner 共享，
+    // 生命周期持续到进程结束。因此设计为 static —— 不绑定任何特定 Runner。
+    //
+    // 重复注册同一 id 会覆盖旧定义。
     // ------------------------------------------------------------------
 
-    // 注册一个节点定义（同时对 Lua 和 C# 脚本开放）
-    // 重复注册同一 id 会覆盖旧定义
-    void RegisterNodeDef(const NodeDefinition& def);
+    // 注册一个节点定义（全局可见）
+    static void RegisterNodeDef(const NodeDefinition& def);
 
     // 注销一个节点定义
-    void UnregisterNodeDef(const std::string& id);
+    static void UnregisterNodeDef(const std::string& id);
 
     // 检查节点定义是否已注册
-    bool HasNodeDef(const std::string& id) const;
+    static bool HasNodeDef(const std::string& id);
 
     // 获取节点定义（未注册返回 nullptr）
-    const NodeDefinition* GetNodeDef(const std::string& id) const;
+    static const NodeDefinition* GetNodeDef(const std::string& id);
 
     // ------------------------------------------------------------------
-    // 注册节点处理器（转发到全局 HandlerRegistry，所有 Runner 共享）
+    // 注册节点处理器 —— **进程级全局**（HandlerRegistry 单例）
+    // ------------------------------------------------------------------
+    //
+    // 同上：所有 Runner 共享一份 handler 表，因此设计为 static。
+    // 注意：handler 的捕获对象（如 lambda 闭包）必须在进程退出前一直有效，
+    //       不要捕获某个 Runner 的成员或临时上下文对象。
     // ------------------------------------------------------------------
 
     // 注册单个节点类型的处理器
-    void RegisterHandler(const std::string& definitionId, NodeHandler handler);
+    static void RegisterHandler(const std::string& definitionId, NodeHandler handler);
 
     // 批量注册处理器
-    void RegisterHandlers(const std::unordered_map<std::string, NodeHandler>& handlers);
+    static void RegisterHandlers(const std::unordered_map<std::string, NodeHandler>& handlers);
 
     // 注销处理器
-    void UnregisterHandler(const std::string& definitionId);
+    static void UnregisterHandler(const std::string& definitionId);
 
     // 检查处理器是否已注册
-    bool HasHandler(const std::string& definitionId) const;
+    static bool HasHandler(const std::string& definitionId);
 
-    // 设置默认处理器（用于没有注册处理器的节点）
+    // ------------------------------------------------------------------
+    // 默认处理器 —— **per-Runner 状态**（不是全局）
+    // ------------------------------------------------------------------
+    //
+    // 每个 Runner 可独立配置：当某节点 id 在 HandlerRegistry 中未找到时，
+    // 由该 Runner 的 m_defaultHandler 兜底（典型用途：子蓝图、脚本引擎 fallback）。
+    // ------------------------------------------------------------------
+
+    // 设置该 Runner 的默认处理器
     void SetDefaultHandler(NodeHandler handler);
 
     // ------------------------------------------------------------------
