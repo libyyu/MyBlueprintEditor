@@ -5,10 +5,19 @@
 //   1. TouchAllButtons(msgHandler) —— 扫描所有 Button 元素，统一路由到 OnClick(name)
 //      完全等价于 UILuaBehaviour.TouchButton()，Lua 侧 OnClick 参数从 GameObject 变为 name string
 //   2. RegisterClick(name, func)   —— 精确绑定单个元素点击
-//   3. Q(name)                     —— 查找 VisualElement，供 Lua 直接操作
-//   4. SetText(name, text)         —— 快捷设置 Label/Button 文本
-//   5. SetDisplay(name, visible)   —— 快捷控制元素显隐
-//   6. ClearAllListeners()         —— 清理全部事件（面板销毁时自动调用）
+//   3. UnregisterClick(name)       —— 取消单个元素的精确绑定
+//   4. Q(name)                     —— 查找 VisualElement，供 Lua 直接操作
+//   5. SetText(name, text)         —— 快捷设置 Label/Button 文本
+//   6. SetDisplay(name, visible)   —— 快捷控制元素显隐
+//   7. ClearGlobalScan()           —— 仅清理 TouchAllButtons 注册的全局扫描
+//   8. ClearAllListeners()         —— 清理全部事件（面板销毁时自动调用）
+//
+// 设计：两种模式可共存（对齐 UGUI 的 UILuaBehaviour.AddClick 语义）
+//   - 全局扫描（TouchAllButtons）和精确绑定（RegisterClick）使用独立的 listener 列表
+//   - 同一按钮同时有全局 + 精确回调时，两者都会触发
+//   - 同一按钮多次 RegisterClick → 全部累加，按注册顺序依次触发（不覆盖）
+//     （等价于 UGUI 的 AddClick：多次调用即多次绑定）
+//   - 重复 TouchAllButtons → 仅替换全局扫描，保留所有精确绑定
 
 using System;
 using System.Collections.Generic;
@@ -22,16 +31,32 @@ namespace CutRope.Framework
     public class UITKLuaBridge : MonoBehaviour
     {
         // ── 内部结构 ─────────────────────────────────────────────────────
-        private struct ListenerEntry
+
+        /// <summary>全局扫描模式的 listener（每个 Button 一条）</summary>
+        private struct GlobalEntry
         {
             public VisualElement element;
             public EventCallback<ClickEvent> callback;
-            public LuaFunction luaCallback;  // RegisterClick 模式下持有，Dispose 用
+        }
+
+        /// <summary>精确绑定模式的 listener（同一 name 可有多条，全部累加）</summary>
+        private struct ExplicitEntry
+        {
+            public string name;               // 元素名，UnregisterClick 时按此匹配
+            public VisualElement element;
+            public EventCallback<ClickEvent> callback;
+            public LuaFunction luaCallback;   // 持有 Lua 闭包，Dispose 时释放
         }
 
         private UIDocument _doc;
-        private readonly List<ListenerEntry> _listeners = new List<ListenerEntry>();
-        private LuaFunction _globalOnClick;   // TouchAllButtons 模式的全局回调
+
+        // 全局扫描：TouchAllButtons 注册的所有 Button 回调
+        private readonly List<GlobalEntry> _globalEntries = new List<GlobalEntry>();
+        private LuaFunction _globalOnClick;
+
+        // 精确绑定：RegisterClick 注册的单元素回调（同 name 可累加多条，对齐 UGUI AddClick）
+        // 与全局扫描完全独立——同一按钮可同时有全局和精确两类回调，全部依次触发
+        private readonly List<ExplicitEntry> _explicitEntries = new List<ExplicitEntry>();
 
         // ── 初始化 ───────────────────────────────────────────────────────
 
@@ -46,7 +71,10 @@ namespace CutRope.Framework
         /// <summary>
         /// 扫描所有 Button 元素，统一路由到 msgHandler.onClick(name)。
         /// 与 UILuaBehaviour.TouchGUIMsg 行为对齐，但参数改为 element.name (string)。
-        /// 
+        ///
+        /// 与 RegisterClick 完全独立：重复调用本方法只会替换全局扫描的回调，
+        /// 不会影响已注册的精确绑定（RegisterClick）。
+        ///
         /// Lua 使用示例：
         ///   -- FPanelBaseUI 在检测到 UITK 后端时自动调用
         ///   function FPanelXxx:OnClick(name)
@@ -55,10 +83,11 @@ namespace CutRope.Framework
         /// </summary>
         public void TouchAllButtons(LuaTable msgHandler)
         {
-            ClearAllListeners();
-            _globalOnClick = msgHandler?.Get<LuaFunction>("onClick");
+            // 仅清理已有的全局扫描，保留所有精确绑定
+            ClearGlobalScan();
 
-            if (_globalOnClick == null || _doc == null) return;
+            _globalOnClick = msgHandler?.Get<LuaFunction>("onClick");
+            if (_globalOnClick == null || _doc == null || _doc.rootVisualElement == null) return;
 
             var buttons = _doc.rootVisualElement.Query<Button>().ToList();
             foreach (var btn in buttons)
@@ -70,21 +99,46 @@ namespace CutRope.Framework
                         _globalOnClick.Call(capturedName);
                 };
                 btn.RegisterCallback(cb);
-                _listeners.Add(new ListenerEntry { element = btn, callback = cb });
+                _globalEntries.Add(new GlobalEntry { element = btn, callback = cb });
             }
+        }
+
+        /// <summary>仅清理 TouchAllButtons 注册的全局扫描回调，保留所有精确绑定。</summary>
+        public void ClearGlobalScan()
+        {
+            foreach (var entry in _globalEntries)
+            {
+                if (entry.element != null)
+                    entry.element.UnregisterCallback(entry.callback);
+            }
+            _globalEntries.Clear();
+
+            _globalOnClick?.Dispose();
+            _globalOnClick = null;
         }
 
         // ── 模式二：精确绑定（等价 btn.onClick.AddListener）──────────────
 
         /// <summary>
-        /// 精确绑定单个元素点击事件。
-        /// 
+        /// 精确绑定单个元素的点击事件（语义对齐 UGUI 的 UILuaBehaviour.AddClick）。
+        ///
+        /// - 与 TouchAllButtons 完全独立：本方法不会清除全局扫描；
+        /// - 同一 name 多次调用 → 全部累加，按注册顺序依次触发（不覆盖旧绑定）；
+        /// - 需要取消某个 name 的所有绑定时，调用 UnregisterClick(name)。
+        ///
         /// Lua 使用示例：
         ///   self.m_bridge:RegisterClick("btn_start", function(name) self:OnClickStart() end)
+        ///   -- 同一按钮可继续追加：
+        ///   self.m_bridge:RegisterClick("btn_start", function(name) self:Analytics(name) end)
         /// </summary>
         public void RegisterClick(string name, LuaFunction callback)
         {
-            if (_doc == null || callback == null) return;
+            if (_doc == null || callback == null || string.IsNullOrEmpty(name)) return;
+            if (_doc.rootVisualElement == null)
+            {
+                Debug.LogWarning($"[UITKLuaBridge] RegisterClick('{name}'): rootVisualElement not ready");
+                return;
+            }
             var el = _doc.rootVisualElement.Q(name);
             if (el == null)
             {
@@ -92,11 +146,38 @@ namespace CutRope.Framework
                 return;
             }
 
-            // 捕获 callback 引用，存入 entry 以便 Dispose
+            // 累加（不覆盖）：同 name 可注册多个回调，全部触发
             var captured = callback;
             EventCallback<ClickEvent> cb = _ => captured.Call(name);
             el.RegisterCallback(cb);
-            _listeners.Add(new ListenerEntry { element = el, callback = cb, luaCallback = captured });
+            _explicitEntries.Add(new ExplicitEntry
+            {
+                name        = name,
+                element     = el,
+                callback    = cb,
+                luaCallback = captured,
+            });
+        }
+
+        /// <summary>
+        /// 取消该 name 的所有精确绑定（不影响全局扫描）。
+        /// 等价于 UGUI 的 ClearClick，但仅作用于指定 name。
+        /// </summary>
+        public void UnregisterClick(string name)
+        {
+            if (string.IsNullOrEmpty(name) || _explicitEntries.Count == 0) return;
+
+            // 倒序遍历，安全地从列表中移除多条同 name 记录
+            for (int i = _explicitEntries.Count - 1; i >= 0; --i)
+            {
+                var entry = _explicitEntries[i];
+                if (entry.name != name) continue;
+
+                if (entry.element != null)
+                    entry.element.UnregisterCallback(entry.callback);
+                entry.luaCallback?.Dispose();
+                _explicitEntries.RemoveAt(i);
+            }
         }
 
         // ── 元素查找 ─────────────────────────────────────────────────────
@@ -188,19 +269,24 @@ namespace CutRope.Framework
 
         // ── 清理 ─────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// 清理全部事件（全局扫描 + 所有精确绑定），释放所有 LuaFunction。
+        /// 面板销毁时由 FPanelBaseUI:DestroyPanelRaw 自动调用。
+        /// 等价于 UGUI 的 UILuaBehaviour.UnTouchGUIMsg + ClearClick。
+        /// </summary>
         public void ClearAllListeners()
         {
-            foreach (var entry in _listeners)
+            // 全局扫描
+            ClearGlobalScan();
+
+            // 精确绑定
+            foreach (var entry in _explicitEntries)
             {
                 if (entry.element != null)
                     entry.element.UnregisterCallback(entry.callback);
-                // RegisterClick 模式下释放 LuaFunction
                 entry.luaCallback?.Dispose();
             }
-            _listeners.Clear();
-
-            _globalOnClick?.Dispose();
-            _globalOnClick = null;
+            _explicitEntries.Clear();
         }
 
         private void OnDestroy()
