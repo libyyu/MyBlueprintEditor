@@ -42,12 +42,14 @@ public static class XLuaConfig
     [LuaCallCSharp]
     public static List<Type> LuaCallCSharp_UITK = new List<Type>()
     {
-        // 后端接口与实现
+        // Panel 后端接口与实现（生命周期 / 显隐 / 深度）
         typeof(CutRope.Framework.IUIPanelBackend),
         typeof(CutRope.Framework.UGUIPanelBackend),
         typeof(CutRope.Framework.UITKPanelBackend),
 
-        // UITK 事件桥（等价 UILuaBehaviour）
+        // UI 操作桥接接口与两端实现（SetText / SetColor / RegisterClick 等统一 API）
+        // Lua 通过 self.m_bridge:XXX 调用，UGUI/UITK 后端无感
+        typeof(CutRope.Framework.IUIPanelBridge),
         typeof(CutRope.Framework.UITKLuaBridge),
 
         // UnityEngine.UIElements 核心类型

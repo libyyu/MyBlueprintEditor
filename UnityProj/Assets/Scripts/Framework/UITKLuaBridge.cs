@@ -28,7 +28,7 @@ using XLua;
 namespace CutRope.Framework
 {
     [LuaCallCSharp]
-    public class UITKLuaBridge : MonoBehaviour
+    public class UITKLuaBridge : MonoBehaviour, IUIPanelBridge
     {
         // ── 内部结构 ─────────────────────────────────────────────────────
 
@@ -57,6 +57,36 @@ namespace CutRope.Framework
         // 精确绑定：RegisterClick 注册的单元素回调（同 name 可累加多条，对齐 UGUI AddClick）
         // 与全局扫描完全独立——同一按钮可同时有全局和精确两类回调，全部依次触发
         private readonly List<ExplicitEntry> _explicitEntries = new List<ExplicitEntry>();
+
+        // name -> element 缓存（避免每次全树 Q）
+        private readonly Dictionary<string, VisualElement> _qCache = new Dictionary<string, VisualElement>();
+
+        /// <summary>
+        /// 把 UGUI 风格的路径式 name（如 "TopBar/lbl_score"）转为 UITK 扁平 name。
+        /// UITK 没有"父子路径寻址"概念，取最后一段作为 element.name 查询。
+        /// </summary>
+        private static string NormalizeName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return name;
+            int slash = name.LastIndexOf('/');
+            return slash < 0 ? name : name.Substring(slash + 1);
+        }
+
+        /// <summary>带缓存的元素查找。</summary>
+        private VisualElement Lookup(string name)
+        {
+            if (string.IsNullOrEmpty(name) || _doc == null) return null;
+            var key = name;
+            if (_qCache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+            var root = _doc.rootVisualElement;
+            if (root == null) return null;
+
+            var n = NormalizeName(name);
+            var el = root.Q(n);
+            if (el != null) _qCache[key] = el;
+            return el;
+        }
 
         // ── 初始化 ───────────────────────────────────────────────────────
 
@@ -134,12 +164,7 @@ namespace CutRope.Framework
         public void RegisterClick(string name, LuaFunction callback)
         {
             if (_doc == null || callback == null || string.IsNullOrEmpty(name)) return;
-            if (_doc.rootVisualElement == null)
-            {
-                Debug.LogWarning($"[UITKLuaBridge] RegisterClick('{name}'): rootVisualElement not ready");
-                return;
-            }
-            var el = _doc.rootVisualElement.Q(name);
+            var el = Lookup(name);
             if (el == null)
             {
                 Debug.LogWarning($"[UITKLuaBridge] RegisterClick: element '{name}' not found");
@@ -148,11 +173,12 @@ namespace CutRope.Framework
 
             // 累加（不覆盖）：同 name 可注册多个回调，全部触发
             var captured = callback;
-            EventCallback<ClickEvent> cb = _ => captured.Call(name);
+            var n = NormalizeName(name);   // 回调参数用扁平 name，与 TouchAllButtons 对齐
+            EventCallback<ClickEvent> cb = _ => captured.Call(n);
             el.RegisterCallback(cb);
             _explicitEntries.Add(new ExplicitEntry
             {
-                name        = name,
+                name        = n,
                 element     = el,
                 callback    = cb,
                 luaCallback = captured,
@@ -166,12 +192,13 @@ namespace CutRope.Framework
         public void UnregisterClick(string name)
         {
             if (string.IsNullOrEmpty(name) || _explicitEntries.Count == 0) return;
+            var n = NormalizeName(name);
 
             // 倒序遍历，安全地从列表中移除多条同 name 记录
             for (int i = _explicitEntries.Count - 1; i >= 0; --i)
             {
                 var entry = _explicitEntries[i];
-                if (entry.name != name) continue;
+                if (entry.name != n) continue;
 
                 if (entry.element != null)
                     entry.element.UnregisterCallback(entry.callback);
@@ -180,53 +207,54 @@ namespace CutRope.Framework
             }
         }
 
+        // ═══════════════════════════════════════════════════════════════════
+        // IUIPanelBridge 实现 —— 与 UILuaBehaviour 同名同参，Lua 调用代码后端无关
+        // 寻址支持路径式 name（如 "TopBar/lbl_score"），自动取末段当 element.name
+        // ═══════════════════════════════════════════════════════════════════
+
         // ── 元素查找 ─────────────────────────────────────────────────────
 
         /// <summary>
-        /// 查找 VisualElement，供 Lua 直接操作。
-        /// 返回 VisualElement（xLua 绑定后 Lua 可访问其属性）。
-        /// 
-        /// Lua 使用示例：
-        ///   local el = self.m_bridge:Q("lbl_score")
+        /// 查找 VisualElement（带缓存）。
+        /// 路径式 name（如 "Header/btn_back"）自动取最后一段。
+        /// 返回值是 object 类型以满足 IUIPanelBridge 接口（UGUI 端返回 GameObject）。
+        /// Lua 端可继续 cast：local ve = self.m_bridge:Q("name")  （UITK 后端时是 VisualElement）
         /// </summary>
-        public VisualElement Q(string name)
-        {
-            return _doc?.rootVisualElement.Q(name);
-        }
+        public object Q(string name) => Lookup(name);
 
-        /// <summary>按类型查找，类型名传字符串（"Label"/"Button"/"TextField" 等）</summary>
+        /// <summary>按类型查找，类型名传字符串（"Label"/"Button"/"TextField" 等）。UITK 专属。</summary>
         public VisualElement QByType(string name, string typeName)
         {
             if (_doc == null) return null;
+            var root = _doc.rootVisualElement;
+            if (root == null) return null;
+            var n = NormalizeName(name);
             return typeName switch
             {
-                "Label"     => _doc.rootVisualElement.Q<Label>(name),
-                "Button"    => _doc.rootVisualElement.Q<Button>(name),
-                "TextField" => _doc.rootVisualElement.Q<TextField>(name),
-                "Toggle"    => _doc.rootVisualElement.Q<Toggle>(name),
-                "Slider"    => _doc.rootVisualElement.Q<Slider>(name),
-                _           => _doc.rootVisualElement.Q(name),
+                "Label"     => root.Q<Label>(n),
+                "Button"    => root.Q<Button>(n),
+                "TextField" => root.Q<TextField>(n),
+                "Toggle"    => root.Q<Toggle>(n),
+                "Slider"    => root.Q<Slider>(n),
+                _           => root.Q(n),
             };
         }
 
-        // ── 快捷属性方法（避免 Lua 直接操作 VisualElement 属性绑定问题）───
+        // ── 文本 ────────────────────────────────────────────────────────
 
-        /// <summary>设置 Label 或 Button 文本</summary>
         public void SetText(string name, string text)
         {
-            if (_doc == null) return;
-            var el = _doc.rootVisualElement.Q(name);
+            var el = Lookup(name);
             if      (el is Label     lbl) lbl.text = text;
             else if (el is Button    btn) btn.text = text;
             else if (el is TextField tf)  tf.value = text;
+            else if (el == null) Debug.LogWarning($"[UITKLuaBridge] SetText: '{name}' not found");
             else Debug.LogWarning($"[UITKLuaBridge] SetText: '{name}' is not a text element");
         }
 
-        /// <summary>获取 Label 或 TextField 文本</summary>
         public string GetText(string name)
         {
-            if (_doc == null) return "";
-            var el = _doc.rootVisualElement.Q(name);
+            var el = Lookup(name);
             return el switch
             {
                 Label     lbl => lbl.text,
@@ -236,36 +264,90 @@ namespace CutRope.Framework
             };
         }
 
-        /// <summary>控制元素显隐（Flex / None）</summary>
+        // ── 显隐 / 启用 ─────────────────────────────────────────────────
+
+        /// <summary>完全隐藏（不占布局）— display Flex/None</summary>
         public void SetDisplay(string name, bool visible)
         {
-            if (_doc == null) return;
-            var el = _doc.rootVisualElement.Q(name);
+            var el = Lookup(name);
             if (el != null)
                 el.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
             else
-                Debug.LogWarning($"[UITKLuaBridge] SetDisplay: element '{name}' not found");
+                Debug.LogWarning($"[UITKLuaBridge] SetDisplay: '{name}' not found");
         }
 
-        /// <summary>控制元素可见性（Visible / Hidden，保留布局空间）</summary>
+        /// <summary>隐藏但保留布局 — visibility Visible/Hidden</summary>
         public void SetVisibility(string name, bool visible)
         {
-            if (_doc == null) return;
-            var el = _doc.rootVisualElement.Q(name);
+            var el = Lookup(name);
             if (el != null)
                 el.style.visibility = visible ? Visibility.Visible : Visibility.Hidden;
         }
 
-        /// <summary>添加/移除 USS 类名</summary>
-        public void AddClass(string name, string className)
+        /// <summary>启用/禁用交互 — VisualElement.SetEnabled</summary>
+        public void SetEnabled(string name, bool enabled)
         {
-            _doc?.rootVisualElement.Q(name)?.AddToClassList(className);
+            var el = Lookup(name);
+            if (el != null) el.SetEnabled(enabled);
         }
 
-        public void RemoveClass(string name, string className)
+        // ── 视觉 ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// 颜色：Label/Button 改文本色（style.color），其他改背景色（style.backgroundColor）。
+        /// </summary>
+        public void SetColor(string name, float r, float g, float b, float a)
         {
-            _doc?.rootVisualElement.Q(name)?.RemoveFromClassList(className);
+            var el = Lookup(name);
+            if (el == null) return;
+            var c = new Color(r, g, b, a);
+            if (el is Label || el is Button || el is TextField)
+                el.style.color = c;
+            else
+                el.style.backgroundColor = c;
         }
+
+        /// <summary>设置 Sprite 作为 backgroundImage（UITK 不直接吃 Sprite，需转 StyleBackground）</summary>
+        public void SetSprite(string name, Sprite sprite)
+        {
+            var el = Lookup(name);
+            if (el == null) return;
+            el.style.backgroundImage = sprite != null
+                ? new StyleBackground(sprite)
+                : StyleKeyword.None;
+        }
+
+        // ── 表单控件 ────────────────────────────────────────────────────
+
+        public void SetSliderValue(string name, float value)
+        {
+            var el = Lookup(name);
+            if (el is Slider s) s.value = value;
+        }
+        public float GetSliderValue(string name)
+        {
+            var el = Lookup(name);
+            return el is Slider s ? s.value : 0f;
+        }
+
+        public void SetToggleValue(string name, bool value)
+        {
+            var el = Lookup(name);
+            if (el is Toggle t) t.value = value;
+        }
+        public bool GetToggleValue(string name)
+        {
+            var el = Lookup(name);
+            return el is Toggle t && t.value;
+        }
+
+        // ── USS 类（UITK 专属）──────────────────────────────────────────
+
+        public void AddClass(string name, string className)
+            => Lookup(name)?.AddToClassList(className);
+
+        public void RemoveClass(string name, string className)
+            => Lookup(name)?.RemoveFromClassList(className);
 
         // ── 清理 ─────────────────────────────────────────────────────────
 
@@ -287,6 +369,9 @@ namespace CutRope.Framework
                 entry.luaCallback?.Dispose();
             }
             _explicitEntries.Clear();
+
+            // 元素缓存（VisualElement 可能已随 UIDocument 销毁）
+            _qCache.Clear();
         }
 
         private void OnDestroy()

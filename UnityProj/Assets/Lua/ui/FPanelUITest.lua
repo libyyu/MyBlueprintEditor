@@ -9,6 +9,12 @@
 --   4. bridge:SetDisplay 显隐切换
 --   5. bridge:AddClass / RemoveClass
 --   6. 生命周期：OnCreate / OnDestroy
+--
+-- 后端无关：
+--   self.m_bridge 在 UGUI/UITK 后端均实现 IUIPanelBridge 接口，
+--   下方所有 RegisterClick / SetText / SetDisplay / SetColor / SetSprite
+--   等调用代码完全相同。仅需把 GetResPath 返回的 .uxml 改为 .prefab
+--   即可切换到 UGUI 后端运行（前提：Prefab 中的子节点 name 与 UXML 元素 name 对齐）。
 
 local FPanelBaseUI = require "ui.FPanelBaseUI"
 

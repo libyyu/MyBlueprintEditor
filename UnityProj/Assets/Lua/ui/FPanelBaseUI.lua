@@ -299,9 +299,10 @@ function FPanelBaseUI:DestroyPanelRaw()
 	FGUIMan.Instance():UnRegisterPanelObj(self.m_panel)
 	self:UnloadPanel()			
 	
-	--清除事件桥接器
-	if self.m_isuitk and self.m_bridge then
-		-- UITKLuaBridge 需要手动清理监听器（防止内存泄漏）
+	--清除事件桥接器（IUIPanelBridge.ClearAllListeners 统一接口，两端实现相同语义）
+	--   UGUI: 清旧 buttons + msgHandle + 新的 _explicitClicks 列表
+	--   UITK: 清全局扫描 + 精确绑定 + 缓存
+	if self.m_bridge and self.m_bridge.ClearAllListeners then
 		self.m_bridge:ClearAllListeners()
 	end
 	self.m_msgHandler = nil
