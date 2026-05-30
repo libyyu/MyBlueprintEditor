@@ -9,7 +9,7 @@
           5. 深度/层级 (sortingOrder)
     -->
     <ui:VisualElement name="root" style="
-        width: 50%; min-width: 420px; max-width: 700px;
+        width: 680px; max-width: 680px;
         background-color: rgba(20,20,30,0.92);
         border-radius: 16px;
         padding: 32px;
@@ -45,16 +45,16 @@
             width: 100%;
             align-items: center;
         ">
-            <ui:Button name="btn_test_text"    text="① SetText 测试"    style="width:80%; min-width:240px; height:52px; font-size:16px; margin-bottom:10px; white-space:normal;"/>
-            <ui:Button name="btn_test_display" text="② SetDisplay 切换"  style="width:80%; min-width:240px; height:52px; font-size:16px; margin-bottom:10px; white-space:normal;"/>
-            <ui:Button name="btn_test_gettext" text="③ GetText 读取"     style="width:80%; min-width:240px; height:52px; font-size:16px; margin-bottom:10px; white-space:normal;"/>
-            <ui:Button name="btn_test_class"   text="④ AddClass 测试"    style="width:80%; min-width:240px; height:52px; font-size:16px; margin-bottom:10px; white-space:normal;"/>
+            <ui:Button name="btn_test_text"    text="① SetText 测试"    style="width:560px; height:80px; font-size:28px; margin-bottom:16px; white-space:normal;"/>
+            <ui:Button name="btn_test_display" text="② SetDisplay 切换"  style="width:560px; height:80px; font-size:28px; margin-bottom:16px; white-space:normal;"/>
+            <ui:Button name="btn_test_gettext" text="③ GetText 读取"     style="width:560px; height:80px; font-size:28px; margin-bottom:16px; white-space:normal;"/>
+            <ui:Button name="btn_test_class"   text="④ AddClass 测试"    style="width:560px; height:80px; font-size:28px; margin-bottom:16px; white-space:normal;"/>
         </ui:VisualElement>
 
         <!-- 可切换显隐的测试元素 -->
         <ui:Label name="lbl_toggle_target" text="★ 这个文字可以被隐藏 ★" style="
-            font-size:18px; color: yellow;
-            margin-top: 20px; margin-bottom: 20px;
+            font-size:28px; color: yellow;
+            margin-top: 24px; margin-bottom: 24px;
             white-space: normal;
             -unity-text-align: upper-center;
             width: 100%;
@@ -62,8 +62,8 @@
 
         <!-- 关闭按钮 -->
         <ui:Button name="btn_close" text="关闭" style="
-            width:50%; min-width:160px; height:52px;
-            font-size:18px;
+            width:320px; height:80px;
+            font-size:30px;
             margin-top: auto;
             background-color: rgb(180,60,60);
             color: white;
