@@ -414,7 +414,7 @@ function FPanelBaseUI:TouchMsgHandler()
 	end
 
 	-- ── 现有 UGUI / FairyGUI 分支（不变）─────────────────────────────
-	if not self:IsFairyGui()  not self:IsFairyGuiWindow() then
+	if not self:IsFairyGui() or not self:IsFairyGuiWindow() then
 		if IsValidObject(self.m_msgHandler) then
 			return
 		end
