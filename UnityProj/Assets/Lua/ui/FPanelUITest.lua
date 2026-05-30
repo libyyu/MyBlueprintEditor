@@ -31,6 +31,9 @@ do
 
     function FPanelUITest:GetResPath() return UXML_PATH end
 
+    function FPanelUITest:__constructor()
+        self.m_toggleVisible = true  -- lbl_toggle_target 初始可见
+    end
     -- ──────────────────────────────────────────────────────────────────
     -- OnCreate：面板加载完成，self.m_bridge 已自动注入
     -- ──────────────────────────────────────────────────────────────────

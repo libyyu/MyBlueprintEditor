@@ -218,6 +218,7 @@ GameObject:
   - component: {fileID: 299405872}
   - component: {fileID: 299405871}
   - component: {fileID: 299405873}
+  - component: {fileID: 299405874}
   m_Layer: 0
   m_Name: GameLauncher
   m_TagString: Untagged
@@ -296,6 +297,20 @@ MonoBehaviour:
   packageName: DefaultPackage
   updateLuaEntry: UpdateLogic
   gameLuaEntry: GameLogic
+  uitkGameSettings: {fileID: 11400000, guid: 7a82a49c83b38c540be5989b5292fa71, type: 2}
+  uitkOverlaySettings: {fileID: 11400000, guid: 4c8c1326ff1a7fb46a7dae495cdadd83, type: 2}
+--- !u!114 &299405874
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 299405861}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a31014a1ba07f2438f6d6e220b53d66, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

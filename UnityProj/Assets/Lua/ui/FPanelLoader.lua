@@ -132,7 +132,7 @@ do
 
 	-- 判断是否为 UI Toolkit 资源（.uxml 后缀）
 	local function isUIToolkitRes(resName)
-		return resName:find("\.uxml$") ~= nil
+		return resName:find("%.uxml$") ~= nil
 	end
 
 	local function parseResource(resName)
@@ -152,14 +152,18 @@ do
 		else
 			local prefabName
 			-- 同时识别 .prefab 和 .uxml
-			local i, j, cap = resName:find("/([%w_]+)%.[pu][rx][em][fl][ab]*$")
+			local i, j, cap = resName:find("/([%w_]+)%.uxml$")
 			if cap then
 				prefabName = cap
 			else
-				local i, j, cap = resName:find("([^/]*)$")
-				prefabName = cap or "<noname>"	
+				i, j, cap = resName:find("/([%w_]+)%.prefab$")
+				if cap then
+					prefabName = cap
+				else
+					i, j, cap = resName:find("([^/]*)$")
+					prefabName = cap or "<noname>"	
+				end
 			end
-
 			return false, prefabName
 		end
 	end
@@ -221,7 +225,7 @@ do
 			onResourceLoaded(panelHide)
 			return
 		end
-		
+	
 		local function onLoad(obj)
 			--create请求已经退出了
 			if not self.m_createRequested then
@@ -239,7 +243,7 @@ do
 				-- UI Toolkit 分支：obj 是 VisualTreeAsset
 				local UITKBackend = CS.CutRope.Framework.UITKPanelBackend
 				-- 把深度层传入，让 Create() 自动选择 Game/Overlay PanelSettings
-				local sortOrder = self:GetDepthLayer and self:GetDepthLayer() or 0
+				local sortOrder = self:GetDepthLayer() or 0
 				-- parentObj 在 UGUI 下是 Transform（GetUGUIRoot() 返回 Canvas.transform）
 				-- UITKPanelBackend.Create 需要 Transform，直接传 parentObj
 				local uitkParent = parentObj
