@@ -9,7 +9,7 @@
           5. 深度/层级 (sortingOrder)
     -->
     <ui:VisualElement name="root" style="
-        width: 600px; height: 800px;
+        width: 50%; min-width: 420px; max-width: 700px;
         background-color: rgba(20,20,30,0.92);
         border-radius: 16px;
         padding: 32px;
@@ -20,10 +20,13 @@
     ">
         <!-- 标题 -->
         <ui:Label name="lbl_title" text="UI Toolkit Test Panel" style="
-            font-size: 28px;
+            font-size: 24px;
             color: white;
             margin-bottom: 24px;
             -unity-font-style: bold;
+            white-space: normal;
+            -unity-text-align: upper-center;
+            width: 100%;
         "/>
 
         <!-- 状态输出 -->
@@ -42,22 +45,25 @@
             width: 100%;
             align-items: center;
         ">
-            <ui:Button name="btn_test_text"    text="① SetText 测试"    style="width:320px; height:56px; font-size:18px; margin-bottom:12px;"/>
-            <ui:Button name="btn_test_display" text="② SetDisplay 切换"  style="width:320px; height:56px; font-size:18px; margin-bottom:12px;"/>
-            <ui:Button name="btn_test_gettext" text="③ GetText 读取"     style="width:320px; height:56px; font-size:18px; margin-bottom:12px;"/>
-            <ui:Button name="btn_test_class"   text="④ AddClass 测试"    style="width:320px; height:56px; font-size:18px; margin-bottom:12px;"/>
+            <ui:Button name="btn_test_text"    text="① SetText 测试"    style="width:80%; min-width:240px; height:52px; font-size:16px; margin-bottom:10px; white-space:normal;"/>
+            <ui:Button name="btn_test_display" text="② SetDisplay 切换"  style="width:80%; min-width:240px; height:52px; font-size:16px; margin-bottom:10px; white-space:normal;"/>
+            <ui:Button name="btn_test_gettext" text="③ GetText 读取"     style="width:80%; min-width:240px; height:52px; font-size:16px; margin-bottom:10px; white-space:normal;"/>
+            <ui:Button name="btn_test_class"   text="④ AddClass 测试"    style="width:80%; min-width:240px; height:52px; font-size:16px; margin-bottom:10px; white-space:normal;"/>
         </ui:VisualElement>
 
         <!-- 可切换显隐的测试元素 -->
         <ui:Label name="lbl_toggle_target" text="★ 这个文字可以被隐藏 ★" style="
-            font-size:20px; color: yellow;
+            font-size:18px; color: yellow;
             margin-top: 20px; margin-bottom: 20px;
+            white-space: normal;
+            -unity-text-align: upper-center;
+            width: 100%;
         "/>
 
         <!-- 关闭按钮 -->
         <ui:Button name="btn_close" text="关闭" style="
-            width:200px; height:52px;
-            font-size:20px;
+            width:50%; min-width:160px; height:52px;
+            font-size:18px;
             margin-top: auto;
             background-color: rgb(180,60,60);
             color: white;
