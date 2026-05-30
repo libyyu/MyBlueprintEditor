@@ -26,8 +26,6 @@ do
 		self.m_panel = nil
 		--后端适配层（IUIPanelBackend），同时支持 UGUI 和 UI Toolkit
 		self.m_backend = nil
-		--是否 UI Toolkit 面板
-		self.m_isuitk = false
 		--是否fairygui
 		self.m_isfgui = false
 		self.m_isfguiWindow = false
@@ -227,26 +225,29 @@ do
 		self.m_panelName = prefabName
 		if not parentObj then parentObj = self:GetUIRoot() end
 		self:OnBeforeLoadPanel()
+		print("prepare load panel", self.m_panelName, "from asset", self.m_assetPath)
 
 		local function onResourceLoaded(panel)
 			self.m_isLoading = false
 			if not panel then
 				onCreateFinish(false)
 				return 
-			elseif uitk then
+			elseif self:IsUIToolkit() then
 				-- UI Toolkit 路径：panel 是 UITKPanelBackend（C# 对象）
 				self.m_backend = panel
 				self:SetPanelObject(panel.RootGameObject)
-			elseif not isfgui then
+			elseif self:IsUGUI() then
 				self:SetPanelObject(panel)
-			elseif window then
+			elseif self:IsFairyGuiWindow() then
 				self.m_fguiOwner = panel.rootContainer.gameObject
 				self:SetPanelObject(panel)
-			else
+			elseif self:IsFairyGui() then
 				self.m_fguiOwner = panel.gameObject
 				self:SetPanelObject(panel.ui)
-			end	
-			onCreateFinish(self.m_panel ~= nil)	
+			else
+				error("不支持的面板类型: " .. tostring(self:GetPanelResourceType()))
+			end
+			onCreateFinish(self.m_panel ~= nil)
 		end
 		
 		--从隐藏界面中创建
@@ -359,14 +360,14 @@ do
 			if self.m_HideOnDestroy then
 				self:_SetPanelHide(self.m_panel)
 			else
-				if self.m_isuitk then
+				if self:IsUIToolkit() then
 					-- UITK：通过 backend 销毁（清理 UIDocument + 宿主 GO）
 					if self.m_backend then
 						self.m_backend:Destroy()
 						self.m_backend = nil
 					end
-				elseif self.m_isfgui then
-					if self.m_isfguiWindow then
+				elseif self:IsFairyGui() then
+					if self:IsFairyGuiWindow() then
 						FairyGUI.GRoot.inst:RemoveChild(self.m_panel)
 					end
 					UnityEngine.Object.Destroy(self.m_fguiOwner)
