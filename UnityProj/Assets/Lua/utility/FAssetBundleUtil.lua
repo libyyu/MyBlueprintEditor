@@ -1,5 +1,5 @@
 
-local YooAssetsLuaBridge = CS.YooAssetsLuaBridge
+local YooAssetsLuaBridge = CS.UGFramework.Runtime.YooAssetsLuaBridge
 
 
 local l_instance = nil

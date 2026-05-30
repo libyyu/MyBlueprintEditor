@@ -21,10 +21,11 @@ namespace XLua.CSObjectWrap
         {
 			ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
 			System.Type type = typeof(CutRope.Game.RopeSpawner);
-			Utils.BeginObjectRegister(type, L, translator, 0, 4, 8, 7);
+			Utils.BeginObjectRegister(type, L, translator, 0, 5, 8, 7);
 			
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "Spawn", _m_Spawn);
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "Cut", _m_Cut);
+			Utils.RegisterFunc(L, Utils.METHOD_IDX, "TryCutWithSegment", _m_TryCutWithSegment);
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "CutAtWorld", _m_CutAtWorld);
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "OnSegmentTrigger", _m_OnSegmentTrigger);
 			
@@ -134,6 +135,36 @@ namespace XLua.CSObjectWrap
                     int _index = LuaAPI.xlua_tointeger(L, 2);
                     
                     gen_to_be_invoked.Cut( _index );
+                    
+                    
+                    
+                    return 0;
+                }
+                
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _m_TryCutWithSegment(RealStatePtr L)
+        {
+		    try {
+            
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            
+            
+                CutRope.Game.RopeSpawner gen_to_be_invoked = (CutRope.Game.RopeSpawner)translator.FastGetCSObj(L, 1);
+            
+            
+                
+                {
+                    UnityEngine.Vector2 _from;translator.Get(L, 2, out _from);
+                    UnityEngine.Vector2 _to;translator.Get(L, 3, out _to);
+                    float _cutRadius = (float)LuaAPI.lua_tonumber(L, 4);
+                    
+                    gen_to_be_invoked.TryCutWithSegment( _from, _to, _cutRadius );
                     
                     
                     

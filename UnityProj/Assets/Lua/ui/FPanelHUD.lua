@@ -93,7 +93,7 @@ do
 
     function FPanelHUD:OnClickPause()
         -- 优先通过蓝图事件 on_pause 驱动（蓝图可选择打开哪个面板）
-        local BPR = CS.CutRope.Framework.BlueprintRuntime
+        local BPR = CS.UGFramework.Runtime.BlueprintRuntime
         if BPR and BPR.Instance and BPR.Instance.IsValid then
             BPR.Instance:DispatchEvent('on_pause')
         else

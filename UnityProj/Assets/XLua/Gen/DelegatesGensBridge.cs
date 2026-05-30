@@ -276,7 +276,7 @@ namespace XLua
 #endif
 		}
         
-		public void __Gen_Delegate_Imp11(CutRope.Framework.IView p0)
+		public void __Gen_Delegate_Imp11(UGFramework.Runtime.IView p0)
 		{
 #if THREAD_SAFE || HOTFIX_ENABLE
             lock (luaEnv.luaEnvLock)
@@ -307,9 +307,9 @@ namespace XLua
 			    return new CutRope.Game.LevelController.LuaTickDelegate(__Gen_Delegate_Imp0);
 			}
 		
-		    if (type == typeof(CutRope.Framework.SceneLoader.LuaProgressCallback))
+		    if (type == typeof(UGFramework.Runtime.SceneLoader.LuaProgressCallback))
 			{
-			    return new CutRope.Framework.SceneLoader.LuaProgressCallback(__Gen_Delegate_Imp0);
+			    return new UGFramework.Runtime.SceneLoader.LuaProgressCallback(__Gen_Delegate_Imp0);
 			}
 		
 		    if (type == typeof(CutRope.Game.LevelController.LuaCutDelegate))
@@ -322,14 +322,14 @@ namespace XLua
 			    return new CutRope.Game.LevelController.LuaVoidDelegate(__Gen_Delegate_Imp2);
 			}
 		
-		    if (type == typeof(CutRope.Framework.SceneLoader.LuaCompleteCallback))
+		    if (type == typeof(UGFramework.Runtime.SceneLoader.LuaCompleteCallback))
 			{
-			    return new CutRope.Framework.SceneLoader.LuaCompleteCallback(__Gen_Delegate_Imp2);
+			    return new UGFramework.Runtime.SceneLoader.LuaCompleteCallback(__Gen_Delegate_Imp2);
 			}
 		
-		    if (type == typeof(FTimerList.TimerCallback))
+		    if (type == typeof(UGFramework.Runtime.FTimerList.TimerCallback))
 			{
-			    return new FTimerList.TimerCallback(__Gen_Delegate_Imp2);
+			    return new UGFramework.Runtime.FTimerList.TimerCallback(__Gen_Delegate_Imp2);
 			}
 		
 		    if (type == typeof(CutRope.Game.LevelController.LuaStarDelegate))
@@ -337,49 +337,49 @@ namespace XLua
 			    return new CutRope.Game.LevelController.LuaStarDelegate(__Gen_Delegate_Imp3);
 			}
 		
-		    if (type == typeof(YooAssetsLuaBridge.LuaLoadAllLuaFilesProgressCallback))
+		    if (type == typeof(UGFramework.Runtime.YooAssetsLuaBridge.LuaLoadAllLuaFilesProgressCallback))
 			{
-			    return new YooAssetsLuaBridge.LuaLoadAllLuaFilesProgressCallback(__Gen_Delegate_Imp3);
+			    return new UGFramework.Runtime.YooAssetsLuaBridge.LuaLoadAllLuaFilesProgressCallback(__Gen_Delegate_Imp3);
 			}
 		
-		    if (type == typeof(YooAssetsLuaBridge.LuaBoolStringCallback))
+		    if (type == typeof(UGFramework.Runtime.YooAssetsLuaBridge.LuaBoolStringCallback))
 			{
-			    return new YooAssetsLuaBridge.LuaBoolStringCallback(__Gen_Delegate_Imp4);
+			    return new UGFramework.Runtime.YooAssetsLuaBridge.LuaBoolStringCallback(__Gen_Delegate_Imp4);
 			}
 		
-		    if (type == typeof(YooAssetsLuaBridge.LuaBoolStringStringCallback))
+		    if (type == typeof(UGFramework.Runtime.YooAssetsLuaBridge.LuaBoolStringStringCallback))
 			{
-			    return new YooAssetsLuaBridge.LuaBoolStringStringCallback(__Gen_Delegate_Imp5);
+			    return new UGFramework.Runtime.YooAssetsLuaBridge.LuaBoolStringStringCallback(__Gen_Delegate_Imp5);
 			}
 		
-		    if (type == typeof(YooAssetsLuaBridge.LuaResourceDownloadProgressCallback))
+		    if (type == typeof(UGFramework.Runtime.YooAssetsLuaBridge.LuaResourceDownloadProgressCallback))
 			{
-			    return new YooAssetsLuaBridge.LuaResourceDownloadProgressCallback(__Gen_Delegate_Imp6);
+			    return new UGFramework.Runtime.YooAssetsLuaBridge.LuaResourceDownloadProgressCallback(__Gen_Delegate_Imp6);
 			}
 		
-		    if (type == typeof(YooAssetsLuaBridge.LuaLoadAssetCallback))
+		    if (type == typeof(UGFramework.Runtime.YooAssetsLuaBridge.LuaLoadAssetCallback))
 			{
-			    return new YooAssetsLuaBridge.LuaLoadAssetCallback(__Gen_Delegate_Imp7);
+			    return new UGFramework.Runtime.YooAssetsLuaBridge.LuaLoadAssetCallback(__Gen_Delegate_Imp7);
 			}
 		
-		    if (type == typeof(YooAssetsLuaBridge.LuaInstantiateCallback))
+		    if (type == typeof(UGFramework.Runtime.YooAssetsLuaBridge.LuaInstantiateCallback))
 			{
-			    return new YooAssetsLuaBridge.LuaInstantiateCallback(__Gen_Delegate_Imp8);
+			    return new UGFramework.Runtime.YooAssetsLuaBridge.LuaInstantiateCallback(__Gen_Delegate_Imp8);
 			}
 		
-		    if (type == typeof(YooAssetsLuaBridge.LuaLoadRawFileCallback))
+		    if (type == typeof(UGFramework.Runtime.YooAssetsLuaBridge.LuaLoadRawFileCallback))
 			{
-			    return new YooAssetsLuaBridge.LuaLoadRawFileCallback(__Gen_Delegate_Imp9);
+			    return new UGFramework.Runtime.YooAssetsLuaBridge.LuaLoadRawFileCallback(__Gen_Delegate_Imp9);
 			}
 		
-		    if (type == typeof(YooAssetsLuaBridge.LuaLoadAllLuaFilesCompleteCallback))
+		    if (type == typeof(UGFramework.Runtime.YooAssetsLuaBridge.LuaLoadAllLuaFilesCompleteCallback))
 			{
-			    return new YooAssetsLuaBridge.LuaLoadAllLuaFilesCompleteCallback(__Gen_Delegate_Imp10);
+			    return new UGFramework.Runtime.YooAssetsLuaBridge.LuaLoadAllLuaFilesCompleteCallback(__Gen_Delegate_Imp10);
 			}
 		
-		    if (type == typeof(CutRope.Framework.UIManager.LuaViewCallback))
+		    if (type == typeof(UGFramework.Runtime.UIManager.LuaViewCallback))
 			{
-			    return new CutRope.Framework.UIManager.LuaViewCallback(__Gen_Delegate_Imp11);
+			    return new UGFramework.Runtime.UIManager.LuaViewCallback(__Gen_Delegate_Imp11);
 			}
 		
 		    return null;

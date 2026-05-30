@@ -163,7 +163,7 @@ Blueprint.RegisterNodeDef({
 })
 Blueprint.RegisterHandler("Scene.Load", function(ctx)
     local scene = ctx:GetInput("Scene"):asString()
-    CS.CutRope.Framework.SceneLoader.LuaLoadScene(scene, nil, nil)
+    CS.UGFramework.Runtime.SceneLoader.LuaLoadScene(scene, nil, nil)
     return true
 end)
 
@@ -183,7 +183,7 @@ Blueprint.RegisterNodeDef({
 })
 Blueprint.RegisterHandler("Scene.LoadAdditive", function(ctx)
     local scene = ctx:GetInput("Scene"):asString()
-    CS.CutRope.Framework.SceneLoader.LuaLoadSceneAdditive(scene, nil, nil)
+    CS.UGFramework.Runtime.SceneLoader.LuaLoadSceneAdditive(scene, nil, nil)
     return true
 end)
 
@@ -203,7 +203,7 @@ Blueprint.RegisterNodeDef({
 })
 Blueprint.RegisterHandler("Scene.Unload", function(ctx)
     local scene = ctx:GetInput("Scene"):asString()
-    CS.CutRope.Framework.SceneLoader.LuaUnloadScene(scene, nil)
+    CS.UGFramework.Runtime.SceneLoader.LuaUnloadScene(scene, nil)
     return true
 end)
 
@@ -447,7 +447,7 @@ Blueprint.RegisterNodeDef({
 Blueprint.RegisterHandler("Level.Pause", function(ctx)
     local ctrl = CS.CutRope.Game.LevelController.Current
     if ctrl then ctrl:PauseLevel() end
-    CS.CutRope.Framework.UIManager.LuaOpen("UI/Pause", nil, nil)
+    CS.UGFramework.Runtime.UIManager.LuaOpen("UI/Pause", nil, nil)
     return true
 end)
 
@@ -465,7 +465,7 @@ Blueprint.RegisterNodeDef({
 Blueprint.RegisterHandler("Level.Resume", function(ctx)
     local ctrl = CS.CutRope.Game.LevelController.Current
     if ctrl then ctrl:ResumeLevel() end
-    CS.CutRope.Framework.UIManager.LuaClose("UI/Pause")
+    CS.UGFramework.Runtime.UIManager.LuaClose("UI/Pause")
     return true
 end)
 
@@ -618,7 +618,7 @@ Blueprint.RegisterHandler("Audio.Play", function(ctx)
     local clip   = ctx:GetInput("Clip"):asString()
     local volume = ctx:GetInput("Volume"):asFloat()
     if volume <= 0 then volume = 1 end
-    local ok, AudioMgr = pcall(function() return CS.CutRope.Framework.AudioManager.Instance end)
+    local ok, AudioMgr = pcall(function() return CS.UGFramework.Runtime.AudioManager.Instance end)
     if ok and AudioMgr then
         AudioMgr:PlaySFX(clip, volume)
     else
@@ -646,7 +646,7 @@ Blueprint.RegisterHandler("Audio.PlayBGM", function(ctx)
     local clip     = ctx:GetInput("Clip"):asString()
     local fadeTime = ctx:GetInput("FadeTime"):asFloat()
     if fadeTime <= 0 then fadeTime = 0.5 end
-    local ok, AudioMgr = pcall(function() return CS.CutRope.Framework.AudioManager.Instance end)
+    local ok, AudioMgr = pcall(function() return CS.UGFramework.Runtime.AudioManager.Instance end)
     if ok and AudioMgr then AudioMgr:PlayBGM(clip, fadeTime) end
     return true
 end)
@@ -668,7 +668,7 @@ Blueprint.RegisterNodeDef({
 Blueprint.RegisterHandler("Audio.Stop", function(ctx)
     local fadeTime = ctx:GetInput("FadeTime"):asFloat()
     if fadeTime <= 0 then fadeTime = 0.5 end
-    local ok, AudioMgr = pcall(function() return CS.CutRope.Framework.AudioManager.Instance end)
+    local ok, AudioMgr = pcall(function() return CS.UGFramework.Runtime.AudioManager.Instance end)
     if ok and AudioMgr then AudioMgr:StopBGM(fadeTime) end
     return true
 end)

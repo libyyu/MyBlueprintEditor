@@ -84,7 +84,7 @@ end
 -- 异步加载蓝图（支持 subBlueprints 依赖）
 function M._load_blueprint_async(levelId, onDone)
     local bjsonPath = 'Assets/Lua/levels/blueprint_' .. levelId .. '.bjson'
-    local Bridge = CS.YooAssetsLuaBridge
+    local Bridge = CS.UGFramework.Runtime.YooAssetsLuaBridge
     Bridge.LoadAsset('DefaultPackage', bjsonPath, function(ok, asset, err)
         if not ok or not asset then
             print('[level_controller] No blueprint for ' .. levelId .. ': ' .. tostring(err))

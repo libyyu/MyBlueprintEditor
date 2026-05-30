@@ -5,7 +5,7 @@ GameObject = UnityEngine.GameObject
 EventSystems = UnityEngine.EventSystems
 Vector3 = UnityEngine.Vector3
 Vector2 = UnityEngine.Vector2
-GameUtil = CS.CutRope.Framework.GameUtil
+GameUtil = CS.UGFramework.Runtime.GameUtil
 
 function NewGameObject(name, parent)
 	if type(name) == "string" then
@@ -93,7 +93,7 @@ function AsyncLoadArray(assetNames, cb)
 end
 
 function HasLuaScript(luaRequiredPath)
-    return CS.YooAssetsLuaBridge.HasLuaFile(luaRequiredPath)
+    return CS.UGFramework.Runtime.YooAssetsLuaBridge.HasLuaFile(luaRequiredPath)
 end
 
 DefaultPackageSeparator = ":"

@@ -3,8 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 using XLua;
-using static CutRope.Framework.SceneLoader;
-using static YooAssetsLuaBridge;
+using UGFramework.Runtime;
 
 public static class XLuaConfig
 {
@@ -13,8 +12,8 @@ public static class XLuaConfig
     {
 
         //SceneLoader
-        typeof(LuaProgressCallback),
-        typeof(LuaCompleteCallback),
+        typeof(SceneLoader.LuaProgressCallback),
+        typeof(SceneLoader.LuaCompleteCallback),
         //YooAssetsLuaBridge
         typeof(YooAssetsLuaBridge.LuaBoolStringCallback),
         typeof(YooAssetsLuaBridge.LuaBoolStringStringCallback),
@@ -43,14 +42,14 @@ public static class XLuaConfig
     public static List<Type> LuaCallCSharp_UITK = new List<Type>()
     {
         // Panel 后端接口与实现（生命周期 / 显隐 / 深度）
-        typeof(CutRope.Framework.IUIPanelBackend),
-        typeof(CutRope.Framework.UGUIPanelBackend),
-        typeof(CutRope.Framework.UITKPanelBackend),
+        typeof(IUIPanelBackend),
+        typeof(UGUIPanelBackend),
+        typeof(UITKPanelBackend),
 
         // UI 操作桥接接口与两端实现（SetText / SetColor / RegisterClick 等统一 API）
         // Lua 通过 self.m_bridge:XXX 调用，UGUI/UITK 后端无感
-        typeof(CutRope.Framework.IUIPanelBridge),
-        typeof(CutRope.Framework.UITKLuaBridge),
+        typeof(IUIPanelBridge),
+        typeof(UITKLuaBridge),
 
         // UnityEngine.UIElements 核心类型
         // Lua 可通过 bridge:Q() 拿到 VisualElement 并操作属性

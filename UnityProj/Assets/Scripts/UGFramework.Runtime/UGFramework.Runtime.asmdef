@@ -1,0 +1,19 @@
+{
+    "name": "UGFramework.Runtime",
+    "rootNamespace": "UGFramework.Runtime",
+    "references": [
+        "YooAsset",
+        "XLua.Runtime",
+        "Unity.TextMeshPro",
+        "UniTask"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

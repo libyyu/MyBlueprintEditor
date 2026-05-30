@@ -17,14 +17,40 @@
 		
 	</assembly>
 
-	<assembly fullname="CutRope.Framework">
-	    <type fullname="FTimerListBehavior" preserve="all"/>
-		<type fullname="UILuaBehaviour" preserve="all"/>
-		<type fullname="YooAssetsLuaBridge" preserve="all"/>
-		<type fullname="CutRope.Framework.AudioManager" preserve="all"/>
-		<type fullname="CutRope.Framework.GameUtil" preserve="all"/>
-		<type fullname="CutRope.Framework.SceneLoader" preserve="all"/>
-		<type fullname="CutRope.Framework.UIManager" preserve="all"/>
+	<assembly fullname="UGFramework.Runtime">
+	    <type fullname="UGFramework.Runtime.IUIPanelBackend" preserve="all"/>
+		<type fullname="UGFramework.Runtime.UGUIPanelBackend" preserve="all"/>
+		<type fullname="UGFramework.Runtime.UITKPanelBackend" preserve="all"/>
+		<type fullname="UGFramework.Runtime.IUIPanelBridge" preserve="all"/>
+		<type fullname="UGFramework.Runtime.UITKLuaBridge" preserve="all"/>
+		<type fullname="UGFramework.Runtime.AudioManager" preserve="all"/>
+		<type fullname="UGFramework.Runtime.FTimerListBehavior" preserve="all"/>
+		<type fullname="UGFramework.Runtime.GameUtil" preserve="all"/>
+		<type fullname="UGFramework.Runtime.SceneLoader" preserve="all"/>
+		<type fullname="UGFramework.Runtime.UILuaBehaviour" preserve="all"/>
+		<type fullname="UGFramework.Runtime.UIManager" preserve="all"/>
+		<type fullname="UGFramework.Runtime.YooAssetsLuaBridge" preserve="all"/>
+		
+	</assembly>
+
+	<assembly fullname="UnityEngine.UIElementsModule">
+	    <type fullname="UnityEngine.UIElements.VisualElement" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.VisualElementExtensions" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.UQueryExtensions" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.UIDocument" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.PanelSettings" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.Button" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.Label" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.TextField" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.Toggle" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.Slider" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.ScrollView" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.ProgressBar" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.DropdownField" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.StyleEnum`1[UnityEngine.UIElements.DisplayStyle]" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.StyleEnum`1[UnityEngine.UIElements.Visibility]" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.DisplayStyle" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.Visibility" preserve="all"/>
 		
 	</assembly>
 

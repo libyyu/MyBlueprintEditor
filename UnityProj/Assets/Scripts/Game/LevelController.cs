@@ -11,7 +11,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using XLua;
-using CutRope.Framework;
+using UGFramework.Runtime;
 
 namespace CutRope.Game
 {

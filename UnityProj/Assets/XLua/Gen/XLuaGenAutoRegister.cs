@@ -55,25 +55,91 @@ namespace XLua.CSObjectWrap
             translator.DelayWrapLoader(typeof(CutRope.Game.RopeVisualSetup), CutRopeGameRopeVisualSetupWrap.__Register);
         
         
-            translator.DelayWrapLoader(typeof(FTimerListBehavior), FTimerListBehaviorWrap.__Register);
+            translator.DelayWrapLoader(typeof(UGFramework.Runtime.IUIPanelBackend), UGFrameworkRuntimeIUIPanelBackendWrap.__Register);
         
         
-            translator.DelayWrapLoader(typeof(UILuaBehaviour), UILuaBehaviourWrap.__Register);
+            translator.DelayWrapLoader(typeof(UGFramework.Runtime.UGUIPanelBackend), UGFrameworkRuntimeUGUIPanelBackendWrap.__Register);
         
         
-            translator.DelayWrapLoader(typeof(YooAssetsLuaBridge), YooAssetsLuaBridgeWrap.__Register);
+            translator.DelayWrapLoader(typeof(UGFramework.Runtime.UITKPanelBackend), UGFrameworkRuntimeUITKPanelBackendWrap.__Register);
         
         
-            translator.DelayWrapLoader(typeof(CutRope.Framework.AudioManager), CutRopeFrameworkAudioManagerWrap.__Register);
+            translator.DelayWrapLoader(typeof(UGFramework.Runtime.IUIPanelBridge), UGFrameworkRuntimeIUIPanelBridgeWrap.__Register);
         
         
-            translator.DelayWrapLoader(typeof(CutRope.Framework.GameUtil), CutRopeFrameworkGameUtilWrap.__Register);
+            translator.DelayWrapLoader(typeof(UGFramework.Runtime.UITKLuaBridge), UGFrameworkRuntimeUITKLuaBridgeWrap.__Register);
         
         
-            translator.DelayWrapLoader(typeof(CutRope.Framework.SceneLoader), CutRopeFrameworkSceneLoaderWrap.__Register);
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.VisualElement), UnityEngineUIElementsVisualElementWrap.__Register);
         
         
-            translator.DelayWrapLoader(typeof(CutRope.Framework.UIManager), CutRopeFrameworkUIManagerWrap.__Register);
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.VisualElementExtensions), UnityEngineUIElementsVisualElementExtensionsWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.UQueryExtensions), UnityEngineUIElementsUQueryExtensionsWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.UIDocument), UnityEngineUIElementsUIDocumentWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.PanelSettings), UnityEngineUIElementsPanelSettingsWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.Button), UnityEngineUIElementsButtonWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.Label), UnityEngineUIElementsLabelWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.TextField), UnityEngineUIElementsTextFieldWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.Toggle), UnityEngineUIElementsToggleWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.Slider), UnityEngineUIElementsSliderWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.ScrollView), UnityEngineUIElementsScrollViewWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.ProgressBar), UnityEngineUIElementsProgressBarWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.DropdownField), UnityEngineUIElementsDropdownFieldWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.StyleEnum<UnityEngine.UIElements.DisplayStyle>), UnityEngineUIElementsStyleEnum_1_UnityEngineUIElementsDisplayStyle_Wrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.StyleEnum<UnityEngine.UIElements.Visibility>), UnityEngineUIElementsStyleEnum_1_UnityEngineUIElementsVisibility_Wrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.DisplayStyle), UnityEngineUIElementsDisplayStyleWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.Visibility), UnityEngineUIElementsVisibilityWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UGFramework.Runtime.AudioManager), UGFrameworkRuntimeAudioManagerWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UGFramework.Runtime.FTimerListBehavior), UGFrameworkRuntimeFTimerListBehaviorWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UGFramework.Runtime.GameUtil), UGFrameworkRuntimeGameUtilWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UGFramework.Runtime.SceneLoader), UGFrameworkRuntimeSceneLoaderWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UGFramework.Runtime.UILuaBehaviour), UGFrameworkRuntimeUILuaBehaviourWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UGFramework.Runtime.UIManager), UGFrameworkRuntimeUIManagerWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UGFramework.Runtime.YooAssetsLuaBridge), UGFrameworkRuntimeYooAssetsLuaBridgeWrap.__Register);
         
         
         

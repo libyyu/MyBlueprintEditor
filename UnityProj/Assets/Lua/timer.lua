@@ -37,7 +37,7 @@ local function getBehavior()
     if go == nil then
         error("[timer] GameLauncher GameObject not found in scene")
     end
-    _behavior = go:GetComponent(typeof(CS.FTimerListBehavior))
+    _behavior = go:GetComponent(typeof(CS.UGFramework.Runtime.FTimerListBehavior))
     if _behavior == nil then
         error("[timer] FTimerListBehavior not found on GameLauncher")
     end

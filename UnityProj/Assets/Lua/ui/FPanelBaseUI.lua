@@ -418,9 +418,9 @@ function FPanelBaseUI:TouchMsgHandler()
 		if self:IsFairyGui() then
 			obj = self.m_fguiOwner
 		end
-		self.m_msgHandler = obj:GetComponent(typeof(CS.UILuaBehaviour))
+		self.m_msgHandler = obj:GetComponent(typeof(CS.UGFramework.Runtime.UILuaBehaviour))
 		if not self.m_msgHandler then
-			self.m_msgHandler = obj:AddComponent(typeof(CS.UILuaBehaviour))
+			self.m_msgHandler = obj:AddComponent(typeof(CS.UGFramework.Runtime.UILuaBehaviour))
 		end
 		-- UGUI 后端：m_bridge 指向同一个 UILuaBehaviour
 		self.m_bridge = self.m_msgHandler

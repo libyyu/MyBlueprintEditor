@@ -16,7 +16,7 @@ using XLua;
 namespace CutRope.Game.UI
 {
     [LuaCallCSharp]
-    public class UIController : MonoBehaviour, Framework.IView
+    public class UIController : MonoBehaviour, UGFramework.Runtime.IView
     {
         // ── 缓存 ──────────────────────────────────────────────────────
         private readonly Dictionary<string, GameObject>  _goCache     = new();

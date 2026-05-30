@@ -26,6 +26,8 @@ namespace XLua
 			translator.RegisterPushAndGetAndUpdate<UnityEngine.Ray>(translator.PushUnityEngineRay, translator.GetUnityEngineRay, translator.UpdateUnityEngineRay);
 			translator.RegisterPushAndGetAndUpdate<UnityEngine.Bounds>(translator.PushUnityEngineBounds, translator.GetUnityEngineBounds, translator.UpdateUnityEngineBounds);
 			translator.RegisterPushAndGetAndUpdate<UnityEngine.Ray2D>(translator.PushUnityEngineRay2D, translator.GetUnityEngineRay2D, translator.UpdateUnityEngineRay2D);
+			translator.RegisterPushAndGetAndUpdate<UnityEngine.UIElements.DisplayStyle>(translator.PushUnityEngineUIElementsDisplayStyle, translator.GetUnityEngineUIElementsDisplayStyle, translator.UpdateUnityEngineUIElementsDisplayStyle);
+			translator.RegisterPushAndGetAndUpdate<UnityEngine.UIElements.Visibility>(translator.PushUnityEngineUIElementsVisibility, translator.GetUnityEngineUIElementsVisibility, translator.UpdateUnityEngineUIElementsVisibility);
 		
 		}
         
@@ -557,6 +559,174 @@ namespace XLua
             }
         }
         
+        static int UnityEngineUIElementsDisplayStyle_TypeID = -1;
+		static int UnityEngineUIElementsDisplayStyle_EnumRef = -1;
+        
+        public static void PushUnityEngineUIElementsDisplayStyle(this ObjectTranslator thiz, RealStatePtr L, UnityEngine.UIElements.DisplayStyle val)
+        {
+            if (UnityEngineUIElementsDisplayStyle_TypeID == -1)
+            {
+			    bool is_first;
+                UnityEngineUIElementsDisplayStyle_TypeID = thiz.getTypeId(L, typeof(UnityEngine.UIElements.DisplayStyle), out is_first);
+				
+				if (UnityEngineUIElementsDisplayStyle_EnumRef == -1)
+				{
+				    Utils.LoadCSTable(L, typeof(UnityEngine.UIElements.DisplayStyle));
+				    UnityEngineUIElementsDisplayStyle_EnumRef = LuaAPI.luaL_ref(L, LuaIndexes.LUA_REGISTRYINDEX);
+				}
+				
+            }
+			
+			if (LuaAPI.xlua_tryget_cachedud(L, (int)val, UnityEngineUIElementsDisplayStyle_EnumRef) == 1)
+            {
+			    return;
+			}
+			
+            IntPtr buff = LuaAPI.xlua_pushstruct(L, 4, UnityEngineUIElementsDisplayStyle_TypeID);
+            if (!CopyByValue_Gen.Pack(buff, 0, (int)val))
+            {
+                throw new Exception("pack fail fail for UnityEngine.UIElements.DisplayStyle ,value="+val);
+            }
+			
+			LuaAPI.lua_getref(L, UnityEngineUIElementsDisplayStyle_EnumRef);
+			LuaAPI.lua_pushvalue(L, -2);
+			LuaAPI.xlua_rawseti(L, -2, (int)val);
+			LuaAPI.lua_pop(L, 1);
+			
+        }
+		
+        public static void GetUnityEngineUIElementsDisplayStyle(this ObjectTranslator thiz, RealStatePtr L, int index, out UnityEngine.UIElements.DisplayStyle val)
+        {
+		    LuaTypes type = LuaAPI.lua_type(L, index);
+            if (type == LuaTypes.LUA_TUSERDATA )
+            {
+			    if (LuaAPI.xlua_gettypeid(L, index) != UnityEngineUIElementsDisplayStyle_TypeID)
+				{
+				    throw new Exception("invalid userdata for UnityEngine.UIElements.DisplayStyle");
+				}
+				
+                IntPtr buff = LuaAPI.lua_touserdata(L, index);
+				int e;
+                if (!CopyByValue_Gen.UnPack(buff, 0, out e))
+                {
+                    throw new Exception("unpack fail for UnityEngine.UIElements.DisplayStyle");
+                }
+				val = (UnityEngine.UIElements.DisplayStyle)e;
+                
+            }
+            else
+            {
+                val = (UnityEngine.UIElements.DisplayStyle)thiz.objectCasters.GetCaster(typeof(UnityEngine.UIElements.DisplayStyle))(L, index, null);
+            }
+        }
+		
+        public static void UpdateUnityEngineUIElementsDisplayStyle(this ObjectTranslator thiz, RealStatePtr L, int index, UnityEngine.UIElements.DisplayStyle val)
+        {
+		    
+            if (LuaAPI.lua_type(L, index) == LuaTypes.LUA_TUSERDATA)
+            {
+			    if (LuaAPI.xlua_gettypeid(L, index) != UnityEngineUIElementsDisplayStyle_TypeID)
+				{
+				    throw new Exception("invalid userdata for UnityEngine.UIElements.DisplayStyle");
+				}
+				
+                IntPtr buff = LuaAPI.lua_touserdata(L, index);
+                if (!CopyByValue_Gen.Pack(buff, 0,  (int)val))
+                {
+                    throw new Exception("pack fail for UnityEngine.UIElements.DisplayStyle ,value="+val);
+                }
+            }
+			
+            else
+            {
+                throw new Exception("try to update a data with lua type:" + LuaAPI.lua_type(L, index));
+            }
+        }
+        
+        static int UnityEngineUIElementsVisibility_TypeID = -1;
+		static int UnityEngineUIElementsVisibility_EnumRef = -1;
+        
+        public static void PushUnityEngineUIElementsVisibility(this ObjectTranslator thiz, RealStatePtr L, UnityEngine.UIElements.Visibility val)
+        {
+            if (UnityEngineUIElementsVisibility_TypeID == -1)
+            {
+			    bool is_first;
+                UnityEngineUIElementsVisibility_TypeID = thiz.getTypeId(L, typeof(UnityEngine.UIElements.Visibility), out is_first);
+				
+				if (UnityEngineUIElementsVisibility_EnumRef == -1)
+				{
+				    Utils.LoadCSTable(L, typeof(UnityEngine.UIElements.Visibility));
+				    UnityEngineUIElementsVisibility_EnumRef = LuaAPI.luaL_ref(L, LuaIndexes.LUA_REGISTRYINDEX);
+				}
+				
+            }
+			
+			if (LuaAPI.xlua_tryget_cachedud(L, (int)val, UnityEngineUIElementsVisibility_EnumRef) == 1)
+            {
+			    return;
+			}
+			
+            IntPtr buff = LuaAPI.xlua_pushstruct(L, 4, UnityEngineUIElementsVisibility_TypeID);
+            if (!CopyByValue_Gen.Pack(buff, 0, (int)val))
+            {
+                throw new Exception("pack fail fail for UnityEngine.UIElements.Visibility ,value="+val);
+            }
+			
+			LuaAPI.lua_getref(L, UnityEngineUIElementsVisibility_EnumRef);
+			LuaAPI.lua_pushvalue(L, -2);
+			LuaAPI.xlua_rawseti(L, -2, (int)val);
+			LuaAPI.lua_pop(L, 1);
+			
+        }
+		
+        public static void GetUnityEngineUIElementsVisibility(this ObjectTranslator thiz, RealStatePtr L, int index, out UnityEngine.UIElements.Visibility val)
+        {
+		    LuaTypes type = LuaAPI.lua_type(L, index);
+            if (type == LuaTypes.LUA_TUSERDATA )
+            {
+			    if (LuaAPI.xlua_gettypeid(L, index) != UnityEngineUIElementsVisibility_TypeID)
+				{
+				    throw new Exception("invalid userdata for UnityEngine.UIElements.Visibility");
+				}
+				
+                IntPtr buff = LuaAPI.lua_touserdata(L, index);
+				int e;
+                if (!CopyByValue_Gen.UnPack(buff, 0, out e))
+                {
+                    throw new Exception("unpack fail for UnityEngine.UIElements.Visibility");
+                }
+				val = (UnityEngine.UIElements.Visibility)e;
+                
+            }
+            else
+            {
+                val = (UnityEngine.UIElements.Visibility)thiz.objectCasters.GetCaster(typeof(UnityEngine.UIElements.Visibility))(L, index, null);
+            }
+        }
+		
+        public static void UpdateUnityEngineUIElementsVisibility(this ObjectTranslator thiz, RealStatePtr L, int index, UnityEngine.UIElements.Visibility val)
+        {
+		    
+            if (LuaAPI.lua_type(L, index) == LuaTypes.LUA_TUSERDATA)
+            {
+			    if (LuaAPI.xlua_gettypeid(L, index) != UnityEngineUIElementsVisibility_TypeID)
+				{
+				    throw new Exception("invalid userdata for UnityEngine.UIElements.Visibility");
+				}
+				
+                IntPtr buff = LuaAPI.lua_touserdata(L, index);
+                if (!CopyByValue_Gen.Pack(buff, 0,  (int)val))
+                {
+                    throw new Exception("pack fail for UnityEngine.UIElements.Visibility ,value="+val);
+                }
+            }
+			
+            else
+            {
+                throw new Exception("try to update a data with lua type:" + LuaAPI.lua_type(L, index));
+            }
+        }
+        
         
 		// table cast optimze
 		
@@ -616,6 +786,18 @@ namespace XLua
 				translator.PushUnityEngineRay2D(L, array[index]);
 				return true;
 			}
+			else if (type == typeof(UnityEngine.UIElements.DisplayStyle[]))
+			{
+			    UnityEngine.UIElements.DisplayStyle[] array = obj as UnityEngine.UIElements.DisplayStyle[];
+				translator.PushUnityEngineUIElementsDisplayStyle(L, array[index]);
+				return true;
+			}
+			else if (type == typeof(UnityEngine.UIElements.Visibility[]))
+			{
+			    UnityEngine.UIElements.Visibility[] array = obj as UnityEngine.UIElements.Visibility[];
+				translator.PushUnityEngineUIElementsVisibility(L, array[index]);
+				return true;
+			}
             return false;
 		}
 		
@@ -667,6 +849,18 @@ namespace XLua
 			else if (type == typeof(UnityEngine.Ray2D[]))
 			{
 			    UnityEngine.Ray2D[] array = obj as UnityEngine.Ray2D[];
+				translator.Get(L, obj_idx, out array[array_idx]);
+				return true;
+			}
+			else if (type == typeof(UnityEngine.UIElements.DisplayStyle[]))
+			{
+			    UnityEngine.UIElements.DisplayStyle[] array = obj as UnityEngine.UIElements.DisplayStyle[];
+				translator.Get(L, obj_idx, out array[array_idx]);
+				return true;
+			}
+			else if (type == typeof(UnityEngine.UIElements.Visibility[]))
+			{
+			    UnityEngine.UIElements.Visibility[] array = obj as UnityEngine.UIElements.Visibility[];
 				translator.Get(L, obj_idx, out array[array_idx]);
 				return true;
 			}

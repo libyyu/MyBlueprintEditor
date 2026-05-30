@@ -1,0 +1,23 @@
+{
+    "name": "UGFramework.Editor",
+    "rootNamespace": "UGFramework.Editor",
+    "references": [
+        "UGFramework.Runtime",
+        "Unity.TextMeshPro",
+        "YooAsset",
+        "YooAsset.Editor",
+        "XLua.Runtime",
+        "XLua.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

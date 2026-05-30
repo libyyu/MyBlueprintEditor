@@ -15,7 +15,7 @@ using UnityEngine;
 using YooAsset;
 using YooAsset.Editor;
 
-namespace CutRope.Editor
+namespace UGFramework.Editor
 {
     public static class BuildScript
     {
@@ -112,22 +112,22 @@ namespace CutRope.Editor
         static void RunSetup()
         {
             Debug.Log("[BuildScript] Step 1: Setup Tags / Prefabs / Scenes...");
-            try
-            {
-                CutRopeSetup.SetupTags();
-                CutRopeSetup.CreatePrefabs();
-                AssetDatabase.Refresh();
-                CutRopeSetup.CreateScenes();
-                CutRopeSetup.AddScenesToBuildSettings();
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
-                Debug.Log("[BuildScript] Step 1: Done.");
-            }
-            catch (Exception e)
-            {
-                // 已存在时 CreateScenes 会 return，log 为非致命警告
-                Debug.LogWarning($"[BuildScript] Step 1 warning (non-fatal): {e.Message}");
-            }
+            // try
+            // {
+            //     CutRopeSetup.SetupTags();
+            //     CutRopeSetup.CreatePrefabs();
+            //     AssetDatabase.Refresh();
+            //     CutRopeSetup.CreateScenes();
+            //     CutRopeSetup.AddScenesToBuildSettings();
+            //     AssetDatabase.SaveAssets();
+            //     AssetDatabase.Refresh();
+            //     Debug.Log("[BuildScript] Step 1: Done.");
+            // }
+            // catch (Exception e)
+            // {
+            //     // 已存在时 CreateScenes 会 return，log 为非致命警告
+            //     Debug.LogWarning($"[BuildScript] Step 1 warning (non-fatal): {e.Message}");
+            // }
         }
 
         // ── Step 2：YooAsset 资源打包 ─────────────────────────────────

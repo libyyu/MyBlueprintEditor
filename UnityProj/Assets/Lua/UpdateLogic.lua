@@ -20,7 +20,7 @@ print("[UpdateLogic] *** Update phase start ***")
 require "preload"
 
 local VERSION_TIMEOUT = 5   -- 拉版本号超时秒数
-local Bridge = CS.YooAssetsLuaBridge
+local Bridge = CS.UGFramework.Runtime.YooAssetsLuaBridge
 
 -- ── 生命周期钩子 ─────────────────────────────────────────────────────────
 function onAppTick(deltaTime)
@@ -161,7 +161,7 @@ end
 -- ── 入口：检查是否有 CDN 配置 ────────────────────────────────────────────
 local cdnUrl = ""
 local initializer = CS.UnityEngine.Object.FindObjectOfType(
-    typeof(CS.CutRope.Framework.YooAssetInitializer))
+    typeof(CS.UGFramework.Runtime.YooAssetInitializer))
 if initializer then
     cdnUrl = initializer.cdnBaseUrl or ""
 end

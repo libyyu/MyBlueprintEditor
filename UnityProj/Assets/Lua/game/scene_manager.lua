@@ -19,7 +19,7 @@
 local M = {}
 
 -- C# SceneLoader 静态方法绑定
-local SceneLoader = CS.CutRope.Framework.SceneLoader
+local SceneLoader = CS.UGFramework.Runtime.SceneLoader
 
 -- ── 场景加载完成钩子（外部可覆盖）─────────────────────────────────────────
 -- 每次任意场景加载完成后都会触发，参数为场景名称字符串

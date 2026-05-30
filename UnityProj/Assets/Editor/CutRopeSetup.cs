@@ -15,7 +15,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine.SceneManagement;
 
-namespace CutRope.Editor
+namespace UGFramework.Editor
 {
     public static class CutRopeSetup
     {

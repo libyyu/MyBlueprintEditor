@@ -272,7 +272,7 @@ do
 
 			if self:IsUIToolkit() then
 				-- UI Toolkit 分支：obj 是 VisualTreeAsset
-				local UITKBackend = CS.CutRope.Framework.UITKPanelBackend
+				local UITKBackend = CS.UGFramework.Runtime.UITKPanelBackend
 				-- 把深度层传入，让 Create() 自动选择 Game/Overlay PanelSettings
 				local sortOrder = self:GetDepthLayer() or 0
 				-- parentObj 在 UGUI 下是 Transform（GetUGUIRoot() 返回 Canvas.transform）
