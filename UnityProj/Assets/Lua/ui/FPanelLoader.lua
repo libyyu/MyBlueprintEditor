@@ -6,6 +6,7 @@ local FGUIMan = require "ui.FGUIMan"
 ]]
 ---@enum PanelType
 _G.PanelType = {
+	Unknow = -1,
 	Auto = 0,
 	UGUI = 1,
 	UIkit = 2,
@@ -16,21 +17,21 @@ _G.PanelType = {
 local FPanelLoader = FLua.Class(FViewBaseUI, "FPanelLoader")
 do
 	function FPanelLoader:__constructor()
-		--所在的资源ab包
-		self.m_abName = ""
 		--资源路径
 		self.m_assetPath = ""
 		--界面名
-		self.panelType = PanelType.Auto
 		self.m_panelName = ""
+		--界面类型（ugui, uitoolkit, fgui, ...)
+		self.m_panelType = PanelType.Auto
+		--界面对象
 		self.m_panel = nil
 		--后端适配层（IUIPanelBackend），同时支持 UGUI 和 UI Toolkit
 		self.m_backend = nil
-		--是否fairygui
-		self.m_isfgui = false
+		--是否fairygui window相关
 		self.m_isfguiWindow = false
 		self.m_fguiOwner = nil
 
+		--加载逻辑
 		self.m_createRequested = false
 		self.m_isLoading = false
 		self.m_disappearing = false
@@ -44,21 +45,21 @@ do
 
 	---@return integer
 	function FPanelLoader:GetPanelResourceType()
-		if self.panelType and self.panelType ~= PanelType.Auto then
-			return self.panelType
+		if self.m_panelType and self.m_panelType ~= PanelType.Auto then
+			return self.m_panelType
 		end
 
 		if self.m_assetPath:find("%.uxml$") then
-			self.panelType = PanelType.UIkit
+			self.m_panelType = PanelType.UIkit
 		elseif self.m_assetPath:find("%.prefab$") then
-			self.panelType = PanelType.UGUI
+			self.m_panelType = PanelType.UGUI
 		-- elseif self.m_assetPath:find(DefaultFGUISeparator) then
-		-- 	self.panelType = PanelType.FairyGUI
+		-- 	self.m_panelType = PanelType.FairyGUI
 		else
 			warn("无法识别的面板资源类型: " .. tostring(self.m_assetPath))
-			self.panelType = PanelType.UGUI
+			self.m_panelType = PanelType.Unknow
 		end
-		return self.panelType
+		return self.m_panelType
 	end
 
 	---@return boolean
