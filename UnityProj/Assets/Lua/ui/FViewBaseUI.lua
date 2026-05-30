@@ -52,6 +52,10 @@ do
 	---@return boolean
 	function FViewBaseUI:IsValid()
 		local obj = self:GetRootObj()
+		-- UITK SubView: m_viewObj 是 VisualElement，不走 IsValidObject（它是纯 C# 对象）
+		if obj ~= nil and type(obj) == "userdata" and obj.IsExtend and obj:IsExtend("UnityEngine.UIElements.VisualElement") then
+			return true  -- VisualElement 存在即有效，无需 Unity Object 检查
+		end
 		return IsValidObject(obj)
 	end
 
@@ -120,22 +124,20 @@ do
 		return tostring(obj)
 	end
 	---@param name string
-	---@return nil|GameObject
+	---@return nil|GameObject|VisualElement
 	function FViewBaseUI:FindDirect(name)
-		-- UITK 后端：没有 GameObject 层级，通过 root panel 的 bridge 查 VisualElement
-		local root = self:GetRootView()
-		if root and root.m_bridge and root.IsUIToolkit and root:IsUIToolkit() then
-			return root.m_bridge:Q(name)
+		-- UITK SubView: m_viewObj 是 VisualElement，Q 子元素
+		if type(self.m_viewObj) == "userdata" and self.m_viewObj.IsExtend and self.m_viewObj:IsExtend("UnityEngine.UIElements.VisualElement") then
+			return self.m_viewObj:Q(name)
 		end
 		return self.m_viewObj:FindDirect(name)
 	end
 	---@param name string
-	---@return nil|GameObject
+	---@return nil|GameObject|VisualElement
 	function FViewBaseUI:RequireFind(name)
-		-- UITK 后端：通过 root panel 的 bridge 查 VisualElement
-		local root = self:GetRootView()
-		if root and root.m_bridge and root.IsUIToolkit and root:IsUIToolkit() then
-			local ve = root.m_bridge:Q(name)
+		-- UITK SubView: m_viewObj 是 VisualElement，Q 子元素
+		if type(self.m_viewObj) == "userdata" and self.m_viewObj.IsExtend and self.m_viewObj:IsExtend("UnityEngine.UIElements.VisualElement") then
+			local ve = self.m_viewObj:Q(name)
 			if not ve then
 				printError("[UITK] RequireFind: element not found: " .. tostring(name))
 			end
@@ -326,16 +328,10 @@ do
 
 	---@return boolean
 	function FViewBaseUI:IsVisible()
-		-- UITK SubView：显隐由 VisualElement.display 控制，走 root panel 的 bridge
-		local root = self:GetRootView()
-		if root and root.IsUIToolkit and root:IsUIToolkit() then
-			if root.m_bridge and self.m_viewObj then
-				-- m_viewObj 在 UITK SubView 里存 element name（字符串）
-				local name = tostring(self.m_viewObj)
-				local ve = root.m_bridge:Q(name)
-				if ve then return ve.style.display.value ~= 0 end  -- 0 = DisplayStyle.None
-			end
-			return false
+		-- UITK SubView: m_viewObj 是 VisualElement，直接查 display
+		if type(self.m_viewObj) == "userdata" and self.m_viewObj.IsExtend and self.m_viewObj:IsExtend("UnityEngine.UIElements.VisualElement") then
+			-- DisplayStyle.None == 0 → 隐藏；Flex/other → 可见
+			return self.m_viewObj.style.display.value ~= 0
 		end
 		local obj = self:GetRootObjSafe()
 		if obj == nil then return false end
@@ -389,16 +385,15 @@ do
 	------------------------------------------------------------
 	---@param b boolean
 	function FViewBaseUI:SetVisibleInner(b)
-		-- UITK SubView：通过 root panel bridge 控制 VisualElement.display
-		local root = self:GetRootView()
-		if root and root.IsUIToolkit and root:IsUIToolkit() then
-			if root.m_bridge and self.m_viewObj then
-				local oldVisible = self:IsVisible()
-				root.m_bridge:SetDisplay(tostring(self.m_viewObj), b)
-				local newVisible = self:IsVisible()
-				if oldVisible ~= newVisible then
-					self:OnShowInternal(newVisible)
-				end
+		-- UITK SubView: m_viewObj 是 VisualElement，直接控制 display
+		if type(self.m_viewObj) == "userdata" and self.m_viewObj.IsExtend and self.m_viewObj:IsExtend("UnityEngine.UIElements.VisualElement") then
+			local oldVisible = self:IsVisible()
+			self.m_viewObj.style.display = b and
+				CS.UnityEngine.UIElements.DisplayStyle.Flex or
+				CS.UnityEngine.UIElements.DisplayStyle.None
+			local newVisible = self:IsVisible()
+			if oldVisible ~= newVisible then
+				self:OnShowInternal(newVisible)
 			end
 			return
 		end
