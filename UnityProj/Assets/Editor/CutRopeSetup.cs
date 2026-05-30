@@ -237,7 +237,7 @@ namespace UGFramework.Editor
             barRect.sizeDelta = Vector2.zero;
 
             // LoadingUIController 脚本
-            var ctrlType = GetTypeByName("CutRope.Framework.LoadingUIController");
+            var ctrlType = GetTypeByName("UGFramework.Runtime.LoadingUIController");
             if (ctrlType != null)
             {
                 var ctrl = canvasGo.AddComponent(ctrlType) as MonoBehaviour;
@@ -328,7 +328,7 @@ namespace UGFramework.Editor
             // Root GameObject — 所有 Framework 组件挂这里
             var root = new GameObject("GameLauncher");
 
-            var launcherType  = GetTypeByName("CutRope.Framework.GameLauncher");
+            var launcherType  = GetTypeByName("UGFramework.Runtime.GameLauncher");
             var bootstrapType = GetTypeByName("CutRope.Game.GameBootstrap");
             if (launcherType  != null) root.AddComponent(launcherType);
             if (bootstrapType != null) root.AddComponent(bootstrapType);
