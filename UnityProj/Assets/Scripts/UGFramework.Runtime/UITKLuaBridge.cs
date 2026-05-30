@@ -128,7 +128,7 @@ namespace UGFramework.Runtime
                 var capturedName = btn.name;
                 EventCallback<ClickEvent> cb = _ =>
                 {
-                    if (_globalOnClick != null)
+                    if (_globalOnClick != null && _globalOnClick.IsValid())
                         _globalOnClick.Call(capturedName);
                 };
                 btn.RegisterCallback(cb);
@@ -146,7 +146,8 @@ namespace UGFramework.Runtime
             }
             _globalEntries.Clear();
 
-            _globalOnClick?.Dispose();
+            if (_globalOnClick != null && _globalOnClick.IsValid())
+                _globalOnClick.Dispose();
             _globalOnClick = null;
         }
 
@@ -177,7 +178,11 @@ namespace UGFramework.Runtime
             // 累加（不覆盖）：同 name 可注册多个回调，全部触发
             var captured = callback;
             var n = NormalizeName(name);   // 回调参数用扁平 name，与 TouchAllButtons 对齐
-            EventCallback<ClickEvent> cb = _ => captured.Call(n);
+            EventCallback<ClickEvent> cb = _ =>
+            {
+                if(captured.IsValid())
+                    captured.Call(n);
+            };
             el.RegisterCallback(cb);
             _explicitEntries.Add(new ExplicitEntry
             {
@@ -205,7 +210,8 @@ namespace UGFramework.Runtime
 
                 if (entry.element != null)
                     entry.element.UnregisterCallback(entry.callback);
-                entry.luaCallback?.Dispose();
+                if(entry.luaCallback != null && entry.luaCallback.IsValid())
+                    entry.luaCallback?.Dispose();
                 _explicitEntries.RemoveAt(i);
             }
         }
@@ -369,7 +375,8 @@ namespace UGFramework.Runtime
             {
                 if (entry.element != null)
                     entry.element.UnregisterCallback(entry.callback);
-                entry.luaCallback?.Dispose();
+                if(entry.luaCallback != null && entry.luaCallback.IsValid())
+                    entry.luaCallback.Dispose();
             }
             _explicitEntries.Clear();
 
