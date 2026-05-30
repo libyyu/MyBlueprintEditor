@@ -1,7 +1,9 @@
+---@type FGUIMan
 local l_instance = nil
 ---@class FGUIMan
 local FGUIMan = FLua.Class("FGUIMan")
 do
+	---@return FGUIMan
 	function FGUIMan.Instance()
 		if not l_instance then
 			l_instance = FGUIMan()
@@ -9,16 +11,21 @@ do
 		return l_instance
 	end
 	function FGUIMan:__constructor()
+		---@type GameObject|nil
 		self.m_UIRoot = nil
+		---@type Transform|nil
 		self.m_UGUIRoot = nil
+		---@type GameObject|nil
 		self.m_FGUIRoot = nil
 		self.m_panelSet = {}
 		self.m_ObjToPanel = setmetatable({}, {__mode = "k"})
 	end
 
+	---@return Transform|nil
 	function FGUIMan:GetUGUIRoot()
 		return self.m_UGUIRoot
 	end
+	---@return GameObject|nil
 	function FGUIMan:GetFGUIRoot()
 		return self.m_FGUIRoot
 	end
@@ -134,12 +141,16 @@ do
 		--self:InitFGUIRoot()
 	end
 
+	---@param panel FPanelBaseUI
 	function FGUIMan:RegisterPanel(panel)
 		self.m_panelSet[panel] = true
 	end
+	---@param panel FPanelBaseUI
 	function FGUIMan:UnRegisterPanel(panel)
 		self.m_panelSet[panel] = nil
 	end
+	---@param panel FPanelBaseUI
+	---@return boolean
 	function FGUIMan:IsPanelRegistered(panel)
 		return self.m_panelSet[panel] == true
 	end
@@ -148,24 +159,32 @@ do
 		return pairs(self.m_panelSet)
 	end
 
+	---@param obj GameObject
+	---@param panel FPanelBaseUI
 	function FGUIMan:RegisterPanelObj(obj, panel)
 		if obj then self.m_ObjToPanel[obj] = panel end
 	end
+	---@param obj GameObject
 	function FGUIMan:UnRegisterPanelObj(obj)
 		if obj then self.m_ObjToPanel[obj] = nil end
 	end
 
+	---@param obj GameObject
+	---@return FPanelBaseUI?
 	function FGUIMan:GetPanelByObj(obj)
 		return self.m_ObjToPanel[obj]
 	end
 
+	---@param assetName string
+	---@param oncreate fun(panel:FPanelBaseUI):void
+	---@param onclick fun(panel:FPanelBaseUI, ...):void
 	---@return FPanelBaseUI
-	function FGUIMan:CreateSimpleUI(assetName, callback, onclick)
+	function FGUIMan:CreateSimpleUI(assetName, oncreate, onclick)
 		local M = FLua.Class(require "ui.FPanelBaseUI")
 		do
 			function M.OnCreate(panel)
-				if callback then 
-					callback(panel)
+				if oncreate then 
+					oncreate(panel)
 				end
 			end
 			if onclick then

@@ -11,6 +11,7 @@ local FPanelBaseUI = FLua.ForwardClass("FPanelBaseUI")
 ---@class FViewBaseUI:FBaseObject
 local FViewBaseUI = FLua.Class("FViewBaseUI")
 do
+	---@class DetachFlag
 	local DetachFlag =
 	{
 		Default = 0,
@@ -29,10 +30,12 @@ do
 		self.m_viewOwner = nil
 
 		--各子 View 的 gameObject resolver，用于获取 View 的 gameObject根节点对象, function resolver (parentView) return subViewObj end, {subViewObjResolver1, ...}
+		---@type nil|fun(view:FViewBaseUI)[]
 		self.m_subViewObjResolvers = nil
 		--各 View 对象 {subView1, ...}
+		---@type nil|FViewBaseUI[]
 		self.m_subViews = nil
-
+		---@type nil|GcCallbacks
 		self.m_cleanerOnDestroy = nil
 	end
 

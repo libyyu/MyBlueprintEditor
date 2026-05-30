@@ -3,7 +3,7 @@ local FPanelLoader = require "ui.FPanelLoader"
 local Callbacks = require "utility.Callbacks"
 local FGUIMan = require "ui.FGUIMan"
 
-
+---@class PanelInVisibleMask
 _G.PanelInVisibleMask =
 {
 	None = 0,
@@ -11,7 +11,7 @@ _G.PanelInVisibleMask =
 	ParentPanel =	0x00000002,	--因父界面隐藏而隐藏
 	Debug 		=	0x00000004,	--调试功能隐藏
 }
-
+---@class GUIDEPTH
 _G.GUIDEPTH = Enum.make
 {
 	'AUTO', '=', 0,
@@ -121,7 +121,7 @@ function FPanelBaseUI:IsVisible()
 		elseif self.m_panel.gameObject then
 			return self.m_panel.gameObject.activeSelf
 		else
-			printerror("self.m_panel not valid >>>>>>>>>>>>>", self.m_panel)
+			printError("self.m_panel not valid >>>>>>>>>>>>>", self.m_panel)
 		end
 	else
 		return self.m_panel.activeSelf
@@ -129,15 +129,19 @@ function FPanelBaseUI:IsVisible()
 end
 
 --指定界面的资源
+---@return string 资源路径
 function FPanelBaseUI:GetResPath()
 	error("You Must Override GetResPath To Specify ResPath: " .. tostring(self), 2)
 end
 
+---@param callback fun(bSucceeded: boolean)
 function FPanelBaseUI:CreatePanelNew(callback)
 	local resName = self:GetResPath()
 	self:CreatePanelInternal(resName, callback)
 end
-
+---@param show boolean
+---@param params any
+---@param callback fun(bSucceeded: boolean)
 function FPanelBaseUI:ShowPanel(show, params, callback)
 	--self.m_paramExt = params
 	if show then
@@ -146,7 +150,7 @@ function FPanelBaseUI:ShowPanel(show, params, callback)
 		self:DestroyPanel()
 	end
 end
-
+---@param resName string
 function FPanelBaseUI:CreatePanel(resName)
 	self:CreatePanelInternal(resName, nil)
 end
@@ -173,6 +177,7 @@ end
 	param bImmediate: 是否立即关闭。立即关闭时不播放关闭动画
 		退出游戏等情况时应立即关闭，否则关闭中点击 UI 可能触发错误访问
 ]]
+---@param bImmediate boolean
 function FPanelBaseUI:_DestroyPanelEx(bImmediate)
 	local firstDestroy = self.m_createRequested
 	self.m_createRequested = false
@@ -203,16 +208,15 @@ function FPanelBaseUI:_DestroyPanelEx(bImmediate)
 	-- end
 end
 
+---@return boolean
 function FPanelBaseUI:IsRootPanel()
 	--return self.m_DependsPanel == nil and not self:IsSubView()
 end
 
-
-
 function FPanelBaseUI:BringTop()
 
 end
-
+---@return integer
 function FPanelBaseUI:GetDepthLayer()
 	--local DepthCfg = ui_depth_cfg.Config
 	if self.m_depthLayer == GUIDEPTH.AUTO then
@@ -236,7 +240,7 @@ end
 function FPanelBaseUI:UnRegisterPanel()
 	FGUIMan.Instance():UnRegisterPanel(self)
 end
-
+---@return boolean
 function FPanelBaseUI:IsPanelRegistered()
 	return FGUIMan.Instance():IsPanelRegistered(self)
 end
@@ -244,7 +248,8 @@ end
 -------------------------------------------------------------
 -----End Public
 -------------------------------------------------------------
-
+---@param resName string
+---@param callback fun(bSucceeded: boolean)
 function FPanelBaseUI:CreatePanelInternal(resName, callback)
 	if self:IsResourceReady() then
 		if callback then callback(true) end
@@ -409,7 +414,7 @@ function FPanelBaseUI:TouchMsgHandler()
 	end
 
 	-- ── 现有 UGUI / FairyGUI 分支（不变）─────────────────────────────
-	if not self:IsFairyGui() or not self:IsFairyGuiWindow() then
+	if not self:IsFairyGui()  not self:IsFairyGuiWindow() then
 		if IsValidObject(self.m_msgHandler) then
 			return
 		end
@@ -576,7 +581,7 @@ function FPanelBaseUI:_SetPanelToLayerMinDepth()
 		end
 	end
 end
-
+---@param real_depth integer
 function FPanelBaseUI:_AddPanelToLayerDepth(real_depth)
 	depthLayers[self:GetDepthLayer()].layerPanels[self] = real_depth
 end
@@ -589,6 +594,7 @@ end
 
 
 ---不要直接调用这个接口
+---@param shouldVisible boolean
 function FPanelBaseUI:_SetVisibleInner(shouldVisible)
 	if self:IsSubView() then --有可能由于优化，将从PanelBase继承的页面作为一个View存在
 		FViewBaseUI._SetVisibleInner(self, shouldVisible)
@@ -613,7 +619,7 @@ function FPanelBaseUI:_SetVisibleInner(shouldVisible)
 			elseif self.m_panel.gameObject then
 				self.m_panel.gameObject.activeSelf = shouldVisible
 			else
-				printerror("self.m_panel not valid >>>>>>>>>>>>>", self.m_panel)
+				printError("self.m_panel not valid >>>>>>>>>>>>>", self.m_panel)
 			end
 		else
 			self.m_panel:SetActive(shouldVisible)
@@ -629,6 +635,8 @@ function FPanelBaseUI:_SetVisibleInner(shouldVisible)
 end
 
 --设置界面不显示标志
+---@param flag integer
+---@param valid boolean
 function FPanelBaseUI:_SetInvisibleFlagValidRaw(flag, valid)
 	if valid then
 		self.m_invisibleFlag = bit.bor(self.m_invisibleFlag, flag)
@@ -636,7 +644,8 @@ function FPanelBaseUI:_SetInvisibleFlagValidRaw(flag, valid)
 		self.m_invisibleFlag = bit.band(bit.bnot(flag), self.m_invisibleFlag)
 	end
 end
-
+---@param flag integer
+---@param valid boolean
 function FPanelBaseUI:SetInvisibleFlagValid(flag, valid)
 	local oldFlag = self.m_invisibleFlag
 	self:_SetInvisibleFlagValidRaw(flag, valid)
@@ -659,16 +668,16 @@ function FPanelBaseUI:UpdateVisibleByFlag()
 	
 	self:_SetVisibleInner(self.m_invisibleFlag == _G.PanelInVisibleMask.None)
 end
-
+---@return boolean
 function FPanelBaseUI:HasAnyInvisibleFlag()
 	return self.m_invisibleFlag ~= 0
 end
-
+---@return boolean
 function FPanelBaseUI:HasPrimaryInvisibleFlag()
 	local primaryInVisibleMask = bit.band(self.m_invisibleFlag, _G.PanelInVisibleMask.SecondaryStart-1)
 	return primaryInVisibleMask ~= 0
 end
-
+---@return boolean
 function FPanelBaseUI:CheckInvisibleFlag(flag)
 	return bit.band(flag, self.m_invisibleFlag) ~= 0
 end

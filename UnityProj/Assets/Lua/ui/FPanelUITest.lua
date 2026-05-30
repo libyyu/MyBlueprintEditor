@@ -20,10 +20,12 @@ local FPanelBaseUI = require "ui.FPanelBaseUI"
 
 local UXML_PATH = "Assets/DefaultPackage/UI/UITK/UITest.uxml"
 
+---@type FPanelUITest
 local l_instance = nil
 ---@class FPanelUITest : FPanelBaseUI
 local FPanelUITest = FLua.Class(FPanelBaseUI, "FPanelUITest")
 do
+    ---@return FPanelUITest
     function FPanelUITest.Instance()
         if not l_instance then l_instance = FPanelUITest() end
         return l_instance

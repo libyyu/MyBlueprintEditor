@@ -4,12 +4,12 @@ local FGUIMan = require "ui.FGUIMan"
 --[[
 	GUI 面板。有加载资源的功能，
 ]]
-
+---@enum PanelType
 _G.PanelType = {
 	Auto = 0,
 	UGUI = 1,
-	FairyGUI = 2,
-	UIkit = 3,
+	UIkit = 2,
+	FairyGUI = 3,
 }
 
 ---@class FPanelLoader : FViewBaseUI
@@ -42,6 +42,7 @@ do
 		self.m_unloadSessionId = 0
 	end
 
+	---@return integer
 	function FPanelLoader:GetPanelResourceType()
 		if self.panelType and self.panelType ~= PanelType.Auto then
 			return self.panelType
@@ -51,8 +52,8 @@ do
 			self.panelType = PanelType.UIkit
 		elseif self.m_assetPath:find("%.prefab$") then
 			self.panelType = PanelType.UGUI
-		elseif self.m_assetPath:find(DefaultFGUISeparator) then
-			self.panelType = PanelType.FairyGUI
+		-- elseif self.m_assetPath:find(DefaultFGUISeparator) then
+		-- 	self.panelType = PanelType.FairyGUI
 		else
 			warn("无法识别的面板资源类型: " .. tostring(self.m_assetPath))
 			self.panelType = PanelType.UGUI
@@ -60,33 +61,36 @@ do
 		return self.panelType
 	end
 
+	---@return boolean
 	function FPanelLoader:IsFairyGui()
 		return self:GetPanelResourceType() == PanelType.FairyGUI
 	end
+	---@return boolean
 	function FPanelLoader:IsFairyGuiWindow()
 		return self:IsFairyGui() and self.m_isfguiWindow
 	end
-
+	---@return boolean
 	function FPanelLoader:IsUIToolkit()
 		return self:GetPanelResourceType() == PanelType.UIkit
 	end
-
+	---@return boolean
 	function FPanelLoader:IsUGUI()
 		return self:GetPanelResourceType() == PanelType.UGUI
 	end
 	
+	---@return Transform|nil
 	function FPanelLoader:GetUIRoot()
-		if self:IsFairyGui() then
+		if self:IsFairyGui() or self:IsFairyGuiWindow() then
 			return FGUIMan.Instance():GetFGUIRoot()
 		else
 			return FGUIMan.Instance():GetUGUIRoot()
 		end
 	end
-
+	---@return boolean
 	function FPanelLoader:IsResourceReady()
 		return self.m_createRequested and IsValidObject(self.m_panel) and not self.m_disappearing
 	end
-
+	---@return boolean
 	function FPanelLoader:IsResourceLoading()
 		return self.m_createRequested and self.m_isLoading
 	end
@@ -161,6 +165,9 @@ do
 		end
 	end
 
+	---@param assetName string
+	---@param callback fun(obj:any):void
+	---@param panelType integer
 	local function LoadPanelPackage(assetName, callback, panelType)
 		if panelType == PanelType.FairyGUI then 
 			LoadFairyGUIPackage(assetName, callback)
@@ -204,13 +211,9 @@ do
 		end
 	end
 
-	--[[
-		param resName: 资源路径
-		param panelName: 界面名称
-		param parentObj: 新面板以此对象为父，非 nil 表示是子面板；nil 表示使用默认（暂时无用）
-		param onCreateFinish: function onCreateFinish (bSucceeded)
-	]]
-
+	---@param resName string 资源路径
+	---@param parentObj Transform|nil 新面板以此对象为父，非 nil 表示是子面板；nil 表示使用默认（暂时无用）
+	---@param onCreateFinish fun(bSucceeded:boolean) 回调函数，当面板创建完成时调用
 	function FPanelLoader:LoadPanel(resName, parentObj, onCreateFinish)
 		self.m_createRequested = true
 		--资源加载中，不用重复创建
@@ -325,6 +328,8 @@ do
 	end
 
 	--TODO:
+	---@param bHideOnDestroy boolean 是否在销毁时隐藏面板
+	---@param clearGCLevel number 当 bHideOnDestroy 为 true 时，清理到什么 GC 层级时才隐藏面板
 	function FPanelLoader:SetHideOnDestroy(bHideOnDestroy, clearGCLevel)
 		self.m_HideOnDestroy = bHideOnDestroy
 		self.m_HideOnDestroyGCLevel = clearGCLevel
@@ -337,14 +342,17 @@ do
 	------------------------------------------------------------
 	-- End of public
 	------------------------------------------------------------
+	---@return boolean 是否禁用世界渲染
 	function FPanelLoader:IsDisableWorldRendering()
 		return false
 	end
 
+	---@return boolean 是否触发 GC
 	function FPanelLoader:IsTrigGC()
 		return self.m_TrigGC
 	end
 
+	---@param panelObject nil|GameObject|UITKPanelBackend|FairyGUI.Window|FairyGUI.GObject
 	function FPanelLoader:SetPanelObject(panelObject)
 		self.m_panel = panelObject
 		self:OnChangePanelObject()
@@ -382,6 +390,7 @@ do
 		self.m_disappearing = false
 	end
 	
+	---@param panelHide nil|GameObject|UITKPanelBackend|FairyGUI.Window|FairyGUI.GObject
 	function FPanelLoader:_SetPanelHide(panelHide)
 		if self.m_panelHide == panelHide then
 			return
@@ -397,6 +406,7 @@ do
 	end
 	
 	--取出缓存的 panelHide 开始使用
+	---@return nil|GameObject|UITKPanelBackend|FairyGUI.Window|FairyGUI.GObject
 	function FPanelLoader:_FetchPanelHide()
 		local panelHide = self.m_panelHide
 		if panelHide then
