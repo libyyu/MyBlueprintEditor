@@ -1,3 +1,4 @@
+---@class FGUITools
 local FGUITools = FLua.Class("FGUITools")
 do
 	function FGUITools.setText(obj,text)

@@ -1,3 +1,4 @@
+---@class Callbacks
 local Callbacks = FLua.Class()
 
 function Callbacks.new(name)

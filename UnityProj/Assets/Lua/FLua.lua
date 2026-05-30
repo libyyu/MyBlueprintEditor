@@ -528,6 +528,11 @@ do
         return classType
     end
     _M.Class = _Class
+    
+    local function _GetClass(className)
+        return all_class[className]
+    end
+    _M.GetClass = _GetClass
 end
 ------------------------------------------------------------------
 ---@class FBaseObject
@@ -793,8 +798,13 @@ function FLua.printValue(...)
     print(table.concat(sb, " "))
 end
 
-
-
+setmetatable(FLua, {
+    __index = function(_, className)
+        local cls = _M.GetClass(className)
+        if cls then return cls end
+        error(("Class`%s` not defined!!!"):format(className), 2)
+    end
+})
 
 if false then
     local function dotest(cb)

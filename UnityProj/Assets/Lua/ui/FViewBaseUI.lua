@@ -3,6 +3,7 @@
 	View 是界面逻辑处理的合适单位，其会收到 OnCreate、OnDestroy 等消息
 ]]
 
+---@type GcCallbacks
 local GcCallbacks = require "utility.GcCallbacks"
 ---@type FPanelBaseUI
 local FPanelBaseUI = FLua.ForwardClass("FPanelBaseUI")
@@ -20,8 +21,11 @@ do
 	FViewBaseUI.DetachFlag = DetachFlag
 
 	function FViewBaseUI:__constructor()
+		---@type FPanelBaseUI|nil
 		self.m_viewRoot = nil
+		---@type GameObject|nil
 		self.m_viewObj = nil
+		---@type FViewBaseUI|nil
 		self.m_viewOwner = nil
 
 		--各子 View 的 gameObject resolver，用于获取 View 的 gameObject根节点对象, function resolver (parentView) return subViewObj end, {subViewObjResolver1, ...}
@@ -32,19 +36,23 @@ do
 		self.m_cleanerOnDestroy = nil
 	end
 
+	---@return FPanelBaseUI|nil
 	function FViewBaseUI:GetRootView()
 		return self.m_viewRoot
 	end
 
+	---@return FViewBaseUI|nil
 	function FViewBaseUI:GetOwnerView()
 		return self.m_viewOwner
 	end
-
+	
+	---@return boolean
 	function FViewBaseUI:IsValid()
 		local obj = self:GetRootObj()
 		return IsValidObject(obj)
 	end
 
+	---@return boolean
 	function FViewBaseUI:IsRegister()
 		if self == self.m_viewRoot then
 			return true
@@ -56,20 +64,19 @@ do
 
 		return false
 	end
-
+	---@return boolean
 	function FViewBaseUI:IsSubView()
 		if self ~= self.m_viewRoot and self:IsRegister() then
 			return true
 		end
 		return false
 	end
-
-
-
+	---@return GameObject|nil
 	function FViewBaseUI:GetRootObj()
 		return self.m_viewObj
 	end
 
+	---@return GameObject|nil
 	function FViewBaseUI:GetRootObjSafe()
 		local obj = self:GetRootObj()
 		return self:IsValid() and obj or nil
@@ -109,18 +116,19 @@ do
 	local function formatGameObjectInfo(obj)
 		return tostring(obj)
 	end
-
-
+	---@param name string
+	---@return nil|GameObject
 	function FViewBaseUI:FindDirect(name)
 		return self.m_viewObj:FindDirect(name)
 	end
-
+	---@param name string
+	---@return nil|GameObject
 	function FViewBaseUI:RequireFind(name)
 		return self.m_viewObj:RequireFind(name)
 	end
-
-
-
+	---@param subViewPath string
+	---@param subView FViewBaseUI
+	---@return FViewBaseUI
 	function FViewBaseUI:RegisterSubView(subViewPath, subView)
 		return self:RegisterSubViewEx(function (view)
 			local viewObj = view.m_viewObj
@@ -137,7 +145,9 @@ do
 			end
 		end, subView)
 	end
-
+	---@param subViewObjResolver fun(view:FViewBaseUI):GameObject|nil
+	---@param subView FViewBaseUI
+	---@return FViewBaseUI
 	function FViewBaseUI:RegisterSubViewEx(subViewObjResolver, subView)
 		if subView == nil then
 			error("bad param #3 to RegisterSubViewEx (FViewBaseUI expected, got nil)", 2)
@@ -162,11 +172,18 @@ do
 		subView:OnAttached(self)
 		return subView
 	end
-
+	---@param gameObject:GameObject|nil
+	---@param subView FViewBaseUI
+	---@param bInvokeOnCreate boolean|nil
+	---@return FViewBaseUI
 	function FViewBaseUI:AttachSubView(gameObject, subView, bInvokeOnCreate)
 		return self:AttachSubViewEx(gameObject, subView, bInvokeOnCreate, DetachFlag.Default)
 	end
-
+	---@param gameObject:GameObject|nil
+	---@param subView FViewBaseUI
+	---@param bInvokeOnCreate boolean|nil
+	---@param nDetachFlag number|nil
+	---@return FViewBaseUI
 	function FViewBaseUI:AttachSubViewEx(gameObject, subView, bInvokeOnCreate, nDetachFlag)
 		if subView == nil then
 			error("bad param #3 to AttachSubView (FViewBaseUI expected, got nil)", 2)
@@ -209,7 +226,8 @@ do
 		end
 		return subView
 	end
-
+	---@param gameObject:GameObject|nil
+	---@param Root FViewBaseUI
 	function FViewBaseUI:CreateFromObj(gameObject, Root)
 		if gameObject == nil then
 			error("bad param #2 to CreateFromObj (gameObject expedted, got nil)", 2)
@@ -223,7 +241,9 @@ do
 		self:OnCreateInternal()
 		self:AfterCreateInternal()
 	end
-
+	---@param subView FViewBaseUI
+	---@param bInvokeOnDestroy boolean
+	---@return boolean
 	function FViewBaseUI:DetachSubView(subView, bInvokeOnDestroy)
 		if not subView:GetOwnerView() then
 			logError(("subView(%s) does not attached to any view"):format(tostring(subView)), 2)
@@ -273,7 +293,7 @@ do
 		subView:OnDetached(self)
 		return true
 	end
-
+	---@param bInvokeOnDestroy boolean?
 	function FViewBaseUI:DetachAllSubView(bInvokeOnDestroy)
 		if self.m_subViews then
 			for _, subView in ipairs(self.m_subViews) do
@@ -282,12 +302,12 @@ do
 		end
 	end
 
-
+	---@param b boolean
 	function FViewBaseUI:SetVisible(b)
 		self:SetVisibleInner(b)
 	end
 
-
+	---@return boolean
 	function FViewBaseUI:IsVisible()
 		local obj = self:GetRootObjSafe()
 		if obj == nil then return false end
@@ -302,7 +322,8 @@ do
 			return obj.activeSelf
 		end
 	end
-
+	---@param id any
+	---@param message any
 	function FViewBaseUI:SendUIMessage(id, message)
 		if self.m_subViews then
 			for _, subView in ipairs(self.m_subViews) do
@@ -312,7 +333,9 @@ do
 			end
 		end
 	end
-
+	---@param methodName string
+	---@param *
+	---@return any
 	function FViewBaseUI:CallMethod(methodName, ...)
 		if not self:tryget(methodName) then
 			return nil
@@ -320,7 +343,9 @@ do
 
 		return self[methodName](self,...)
 	end
-
+	---@param functionName string
+	---@param *
+	---@return any
 	function FViewBaseUI:InvokeSubViewsFunction(functionName, ...)
 		if self.m_subViews then
 			for _, subView in ipairs(self.m_subViews) do
@@ -334,6 +359,7 @@ do
 	------------------------------------------------------------
 	-- End of public
 	------------------------------------------------------------
+	---@param b boolean
 	function FViewBaseUI:SetVisibleInner(b)
 		local obj = self:GetRootObjSafe()
 		if obj then
@@ -359,7 +385,9 @@ do
 			end
 		end
 	end
-
+	---@param subView FViewBaseUI
+	---@param id any
+	---@param message any
 	function FViewBaseUI:OnUIMessage(subView, id, message)
 	end
 
@@ -394,7 +422,7 @@ do
 		self:AfterDestroy()
 		self:InvokeSubViewsFunction("AfterDestroyInternal")
 	end
-
+	---@param bShow boolean
 	function FViewBaseUI:OnShowInternal(bShow)
 		self:OnVisibilityChanged(bShow)
 		if self.m_subViews then
@@ -411,18 +439,22 @@ do
 		--self:InvokeSubViewsFunction("OnShowInternal")
 		--self:callMethod("__OnPanelShow", bShow)
 	end
-
+	---@param viewPanel FViewBaseUI
 	function FViewBaseUI:SetViewRoot(viewPanel)
 		self.m_viewRoot = viewPanel
 		self:InvokeSubViewsFunction("SetViewRoot", viewPanel)
 	end
 
-
+	---@param view FViewBaseUI
 	function FViewBaseUI:OnAttached(view) end
+	---@param view FViewBaseUI
 	function FViewBaseUI:OnDetached(view) end
+	---@param view FViewBaseUI
 	function FViewBaseUI:AfterAttached(view) end
+	---@param view FViewBaseUI
 	function FViewBaseUI:BeforeDetached(view) end
 
+	---@return GcCallbacks
 	function FViewBaseUI:cleanerOnDestroy()
 		local cleaner = self.m_cleanerOnDestroy
 		if not cleaner then

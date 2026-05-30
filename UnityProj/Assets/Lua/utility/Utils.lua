@@ -1,5 +1,5 @@
 
-
+---@class Utils
 local Utils = FLua.StaticClass("Utils")
 
 function Utils.Value2String(sth)

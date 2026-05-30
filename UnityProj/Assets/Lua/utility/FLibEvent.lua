@@ -1,4 +1,4 @@
-
+---@class FLibEvent
 local FLibEvent = FLua.Class("FLibEvent")
 do
 	function FLibEvent:__constructor()

@@ -2,8 +2,10 @@
 	辅助把 GcCallbacks 当作 cleaner
 ]]
 
-local GcCallbacks = require "Utility.GcCallbacks"
+---@type GcCallbacks
+local GcCallbacks = require "utility.GcCallbacks"
 
+---@class CleanerHelper
 local CleanerHelper = FLua.StaticClass()
 do
 	--[[

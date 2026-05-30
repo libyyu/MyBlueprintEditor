@@ -1,3 +1,4 @@
+---@class FTask
 local FTask = FLua.Class("FTask")
 do
 	function FTask.__constructor( )

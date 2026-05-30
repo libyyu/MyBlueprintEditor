@@ -18,7 +18,7 @@ local function checkSimpleType (value, who, argIndex, needType, errLevel)
 	end
 end
 
-
+---@class TableProxy
 local TableProxy = FLua.StaticClass()
 do
 	local function createProxy (__index)
