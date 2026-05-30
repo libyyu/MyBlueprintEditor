@@ -109,13 +109,13 @@ function FPanelBaseUI:IsVisible()
 		return false
 	end
 	-- UITK：委托给 backend，以 rootVisualElement.display 为准
-	if self.m_isuitk then
+	if self:IsUIToolkit() then
 		if self.m_backend and self.m_backend.IsValid then
 			return self.m_backend:GetVisible()
 		end
 		return false
 	end
-	if self.m_isfgui then
+	if self:IsFairyGui() then
 		if self.m_panel.displayObject then
 			return not not self.m_panel.displayObject.visible
 		elseif self.m_panel.gameObject then
@@ -336,7 +336,7 @@ function FPanelBaseUI:OnLoadPanel()
 	self:OnCreateInternal()
 	self.m_created = true
 
-	if self.m_isfgui then
+	if self:IsFairyGui() then
 		self.m_panel.opaque = self.m_opaque
 	end
 
@@ -388,7 +388,7 @@ function FPanelBaseUI:TouchMsgHandler()
 	end
 
 	-- ── UI Toolkit 分支 ───────────────────────────────────────────────────
-	if self.m_isuitk then
+	if self:IsUIToolkit() then
 		-- 从 backend 拿到 UITKLuaBridge
 		if not self.m_backend then return end
 		local bridge = self.m_backend:GetEventBridge()
@@ -409,13 +409,13 @@ function FPanelBaseUI:TouchMsgHandler()
 	end
 
 	-- ── 现有 UGUI / FairyGUI 分支（不变）─────────────────────────────
-	if not self.m_isfgui or not self.m_isfguiWindow then
+	if not self:IsFairyGui() or not self:IsFairyGuiWindow() then
 		if IsValidObject(self.m_msgHandler) then
 			return
 		end
 
 		local obj = self.m_panel
-		if self.m_isfgui then
+		if self:IsFairyGui() then
 			obj = self.m_fguiOwner
 		end
 		self.m_msgHandler = obj:GetComponent(typeof(CS.UILuaBehaviour))
@@ -523,14 +523,14 @@ function FPanelBaseUI:_SetPanelToLayerMaxDepth()
 	self:_RemovePanelFromLayer()
 
 	local real_depth = GetLayerNextTopDepth(self:GetDepthLayer())
-	if self.m_isuitk then
+	if self:IsUIToolkit() then
 		-- UI Toolkit：通过 backend 设置 UIDocument.sortingOrder
 		if self.m_backend and self.m_backend.IsValid then
 			self.m_backend:SetSortingOrder(real_depth)
 			self:_AddPanelToLayerDepth(real_depth)
 		end
-	elseif self.m_isfgui then
-		if self.m_isfguiWindow then
+	elseif self:IsFairyGui() then
+		if self:IsFairyGuiWindow() then
 			self.m_panel:SetSortingOrder(real_depth, true)
 			self:_AddPanelToLayerDepth(real_depth)
 		else
@@ -553,13 +553,13 @@ function FPanelBaseUI:_SetPanelToLayerMinDepth()
 
 	local real_depth = GetLayerNextBottomDepth(self:GetDepthLayer())
 
-	if self.m_isuitk then
+	if self:IsUIToolkit() then
 		if self.m_backend and self.m_backend.IsValid then
 			self.m_backend:SetSortingOrder(real_depth)
 			self:_AddPanelToLayerDepth(real_depth)
 		end
-	elseif self.m_isfgui then
-		if self.m_isfguiWindow then
+	elseif self:IsFairyGui() then
+		if self:IsFairyGuiWindow() then
 			self.m_panel:SetSortingOrder(real_depth, true)
 			self:_AddPanelToLayerDepth(real_depth)
 		else
@@ -602,12 +602,12 @@ function FPanelBaseUI:_SetVisibleInner(shouldVisible)
 	end
 
 	if self.m_panel then
-		if self.m_isuitk then
+		if self:IsUIToolkit() then
 			-- UITK：通过 backend 控制，同步 rootVisualElement.display + GO active
 			if self.m_backend and self.m_backend.IsValid then
 				self.m_backend:SetVisible(shouldVisible)
 			end
-		elseif self.m_isfgui then
+		elseif self:IsFairyGui() then
 			if self.m_panel.displayObject then
 				self.m_panel.displayObject.visible = shouldVisible
 			elseif self.m_panel.gameObject then

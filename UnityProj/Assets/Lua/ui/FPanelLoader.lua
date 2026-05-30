@@ -4,6 +4,14 @@ local FGUIMan = require "ui.FGUIMan"
 --[[
 	GUI 面板。有加载资源的功能，
 ]]
+
+_G.PanelType = {
+	Auto = 0,
+	UGUI = 1,
+	FairyGUI = 2,
+	UIkit = 3,
+}
+
 ---@class FPanelLoader : FViewBaseUI
 local FPanelLoader = FLua.Class(FViewBaseUI, "FPanelLoader")
 do
@@ -13,6 +21,7 @@ do
 		--资源路径
 		self.m_assetPath = ""
 		--界面名
+		self.panelType = PanelType.Auto
 		self.m_panelName = ""
 		self.m_panel = nil
 		--后端适配层（IUIPanelBackend），同时支持 UGUI 和 UI Toolkit
@@ -23,6 +32,7 @@ do
 		self.m_isfgui = false
 		self.m_isfguiWindow = false
 		self.m_fguiOwner = nil
+
 		self.m_createRequested = false
 		self.m_isLoading = false
 		self.m_disappearing = false
@@ -34,8 +44,41 @@ do
 		self.m_unloadSessionId = 0
 	end
 
+	function FPanelLoader:GetPanelResourceType()
+		if self.panelType and self.panelType ~= PanelType.Auto then
+			return self.panelType
+		end
+
+		if self.m_assetPath:find("%.uxml$") then
+			self.panelType = PanelType.UIkit
+		elseif self.m_assetPath:find("%.prefab$") then
+			self.panelType = PanelType.UGUI
+		elseif self.m_assetPath:find(DefaultFGUISeparator) then
+			self.panelType = PanelType.FairyGUI
+		else
+			warn("无法识别的面板资源类型: " .. tostring(self.m_assetPath))
+			self.panelType = PanelType.UGUI
+		end
+		return self.panelType
+	end
+
+	function FPanelLoader:IsFairyGui()
+		return self:GetPanelResourceType() == PanelType.FairyGUI
+	end
+	function FPanelLoader:IsFairyGuiWindow()
+		return self:IsFairyGui() and self.m_isfguiWindow
+	end
+
+	function FPanelLoader:IsUIToolkit()
+		return self:GetPanelResourceType() == PanelType.UIkit
+	end
+
+	function FPanelLoader:IsUGUI()
+		return self:GetPanelResourceType() == PanelType.UGUI
+	end
+	
 	function FPanelLoader:GetUIRoot()
-		if self.m_isfgui then
+		if self:IsFairyGui() then
 			return FGUIMan.Instance():GetFGUIRoot()
 		else
 			return FGUIMan.Instance():GetUGUIRoot()
@@ -120,19 +163,14 @@ do
 		end
 	end
 
-	local function LoadPanelPackage(assetName, callback, fgui)
-		if fgui then 
+	local function LoadPanelPackage(assetName, callback, panelType)
+		if panelType == PanelType.FairyGUI then 
 			LoadFairyGUIPackage(assetName, callback)
 		else
 			AsyncLoad(assetName, function(obj)
 				callback(obj)
 			end)
 		end
-	end
-
-	-- 判断是否为 UI Toolkit 资源（.uxml 后缀）
-	local function isUIToolkitRes(resName)
-		return resName:find("%.uxml$") ~= nil
 	end
 
 	local function parseResource(resName)
@@ -168,7 +206,6 @@ do
 		end
 	end
 
-
 	--[[
 		param resName: 资源路径
 		param panelName: 界面名称
@@ -182,19 +219,12 @@ do
 		if self.m_isLoading then
 			return
 		end
+		
+		local _, prefabName = parseResource(resName)
+
 		self.m_isLoading = true
-
-		-- 检测是否为 UI Toolkit (.uxml) 资源
-		local uitk = isUIToolkitRes(resName)
-		self.m_isuitk = uitk
-
-		local isfgui, prefabName, packageName, window = parseResource(resName)
-		print("parseResource", isfgui, uitk, resName, prefabName)
-		self.m_isfgui = isfgui
-		self.m_isfguiWindow = window
 		self.m_assetPath = resName
 		self.m_panelName = prefabName
-		self.m_abName = abName
 		if not parentObj then parentObj = self:GetUIRoot() end
 		self:OnBeforeLoadPanel()
 
@@ -221,7 +251,7 @@ do
 		
 		--从隐藏界面中创建
 		local panelHide = self:_FetchPanelHide()
-		if panelHide then		
+		if panelHide then
 			onResourceLoaded(panelHide)
 			return
 		end
@@ -239,7 +269,7 @@ do
 				return
 			end
 
-			if uitk then
+			if self:IsUIToolkit() then
 				-- UI Toolkit 分支：obj 是 VisualTreeAsset
 				local UITKBackend = CS.CutRope.Framework.UITKPanelBackend
 				-- 把深度层传入，让 Create() 自动选择 Game/Overlay PanelSettings
@@ -255,7 +285,7 @@ do
 					sortOrder
 				)
 				onResourceLoaded(backend)
-			elseif not isfgui then
+			elseif self:IsUGUI() then
 				local panel = Instantiate(obj, self.m_panelName, parentObj)
 				panel.transform.localPosition = Vector3(0, 0, 0)
 				panel.transform.localScale = Vector3(1, 1, 1)
@@ -289,8 +319,8 @@ do
 				onResourceLoaded(panel)
 			end
 		end
-		
-		LoadPanelPackage(resName, onLoad, isfgui and not uitk)
+
+		LoadPanelPackage(resName, onLoad, self:GetPanelResourceType())
 	end
 
 	--TODO:
