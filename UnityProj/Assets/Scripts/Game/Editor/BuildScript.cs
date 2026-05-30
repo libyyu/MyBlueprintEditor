@@ -15,7 +15,7 @@ using UnityEngine;
 using YooAsset;
 using YooAsset.Editor;
 
-namespace UGFramework.Editor
+namespace CutRope.Editor
 {
     public static class BuildScript
     {
