@@ -30,6 +30,9 @@ namespace CutRope.Framework
     [LuaCallCSharp]
     public class UITKLuaBridge : MonoBehaviour, IUIPanelBridge
     {
+        private LuaTable msgHandle = null;
+        protected bool initialize = false;
+        private bool __visible = false;
         // ── 内部结构 ─────────────────────────────────────────────────────
 
         /// <summary>全局扫描模式的 listener（每个 Button 一条）</summary>
@@ -178,9 +181,9 @@ namespace CutRope.Framework
             el.RegisterCallback(cb);
             _explicitEntries.Add(new ExplicitEntry
             {
-                name        = n,
-                element     = el,
-                callback    = cb,
+                name = n,
+                element = el,
+                callback = cb,
                 luaCallback = captured,
             });
         }
@@ -231,12 +234,12 @@ namespace CutRope.Framework
             var n = NormalizeName(name);
             return typeName switch
             {
-                "Label"     => root.Q<Label>(n),
-                "Button"    => root.Q<Button>(n),
+                "Label" => root.Q<Label>(n),
+                "Button" => root.Q<Button>(n),
                 "TextField" => root.Q<TextField>(n),
-                "Toggle"    => root.Q<Toggle>(n),
-                "Slider"    => root.Q<Slider>(n),
-                _           => root.Q(n),
+                "Toggle" => root.Q<Toggle>(n),
+                "Slider" => root.Q<Slider>(n),
+                _ => root.Q(n),
             };
         }
 
@@ -245,9 +248,9 @@ namespace CutRope.Framework
         public void SetText(string name, string text)
         {
             var el = Lookup(name);
-            if      (el is Label     lbl) lbl.text = text;
-            else if (el is Button    btn) btn.text = text;
-            else if (el is TextField tf)  tf.value = text;
+            if (el is Label lbl) lbl.text = text;
+            else if (el is Button btn) btn.text = text;
+            else if (el is TextField tf) tf.value = text;
             else if (el == null) Debug.LogWarning($"[UITKLuaBridge] SetText: '{name}' not found");
             else Debug.LogWarning($"[UITKLuaBridge] SetText: '{name}' is not a text element");
         }
@@ -257,10 +260,10 @@ namespace CutRope.Framework
             var el = Lookup(name);
             return el switch
             {
-                Label     lbl => lbl.text,
-                Button    btn => btn.text,
-                TextField tf  => tf.value,
-                _             => ""
+                Label lbl => lbl.text,
+                Button btn => btn.text,
+                TextField tf => tf.value,
+                _ => ""
             };
         }
 
@@ -376,7 +379,38 @@ namespace CutRope.Framework
 
         private void OnDestroy()
         {
+            CallMethod("onDestroy");
             ClearAllListeners();
+            initialize = true;
+        }
+
+        protected void Awake()
+        {
+            initialize = true;
+            CallMethod("onAwake", gameObject);
+        }
+        protected void Start()
+        {
+            CallMethod("onStart");
+        }
+
+        protected void OnBecameVisible()
+        {
+            __visible = true;
+            CallMethod("onBecameVisible");
+        }
+        protected void OnBecameInvisible()
+        {
+            __visible = false;
+            CallMethod("onBecameInvisible");
+        }
+
+        object[] CallMethod(string func, params object[] args)
+        {
+            if (!initialize || null == msgHandle || !msgHandle.IsValid()) return null;
+            var fun = msgHandle.Get<LuaFunction>(func);
+            if (null == fun) return null;
+            return fun.Call(args);
         }
     }
 }

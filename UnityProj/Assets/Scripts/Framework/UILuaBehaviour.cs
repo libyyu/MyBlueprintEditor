@@ -285,7 +285,7 @@ public class UILuaBehaviour : MonoBehaviour, IUIPanelBridge {
     /// </summary>
     object[] CallMethod(string func, params object[] args) 
     {
-        if (!initialize || null == msgHandle || LuaManager.IsLuaValid) return null;
+        if (!initialize || null == msgHandle || !msgHandle.IsValid()) return null;
         var fun = msgHandle.Get<LuaFunction>(func);
         if (null == fun) return null;
         return fun.Call(args);
