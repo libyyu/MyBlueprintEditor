@@ -105,14 +105,15 @@ function FPanelBaseUI:IsVisible()
 	if self:IsSubView() then --有可能由于优化，将从PanelBase继承的页面作为一个View存在
 		return FViewBaseUI.IsVisible(self)
 	end
-	if not IsValidObject(self.m_panel) then
-		return false
-	end
-	-- UITK：委托给 backend，以 rootVisualElement.display 为准
+	-- UITK：不依赖 m_panel（RootGameObject）判断，直接问 backend
+	-- 注意：必须在 IsValidObject(m_panel) 检查之前，否则 DestroyPanelRaw 后 m_backend 已 nil
 	if self:IsUIToolkit() then
 		if self.m_backend and self.m_backend.IsValid then
 			return self.m_backend:GetVisible()
 		end
+		return false
+	end
+	if not IsValidObject(self.m_panel) then
 		return false
 	end
 	if self:IsFairyGui() then
@@ -401,14 +402,27 @@ function FPanelBaseUI:TouchMsgHandler()
 		self.m_bridge = bridge
 		self.m_msgHandler = bridge  -- 兼容旧代码对 m_msgHandler 的引用
 
-		-- 如果 Lua 面板定义了 OnClick，自动扫描所有 Button 元素
-		-- 参数为 name string，与 UGUI 的对齐方案一致
+		-- OnClick：全局扫描所有 Button
 		local func = getFunc("OnClick")
 		if func then
 			local mst = {
 				onClick = function(name) self:OnClick(name) end
 			}
 			bridge:TouchAllButtons(mst)
+		end
+
+		-- OnSubmit / OnChange：全局扫描所有 TextField
+		local hasSubmit = getFunc("OnSubmit")
+		local hasChange = getFunc("OnChange")
+		if hasSubmit or hasChange then
+			local mst2 = {}
+			if hasSubmit then
+				mst2.onSubmit = function(name) self:OnSubmit(name) end
+			end
+			if hasChange then
+				mst2.onTextChange = function(name, val) self:OnChange(name, val) end
+			end
+			bridge:TouchAllInputs(mst2)
 		end
 		return
 	end

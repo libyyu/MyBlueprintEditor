@@ -11,6 +11,7 @@
 //   6. SetDisplay(name, visible)   —— 快捷控制元素显隐
 //   7. ClearGlobalScan()           —— 仅清理 TouchAllButtons 注册的全局扫描
 //   8. ClearAllListeners()         —— 清理全部事件（面板销毁时自动调用）
+//   9. TouchAllInputs(msgHandler)  —— 扫描所有 TextField，路由到 OnSubmit(name) / OnChange(name,val)
 //
 // 设计：两种模式可共存（对齐 UGUI 的 UILuaBehaviour.AddClick 语义）
 //   - 全局扫描（TouchAllButtons）和精确绑定（RegisterClick）使用独立的 listener 列表
@@ -134,6 +135,77 @@ namespace UGFramework.Runtime
                 btn.RegisterCallback(cb);
                 _globalEntries.Add(new GlobalEntry { element = btn, callback = cb });
             }
+        }
+
+        // ── 模式一-B：全局 TextField 扫描（onSubmit / onTextChange）────────────
+
+        /// <summary>全局 TextField 扫描的 listener</summary>
+        private struct InputEntry
+        {
+            public TextField element;
+            public EventCallback<ChangeEvent<string>> cbChange;
+            public EventCallback<NavigationSubmitEvent> cbSubmit;
+        }
+        private readonly List<InputEntry> _inputEntries = new List<InputEntry>();
+        private LuaFunction _globalOnChange;
+        private LuaFunction _globalOnSubmit;
+
+        /// <summary>
+        /// 扫描所有 TextField，统一路由：
+        ///   msgHandler.onTextChange(name, value)  —— 值变化时触发
+        ///   msgHandler.onSubmit(name)             —— 提交（回车/确认）时触发
+        /// 与 UGUI 的 UILuaBehaviour.TouchGUIMsg onTextChange/onSubmit 对齐。
+        /// </summary>
+        public void TouchAllInputs(LuaTable msgHandler)
+        {
+            ClearInputScan();
+            _globalOnChange = msgHandler?.Get<LuaFunction>("onTextChange");
+            _globalOnSubmit = msgHandler?.Get<LuaFunction>("onSubmit");
+            if (_doc == null || _doc.rootVisualElement == null) return;
+
+            var fields = _doc.rootVisualElement.Query<TextField>().ToList();
+            foreach (var tf in fields)
+            {
+                var capturedName = tf.name;
+                EventCallback<ChangeEvent<string>> cbChange = null;
+                EventCallback<NavigationSubmitEvent> cbSubmit = null;
+
+                if (_globalOnChange != null && _globalOnChange.IsValid())
+                {
+                    cbChange = evt =>
+                    {
+                        if (_globalOnChange != null && _globalOnChange.IsValid())
+                            _globalOnChange.Call(capturedName, evt.newValue);
+                    };
+                    tf.RegisterCallback(cbChange);
+                }
+                if (_globalOnSubmit != null && _globalOnSubmit.IsValid())
+                {
+                    cbSubmit = _ =>
+                    {
+                        if (_globalOnSubmit != null && _globalOnSubmit.IsValid())
+                            _globalOnSubmit.Call(capturedName);
+                    };
+                    tf.RegisterCallback(cbSubmit);
+                }
+                _inputEntries.Add(new InputEntry { element = tf, cbChange = cbChange, cbSubmit = cbSubmit });
+            }
+        }
+
+        /// <summary>仅清理 TouchAllInputs 注册的 TextField 扫描回调。</summary>
+        public void ClearInputScan()
+        {
+            foreach (var entry in _inputEntries)
+            {
+                if (entry.element == null) continue;
+                if (entry.cbChange != null) entry.element.UnregisterCallback(entry.cbChange);
+                if (entry.cbSubmit != null) entry.element.UnregisterCallback(entry.cbSubmit);
+            }
+            _inputEntries.Clear();
+            if (_globalOnChange != null && _globalOnChange.IsValid()) _globalOnChange.Dispose();
+            if (_globalOnSubmit != null && _globalOnSubmit.IsValid()) _globalOnSubmit.Dispose();
+            _globalOnChange = null;
+            _globalOnSubmit = null;
         }
 
         /// <summary>仅清理 TouchAllButtons 注册的全局扫描回调，保留所有精确绑定。</summary>
@@ -367,8 +439,9 @@ namespace UGFramework.Runtime
         /// </summary>
         public void ClearAllListeners()
         {
-            // 全局扫描
+            // 全局扫描（按钮 + 输入框）
             ClearGlobalScan();
+            ClearInputScan();
 
             // 精确绑定
             foreach (var entry in _explicitEntries)

@@ -122,11 +122,25 @@ do
 	---@param name string
 	---@return nil|GameObject
 	function FViewBaseUI:FindDirect(name)
+		-- UITK 后端：没有 GameObject 层级，通过 root panel 的 bridge 查 VisualElement
+		local root = self:GetRootView()
+		if root and root.m_bridge and root.IsUIToolkit and root:IsUIToolkit() then
+			return root.m_bridge:Q(name)
+		end
 		return self.m_viewObj:FindDirect(name)
 	end
 	---@param name string
 	---@return nil|GameObject
 	function FViewBaseUI:RequireFind(name)
+		-- UITK 后端：通过 root panel 的 bridge 查 VisualElement
+		local root = self:GetRootView()
+		if root and root.m_bridge and root.IsUIToolkit and root:IsUIToolkit() then
+			local ve = root.m_bridge:Q(name)
+			if not ve then
+				printError("[UITK] RequireFind: element not found: " .. tostring(name))
+			end
+			return ve
+		end
 		return self.m_viewObj:RequireFind(name)
 	end
 	---@param subViewPath string
@@ -312,6 +326,17 @@ do
 
 	---@return boolean
 	function FViewBaseUI:IsVisible()
+		-- UITK SubView：显隐由 VisualElement.display 控制，走 root panel 的 bridge
+		local root = self:GetRootView()
+		if root and root.IsUIToolkit and root:IsUIToolkit() then
+			if root.m_bridge and self.m_viewObj then
+				-- m_viewObj 在 UITK SubView 里存 element name（字符串）
+				local name = tostring(self.m_viewObj)
+				local ve = root.m_bridge:Q(name)
+				if ve then return ve.style.display.value ~= 0 end  -- 0 = DisplayStyle.None
+			end
+			return false
+		end
 		local obj = self:GetRootObjSafe()
 		if obj == nil then return false end
 
@@ -364,6 +389,19 @@ do
 	------------------------------------------------------------
 	---@param b boolean
 	function FViewBaseUI:SetVisibleInner(b)
+		-- UITK SubView：通过 root panel bridge 控制 VisualElement.display
+		local root = self:GetRootView()
+		if root and root.IsUIToolkit and root:IsUIToolkit() then
+			if root.m_bridge and self.m_viewObj then
+				local oldVisible = self:IsVisible()
+				root.m_bridge:SetDisplay(tostring(self.m_viewObj), b)
+				local newVisible = self:IsVisible()
+				if oldVisible ~= newVisible then
+					self:OnShowInternal(newVisible)
+				end
+			end
+			return
+		end
 		local obj = self:GetRootObjSafe()
 		if obj then
 			local oldVisible = self:IsVisible()
