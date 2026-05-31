@@ -31,7 +31,7 @@ namespace XLua.CSObjectWrap
 			Utils.EndObjectRegister(type, L, translator, null, null,
 			    null, null, null);
 
-		    Utils.BeginClassRegister(type, L, __CreateInstance, 11, 0, 0);
+		    Utils.BeginClassRegister(type, L, __CreateInstance, 12, 0, 0);
 			Utils.RegisterFunc(L, Utils.CLS_IDX, "IsEditorEnv", _m_IsEditorEnv_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "IsWXEnv", _m_IsWXEnv_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "IsWebGLEnv", _m_IsWebGLEnv_xlua_st_);
@@ -41,6 +41,7 @@ namespace XLua.CSObjectWrap
             Utils.RegisterFunc(L, Utils.CLS_IDX, "ToHexString", _m_ToHexString_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "ToBytesString", _m_ToBytesString_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "IsPointerOverUIObject", _m_IsPointerOverUIObject_xlua_st_);
+            Utils.RegisterFunc(L, Utils.CLS_IDX, "GetMetaTable", _m_GetMetaTable_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "LoadTexture2DFromFile", _m_LoadTexture2DFromFile_xlua_st_);
             
 			
@@ -330,6 +331,33 @@ namespace XLua.CSObjectWrap
             }
             
             return LuaAPI.luaL_error(L, "invalid arguments to UGFramework.Runtime.GameUtil.IsPointerOverUIObject!");
+            
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _m_GetMetaTable_xlua_st_(RealStatePtr L)
+        {
+		    try {
+            
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            
+            
+            
+                
+                {
+                    string _typeName = LuaAPI.lua_tostring(L, 1);
+                    
+                        var gen_ret = UGFramework.Runtime.GameUtil.GetMetaTable( _typeName );
+                        translator.Push(L, gen_ret);
+                    
+                    
+                    
+                    return 1;
+                }
+                
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
             
         }
         

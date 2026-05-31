@@ -295,6 +295,7 @@ do
 				panel.transform.localPosition = Vector3(0, 0, 0)
 				panel.transform.localScale = Vector3(1, 1, 1)
 				panel.layer = UnityEngine.LayerMask.NameToLayer("UI")
+				print("panel:", panel, type(panel), getmetatable(panel), CS.UnityEngine.GameObject, getmetatable(CS.UnityEngine.GameObject), GameUtil.GetMetaTable("UnityEngine.GameObject"))
 				onResourceLoaded(panel)
 			elseif window then
 				print("CreateWindow", packageName, prefabName)

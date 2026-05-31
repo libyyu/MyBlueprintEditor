@@ -464,7 +464,7 @@ function FPanelBaseUI:TouchMsgHandler()
 
 		self.m_msgHandler:TouchGUIMsg(mst)
 
-		if self.m_isfgui then
+		if self:IsFairyGui() then
 			local ui = self.m_panel
 			if mst.onClick then
 				ui:AddEventListener("onClick", mst.onClick)

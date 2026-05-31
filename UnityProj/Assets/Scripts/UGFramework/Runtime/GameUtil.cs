@@ -140,26 +140,7 @@ namespace UGFramework.Runtime
                 actionResult(t);
             }
         }
-
-        /// <summary>
-        /// 根据 C# 类型全名返回该类型在 Lua 中的 metatable（LuaTable）。
-        /// 如果该类型还没有被 push 过，会主动触发 xLua 为其创建 metatable。
-        /// Lua 侧用法：
-        ///   local mt = CS.UGFramework.Runtime.GameUtil.GetMetaTable("UnityEngine.Component")
-        ///   local raw = mt.__index
-        ///   mt.__index = function(obj, key) ... return raw(obj, key) end
-        /// </summary>
-        /// <summary>
-        /// 检查 LuaTable / LuaFunction 等 LuaBase 对象是否有效。
-        /// 封装 LuaBaseExtensions.IsValid()，通过 [LuaCallCSharp] 暴露给 Lua。
-        /// Lua 用法：
-        ///   local ok = CS.UGFramework.Runtime.GameUtil.IsLuaObjectValid(myTable)
-        /// </summary>
-        public static bool IsLuaObjectValid(XLua.LuaBase obj)
-        {
-            return obj.IsValid();  // 调 LuaBaseExtensions.IsValid extension method
-        }
-
+        
         public static LuaTable GetMetaTable(string typeName)
         {
             var luaEnv = LuaManager.Instance?.ActiveLuaEnv;

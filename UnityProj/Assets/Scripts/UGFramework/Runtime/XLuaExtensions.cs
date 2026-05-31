@@ -48,7 +48,7 @@ namespace UGFramework.Runtime
 
             // 2. 检查 luaEnv 是否为 null
             var env = s_luaBaseEnv?.GetValue(obj) as LuaEnv;
-            if (env == null) return true; // 没有 env 视为有效（兼容某些场景）
+            if (env == null) return false; // 没有 env 视为有效（兼容某些场景）
 
             // 3. 检查 LuaEnv.disposed（private bool）
             if (s_luaEnvDisposed != null && (bool)s_luaEnvDisposed.GetValue(env))
