@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
 using XLua;
+using XLua.LuaDLL;
 
 namespace UGFramework.Runtime
 {
@@ -138,6 +139,38 @@ namespace UGFramework.Runtime
             {
                 actionResult(t);
             }
+        }
+
+        /// <summary>
+        /// 根据 C# 类型全名（如 "UnityEngine.GameObject"）返回该类型在 Lua 中的 metatable（LuaTable）。
+        /// Lua 侧用法：
+        ///   local mt = CS.UGFramework.Runtime.GameUtil.GetMetaTable("UnityEngine.GameObject")
+        ///   local raw = mt.__index
+        ///   mt.__index = function(obj, key) ... return raw(obj, key) end
+        /// </summary>
+        public static LuaTable GetMetaTable(string typeName)
+        {
+            var luaEnv = LuaManager.Instance?.ActiveLuaEnv;
+            if (luaEnv == null)
+            {
+                UnityEngine.Debug.LogWarning("[GameUtil.GetMetaTable] LuaEnv not ready");
+                return null;
+            }
+            // luaL_getmetatable 把 registry[typeName] 压栈，取出来包成 LuaTable
+            var L = luaEnv.L;
+            int top = Lua.lua_gettop(L);
+            Lua.luaL_getmetatable(L, typeName);
+            if (Lua.lua_isnil(L, -1))
+            {
+                Lua.lua_pop(L, 1);
+                UnityEngine.Debug.LogWarning($"[GameUtil.GetMetaTable] metatable not found for: {typeName}");
+                return null;
+            }
+            // 让 ObjectTranslator 把栈顶 table 包成 LuaTable
+            ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            LuaTable result = (LuaTable)translator.GetObject(L, -1);
+            Lua.lua_settop(L, top); // 恢复栈
+            return result;
         }
 
         public static Texture2D LoadTexture2DFromFile(string path)
