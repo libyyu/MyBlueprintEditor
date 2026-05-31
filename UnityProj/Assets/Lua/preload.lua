@@ -96,14 +96,15 @@ function HasLuaScript(luaRequiredPath)
     return CS.UGFramework.Runtime.YooAssetsLuaBridge.HasLuaFile(luaRequiredPath)
 end
 
+require "coro"
+require "core.preload"
+require "FLua"
+require "utility.Enum"
+require "Override"
+
 DefaultPackageSeparator = ":"
 DefaultFGUISeparator = "@"
 DefaultPackageName = "DefaultPackage"
 PlatformSuffix = IsWebGLRuntime() and "WebGL" or "App"
 print("PlatformSuffix", PlatformSuffix, "IsWebGLRuntime", IsWebGLRuntime(), "IsWXRuntime", IsWXRuntime())
 
-require "coro"
-require "core.preload"
-require "FLua"
-require "utility.Enum"
-require "Override"

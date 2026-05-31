@@ -16,10 +16,11 @@ local function getBehavior()
     return _behavior
 end
 
-do --UnityEngine.Object
+do --System.Object
+    print("Override System.Object")
 	local __lua_userdata = {}
 	setmetatable(__lua_userdata, {__mode = "k"})
-	local mt = GameUtil.GetMetaTable("UnityEngine.Object")
+	local mt = GameUtil.GetMetaTable("System.Object")
 	function mt:SetLuaUserData(key, value)
 		local t = rawget(__lua_userdata, self)
 		if not t then
@@ -35,9 +36,17 @@ do --UnityEngine.Object
 		end
 		return t[key]
 	end
+
+    function mt:IsExtend(t)
+        if type(t) == "string" then
+            return GameUtil.IsExtendByName(self, t)
+        end
+        return GameUtil.IsExtend(self, t)
+    end
 end
 
 do --UnityEngine.GameObject
+    print("Override UnityEngine.GameObject")
 	local mt = GameUtil.GetMetaTable("UnityEngine.GameObject")
 	function mt:FindDirect(name)
 		if name == "." or name == "" then
@@ -58,6 +67,7 @@ do --UnityEngine.GameObject
 end
 
 do--UnityEngine.UI.Slider
+    print("Override UnityEngine.UI.Slider")
 	local mt = GameUtil.GetMetaTable("UnityEngine.UI.Slider")
 	function mt:AutoProgress(time, start, to, onfinish)
 		local pretimer = self:GetLuaUserData("AutoProgress")

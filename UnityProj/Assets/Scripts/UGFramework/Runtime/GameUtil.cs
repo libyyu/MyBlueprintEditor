@@ -258,5 +258,55 @@ namespace UGFramework.Runtime
             if (comp == null) return;
             comp.RemoveTimer(timerId);
         }
+        
+        public static Type FindType(string qualifiedTypeName) 
+        {
+            Type t = Type.GetType(qualifiedTypeName);
+
+            if (t != null)
+            {
+                return t;
+            }
+            var Assemblies = System.AppDomain.CurrentDomain.GetAssemblies();
+            for (int n = 0; n < Assemblies.Length;n++ )
+            {
+                var asm = Assemblies[n];
+                t = asm.GetType(qualifiedTypeName);
+                if (t != null)
+                    return t;
+                Type[] types = asm.GetExportedTypes();
+                foreach (Type ts in types)
+                {
+                    if (ts.Name.Equals(qualifiedTypeName))
+                        return t;
+                }
+            }
+            return null;
+        }
+
+        public static bool IsExtendByName(System.Object obj, string name)
+        {
+            Type t = FindType(name);
+            return IsExtend(obj, t);
+        }
+
+        public static bool IsExtend(System.Object obj, Type type)
+        {
+            if (type == null) return false;
+            bool ret = false;
+            Type t = obj.GetType();
+            while (t != null)
+            {
+                if (t == type)
+                {
+                    ret = true;
+                    break;
+                }
+
+                t = t.BaseType;
+            }
+
+            return ret;
+        }
     }
 }

@@ -31,7 +31,7 @@ namespace XLua.CSObjectWrap
 			Utils.EndObjectRegister(type, L, translator, null, null,
 			    null, null, null);
 
-		    Utils.BeginClassRegister(type, L, __CreateInstance, 16, 0, 0);
+		    Utils.BeginClassRegister(type, L, __CreateInstance, 19, 0, 0);
 			Utils.RegisterFunc(L, Utils.CLS_IDX, "IsEditorEnv", _m_IsEditorEnv_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "IsWXEnv", _m_IsWXEnv_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "IsWebGLEnv", _m_IsWebGLEnv_xlua_st_);
@@ -47,6 +47,9 @@ namespace XLua.CSObjectWrap
             Utils.RegisterFunc(L, Utils.CLS_IDX, "RemoveGlobalTimer", _m_RemoveGlobalTimer_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "AddObjectTimer", _m_AddObjectTimer_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "RemoveObjectTimer", _m_RemoveObjectTimer_xlua_st_);
+            Utils.RegisterFunc(L, Utils.CLS_IDX, "FindType", _m_FindType_xlua_st_);
+            Utils.RegisterFunc(L, Utils.CLS_IDX, "IsExtendByName", _m_IsExtendByName_xlua_st_);
+            Utils.RegisterFunc(L, Utils.CLS_IDX, "IsExtend", _m_IsExtend_xlua_st_);
             
 			
             
@@ -496,6 +499,89 @@ namespace XLua.CSObjectWrap
                     
                     
                     return 0;
+                }
+                
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _m_FindType_xlua_st_(RealStatePtr L)
+        {
+		    try {
+            
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            
+            
+            
+                
+                {
+                    string _qualifiedTypeName = LuaAPI.lua_tostring(L, 1);
+                    
+                        var gen_ret = UGFramework.Runtime.GameUtil.FindType( _qualifiedTypeName );
+                        translator.Push(L, gen_ret);
+                    
+                    
+                    
+                    return 1;
+                }
+                
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _m_IsExtendByName_xlua_st_(RealStatePtr L)
+        {
+		    try {
+            
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            
+            
+            
+                
+                {
+                    object _obj = translator.GetObject(L, 1, typeof(object));
+                    string _name = LuaAPI.lua_tostring(L, 2);
+                    
+                        var gen_ret = UGFramework.Runtime.GameUtil.IsExtendByName( _obj, _name );
+                        LuaAPI.lua_pushboolean(L, gen_ret);
+                    
+                    
+                    
+                    return 1;
+                }
+                
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _m_IsExtend_xlua_st_(RealStatePtr L)
+        {
+		    try {
+            
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            
+            
+            
+                
+                {
+                    object _obj = translator.GetObject(L, 1, typeof(object));
+                    System.Type _type = (System.Type)translator.GetObject(L, 2, typeof(System.Type));
+                    
+                        var gen_ret = UGFramework.Runtime.GameUtil.IsExtend( _obj, _type );
+                        LuaAPI.lua_pushboolean(L, gen_ret);
+                    
+                    
+                    
+                    return 1;
                 }
                 
             } catch(System.Exception gen_e) {
