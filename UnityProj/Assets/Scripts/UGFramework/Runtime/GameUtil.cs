@@ -142,9 +142,10 @@ namespace UGFramework.Runtime
         }
 
         /// <summary>
-        /// 根据 C# 类型全名（如 "UnityEngine.GameObject"）返回该类型在 Lua 中的 metatable（LuaTable）。
+        /// 根据 C# 类型全名返回该类型在 Lua 中的 metatable（LuaTable）。
+        /// 如果该类型还没有被 push 过，会主动触发 xLua 为其创建 metatable。
         /// Lua 侧用法：
-        ///   local mt = CS.UGFramework.Runtime.GameUtil.GetMetaTable("UnityEngine.GameObject")
+        ///   local mt = CS.UGFramework.Runtime.GameUtil.GetMetaTable("UnityEngine.Component")
         ///   local raw = mt.__index
         ///   mt.__index = function(obj, key) ... return raw(obj, key) end
         /// </summary>
@@ -156,18 +157,57 @@ namespace UGFramework.Runtime
                 UnityEngine.Debug.LogWarning("[GameUtil.GetMetaTable] LuaEnv not ready");
                 return null;
             }
-            // luaL_getmetatable 把 registry[typeName] 压栈，取出来包成 LuaTable
+
             var L = luaEnv.L;
+            ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
             int top = Lua.lua_gettop(L);
+
+            // 1. 尝试直接从 registry 取（已经 push 过的类型）
+            Lua.luaL_getmetatable(L, typeName);
+            bool exists = !Lua.lua_isnil(L, -1);
+            Lua.lua_pop(L, 1);
+
+            if (!exists)
+            {
+                // 2. 类型还没注册过，用 translator.FindType + TryDelayWrapLoader 主动触发
+                //    FindType / TryDelayWrapLoader 是 internal 方法，通过反射调用
+                var translatorType = translator.GetType();
+                var findTypeMethod = translatorType.GetMethod(
+                    "FindType",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                    null,
+                    new System.Type[] { typeof(string), typeof(bool) },
+                    null);
+                var tryWrapMethod = translatorType.GetMethod(
+                    "TryDelayWrapLoader",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+
+                if (findTypeMethod == null || tryWrapMethod == null)
+                {
+                    UnityEngine.Debug.LogWarning("[GameUtil.GetMetaTable] Cannot reflect FindType/TryDelayWrapLoader");
+                    return null;
+                }
+
+                var type = (System.Type)findTypeMethod.Invoke(translator, new object[] { typeName, false });
+                if (type == null)
+                {
+                    UnityEngine.Debug.LogWarning($"[GameUtil.GetMetaTable] Type not found: {typeName}");
+                    return null;
+                }
+
+                // TryDelayWrapLoader 会在 registry 里建好 metatable
+                tryWrapMethod.Invoke(translator, new object[] { L, type });
+            }
+
+            // 3. 再次从 registry 取，这次必定有
             Lua.luaL_getmetatable(L, typeName);
             if (Lua.lua_isnil(L, -1))
             {
                 Lua.lua_pop(L, 1);
-                UnityEngine.Debug.LogWarning($"[GameUtil.GetMetaTable] metatable not found for: {typeName}");
+                UnityEngine.Debug.LogWarning($"[GameUtil.GetMetaTable] metatable still missing after wrap: {typeName}");
                 return null;
             }
-            // 让 ObjectTranslator 把栈顶 table 包成 LuaTable
-            ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+
             LuaTable result = (LuaTable)translator.GetObject(L, -1);
             Lua.lua_settop(L, top); // 恢复栈
             return result;
