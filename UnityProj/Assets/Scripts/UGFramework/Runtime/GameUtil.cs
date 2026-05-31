@@ -229,7 +229,7 @@ namespace UGFramework.Runtime
             }
         }
         
-        public static int AddGlobalTimer(float ttl, bool bOnce, FTimerList.TimerCallback callback, bool bLateUpdate)
+        public static int AddGlobalTimer(float ttl, bool bOnce, FTimerList.TimerCallback callback, bool bLateUpdate = false)
         {
             if (GameLauncher.Instance == null) return -1;
             var comp = GameLauncher.Instance.GetComponent<FTimerListBehavior>();
@@ -243,7 +243,7 @@ namespace UGFramework.Runtime
             comp.RemoveTimer(timerId);
         }
 
-        public static int AddObjectTimer(GameObject go, float ttl, bool bOnce, FTimerList.TimerCallback callback, bool bLateUpdate)
+        public static int AddObjectTimer(GameObject go, float ttl, bool bOnce, FTimerList.TimerCallback callback, bool bLateUpdate = false)
         {
             if (go == null) return -1;
             var comp = go.GetComponent<FTimerListBehavior>();

@@ -404,7 +404,9 @@ namespace XLua.CSObjectWrap
             
             
             
-                
+			    int gen_param_count = LuaAPI.lua_gettop(L);
+            
+                if(gen_param_count == 4&& LuaTypes.LUA_TNUMBER == LuaAPI.lua_type(L, 1)&& LuaTypes.LUA_TBOOLEAN == LuaAPI.lua_type(L, 2)&& translator.Assignable<UGFramework.Runtime.FTimerList.TimerCallback>(L, 3)&& LuaTypes.LUA_TBOOLEAN == LuaAPI.lua_type(L, 4)) 
                 {
                     float _ttl = (float)LuaAPI.lua_tonumber(L, 1);
                     bool _bOnce = LuaAPI.lua_toboolean(L, 2);
@@ -418,10 +420,25 @@ namespace XLua.CSObjectWrap
                     
                     return 1;
                 }
+                if(gen_param_count == 3&& LuaTypes.LUA_TNUMBER == LuaAPI.lua_type(L, 1)&& LuaTypes.LUA_TBOOLEAN == LuaAPI.lua_type(L, 2)&& translator.Assignable<UGFramework.Runtime.FTimerList.TimerCallback>(L, 3)) 
+                {
+                    float _ttl = (float)LuaAPI.lua_tonumber(L, 1);
+                    bool _bOnce = LuaAPI.lua_toboolean(L, 2);
+                    UGFramework.Runtime.FTimerList.TimerCallback _callback = translator.GetDelegate<UGFramework.Runtime.FTimerList.TimerCallback>(L, 3);
+                    
+                        var gen_ret = UGFramework.Runtime.GameUtil.AddGlobalTimer( _ttl, _bOnce, _callback );
+                        LuaAPI.xlua_pushinteger(L, gen_ret);
+                    
+                    
+                    
+                    return 1;
+                }
                 
             } catch(System.Exception gen_e) {
                 return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
             }
+            
+            return LuaAPI.luaL_error(L, "invalid arguments to UGFramework.Runtime.GameUtil.AddGlobalTimer!");
             
         }
         
@@ -458,7 +475,9 @@ namespace XLua.CSObjectWrap
             
             
             
-                
+			    int gen_param_count = LuaAPI.lua_gettop(L);
+            
+                if(gen_param_count == 5&& translator.Assignable<UnityEngine.GameObject>(L, 1)&& LuaTypes.LUA_TNUMBER == LuaAPI.lua_type(L, 2)&& LuaTypes.LUA_TBOOLEAN == LuaAPI.lua_type(L, 3)&& translator.Assignable<UGFramework.Runtime.FTimerList.TimerCallback>(L, 4)&& LuaTypes.LUA_TBOOLEAN == LuaAPI.lua_type(L, 5)) 
                 {
                     UnityEngine.GameObject _go = (UnityEngine.GameObject)translator.GetObject(L, 1, typeof(UnityEngine.GameObject));
                     float _ttl = (float)LuaAPI.lua_tonumber(L, 2);
@@ -473,10 +492,26 @@ namespace XLua.CSObjectWrap
                     
                     return 1;
                 }
+                if(gen_param_count == 4&& translator.Assignable<UnityEngine.GameObject>(L, 1)&& LuaTypes.LUA_TNUMBER == LuaAPI.lua_type(L, 2)&& LuaTypes.LUA_TBOOLEAN == LuaAPI.lua_type(L, 3)&& translator.Assignable<UGFramework.Runtime.FTimerList.TimerCallback>(L, 4)) 
+                {
+                    UnityEngine.GameObject _go = (UnityEngine.GameObject)translator.GetObject(L, 1, typeof(UnityEngine.GameObject));
+                    float _ttl = (float)LuaAPI.lua_tonumber(L, 2);
+                    bool _bOnce = LuaAPI.lua_toboolean(L, 3);
+                    UGFramework.Runtime.FTimerList.TimerCallback _callback = translator.GetDelegate<UGFramework.Runtime.FTimerList.TimerCallback>(L, 4);
+                    
+                        var gen_ret = UGFramework.Runtime.GameUtil.AddObjectTimer( _go, _ttl, _bOnce, _callback );
+                        LuaAPI.xlua_pushinteger(L, gen_ret);
+                    
+                    
+                    
+                    return 1;
+                }
                 
             } catch(System.Exception gen_e) {
                 return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
             }
+            
+            return LuaAPI.luaL_error(L, "invalid arguments to UGFramework.Runtime.GameUtil.AddObjectTimer!");
             
         }
         
