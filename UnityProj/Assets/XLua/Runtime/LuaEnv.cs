@@ -414,7 +414,7 @@ namespace XLua
 #endif
         }
 
-        public bool disposed = false;
+        private bool disposed = false;
 
         public void Dispose()
         {

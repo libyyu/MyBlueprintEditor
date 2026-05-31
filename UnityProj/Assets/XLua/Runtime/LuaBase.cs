@@ -32,14 +32,6 @@ namespace XLua
         protected ObjectTranslator _translator { get { return luaEnv.translator; } }
 #endif
 
-        public bool IsValid()
-        {
-            if (disposed) return false;
-            if (luaEnv == null) return true;
-            if (luaEnv.disposed) return false;
-            return true;
-        }
-
         public LuaBase(int reference, LuaEnv luaenv)
         {
             luaReference = reference;

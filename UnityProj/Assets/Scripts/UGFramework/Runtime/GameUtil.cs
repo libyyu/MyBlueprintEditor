@@ -151,16 +151,13 @@ namespace UGFramework.Runtime
         /// </summary>
         /// <summary>
         /// 检查 LuaTable / LuaFunction 等 LuaBase 对象是否有效。
-        /// 封装 xLua 内部的 LuaBase.IsValid()，通过 [LuaCallCSharp] 暴露给 Lua 层，
-        /// 避免直接改动 xLua 源码。
+        /// 封装 LuaBaseExtensions.IsValid()，通过 [LuaCallCSharp] 暴露给 Lua。
         /// Lua 用法：
         ///   local ok = CS.UGFramework.Runtime.GameUtil.IsLuaObjectValid(myTable)
         /// </summary>
         public static bool IsLuaObjectValid(XLua.LuaBase obj)
         {
-            // LuaBase.IsValid() 检查：disposed==false && luaEnv!=null && luaEnv.disposed==false
-            // LuaEnv.disposed 在 xLua 里本身就是 public，无需修改
-            return obj != null && obj.IsValid();
+            return obj.IsValid();  // 调 LuaBaseExtensions.IsValid extension method
         }
 
         public static LuaTable GetMetaTable(string typeName)
