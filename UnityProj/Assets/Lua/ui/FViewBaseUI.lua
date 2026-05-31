@@ -24,7 +24,7 @@ do
 	function FViewBaseUI:__constructor()
 		---@type FPanelBaseUI|nil
 		self.m_viewRoot = nil
-		---@type GameObject|nil
+		---@type nil|GameObject|VisualElement
 		self.m_viewObj = nil
 		---@type FViewBaseUI|nil
 		self.m_viewOwner = nil
@@ -47,6 +47,18 @@ do
 	---@return FViewBaseUI|nil
 	function FViewBaseUI:GetOwnerView()
 		return self.m_viewOwner
+	end
+	
+	---UGUI是一个GameObject, UIToolKit是VisualElement
+	---@return nil|GameObject|VisualElement
+	function FViewBaseUI:GetRootObj()
+		return self.m_viewObj
+	end
+
+	---@return nil|GameObject|VisualElement
+	function FViewBaseUI:GetRootObjSafe()
+		local obj = self:GetRootObj()
+		return self:IsValid() and obj or nil
 	end
 	
 	---@return boolean
@@ -78,17 +90,7 @@ do
 		end
 		return false
 	end
-	---@return GameObject|nil
-	function FViewBaseUI:GetRootObj()
-		return self.m_viewObj
-	end
-
-	---@return GameObject|nil
-	function FViewBaseUI:GetRootObjSafe()
-		local obj = self:GetRootObj()
-		return self:IsValid() and obj or nil
-	end
-
+	
 	function FViewBaseUI:OnCreate()
 	end
 

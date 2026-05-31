@@ -34,6 +34,16 @@ namespace UGFramework.Runtime
             s_luaEnvDisposed  = typeof(LuaEnv) .GetField("disposed", baseFlags);
         }
 
+        public static bool IsValid(this LuaEnv obj)
+        {
+            if (obj == null) return false;
+            
+            if (s_luaEnvDisposed != null && (bool)s_luaEnvDisposed.GetValue(obj))
+                return false;
+            
+            return true;
+        }
+
         /// <summary>
         /// 判断 LuaTable / LuaFunction 等 LuaBase 对象是否仍然有效。
         /// 等价于原来 LuaBase.IsValid() 的逻辑，但不修改 xLua 源码。

@@ -46,6 +46,8 @@ namespace UGFramework.Runtime
         {
             if (!LuaManager.Instance || LuaManager.Instance.ActiveLuaEnv == null)
                 return null;
+            if (!LuaManager.Instance.ActiveLuaEnv.IsValid())
+                return null;
             return LuaManager.Instance.ActiveLuaEnv;
         }
 
@@ -145,7 +147,7 @@ namespace UGFramework.Runtime
                 if (tm.end_time <= curTime)
                 {
                     // 触发回调：有参数则传入 LuaTable，否则无参调用
-                    if (tm.callback != null)
+                    if (tm.callback != null && getEnv() != null)
                     {
                         tm.callback?.Invoke();
                     }
@@ -233,19 +235,9 @@ namespace UGFramework.Runtime
 #if UNITY_EDITOR
         [BlackList] public int timer_num = 0;
 #endif
-
-        public static FTimerListBehavior Instance { get; private set; }
-
+        
         void Awake()
         {
-            if (Instance != null && Instance != this)
-            {
-                Destroy(gameObject);
-                return;
-            }
-
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
             FTimerList.RegisterTimerList(m_TimerList, gameObject);
             FTimerList.RegisterTimerList(m_LateTimerList, gameObject);
         }
@@ -257,8 +249,6 @@ namespace UGFramework.Runtime
 
             m_TimerList.Clear();
             m_LateTimerList.Clear();
-
-            if (Instance == this) Instance = null;
         }
 
         void Update()

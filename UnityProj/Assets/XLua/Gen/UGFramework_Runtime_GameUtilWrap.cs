@@ -31,7 +31,7 @@ namespace XLua.CSObjectWrap
 			Utils.EndObjectRegister(type, L, translator, null, null,
 			    null, null, null);
 
-		    Utils.BeginClassRegister(type, L, __CreateInstance, 12, 0, 0);
+		    Utils.BeginClassRegister(type, L, __CreateInstance, 16, 0, 0);
 			Utils.RegisterFunc(L, Utils.CLS_IDX, "IsEditorEnv", _m_IsEditorEnv_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "IsWXEnv", _m_IsWXEnv_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "IsWebGLEnv", _m_IsWebGLEnv_xlua_st_);
@@ -43,6 +43,10 @@ namespace XLua.CSObjectWrap
             Utils.RegisterFunc(L, Utils.CLS_IDX, "IsPointerOverUIObject", _m_IsPointerOverUIObject_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "GetMetaTable", _m_GetMetaTable_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "LoadTexture2DFromFile", _m_LoadTexture2DFromFile_xlua_st_);
+            Utils.RegisterFunc(L, Utils.CLS_IDX, "AddGlobalTimer", _m_AddGlobalTimer_xlua_st_);
+            Utils.RegisterFunc(L, Utils.CLS_IDX, "RemoveGlobalTimer", _m_RemoveGlobalTimer_xlua_st_);
+            Utils.RegisterFunc(L, Utils.CLS_IDX, "AddObjectTimer", _m_AddObjectTimer_xlua_st_);
+            Utils.RegisterFunc(L, Utils.CLS_IDX, "RemoveObjectTimer", _m_RemoveObjectTimer_xlua_st_);
             
 			
             
@@ -380,6 +384,118 @@ namespace XLua.CSObjectWrap
                     
                     
                     return 1;
+                }
+                
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _m_AddGlobalTimer_xlua_st_(RealStatePtr L)
+        {
+		    try {
+            
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            
+            
+            
+                
+                {
+                    float _ttl = (float)LuaAPI.lua_tonumber(L, 1);
+                    bool _bOnce = LuaAPI.lua_toboolean(L, 2);
+                    UGFramework.Runtime.FTimerList.TimerCallback _callback = translator.GetDelegate<UGFramework.Runtime.FTimerList.TimerCallback>(L, 3);
+                    bool _bLateUpdate = LuaAPI.lua_toboolean(L, 4);
+                    
+                        var gen_ret = UGFramework.Runtime.GameUtil.AddGlobalTimer( _ttl, _bOnce, _callback, _bLateUpdate );
+                        LuaAPI.xlua_pushinteger(L, gen_ret);
+                    
+                    
+                    
+                    return 1;
+                }
+                
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _m_RemoveGlobalTimer_xlua_st_(RealStatePtr L)
+        {
+		    try {
+            
+            
+            
+                
+                {
+                    int _timerId = LuaAPI.xlua_tointeger(L, 1);
+                    
+                    UGFramework.Runtime.GameUtil.RemoveGlobalTimer( _timerId );
+                    
+                    
+                    
+                    return 0;
+                }
+                
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _m_AddObjectTimer_xlua_st_(RealStatePtr L)
+        {
+		    try {
+            
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            
+            
+            
+                
+                {
+                    UnityEngine.GameObject _go = (UnityEngine.GameObject)translator.GetObject(L, 1, typeof(UnityEngine.GameObject));
+                    float _ttl = (float)LuaAPI.lua_tonumber(L, 2);
+                    bool _bOnce = LuaAPI.lua_toboolean(L, 3);
+                    UGFramework.Runtime.FTimerList.TimerCallback _callback = translator.GetDelegate<UGFramework.Runtime.FTimerList.TimerCallback>(L, 4);
+                    bool _bLateUpdate = LuaAPI.lua_toboolean(L, 5);
+                    
+                        var gen_ret = UGFramework.Runtime.GameUtil.AddObjectTimer( _go, _ttl, _bOnce, _callback, _bLateUpdate );
+                        LuaAPI.xlua_pushinteger(L, gen_ret);
+                    
+                    
+                    
+                    return 1;
+                }
+                
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _m_RemoveObjectTimer_xlua_st_(RealStatePtr L)
+        {
+		    try {
+            
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            
+            
+            
+                
+                {
+                    UnityEngine.GameObject _go = (UnityEngine.GameObject)translator.GetObject(L, 1, typeof(UnityEngine.GameObject));
+                    int _timerId = LuaAPI.xlua_tointeger(L, 2);
+                    
+                    UGFramework.Runtime.GameUtil.RemoveObjectTimer( _go, _timerId );
+                    
+                    
+                    
+                    return 0;
                 }
                 
             } catch(System.Exception gen_e) {
