@@ -62,6 +62,18 @@ namespace UGFramework.Runtime
         // 与全局扫描完全独立——同一按钮可同时有全局和精确两类回调，全部依次触发
         private readonly List<ExplicitEntry> _explicitEntries = new List<ExplicitEntry>();
 
+        // 通用事件 entry（Submit/TextChange/ValueChange 共用）
+        // detach 闭包封装具体 UnregisterCallback 调用，免去保存 EventCallback<T> 类型的复杂性。
+        private struct EventEntry
+        {
+            public string name;
+            public LuaFunction lua;
+            public Action detach;
+        }
+        private readonly List<EventEntry> _explicitSubmits = new List<EventEntry>();
+        private readonly List<EventEntry> _explicitChanges = new List<EventEntry>();
+        private readonly List<EventEntry> _explicitValues  = new List<EventEntry>();
+
         // name -> element 缓存（避免每次全树 Q）
         private readonly Dictionary<string, VisualElement> _qCache = new Dictionary<string, VisualElement>();
 
@@ -288,6 +300,139 @@ namespace UGFramework.Runtime
             }
         }
 
+        // ── 输入框值读写 / Submit / TextChange / ValueChange ──────────────
+
+        public void SetInputText(string name, string text)
+        {
+            var el = Lookup(name);
+            if (el is TextField tf) tf.value = text;
+            else if (el == null) Debug.LogWarning($"[UITKLuaBridge] SetInputText: '{name}' not found");
+            else Debug.LogWarning($"[UITKLuaBridge] SetInputText: '{name}' is not a TextField");
+        }
+
+        public string GetInputText(string name)
+        {
+            var el = Lookup(name);
+            return el is TextField tf ? tf.value : "";
+        }
+
+        /// <summary>
+        /// 输入框提交回调。回调签名：function(name, text) end
+        /// UITK 用 NavigationSubmitEvent（回车/确认）。
+        /// </summary>
+        public void RegisterSubmit(string name, LuaFunction callback)
+        {
+            if (callback == null || string.IsNullOrEmpty(name)) return;
+            var el = Lookup(name);
+            if (el == null) { Debug.LogWarning($"[UITKLuaBridge] RegisterSubmit: '{name}' not found"); return; }
+            if (!(el is TextField tf)) { Debug.LogWarning($"[UITKLuaBridge] RegisterSubmit: '{name}' is not a TextField"); return; }
+
+            var captured = callback;
+            var n = NormalizeName(name);
+            EventCallback<NavigationSubmitEvent> cb = _ =>
+            {
+                if (captured.IsValid()) captured.Call(n, tf.value);
+            };
+            tf.RegisterCallback(cb);
+            Action detach = () => { if (tf != null) tf.UnregisterCallback(cb); };
+            _explicitSubmits.Add(new EventEntry { name = n, lua = captured, detach = detach });
+        }
+
+        public void UnregisterSubmit(string name) => UnregisterEntry(_explicitSubmits, name);
+
+        /// <summary>
+        /// 输入框文本变化回调。回调签名：function(name, newText) end
+        /// UITK 用 ChangeEvent&lt;string&gt;。
+        /// </summary>
+        public void RegisterTextChange(string name, LuaFunction callback)
+        {
+            if (callback == null || string.IsNullOrEmpty(name)) return;
+            var el = Lookup(name);
+            if (el == null) { Debug.LogWarning($"[UITKLuaBridge] RegisterTextChange: '{name}' not found"); return; }
+            if (!(el is TextField tf)) { Debug.LogWarning($"[UITKLuaBridge] RegisterTextChange: '{name}' is not a TextField"); return; }
+
+            var captured = callback;
+            var n = NormalizeName(name);
+            EventCallback<ChangeEvent<string>> cb = evt =>
+            {
+                if (captured.IsValid()) captured.Call(n, evt.newValue);
+            };
+            tf.RegisterCallback(cb);
+            Action detach = () => { if (tf != null) tf.UnregisterCallback(cb); };
+            _explicitChanges.Add(new EventEntry { name = n, lua = captured, detach = detach });
+        }
+
+        public void UnregisterTextChange(string name) => UnregisterEntry(_explicitChanges, name);
+
+        /// <summary>
+        /// Slider/Toggle 值变化回调。回调签名：function(name, value) end
+        /// value 为 float（Slider）或 bool（Toggle）。
+        /// </summary>
+        public void RegisterValueChange(string name, LuaFunction callback)
+        {
+            if (callback == null || string.IsNullOrEmpty(name)) return;
+            var el = Lookup(name);
+            if (el == null) { Debug.LogWarning($"[UITKLuaBridge] RegisterValueChange: '{name}' not found"); return; }
+
+            var captured = callback;
+            var n = NormalizeName(name);
+            Action detach = null;
+
+            if (el is Slider sl)
+            {
+                EventCallback<ChangeEvent<float>> cb = evt =>
+                {
+                    if (captured.IsValid()) captured.Call(n, evt.newValue);
+                };
+                sl.RegisterCallback(cb);
+                detach = () => { if (sl != null) sl.UnregisterCallback(cb); };
+            }
+            else if (el is Toggle tg)
+            {
+                EventCallback<ChangeEvent<bool>> cb = evt =>
+                {
+                    if (captured.IsValid()) captured.Call(n, evt.newValue);
+                };
+                tg.RegisterCallback(cb);
+                detach = () => { if (tg != null) tg.UnregisterCallback(cb); };
+            }
+            else
+            {
+                Debug.LogWarning($"[UITKLuaBridge] RegisterValueChange: '{name}' is not a Slider/Toggle");
+                return;
+            }
+            _explicitValues.Add(new EventEntry { name = n, lua = captured, detach = detach });
+        }
+
+        public void UnregisterValueChange(string name) => UnregisterEntry(_explicitValues, name);
+
+        // ── 通用 Unregister/Clear 帮助函数 ───────────────────────────────
+
+        private static void UnregisterEntry(List<EventEntry> list, string name)
+        {
+            if (string.IsNullOrEmpty(name) || list.Count == 0) return;
+            var n = NormalizeName(name);
+            for (int i = list.Count - 1; i >= 0; --i)
+            {
+                var e = list[i];
+                if (e.name != n) continue;
+                e.detach?.Invoke();
+                if (e.lua != null && e.lua.IsValid()) e.lua.Dispose();
+                list.RemoveAt(i);
+            }
+        }
+
+        private static void ClearEntries(List<EventEntry> list)
+        {
+            for (int i = 0; i < list.Count; ++i)
+            {
+                var e = list[i];
+                e.detach?.Invoke();
+                if (e.lua != null && e.lua.IsValid()) e.lua.Dispose();
+            }
+            list.Clear();
+        }
+
         // ═══════════════════════════════════════════════════════════════════
         // IUIPanelBridge 实现 —— 与 UILuaBehaviour 同名同参，Lua 调用代码后端无关
         // 寻址支持路径式 name（如 "TopBar/lbl_score"），自动取末段当 element.name
@@ -443,7 +588,7 @@ namespace UGFramework.Runtime
             ClearGlobalScan();
             ClearInputScan();
 
-            // 精确绑定
+            // 精确绑定（点击 + 输入框 Submit/TextChange + Slider/Toggle ValueChange）
             foreach (var entry in _explicitEntries)
             {
                 if (entry.element != null)
@@ -452,6 +597,9 @@ namespace UGFramework.Runtime
                     entry.luaCallback.Dispose();
             }
             _explicitEntries.Clear();
+            ClearEntries(_explicitSubmits);
+            ClearEntries(_explicitChanges);
+            ClearEntries(_explicitValues);
 
             // 元素缓存（VisualElement 可能已随 UIDocument 销毁）
             _qCache.Clear();

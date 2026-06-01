@@ -31,6 +31,18 @@ namespace UGFramework.Runtime
 
         private readonly List<ClickEntry> _explicitClicks = new List<ClickEntry>();
 
+        // 通用事件 entry（Submit/TextChange/ValueChange 共用）
+        // detach 闭包封装具体的 RemoveListener 逻辑，免去保存原 UnityAction 类型的复杂性。
+        private struct EventEntry
+        {
+            public string name;
+            public LuaFunction lua;
+            public Action detach;
+        }
+        private readonly List<EventEntry> _explicitSubmits  = new List<EventEntry>();
+        private readonly List<EventEntry> _explicitChanges  = new List<EventEntry>();
+        private readonly List<EventEntry> _explicitValues   = new List<EventEntry>();
+
 
         private bool __visible = false;
 
@@ -55,15 +67,17 @@ namespace UGFramework.Runtime
             CallMethod("onDestroy");
             UnTouchGUIMsg();
 
-            // 清理 IUIPanelBridge.RegisterClick 的累加列表（与 buttons 字段独立）
+            // 清理 IUIPanelBridge 累加的所有精确绑定（与 buttons 字段独立）
             for (int i = 0; i < _explicitClicks.Count; ++i)
             {
                 var e = _explicitClicks[i];
                 if (e.button != null) e.button.onClick.RemoveListener(e.action);
                 e.lua?.Dispose();
             }
-
             _explicitClicks.Clear();
+            ClearEntries(_explicitSubmits);
+            ClearEntries(_explicitChanges);
+            ClearEntries(_explicitValues);
             _qCache.Clear();
 
             initialize = false;
@@ -552,6 +566,181 @@ namespace UGFramework.Runtime
             }
         }
 
+        // ─── 输入框值读写 ────────────────────────────────────────────────
+
+        public void SetInputText(string name, string text)
+        {
+            var go = FindByName(name);
+            if (go == null) { Debug.LogWarning($"[UILuaBehaviour] SetInputText: '{name}' not found"); return; }
+            var f = go.GetComponent<InputField>();
+            if (f != null) { f.text = text; return; }
+            var tf = go.GetComponent<TMP_InputField>();
+            if (tf != null) { tf.text = text; return; }
+            Debug.LogWarning($"[UILuaBehaviour] SetInputText: '{name}' is not an InputField/TMP_InputField");
+        }
+
+        public string GetInputText(string name)
+        {
+            var go = FindByName(name);
+            if (go == null) return "";
+            var f = go.GetComponent<InputField>();
+            if (f != null) return f.text;
+            var tf = go.GetComponent<TMP_InputField>();
+            if (tf != null) return tf.text;
+            return "";
+        }
+
+        // ─── Submit (输入框提交) ─────────────────────────────────────────
+
+        /// <summary>
+        /// 输入框提交（回车）回调。回调签名：function(name, text) end
+        /// UGUI 用 onEndEdit（InputField/TMP_InputField 都有）。
+        /// 多次注册累加，UnregisterSubmit(name) 清同 name 所有绑定。
+        /// </summary>
+        public void RegisterSubmit(string name, LuaFunction callback)
+        {
+            if (callback == null || string.IsNullOrEmpty(name)) return;
+            var go = FindByName(name);
+            if (go == null) { Debug.LogWarning($"[UILuaBehaviour] RegisterSubmit: '{name}' not found"); return; }
+
+            var captured = callback;
+            UnityEngine.Events.UnityAction<string> action = s => captured.Call(name, s);
+
+            Action detach = null;
+            var f = go.GetComponent<InputField>();
+            if (f != null)
+            {
+                f.onEndEdit.AddListener(action);
+                detach = () => { if (f != null) f.onEndEdit.RemoveListener(action); };
+            }
+            else
+            {
+                var tf = go.GetComponent<TMP_InputField>();
+                if (tf != null)
+                {
+                    tf.onEndEdit.AddListener(action);
+                    detach = () => { if (tf != null) tf.onEndEdit.RemoveListener(action); };
+                }
+            }
+            if (detach == null)
+            {
+                Debug.LogWarning($"[UILuaBehaviour] RegisterSubmit: '{name}' has no InputField/TMP_InputField");
+                return;
+            }
+            _explicitSubmits.Add(new EventEntry { name = name, lua = captured, detach = detach });
+        }
+
+        public void UnregisterSubmit(string name) => UnregisterEntry(_explicitSubmits, name);
+
+        // ─── TextChange (输入框值变化) ───────────────────────────────────
+
+        /// <summary>
+        /// 输入框文本变化回调。回调签名：function(name, newText) end
+        /// UGUI 用 onValueChanged。
+        /// </summary>
+        public void RegisterTextChange(string name, LuaFunction callback)
+        {
+            if (callback == null || string.IsNullOrEmpty(name)) return;
+            var go = FindByName(name);
+            if (go == null) { Debug.LogWarning($"[UILuaBehaviour] RegisterTextChange: '{name}' not found"); return; }
+
+            var captured = callback;
+            UnityEngine.Events.UnityAction<string> action = s => captured.Call(name, s);
+
+            Action detach = null;
+            var f = go.GetComponent<InputField>();
+            if (f != null)
+            {
+                f.onValueChanged.AddListener(action);
+                detach = () => { if (f != null) f.onValueChanged.RemoveListener(action); };
+            }
+            else
+            {
+                var tf = go.GetComponent<TMP_InputField>();
+                if (tf != null)
+                {
+                    tf.onValueChanged.AddListener(action);
+                    detach = () => { if (tf != null) tf.onValueChanged.RemoveListener(action); };
+                }
+            }
+            if (detach == null)
+            {
+                Debug.LogWarning($"[UILuaBehaviour] RegisterTextChange: '{name}' has no InputField/TMP_InputField");
+                return;
+            }
+            _explicitChanges.Add(new EventEntry { name = name, lua = captured, detach = detach });
+        }
+
+        public void UnregisterTextChange(string name) => UnregisterEntry(_explicitChanges, name);
+
+        // ─── ValueChange (Slider/Toggle 值变化) ──────────────────────────
+
+        /// <summary>
+        /// Slider/Toggle 值变化回调。回调签名：function(name, value) end
+        /// value 为 float（Slider）或 bool（Toggle）。
+        /// </summary>
+        public void RegisterValueChange(string name, LuaFunction callback)
+        {
+            if (callback == null || string.IsNullOrEmpty(name)) return;
+            var go = FindByName(name);
+            if (go == null) { Debug.LogWarning($"[UILuaBehaviour] RegisterValueChange: '{name}' not found"); return; }
+
+            var captured = callback;
+            Action detach = null;
+
+            var sl = go.GetComponent<Slider>();
+            if (sl != null)
+            {
+                UnityEngine.Events.UnityAction<float> a = v => captured.Call(name, v);
+                sl.onValueChanged.AddListener(a);
+                detach = () => { if (sl != null) sl.onValueChanged.RemoveListener(a); };
+            }
+            else
+            {
+                var tg = go.GetComponent<Toggle>();
+                if (tg != null)
+                {
+                    UnityEngine.Events.UnityAction<bool> a = v => captured.Call(name, v);
+                    tg.onValueChanged.AddListener(a);
+                    detach = () => { if (tg != null) tg.onValueChanged.RemoveListener(a); };
+                }
+            }
+            if (detach == null)
+            {
+                Debug.LogWarning($"[UILuaBehaviour] RegisterValueChange: '{name}' has no Slider/Toggle");
+                return;
+            }
+            _explicitValues.Add(new EventEntry { name = name, lua = captured, detach = detach });
+        }
+
+        public void UnregisterValueChange(string name) => UnregisterEntry(_explicitValues, name);
+
+        // ─── 通用 Unregister/Clear 帮助函数 ──────────────────────────────
+
+        private static void UnregisterEntry(List<EventEntry> list, string name)
+        {
+            if (string.IsNullOrEmpty(name) || list.Count == 0) return;
+            for (int i = list.Count - 1; i >= 0; --i)
+            {
+                var e = list[i];
+                if (e.name != name) continue;
+                e.detach?.Invoke();
+                e.lua?.Dispose();
+                list.RemoveAt(i);
+            }
+        }
+
+        private static void ClearEntries(List<EventEntry> list)
+        {
+            for (int i = 0; i < list.Count; ++i)
+            {
+                var e = list[i];
+                e.detach?.Invoke();
+                e.lua?.Dispose();
+            }
+            list.Clear();
+        }
+
         /// <summary>
         /// 清理全部 listener（对齐 UITKLuaBridge.ClearAllListeners 语义）：
         ///   - 全局扫描的 onClick / onSubmit / onTextChange (DetachEventHandle)
@@ -574,6 +763,9 @@ namespace UGFramework.Runtime
             }
 
             _explicitClicks.Clear();
+            ClearEntries(_explicitSubmits);
+            ClearEntries(_explicitChanges);
+            ClearEntries(_explicitValues);
 
             // 缓存清空（GameObject 可能已被 destroy）
             _qCache.Clear();

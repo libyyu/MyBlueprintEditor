@@ -65,11 +65,35 @@ namespace UGFramework.Runtime
         void  SetToggleValue(string name, bool value);
         bool  GetToggleValue(string name);
 
+        // 输入框值读写（同步）
+        // UGUI: InputField.text / TMP_InputField.text 自动识别
+        // UITK: TextField.value
+        void   SetInputText(string name, string text);
+        string GetInputText(string name);
+
         // ─── 事件 ────────────────────────────────────────────────────────
-        // 累加语义：同 name 多次 RegisterClick 全部触发，对齐 UGUI AddClick
-        // 回调签名：function(name) end —— name 是触发的元素名
+        // 累加语义：同 name 多次注册全部触发，对齐 UGUI AddClick
+        // 所有 RegisterXxx 都通过对应的 UnregisterXxx 解绑（清同 name 所有累加）
+        // 也会在 ClearAllListeners 时统一释放
+
+        // 点击：function(name) end
         void RegisterClick  (string name, LuaFunction callback);
         void UnregisterClick(string name);
+
+        // 输入框提交（UGUI = InputField/TMP_InputField.onEndEdit；UITK = NavigationSubmitEvent）
+        // 回调签名：function(name, text) end
+        void RegisterSubmit  (string name, LuaFunction callback);
+        void UnregisterSubmit(string name);
+
+        // 输入框文本变化（UGUI = onValueChanged；UITK = ChangeEvent<string>）
+        // 回调签名：function(name, newText) end
+        void RegisterTextChange  (string name, LuaFunction callback);
+        void UnregisterTextChange(string name);
+
+        // Slider/Toggle 值变化（UGUI = Slider.onValueChanged / Toggle.onValueChanged；UITK = ChangeEvent<float|bool>）
+        // 回调签名：function(name, value) end —— value 是 float（Slider）或 bool（Toggle）
+        void RegisterValueChange  (string name, LuaFunction callback);
+        void UnregisterValueChange(string name);
 
         // ─── 清理 ────────────────────────────────────────────────────────
         // Panel 销毁时调用，释放所有 LuaFunction、卸载所有 listener
