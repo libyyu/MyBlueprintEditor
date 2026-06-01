@@ -485,12 +485,14 @@ namespace UGFramework.Runtime
             CallMethod("onBecameInvisible");
         }
 
+        // 修复：Get<LuaFunction> 必须 Dispose，否则每次 onAwake/onStart/onBecameVisible/
+        // onBecameInvisible 都会泄漏一个 wrapper（可显示/隐藏 Panel 反复触发）。
         object[] CallMethod(string func, params object[] args)
         {
             if (!initialize || null == msgHandle || !msgHandle.IsValid()) return null;
             var fun = msgHandle.Get<LuaFunction>(func);
             if (null == fun) return null;
-            return fun.Call(args);
+            try { return fun.Call(args); } finally { fun.Dispose(); }
         }
     }
 }

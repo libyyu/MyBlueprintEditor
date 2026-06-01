@@ -121,37 +121,11 @@ namespace UGFramework.Runtime
             msgHandle = luaMsgHandler;
             if (msgHandle != null)
             {
-                LuaFunction fun = msgHandle.Get<LuaFunction>("onClick");
-                if (fun != null)
-                {
-                    TouchButton();
-                }
-
-                fun = msgHandle.Get<LuaFunction>("onSubmit");
-                if (fun != null)
-                {
-                    TouchInputField();
-                }
-                else
-                {
-                    fun = msgHandle.Get<LuaFunction>("onTextChange");
-                    if (fun != null)
-                    {
-                        TouchInputField();
-                    }
-                }
-
-                fun = msgHandle.Get<LuaFunction>("onStepTweenFinish");
-                if (fun != null)
-                {
-                    TouchTweener();
-                }
-
-                fun = msgHandle.Get<LuaFunction>("onScroll");
-                if (fun != null)
-                {
-                    TouchScroll();
-                }
+                if (HasMethod("onClick"))           TouchButton();
+                if (HasMethod("onSubmit"))          TouchInputField();
+                else if (HasMethod("onTextChange")) TouchInputField();
+                if (HasMethod("onStepTweenFinish")) TouchTweener();
+                if (HasMethod("onScroll"))          TouchScroll();
             }
         }
 
@@ -297,14 +271,28 @@ namespace UGFramework.Runtime
         }
 
         /// <summary>
-        /// 执行Lua方法
+        /// 执行Lua方法。
+        /// 修复：每次 Get LuaFunction 都会创建 wrapper + xLua 注册表条目，必须 Dispose。
+        /// 否则像 onScroll/onTextChange/onClick 这类高频回调每帧/每按键都会泄漏一个。
         /// </summary>
         object[] CallMethod(string func, params object[] args)
         {
             if (!initialize || null == msgHandle || !msgHandle.IsValid()) return null;
             var fun = msgHandle.Get<LuaFunction>(func);
             if (null == fun) return null;
-            return fun.Call(args);
+            try { return fun.Call(args); } finally { fun.Dispose(); }
+        }
+
+        /// <summary>
+        /// 仅做存在性判断。Get 必须配 Dispose，否则每次 TouchGUIMsg 都会泄漏多个 LuaFunction。
+        /// </summary>
+        private bool HasMethod(string name)
+        {
+            if (msgHandle == null || !msgHandle.IsValid()) return false;
+            var fun = msgHandle.Get<LuaFunction>(name);
+            if (fun == null) return false;
+            fun.Dispose();
+            return true;
         }
 
         // ═══════════════════════════════════════════════════════════════════
