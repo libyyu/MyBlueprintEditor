@@ -345,7 +345,7 @@ do
             __options = classOption,
         }
 
-        local internalOp = {"__tostring", "__add", "__sub", "__mul", "__div", "__mod", "__pow", "__unm", "__contact", "__len", "__eq", "__lt", "__le"}
+        local internalOp = {"__tostring", "__add", "__sub", "__mul", "__div", "__mod", "__pow", "__unm", "__concat", "__len", "__eq", "__lt", "__le"}
 
         setmetatable(classType, typeMeta)
 
@@ -549,8 +549,16 @@ do
         return self.__pointer
     end
     function FBaseObject:GetClassOptions()
-         local meta = getmetatable(self.__class)
+        local meta = getmetatable(self.__class)
         return meta.__options
+    end
+    function FBaseObject:GetParentClassOptions()
+        local pclass = self:GetParentClass()
+        if not pclass then
+            return nil
+        end
+        local meta = getmetatable(pclass)
+        return meta and meta.__options or nil
     end
     function FBaseObject:toString()
         return tostring(self:GetClass()) ..  "(".. self:GetPointer() .. ")"
@@ -675,12 +683,15 @@ function FLua.IsImplement(obj, interfaceType)
     end
 
     --Implement interface
-    local options = obj:GetClassOptions()
-    for _, interface_ in ipairs(options.interfaces or {}) do
-        if interface_ == interface then
-            return true
+    local pcls = obj:GetClass()
+    while pcls do
+        local opts = getmetatable(pcls).__options
+        for _, iface in ipairs(opts.interfaces or {}) do
+            if iface == interfaceType then return true end
         end
+        pcls = getmetatable(pcls).__parent
     end
+
     return false
 end
 
@@ -873,6 +884,21 @@ if false then
         local a = TB()
         print(a)
         print(a < b)
+
+        local A = FLua.Class("A")
+        function A:__concat(other) return "concat ok" end
+        local aa = A()
+        print(aa)
+        print(aa .. "x")   -- 期望: concat ok（修复前: error 或拿到默认行为）
+
+        local IFoo = FLua.Interface("IFoo")
+        function IFoo:foo() end
+
+        local Bar = FLua.Class("Bar").Implement(IFoo)
+        function Bar:foo() end
+
+        local b = Bar()
+        print(FLua.IsImplement(b, IFoo))   -- 修前: false（错），修后: true
     --end)
 end
 
