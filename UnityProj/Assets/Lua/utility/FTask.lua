@@ -25,7 +25,7 @@ local TaskAsyncOp <const> =
 ---@alias TaskContinuationFunction fun(task:Task):void
 ---@alias TaskResumeEntryFunction fun(task:Task):void
 do
-	function Task:Constructor()
+	function Task:__constructor()
 		---@type nil|TaskActionFunction
 		self.m_action = nil
 		---@type nil|TaskCancelFunction
@@ -388,7 +388,7 @@ local function checkParamType (value, who, argIndex, needType)
 end
 
 ---@class TaskHelper
-TaskHelper = {}
+local TaskHelper = {}
 TaskHelper.TaskStatus = TaskStatus
 
 ---@param action TaskActionFunction
@@ -403,7 +403,7 @@ end
 function TaskHelper.createEx(action, cancelCallback)
 	checkParamType(action, 'action', 1, "function")
 	checkParamType(cancelCallback, 'cancelCallback', 2, {"function", "boolean", "nil"})
-	local obj = Task:New()
+	local obj = Task()
 	obj.m_action = action
 	obj.m_cancelCallback = cancelCallback or false
 	return obj
