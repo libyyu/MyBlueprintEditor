@@ -169,56 +169,87 @@ do
     _M.ForwardDeclare = _ForwardDeclare
 
     ------------------------------------------------------------------
+    -- 字段查找系列函数
+    --
+    -- 返回值规约：
+    --   class__rawget(theType, key)  -> (value)
+    --       仅查当前类自身（rawget classType + meta.__property），不沿继承链。
+    --       仅服务于 internalOp / __destructor / __constructor 这类"只可能是函数"的查找，
+    --       所以保持单返回值语义即可。
+    --   class__tryget(theType, key)  -> (value, found)
+    --       沿继承链查找；found 标志表示"key 是否在某层被声明过"，
+    --       与 value 的真值性无关（区分"声明=nil/false" vs "未声明"）。
+    --   obj__tryget(obj, key)        -> (value, found)
+    --       完整查找（实例字段 + objMeta + attributes + 类继承链）。
+    --
+    -- ⚠️ 用 wrapper {value=v} 检测"是否声明过"是 FLua 严格未声明检查的关键 ——
+    -- 因为 Lua 里 t[k] = nil 等价于删 key，无法直接区分 nil 字段和不存在字段。
+    ------------------------------------------------------------------
+
     local function class__rawget(theType, key)
-        if rawget(theType, key) then
-            return rawget(theType, key)
+        local v = rawget(theType, key)
+        if v ~= nil then
+            return v
         end
 
         local meta = getmetatable(theType)
         local property = meta.__property
-        if property[key] then
-            return property[key].value
+        local wrapper = property[key]
+        if wrapper ~= nil then
+            return wrapper.value
         end
 
         return nil
     end
 
-    local function class__tryget(theType, key)    
-        if rawget(theType, key) then
-            return rawget(theType, key)
+    -- 沿继承链查找类字段；返回 (value, found)
+    -- 单值赋值上下文（如 `local v = class__tryget(...)`）只取 value，向后兼容
+    local function class__tryget(theType, key)
+        local v = rawget(theType, key)
+        if v ~= nil then
+            return v, true
         end
 
         local meta = getmetatable(theType)
         local property = meta.__property
-        if property[key] then
-            return property[key].value
-        else
-            local parent = meta.__parent
-            if parent then
-                return class__tryget(parent, key)
-            end
+        local wrapper = property[key]
+        if wrapper ~= nil then
+            return wrapper.value, true
         end
-        return nil
+
+        local parent = meta.__parent
+        if parent then
+            return class__tryget(parent, key)
+        end
+        return nil, false
     end
     _M.class__tryget = class__tryget
 
     local function obj__tryget(obj, key)
-        if rawget(obj, key) then
-            return rawget(obj, key), true
-        end
-        local objMeta = getmetatable(obj)
-        if rawget(objMeta, key) then
-            return rawget(objMeta, key), true
+        -- 1) 实例自身字段（__in_constructor / __ctor_args / __attributes 等内部字段）
+        local v = rawget(obj, key)
+        if v ~= nil then
+            return v, true
         end
 
-        local attributes = obj.__attributes
-        if attributes and attributes[key] then
-            return attributes[key].value, true
-        else
-            local v = class__tryget(objMeta.__class, key)
-            return v, not not v
+        -- 2) objMeta 上的字段（__class / 拷贝过来的 internalOp 元方法等）
+        local objMeta = getmetatable(obj)
+        v = rawget(objMeta, key)
+        if v ~= nil then
+            return v, true
         end
-        return nil
+
+        -- 3) attributes 里的用户字段（构造期间或运行期声明）
+        local attributes = obj.__attributes
+        if attributes then
+            local wrapper = attributes[key]
+            if wrapper ~= nil then
+                return wrapper.value, true
+            end
+        end
+
+        -- 4) 沿类继承链查找（方法 / 类静态字段）
+        return class__tryget(objMeta.__class, key)
     end
     _M.obj__tryget = obj__tryget
     ------------------------------------------------------------------
@@ -368,8 +399,8 @@ do
         end
 
         typeMeta.__index = function(theType, key)
-            local v = class__tryget(theType, key)
-            if v then
+            local v, found = class__tryget(theType, key)
+            if found then
                 return v
             else
                 error(("failed to access non-exist property '%s' in class:'%s'"):format(key, tostring(theType)), 2)
@@ -380,10 +411,11 @@ do
             if built_in_type[key] then
                 error(("failed to override built-in property '%s' in class:'%s'"):format(key, tostring(theType)), 2)
             end
-            
+
             local meta = getmetatable(theType)
-            if meta.__property[key] then
-                error(("failed to override property '%s' in class:'%s'"):format(key, tostring(theType)), 2) 
+            -- wrapper {value=...} 永远 truthy，存在即"已声明"，与 value 真值性无关
+            if meta.__property[key] ~= nil then
+                error(("failed to override property '%s' in class:'%s'"):format(key, tostring(theType)), 2)
             end
 
             meta.__property[key] = {value = value, }
@@ -415,8 +447,10 @@ do
         end
 
         objMeta.__newindex = function(obj, key, value)
-            local v, b = obj__tryget(obj, key)
-            if not v and not b and not rawget(obj, "__in_constructor") then
+            local _, found = obj__tryget(obj, key)
+            -- 仅在"字段从未被声明过"且"不在构造期间"时才拒绝赋值
+            -- found 标志精确表达"是否声明过"，与值的真值性无关（声明=nil/false 也合法）
+            if not found and not rawget(obj, "__in_constructor") then
                 error(("failed to assignment non-exist field:'%s@%s'"):format(key, tostring(obj)), 2)
                 return
             end
@@ -506,14 +540,17 @@ do
                     end)}
                 end
 
-                do --constructor  
+                do --constructor
+                    -- 从根到叶逐级调用 __constructor，并把用户传入的 ... 一并转发。
+                    -- 父子构造器接收同一份参数（FLua 没有 super(...) 概念，
+                    -- 各级 ctor 各自决定要消费哪些参数）。
                     for i = #clsList, 1, -1 do
                         local _cls = clsList[i]
                         local func = class__rawget(_cls, "__constructor")
                         if func then
-                            func(instance)
+                            func(instance, ...)
                         end
-                    end                 
+                    end
                 end
             end
             rawset(instance, "__in_constructor", nil)
@@ -582,7 +619,14 @@ do
             return false
         end
 
-        if meta.__options.type == _INTERFACE then
+        -- forward-declared classType 还没正式定义，meta.__options 是 nil；
+        -- 这种类型不可能有实例，is(forwardType) 一定是 false。
+        local options = meta.__options
+        if not options then
+            return false
+        end
+
+        if options.type == _INTERFACE then
             for _, v in ipairs(self:GetClassOptions().interfaces or {}) do
                 if v == classType then
                     return true
@@ -649,14 +693,15 @@ end
 
 function FLua.IsAbstract(classType)
     local meta = _M.getClassMeta(classType)
-    if meta then
+    -- forward-declared 类的 typeMeta 没有 __options 字段，需要防御
+    if meta and meta.__options then
         return meta.__options.type == _ABSTRACT
     end
 end
 
 function FLua.IsInterface(classType)
     local meta = _M.getClassMeta(classType)
-    if meta then
+    if meta and meta.__options then
         return meta.__options.type == _INTERFACE
     end
 end
