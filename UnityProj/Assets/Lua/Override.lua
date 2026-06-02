@@ -20,7 +20,7 @@ do --System.Object
     print("Override System.Object")
 	local __lua_userdata = {}
 	setmetatable(__lua_userdata, {__mode = "k"})
-	local mt = GameUtil.GetMetaTable("System.Object")
+	local mt = GameUtil.GetMethodTable("System.Object")
 	function mt:SetLuaUserData(key, value)
 		local t = rawget(__lua_userdata, self)
 		if not t then
@@ -47,7 +47,7 @@ end
 
 do --UnityEngine.GameObject
     print("Override UnityEngine.GameObject")
-	local mt = GameUtil.GetMetaTable("UnityEngine.GameObject")
+	local mt = GameUtil.GetMethodTable("UnityEngine.GameObject")
 	function mt:FindDirect(name)
 		if name == "." or name == "" then
 			return self
@@ -68,7 +68,7 @@ do --UnityEngine.GameObject
 		return self.activeSelf
 	end
 
-	local mt2 = GameUtil.GetMetaTable("UnityEngine.UIElements.VisualElement")
+	local mt2 = GameUtil.GetMethodTable("UnityEngine.UIElements.VisualElement")
 	if mt2 then
 		print("Override UnityEngine.UIElements.VisualElement")
 		function mt2:FindDirect(name)
@@ -86,7 +86,7 @@ do --UnityEngine.GameObject
 		end
 	end
 
-	local mt3 = GameUtil.GetMetaTable("UGFramework.Runtime.UGUIPanelBackend")
+	local mt3 = GameUtil.GetMethodTable("UGFramework.Runtime.UGUIPanelBackend")
 	if mt3 then
 		print("Override UGFramework.Runtime.UGUIPanelBackend", mt3, getmetatable(CS.UGFramework.Runtime.UGUIPanelBackend(nil)))
 		function mt3:FindDirect(name)
@@ -97,7 +97,7 @@ do --UnityEngine.GameObject
 			end
 		end
 	end
-	local mt4 = GameUtil.GetMetaTable("UGFramework.Runtime.UITKPanelBackend")
+	local mt4 = GameUtil.GetMethodTable("UGFramework.Runtime.UITKPanelBackend")
 	if mt4 then
 		print("Override UGFramework.Runtime.UITKPanelBackend")
 		function mt4:FindDirect(name)
@@ -109,7 +109,7 @@ do --UnityEngine.GameObject
 		end
 	end
 
-	local mt5 = GameUtil.GetMetaTable("FairyGUI.GComponent")
+	local mt5 = GameUtil.GetMethodTable("FairyGUI.GComponent")
 	if mt5 then
 		print("Override FairyGUI.GComponent")
 		function mt5:FindDirect(name)
@@ -123,7 +123,7 @@ end
 
 do--UnityEngine.UI.Slider
     print("Override UnityEngine.UI.Slider")
-	local mt = GameUtil.GetMetaTable("UnityEngine.UI.Slider")
+	local mt = GameUtil.GetMethodTable("UnityEngine.UI.Slider")
 	function mt:AutoProgress(time, start, to, onfinish)
 		local pretimer = self:GetLuaUserData("AutoProgress")
 		if pretimer then

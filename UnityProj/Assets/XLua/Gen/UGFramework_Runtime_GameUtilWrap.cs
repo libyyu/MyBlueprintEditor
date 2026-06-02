@@ -42,6 +42,7 @@ namespace XLua.CSObjectWrap
             Utils.RegisterFunc(L, Utils.CLS_IDX, "ToBytesString", _m_ToBytesString_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "IsPointerOverUIObject", _m_IsPointerOverUIObject_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "GetMetaTable", _m_GetMetaTable_xlua_st_);
+            Utils.RegisterFunc(L, Utils.CLS_IDX, "GetMethodTable", _m_GetMethodTable_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "LoadTexture2DFromFile", _m_LoadTexture2DFromFile_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "AddGlobalTimer", _m_AddGlobalTimer_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "RemoveGlobalTimer", _m_RemoveGlobalTimer_xlua_st_);
@@ -358,6 +359,28 @@ namespace XLua.CSObjectWrap
                         translator.Push(L, gen_ret);
                     
                     
+                    
+                    return 1;
+                }
+                
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _m_GetMethodTable_xlua_st_(RealStatePtr L)
+        {
+		    try {
+            
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            
+                {
+                    string _typeName = LuaAPI.lua_tostring(L, 1);
+                    
+                        var gen_ret = UGFramework.Runtime.GameUtil.GetMethodTable( _typeName );
+                        translator.Push(L, gen_ret);
                     
                     return 1;
                 }
