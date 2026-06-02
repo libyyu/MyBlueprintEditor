@@ -68,5 +68,10 @@ namespace UGFramework.Runtime
             if (IsValid)
                 Object.Destroy(_root);
         }
+
+        public static UGUIPanelBackend Create(GameObject go)
+        {
+            return new UGUIPanelBackend(go);
+        }
     }
 }

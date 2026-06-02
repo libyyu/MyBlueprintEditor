@@ -64,6 +64,61 @@ do --UnityEngine.GameObject
 		end
 		return child.gameObject
 	end
+	function mt:GetVisible()
+		return self.activeSelf
+	end
+
+	local mt2 = GameUtil.GetMetaTable("UnityEngine.UIElements.VisualElement")
+	if mt2 then
+		print("Override UnityEngine.UIElements.VisualElement")
+		function mt2:FindDirect(name)
+			if name == "." or name == "" then
+				return self
+			end
+			name = name:replace('.', '/', {plain=true})
+			return self:Q(name)
+		end
+		function mt2:GetVisible()
+			return self.style.display.value ~= 0
+		end
+		function mt2:SetVisible(visible)
+			self.style.display.value = visible and CS.UnityEngine.UIElements.DisplayStyle.Flex or CS.UnityEngine.UIElements.DisplayStyle.None
+		end
+	end
+
+	local mt3 = GameUtil.GetMetaTable("UGFramework.Runtime.UGUIPanelBackend")
+	if mt3 then
+		print("Override UGFramework.Runtime.UGUIPanelBackend", mt3, getmetatable(CS.UGFramework.Runtime.UGUIPanelBackend(nil)))
+		function mt3:FindDirect(name)
+			---@type GameObject
+			local go = self.RootGameObject
+			if go then
+				return go:FindDirect(name)
+			end
+		end
+	end
+	local mt4 = GameUtil.GetMetaTable("UGFramework.Runtime.UITKPanelBackend")
+	if mt4 then
+		print("Override UGFramework.Runtime.UITKPanelBackend")
+		function mt4:FindDirect(name)
+			---@type VisualElement
+			local vt = self.RootVisualElement
+			if vt then
+				return vt:FindDirect(name)
+			end
+		end
+	end
+
+	local mt5 = GameUtil.GetMetaTable("FairyGUI.GComponent")
+	if mt5 then
+		print("Override FairyGUI.GComponent")
+		function mt5:FindDirect(name)
+			--TODO: fairygui
+		end
+		function mt5:GetVisible()
+			--TODO: fairygui
+		end
+	end
 end
 
 do--UnityEngine.UI.Slider

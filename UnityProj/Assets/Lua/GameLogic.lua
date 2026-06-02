@@ -25,7 +25,8 @@ SM.on_scene_loaded = function(sceneName)
     -- 只取末段名字，避免路径前缀干扰
     local name = sceneName:match("([^/]+)$") or sceneName
     if name == 'MainMenu' or name == 'main_menu' then
-        require 'ui.FPanelMainMenu'.Instance():ShowPanel(true)
+        --require 'ui.FPanelMainMenu'.Instance():ShowPanel(true)
+        require 'ui.FPanelUITest'.Instance():ShowPanel(true)
     end
 end
 

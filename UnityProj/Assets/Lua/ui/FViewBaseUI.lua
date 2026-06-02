@@ -64,11 +64,10 @@ do
 	---@return boolean
 	function FViewBaseUI:IsValid()
 		local obj = self:GetRootObj()
-		-- UITK SubView: m_viewObj 是 VisualElement，不走 IsValidObject（它是纯 C# 对象）
-		if obj ~= nil and type(obj) == "userdata" and obj.IsExtend and obj:IsExtend("UnityEngine.UIElements.VisualElement") then
-			return true  -- VisualElement 存在即有效，无需 Unity Object 检查
+		if not IsValidObject(obj) then --nil and null
+			return false
 		end
-		return IsValidObject(obj)
+		return true
 	end
 
 	---@return boolean
@@ -128,24 +127,17 @@ do
 	---@param name string
 	---@return nil|GameObject|VisualElement
 	function FViewBaseUI:FindDirect(name)
-		-- UITK SubView: m_viewObj 是 VisualElement，Q 子元素
-		if type(self.m_viewObj) == "userdata" and self.m_viewObj.IsExtend and self.m_viewObj:IsExtend("UnityEngine.UIElements.VisualElement") then
-			return self.m_viewObj:Q(name)
-		end
+	print("...", self.m_viewObj, name)
 		return self.m_viewObj:FindDirect(name)
 	end
 	---@param name string
 	---@return nil|GameObject|VisualElement
 	function FViewBaseUI:RequireFind(name)
-		-- UITK SubView: m_viewObj 是 VisualElement，Q 子元素
-		if type(self.m_viewObj) == "userdata" and self.m_viewObj.IsExtend and self.m_viewObj:IsExtend("UnityEngine.UIElements.VisualElement") then
-			local ve = self.m_viewObj:Q(name)
-			if not ve then
-				printError("[UITK] RequireFind: element not found: " .. tostring(name))
-			end
-			return ve
+		local obj = self:FindDirect(name)
+		if not IsValidObject(obj) then
+			error("RequireFind failed: " .. tostring(name) .. ", on obj: " .. formatGameObjectInfo(self.m_viewObj), 2)
 		end
-		return self.m_viewObj:RequireFind(name)
+		return obj
 	end
 	---@param subViewPath string
 	---@param subView FViewBaseUI
@@ -166,7 +158,7 @@ do
 			end
 		end, subView)
 	end
-	---@param subViewObjResolver fun(view:FViewBaseUI):GameObject|nil
+	---@param subViewObjResolver fun(view:FViewBaseUI):GameObject|VisualElement|nil
 	---@param subView FViewBaseUI
 	---@return FViewBaseUI
 	function FViewBaseUI:RegisterSubViewEx(subViewObjResolver, subView)
@@ -193,14 +185,14 @@ do
 		subView:OnAttached(self)
 		return subView
 	end
-	---@param gameObject:GameObject|nil
+	---@param gameObject GameObject|VisualElement|nil
 	---@param subView FViewBaseUI
 	---@param bInvokeOnCreate boolean|nil
 	---@return FViewBaseUI
 	function FViewBaseUI:AttachSubView(gameObject, subView, bInvokeOnCreate)
 		return self:AttachSubViewEx(gameObject, subView, bInvokeOnCreate, DetachFlag.Default)
 	end
-	---@param gameObject:GameObject|nil
+	---@param gameObject GameObject|VisualElement|nil
 	---@param subView FViewBaseUI
 	---@param bInvokeOnCreate boolean|nil
 	---@param nDetachFlag number|nil
@@ -247,7 +239,7 @@ do
 		end
 		return subView
 	end
-	---@param gameObject:GameObject|nil
+	---@param gameObject GameObject|VisualElement|nil
 	---@param Root FViewBaseUI
 	function FViewBaseUI:CreateFromObj(gameObject, Root)
 		if gameObject == nil then
@@ -330,23 +322,10 @@ do
 
 	---@return boolean
 	function FViewBaseUI:IsVisible()
-		-- UITK SubView: m_viewObj 是 VisualElement，直接查 display
-		if type(self.m_viewObj) == "userdata" and self.m_viewObj.IsExtend and self.m_viewObj:IsExtend("UnityEngine.UIElements.VisualElement") then
-			-- DisplayStyle.None == 0 → 隐藏；Flex/other → 可见
-			return self.m_viewObj.style.display.value ~= 0
-		end
 		local obj = self:GetRootObjSafe()
 		if obj == nil then return false end
 
-		if obj:IsExtend("FairyGUI.GComponent") then --GComponent
-			if obj.displayObject then
-				return not not obj.displayObject.visible
-			elseif obj.gameObject then
-				return obj.gameObject.activeSelf
-			end
-		else
-			return obj.activeSelf
-		end
+		return obj:GetVisible()
 	end
 	---@param id any
 	---@param message any
@@ -360,7 +339,6 @@ do
 		end
 	end
 	---@param methodName string
-	---@param *
 	---@return any
 	function FViewBaseUI:CallMethod(methodName, ...)
 		if not self:tryget(methodName) then
@@ -370,7 +348,6 @@ do
 		return self[methodName](self,...)
 	end
 	---@param functionName string
-	---@param *
 	---@return any
 	function FViewBaseUI:InvokeSubViewsFunction(functionName, ...)
 		if self.m_subViews then
@@ -387,35 +364,15 @@ do
 	------------------------------------------------------------
 	---@param b boolean
 	function FViewBaseUI:SetVisibleInner(b)
-		-- UITK SubView: m_viewObj 是 VisualElement，直接控制 display
-		if type(self.m_viewObj) == "userdata" and self.m_viewObj.IsExtend and self.m_viewObj:IsExtend("UnityEngine.UIElements.VisualElement") then
-			local oldVisible = self:IsVisible()
-			self.m_viewObj.style.display = b and
-				CS.UnityEngine.UIElements.DisplayStyle.Flex or
-				CS.UnityEngine.UIElements.DisplayStyle.None
-			local newVisible = self:IsVisible()
-			if oldVisible ~= newVisible then
-				self:OnShowInternal(newVisible)
-			end
-			return
-		end
 		local obj = self:GetRootObjSafe()
 		if obj then
 			local oldVisible = self:IsVisible()
-			if obj:IsExtend("FairyGUI.GComponent") then --GComponent
-				if obj.displayObject then
-					obj.displayObject.visible = b
-				elseif obj.gameObject then
-					obj.gameObject:SetActive(b)
-				else
-					logError("viewObj not valid fgui object")
-				end
+			if obj.SetVisible then
+				obj:SetVisible(b)
+			elseif obj.SetActive then
+				obj:SetActive(b)
 			else
-				if obj.SetActive then
-					obj:SetActive(b)
-				else
-					logError("viewObj not valid ugui object")
-				end
+				logError("viewObj not valid ugui object")
 			end
 			local newVisible = self:IsVisible()
 			if oldVisible ~= newVisible then
@@ -477,7 +434,7 @@ do
 		--self:InvokeSubViewsFunction("OnShowInternal")
 		--self:callMethod("__OnPanelShow", bShow)
 	end
-	---@param viewPanel FViewBaseUI
+	---@param viewPanel FPanelBaseUI
 	function FViewBaseUI:SetViewRoot(viewPanel)
 		self.m_viewRoot = viewPanel
 		self:InvokeSubViewsFunction("SetViewRoot", viewPanel)

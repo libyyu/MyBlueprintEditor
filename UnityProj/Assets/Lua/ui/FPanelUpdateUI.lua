@@ -37,7 +37,7 @@ do
 
     function FPanelUpdateUI:OnCreate()
         -- 找 Slider 组件（路径：UILoading/Slider）
-        local sliderTr = self.m_panel.transform:Find("bg/Slider")
+        local sliderTr = self:RequireFind("bg/Slider")
         self.m_slider = sliderTr and sliderTr:GetComponent(typeof(UnityEngine.UI.Slider)) or nil
         if not self.m_slider then
             print("[FPanelUpdateUI] Warning: Slider not found")

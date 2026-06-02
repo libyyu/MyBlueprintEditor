@@ -25,8 +25,6 @@ do
 		self.m_panelType = PanelType.Auto
 		--界面对象
 		self.m_panel = nil
-		--后端适配层（IUIPanelBackend），同时支持 UGUI 和 UI Toolkit
-		self.m_backend = nil
 		--是否fairygui window相关
 		self.m_isfguiWindow = false
 		self.m_fguiOwner = nil
@@ -238,8 +236,7 @@ do
 				return 
 			elseif self:IsUIToolkit() then
 				-- UI Toolkit 路径：panel 是 UITKPanelBackend（C# 对象）
-				self.m_backend = panel
-				self:SetPanelObject(panel.RootGameObject)
+				self:SetPanelObject(panel)
 			elseif self:IsUGUI() then
 				self:SetPanelObject(panel)
 			elseif self:IsFairyGuiWindow() then
@@ -296,7 +293,9 @@ do
 				panel.transform.localScale = Vector3(1, 1, 1)
 				panel.layer = UnityEngine.LayerMask.NameToLayer("UI")
 				print("panel:", panel, type(panel), getmetatable(panel), CS.UnityEngine.GameObject, getmetatable(CS.UnityEngine.GameObject), GameUtil.GetMetaTable("UnityEngine.GameObject"))
-				onResourceLoaded(panel)
+				
+				local UIUGUIBackend = CS.UGFramework.Runtime.UGUIPanelBackend
+				onResourceLoaded(UIUGUIBackend.Create(panel))
 			elseif window then
 				print("CreateWindow", packageName, prefabName)
 				local window = FGUIHelper.CreateWindow(packageName, prefabName)
@@ -372,10 +371,7 @@ do
 			else
 				if self:IsUIToolkit() then
 					-- UITK：通过 backend 销毁（清理 UIDocument + 宿主 GO）
-					if self.m_backend then
-						self.m_backend:Destroy()
-						self.m_backend = nil
-					end
+					self.m_panel:Destroy()
 				elseif self:IsFairyGui() then
 					if self:IsFairyGuiWindow() then
 						FairyGUI.GRoot.inst:RemoveChild(self.m_panel)

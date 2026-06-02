@@ -105,18 +105,13 @@ function FPanelBaseUI:IsVisible()
 	if self:IsSubView() then --有可能由于优化，将从PanelBase继承的页面作为一个View存在
 		return FViewBaseUI.IsVisible(self)
 	end
-	-- UITK：不依赖 m_panel（RootGameObject）判断，直接问 backend
-	-- 注意：必须在 IsValidObject(m_panel) 检查之前，否则 DestroyPanelRaw 后 m_backend 已 nil
-	if self:IsUIToolkit() then
-		if self.m_backend and self.m_backend.IsValid then
-			return self.m_backend:GetVisible()
-		end
-		return false
-	end
+	
 	if not IsValidObject(self.m_panel) then
 		return false
 	end
-	if self:IsFairyGui() then
+	if self:IsUIToolkit() then
+		return self.m_panel:GetVisible()
+	elseif self:IsFairyGui() then
 		if self.m_panel.displayObject then
 			return not not self.m_panel.displayObject.visible
 		elseif self.m_panel.gameObject then
@@ -396,8 +391,8 @@ function FPanelBaseUI:TouchMsgHandler()
 	-- ── UI Toolkit 分支 ───────────────────────────────────────────────────
 	if self:IsUIToolkit() then
 		-- 从 backend 拿到 UITKLuaBridge
-		if not self.m_backend then return end
-		local bridge = self.m_backend:GetEventBridge()
+		if not self.m_panel then return end
+		local bridge = self.m_panel:GetEventBridge()
 		if not bridge then return end
 		self.m_bridge = bridge
 		self.m_msgHandler = bridge  -- 兼容旧代码对 m_msgHandler 的引用
@@ -433,7 +428,7 @@ function FPanelBaseUI:TouchMsgHandler()
 			return
 		end
 
-		local obj = self.m_panel
+		local obj = self.m_panel.RootGameObject
 		if self:IsFairyGui() then
 			obj = self.m_fguiOwner
 		end
@@ -542,12 +537,10 @@ function FPanelBaseUI:_SetPanelToLayerMaxDepth()
 	self:_RemovePanelFromLayer()
 
 	local real_depth = GetLayerNextTopDepth(self:GetDepthLayer())
-	if self:IsUIToolkit() then
+	if self:IsUIToolkit() or self:IsUGUI() then
 		-- UI Toolkit：通过 backend 设置 UIDocument.sortingOrder
-		if self.m_backend and self.m_backend.IsValid then
-			self.m_backend:SetSortingOrder(real_depth)
-			self:_AddPanelToLayerDepth(real_depth)
-		end
+		self.m_panel:SetSortingOrder(real_depth)
+		self:_AddPanelToLayerDepth(real_depth)
 	elseif self:IsFairyGui() then
 		if self:IsFairyGuiWindow() then
 			self.m_panel:SetSortingOrder(real_depth, true)
@@ -555,13 +548,6 @@ function FPanelBaseUI:_SetPanelToLayerMaxDepth()
 		else
 			local panel = self.m_fguiOwner:GetComponent("UIPanel")
 			panel:SetSortingOrder(real_depth, true)
-			self:_AddPanelToLayerDepth(real_depth)
-		end
-	else
-		local canvas = self.m_panel:GetComponent(typeof(UnityEngine.Canvas))
-		if IsValidObject(canvas) then
-			canvas.overrideSorting = true
-			canvas.sortingOrder = real_depth
 			self:_AddPanelToLayerDepth(real_depth)
 		end
 	end
@@ -572,11 +558,9 @@ function FPanelBaseUI:_SetPanelToLayerMinDepth()
 
 	local real_depth = GetLayerNextBottomDepth(self:GetDepthLayer())
 
-	if self:IsUIToolkit() then
-		if self.m_backend and self.m_backend.IsValid then
-			self.m_backend:SetSortingOrder(real_depth)
-			self:_AddPanelToLayerDepth(real_depth)
-		end
+	if self:IsUIToolkit() or self:IsUGUI() then
+		self.m_panel:SetSortingOrder(real_depth)
+		self:_AddPanelToLayerDepth(real_depth)
 	elseif self:IsFairyGui() then
 		if self:IsFairyGuiWindow() then
 			self.m_panel:SetSortingOrder(real_depth, true)
@@ -584,13 +568,6 @@ function FPanelBaseUI:_SetPanelToLayerMinDepth()
 		else
 			local panel = self.m_fguiOwner:GetComponent("UIPanel")
 			panel:SetSortingOrder(real_depth)
-			self:_AddPanelToLayerDepth(real_depth)
-		end
-	else
-		local canvas = self.m_panel:GetComponent(typeof(UnityEngine.Canvas))
-		if IsValidObject(canvas) then
-			canvas.overrideSorting = true
-			canvas.sortingOrder = real_depth
 			self:_AddPanelToLayerDepth(real_depth)
 		end
 	end
@@ -622,21 +599,12 @@ function FPanelBaseUI:_SetVisibleInner(shouldVisible)
 	end
 
 	if self.m_panel then
-		if self:IsUIToolkit() then
-			-- UITK：通过 backend 控制，同步 rootVisualElement.display + GO active
-			if self.m_backend and self.m_backend.IsValid then
-				self.m_backend:SetVisible(shouldVisible)
-			end
-		elseif self:IsFairyGui() then
-			if self.m_panel.displayObject then
-				self.m_panel.displayObject.visible = shouldVisible
-			elseif self.m_panel.gameObject then
-				self.m_panel.gameObject.activeSelf = shouldVisible
-			else
-				printError("self.m_panel not valid >>>>>>>>>>>>>", self.m_panel)
-			end
-		else
+		if self.m_panel.SetVisible then
+			self.m_panel:SetVisible(shouldVisible)
+		elseif self.m_panel.SetActive then
 			self.m_panel:SetActive(shouldVisible)
+		else
+			printError("self.m_panel not valid >>>>>>>>>>>>>", self.m_panel)
 		end
 	end
 
