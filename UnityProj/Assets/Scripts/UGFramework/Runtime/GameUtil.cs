@@ -116,30 +116,6 @@ namespace UGFramework.Runtime
             uiRaycaster.Raycast(eventDataCurrentPosition, results);
             return results.Count > 0;
         }
-
-        static IEnumerator _GetTexture(string url, Action<Texture2D> actionResult)
-        {
-
-            UnityWebRequest uwr = new UnityWebRequest(url);
-            DownloadHandlerTexture downloadTexture = new DownloadHandlerTexture(true);
-            uwr.downloadHandler = downloadTexture;
-
-            yield return uwr.SendWebRequest();
-            Texture2D t = null;
-            if (uwr.result == UnityWebRequest.Result.Success)
-            {
-                t = downloadTexture.texture;
-            }
-            else
-            {
-                UnityEngine.Debug.LogWarning("����ʧ�ܣ��������磬�������ص�ַ�Ƿ���ȷ�� " + url);
-            }
-
-            if (actionResult != null)
-            {
-                actionResult(t);
-            }
-        }
         
         /// <summary>
         /// 确保类型已注册到 xLua。
@@ -307,7 +283,55 @@ namespace UGFramework.Runtime
                 return null;
             }
         }
-        
+
+        static IEnumerator _GetTexture(string url, Action<Texture2D> actionResult)
+        {
+
+            UnityWebRequest uwr = new UnityWebRequest(url);
+            DownloadHandlerTexture downloadTexture = new DownloadHandlerTexture(true);
+            uwr.downloadHandler = downloadTexture;
+
+            yield return uwr.SendWebRequest();
+            Texture2D t = null;
+            if (uwr.result == UnityWebRequest.Result.Success)
+            {
+                t = downloadTexture.texture;
+            }
+            else
+            {
+                UnityEngine.Debug.LogWarning("Can't get texture: " + url);
+            }
+
+            if (actionResult != null)
+            {
+                actionResult(t);
+            }
+        }
+
+        public static void AsyncLoadTextureFromPathOrUrl(string url, Action<Texture2D> cb)
+        {
+            GameLauncher.Instance.StartCoroutine(_GetTexture(url, (tex) =>
+            {
+                cb(tex);
+            }));
+        }
+
+        public static bool SaveTextureToFile(Texture2D tex, string path)
+        {
+            try
+            {
+                CreateDirectoryForFile(path);
+                Byte[] bytes = tex.EncodeToPNG();
+                File.WriteAllBytes(path, bytes);
+                return true;
+            }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.LogException(e);
+                return false;
+            }
+        }
+
         public static int AddGlobalTimer(float ttl, bool bOnce, FTimerList.TimerCallback callback, bool bLateUpdate = false)
         {
             if (GameLauncher.Instance == null) return -1;

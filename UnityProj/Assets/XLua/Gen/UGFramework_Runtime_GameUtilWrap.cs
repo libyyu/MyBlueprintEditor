@@ -31,7 +31,7 @@ namespace XLua.CSObjectWrap
 			Utils.EndObjectRegister(type, L, translator, null, null,
 			    null, null, null);
 
-		    Utils.BeginClassRegister(type, L, __CreateInstance, 19, 0, 0);
+		    Utils.BeginClassRegister(type, L, __CreateInstance, 22, 0, 0);
 			Utils.RegisterFunc(L, Utils.CLS_IDX, "IsEditorEnv", _m_IsEditorEnv_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "IsWXEnv", _m_IsWXEnv_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "IsWebGLEnv", _m_IsWebGLEnv_xlua_st_);
@@ -44,6 +44,8 @@ namespace XLua.CSObjectWrap
             Utils.RegisterFunc(L, Utils.CLS_IDX, "GetMetaTable", _m_GetMetaTable_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "GetMethodTable", _m_GetMethodTable_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "LoadTexture2DFromFile", _m_LoadTexture2DFromFile_xlua_st_);
+            Utils.RegisterFunc(L, Utils.CLS_IDX, "AsyncLoadTextureFromPathOrUrl", _m_AsyncLoadTextureFromPathOrUrl_xlua_st_);
+            Utils.RegisterFunc(L, Utils.CLS_IDX, "SaveTextureToFile", _m_SaveTextureToFile_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "AddGlobalTimer", _m_AddGlobalTimer_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "RemoveGlobalTimer", _m_RemoveGlobalTimer_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "AddObjectTimer", _m_AddObjectTimer_xlua_st_);
@@ -376,11 +378,16 @@ namespace XLua.CSObjectWrap
             
                 ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
             
+            
+            
+                
                 {
                     string _typeName = LuaAPI.lua_tostring(L, 1);
                     
                         var gen_ret = UGFramework.Runtime.GameUtil.GetMethodTable( _typeName );
                         translator.Push(L, gen_ret);
+                    
+                    
                     
                     return 1;
                 }
@@ -406,6 +413,61 @@ namespace XLua.CSObjectWrap
                     
                         var gen_ret = UGFramework.Runtime.GameUtil.LoadTexture2DFromFile( _path );
                         translator.Push(L, gen_ret);
+                    
+                    
+                    
+                    return 1;
+                }
+                
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _m_AsyncLoadTextureFromPathOrUrl_xlua_st_(RealStatePtr L)
+        {
+		    try {
+            
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            
+            
+            
+                
+                {
+                    string _url = LuaAPI.lua_tostring(L, 1);
+                    System.Action<UnityEngine.Texture2D> _cb = translator.GetDelegate<System.Action<UnityEngine.Texture2D>>(L, 2);
+                    
+                    UGFramework.Runtime.GameUtil.AsyncLoadTextureFromPathOrUrl( _url, _cb );
+                    
+                    
+                    
+                    return 0;
+                }
+                
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _m_SaveTextureToFile_xlua_st_(RealStatePtr L)
+        {
+		    try {
+            
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            
+            
+            
+                
+                {
+                    UnityEngine.Texture2D _tex = (UnityEngine.Texture2D)translator.GetObject(L, 1, typeof(UnityEngine.Texture2D));
+                    string _path = LuaAPI.lua_tostring(L, 2);
+                    
+                        var gen_ret = UGFramework.Runtime.GameUtil.SaveTextureToFile( _tex, _path );
+                        LuaAPI.lua_pushboolean(L, gen_ret);
                     
                     
                     
