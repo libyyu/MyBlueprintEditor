@@ -149,7 +149,7 @@ namespace UGFramework.Runtime
             var type = (System.Type)findTypeMethod.Invoke(translator, new object[] { typeName, false });
             if (type == null)
             {
-                UnityEngine.Debug.LogWarning($"[GameUtil] Type not found: {typeName}");
+                //UnityEngine.Debug.LogWarning($"[GameUtil] Type not found: {typeName}");
                 return false;
             }
 
