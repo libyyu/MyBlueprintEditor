@@ -245,6 +245,17 @@ namespace UGFramework.Runtime
         // require "game.util" → Assets/Lua/game/util.lua
         private byte[] YooAssetLuaLoader(ref string luaPath)
         {
+#if !UNITY_EDITOR && !UNITY_WEBGL
+            string pckPath = GameUtil.PckPath;
+            string fixluaPath = luaAddressPrefix + luaPath.Replace('.', '/') + ".lua";
+            var pckFullPath = Path.Combine(pckPath, fixluaPath);
+            if (File.Exists(pckFullPath))
+            {
+                luaPath = pckFullPath;
+                return File.ReadAllBytes(pckFullPath);
+            }
+#endif
+
 #if UNITY_EDITOR || !UNITY_WEBGL
             // Editor 和非 WebGL 平台直接从 StreamingAssets 同步加载（不走 YooAsset 包管理，方便开发）
             string relativePath = luaAddressPrefix + luaPath.Replace('.', '/') + ".lua";

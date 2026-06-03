@@ -14,6 +14,8 @@ namespace UGFramework.Runtime
     [LuaCallCSharp]
     public static class GameUtil
     {
+        public static string PckPath => Application.dataPath + "/../pck";
+
         public static bool IsEditorEnv()
         {
 #if UNITY_EDITOR
@@ -23,7 +25,6 @@ namespace UGFramework.Runtime
 #endif
         }
 
-        //��ǰ�Ƿ�������΢��С��Ϸ����
         public static bool IsWXEnv()
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
