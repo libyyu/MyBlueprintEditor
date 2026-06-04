@@ -21,9 +21,10 @@ namespace XLua.CSObjectWrap
         {
 			ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
 			System.Type type = typeof(UGFramework.Runtime.UITKLuaBridge);
-			Utils.BeginObjectRegister(type, L, translator, 0, 31, 0, 0);
+			Utils.BeginObjectRegister(type, L, translator, 0, 32, 0, 0);
 			
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "Init", _m_Init);
+			Utils.RegisterFunc(L, Utils.METHOD_IDX, "TouchGUIMsg", _m_TouchGUIMsg);
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "TouchAllButtons", _m_TouchAllButtons);
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "TouchAllInputs", _m_TouchAllInputs);
 			Utils.RegisterFunc(L, Utils.METHOD_IDX, "ClearInputScan", _m_ClearInputScan);
@@ -118,6 +119,34 @@ namespace XLua.CSObjectWrap
                     UnityEngine.UIElements.UIDocument _doc = (UnityEngine.UIElements.UIDocument)translator.GetObject(L, 2, typeof(UnityEngine.UIElements.UIDocument));
                     
                     gen_to_be_invoked.Init( _doc );
+                    
+                    
+                    
+                    return 0;
+                }
+                
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            
+        }
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _m_TouchGUIMsg(RealStatePtr L)
+        {
+		    try {
+            
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            
+            
+                UGFramework.Runtime.UITKLuaBridge gen_to_be_invoked = (UGFramework.Runtime.UITKLuaBridge)translator.FastGetCSObj(L, 1);
+            
+            
+                
+                {
+                    XLua.LuaTable _luaMsgHandler = (XLua.LuaTable)translator.GetObject(L, 2, typeof(XLua.LuaTable));
+                    
+                    gen_to_be_invoked.TouchGUIMsg( _luaMsgHandler );
                     
                     
                     

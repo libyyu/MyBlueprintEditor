@@ -289,12 +289,12 @@ namespace UGFramework.Runtime
         /// 修复：每次 Get LuaFunction 都会创建 wrapper + xLua 注册表条目，必须 Dispose。
         /// 否则像 onScroll/onTextChange/onClick 这类高频回调每帧/每按键都会泄漏一个。
         /// </summary>
-        object[] CallMethod(string func, params object[] args)
+        void CallMethod(string func, params object[] args)
         {
-            if (!initialize || null == msgHandle || !msgHandle.IsValid()) return null;
+            if (!initialize || null == msgHandle || !msgHandle.IsValid()) return;
             var fun = msgHandle.Get<LuaFunction>(func);
-            if (null == fun) return null;
-            try { return fun.Call(args); } finally { fun.Dispose(); }
+            if (null == fun) return ;
+            try { fun.Call(args); } finally { fun.Dispose(); }
         }
 
         /// <summary>

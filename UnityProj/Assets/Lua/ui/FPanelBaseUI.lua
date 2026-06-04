@@ -70,9 +70,6 @@ function FPanelBaseUI:__constructor()
 	---@type number
 	self.m_depthLayer = GUIDEPTH.AUTO
 
-	---@type userdata
-	self.m_msgHandler = nil
-
 	--- 事件桥接器：UGUI = UILuaBehaviour, UITK = UITKLuaBridge
 	--- Lua 面板通过 self.m_bridge 访问，无需关心后端类型
 	self.m_bridge = nil
@@ -306,7 +303,6 @@ function FPanelBaseUI:DestroyPanelRaw()
 	if self.m_bridge and self.m_bridge.ClearAllListeners then
 		self.m_bridge:ClearAllListeners()
 	end
-	self.m_msgHandler = nil
 	self.m_bridge = nil
 	self.m_backend = nil
 	
@@ -389,36 +385,31 @@ function FPanelBaseUI:TouchMsgHandler()
 	end
 
 	-- ── UI Toolkit 分支 ───────────────────────────────────────────────────
-	if self:IsUIToolkit() then
+	if self:IsUIToolkit() or self:IsUGUI() then
 		-- 从 backend 拿到 UITKLuaBridge
 		if not self.m_panel then return end
 		local bridge = self.m_panel:GetEventBridge()
 		if not bridge then return end
 		self.m_bridge = bridge
-		self.m_msgHandler = bridge  -- 兼容旧代码对 m_msgHandler 的引用
 
-		-- OnClick：全局扫描所有 Button
+		local mst = {
+			onDestroy = function() self:DestroyPanelRaw() end,
+			onBecameVisible = function(...) self:_BecameVisible(...) end,
+			onBecameInvisible = function(...) self:_BecameInvisible(...) end,
+		}
 		local func = getFunc("OnClick")
 		if func then
-			local mst = {
-				onClick = function(name) self:OnClick(name) end
-			}
-			bridge:TouchAllButtons(mst)
+			mst.onClick = function(...) print("ui:click", ...) self:OnClick(...) end
+		end 
+		func = getFunc("OnSubmit")
+		if func then
+			mst.onSubmit = function(...) self:OnSubmit(...) end
+		end 
+		func = getFunc("OnChange")
+		if func then
+			mst.onTextChange = function(...) self:OnChange(...) end
 		end
-
-		-- OnSubmit / OnChange：全局扫描所有 TextField
-		local hasSubmit = getFunc("OnSubmit")
-		local hasChange = getFunc("OnChange")
-		if hasSubmit or hasChange then
-			local mst2 = {}
-			if hasSubmit then
-				mst2.onSubmit = function(name) self:OnSubmit(name) end
-			end
-			if hasChange then
-				mst2.onTextChange = function(name, val) self:OnChange(name, val) end
-			end
-			bridge:TouchAllInputs(mst2)
-		end
+		self.m_bridge:TouchGUIMsg(mst)
 		return
 	end
 

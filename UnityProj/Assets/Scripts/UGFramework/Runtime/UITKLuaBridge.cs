@@ -112,6 +112,13 @@ namespace UGFramework.Runtime
             _doc = doc;
         }
 
+        public void TouchGUIMsg(LuaTable luaMsgHandler)
+        {
+            msgHandle = luaMsgHandler;
+            TouchAllButtons(luaMsgHandler);
+            TouchAllInputs(luaMsgHandler);
+        }
+
         // ── 模式一：全局扫描（等价 UILuaBehaviour.TouchButton + TouchGUIMsg）────
 
         /// <summary>
@@ -620,6 +627,10 @@ namespace UGFramework.Runtime
         protected void Start()
         {
             CallMethod("onStart");
+            if (!__visible && gameObject.activeSelf)
+            {
+                OnBecameVisible();
+            }
         }
 
         protected void OnBecameVisible()
@@ -635,12 +646,12 @@ namespace UGFramework.Runtime
 
         // 修复：Get<LuaFunction> 必须 Dispose，否则每次 onAwake/onStart/onBecameVisible/
         // onBecameInvisible 都会泄漏一个 wrapper（可显示/隐藏 Panel 反复触发）。
-        object[] CallMethod(string func, params object[] args)
+        void CallMethod(string func, params object[] args)
         {
-            if (!initialize || null == msgHandle || !msgHandle.IsValid()) return null;
+            if (!initialize || null == msgHandle || !msgHandle.IsValid()) return;
             var fun = msgHandle.Get<LuaFunction>(func);
-            if (null == fun) return null;
-            try { return fun.Call(args); } finally { fun.Dispose(); }
+            if (null == fun) return;
+            try { fun.Call(args); } finally { fun.Dispose(); }
         }
     }
 }

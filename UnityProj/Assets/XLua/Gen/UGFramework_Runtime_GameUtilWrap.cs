@@ -31,7 +31,7 @@ namespace XLua.CSObjectWrap
 			Utils.EndObjectRegister(type, L, translator, null, null,
 			    null, null, null);
 
-		    Utils.BeginClassRegister(type, L, __CreateInstance, 22, 0, 0);
+		    Utils.BeginClassRegister(type, L, __CreateInstance, 22, 1, 0);
 			Utils.RegisterFunc(L, Utils.CLS_IDX, "IsEditorEnv", _m_IsEditorEnv_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "IsWXEnv", _m_IsWXEnv_xlua_st_);
             Utils.RegisterFunc(L, Utils.CLS_IDX, "IsWebGLEnv", _m_IsWebGLEnv_xlua_st_);
@@ -56,7 +56,8 @@ namespace XLua.CSObjectWrap
             
 			
             
-			
+			Utils.RegisterFunc(L, Utils.CLS_GETTER_IDX, "PckPath", _g_get_PckPath);
+            
 			
 			
 			Utils.EndClassRegister(type, L, translator);
@@ -712,6 +713,18 @@ namespace XLua.CSObjectWrap
         
         
         
+        
+        [MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int _g_get_PckPath(RealStatePtr L)
+        {
+		    try {
+            
+			    LuaAPI.lua_pushstring(L, UGFramework.Runtime.GameUtil.PckPath);
+            } catch(System.Exception gen_e) {
+                return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
+            }
+            return 1;
+        }
         
         
         
