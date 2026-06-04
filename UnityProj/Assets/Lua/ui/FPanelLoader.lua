@@ -24,6 +24,7 @@ do
 		--界面类型（ugui, uitoolkit, fgui, ...)
 		self.m_panelType = PanelType.Auto
 		--界面对象
+		---@type IUIPanelBackend|nil
 		self.m_panel = nil
 		--是否fairygui window相关
 		self.m_isfguiWindow = false
@@ -383,6 +384,11 @@ do
 			end
 
 			self:SetPanelObject(nil)	--self.m_panel = nil
+
+			if self.m_HideOnDestroy then
+				print("destroy to hide", self)
+				self:OnPanelSetToHide()
+			end
 		end
 		
 		self.m_disappearing = false
@@ -396,11 +402,10 @@ do
 		
 		if self.m_panelHide then
 			--清除旧 panelHide
-			UnityEngine.Object.Destroy(self.m_panelHide)
+			self.m_panelHide:Destroy()
 			self.m_panelHide = nil
 		end
-		if panelHide then
-		end
+		self.m_panelHide = panelHide
 	end
 	
 	--取出缓存的 panelHide 开始使用
@@ -413,6 +418,9 @@ do
 		else
 			return nil
 		end
+	end
+
+	function FPanelLoader:OnPanelSetToHide()
 	end
 
 	function FPanelLoader:OnBeforeLoadPanel()

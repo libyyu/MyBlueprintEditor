@@ -106,19 +106,8 @@ function FPanelBaseUI:IsVisible()
 	if not IsValidObject(self.m_panel) then
 		return false
 	end
-	if self:IsUIToolkit() then
-		return self.m_panel:GetVisible()
-	elseif self:IsFairyGui() then
-		if self.m_panel.displayObject then
-			return not not self.m_panel.displayObject.visible
-		elseif self.m_panel.gameObject then
-			return self.m_panel.gameObject.activeSelf
-		else
-			printError("self.m_panel not valid >>>>>>>>>>>>>", self.m_panel)
-		end
-	else
-		return self.m_panel.activeSelf
-	end
+
+	return self.m_panel:GetVisible()
 end
 
 --指定界面的资源
@@ -329,9 +318,9 @@ function FPanelBaseUI:OnLoadPanel()
 	self:TouchMsgHandler()
 
 	-- 触发OnCreate
-	self:OnCreateInternal()
 	self.m_created = true
-
+	self:OnCreateInternal()
+	
 	if self:IsFairyGui() then
 		self.m_panel.opaque = self.m_opaque
 	end
@@ -611,9 +600,9 @@ end
 ---@param valid boolean
 function FPanelBaseUI:_SetInvisibleFlagValidRaw(flag, valid)
 	if valid then
-		self.m_invisibleFlag = bit.bor(self.m_invisibleFlag, flag)
+		self.m_invisibleFlag = self.m_invisibleFlag | flag
 	else
-		self.m_invisibleFlag = bit.band(bit.bnot(flag), self.m_invisibleFlag)
+		self.m_invisibleFlag = self.m_invisibleFlag & ~flag
 	end
 end
 ---@param flag integer
@@ -642,16 +631,16 @@ function FPanelBaseUI:UpdateVisibleByFlag()
 end
 ---@return boolean
 function FPanelBaseUI:HasAnyInvisibleFlag()
-	return self.m_invisibleFlag ~= 0
+	return self.m_invisibleFlag ~= PanelInVisibleMask.None
 end
 ---@return boolean
 function FPanelBaseUI:HasPrimaryInvisibleFlag()
-	local primaryInVisibleMask = bit.band(self.m_invisibleFlag, _G.PanelInVisibleMask.SecondaryStart-1)
+	local primaryInVisibleMask = self.m_invisibleFlag & (_G.PanelInVisibleMask.SecondaryStart - 1)
 	return primaryInVisibleMask ~= 0
 end
 ---@return boolean
 function FPanelBaseUI:CheckInvisibleFlag(flag)
-	return bit.band(flag, self.m_invisibleFlag) ~= 0
+	return (flag & self.m_invisibleFlag) ~= PanelInVisibleMask.None
 end
 
 
