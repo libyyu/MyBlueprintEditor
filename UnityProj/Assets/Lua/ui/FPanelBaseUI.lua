@@ -304,7 +304,6 @@ function FPanelBaseUI:DestroyPanelRaw()
 		self.m_bridge:ClearAllListeners()
 	end
 	self.m_bridge = nil
-	self.m_backend = nil
 	
 	self.m_disappearing = false
 	self.m_destroying = false

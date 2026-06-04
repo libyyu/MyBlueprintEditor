@@ -145,11 +145,10 @@ namespace UGFramework.Runtime
             var buttons = _doc.rootVisualElement.Query<Button>().ToList();
             foreach (var btn in buttons)
             {
-                var capturedName = btn.name;
                 EventCallback<ClickEvent> cb = _ =>
                 {
                     if (_globalOnClick != null && _globalOnClick.IsValid())
-                        _globalOnClick.Call(capturedName);
+                        _globalOnClick.Call(btn);
                 };
                 btn.RegisterCallback(cb);
                 _globalEntries.Add(new GlobalEntry { element = btn, callback = cb });
@@ -185,7 +184,6 @@ namespace UGFramework.Runtime
             var fields = _doc.rootVisualElement.Query<TextField>().ToList();
             foreach (var tf in fields)
             {
-                var capturedName = tf.name;
                 EventCallback<ChangeEvent<string>> cbChange = null;
                 EventCallback<NavigationSubmitEvent> cbSubmit = null;
 
@@ -194,7 +192,7 @@ namespace UGFramework.Runtime
                     cbChange = evt =>
                     {
                         if (_globalOnChange != null && _globalOnChange.IsValid())
-                            _globalOnChange.Call(capturedName, evt.newValue);
+                            _globalOnChange.Call(tf, evt.newValue);
                     };
                     tf.RegisterCallback(cbChange);
                 }
@@ -203,7 +201,7 @@ namespace UGFramework.Runtime
                     cbSubmit = _ =>
                     {
                         if (_globalOnSubmit != null && _globalOnSubmit.IsValid())
-                            _globalOnSubmit.Call(capturedName);
+                            _globalOnSubmit.Call(tf);
                     };
                     tf.RegisterCallback(cbSubmit);
                 }
@@ -272,7 +270,7 @@ namespace UGFramework.Runtime
             EventCallback<ClickEvent> cb = _ =>
             {
                 if(captured.IsValid())
-                    captured.Call(n);
+                    captured.Call(el);
             };
             el.RegisterCallback(cb);
             _explicitEntries.Add(new ExplicitEntry
@@ -338,7 +336,7 @@ namespace UGFramework.Runtime
             var n = NormalizeName(name);
             EventCallback<NavigationSubmitEvent> cb = _ =>
             {
-                if (captured.IsValid()) captured.Call(n, tf.value);
+                if (captured.IsValid()) captured.Call(tf, tf.value);
             };
             tf.RegisterCallback(cb);
             Action detach = () => { if (tf != null) tf.UnregisterCallback(cb); };
@@ -362,7 +360,7 @@ namespace UGFramework.Runtime
             var n = NormalizeName(name);
             EventCallback<ChangeEvent<string>> cb = evt =>
             {
-                if (captured.IsValid()) captured.Call(n, evt.newValue);
+                if (captured.IsValid()) captured.Call(el, evt.newValue);
             };
             tf.RegisterCallback(cb);
             Action detach = () => { if (tf != null) tf.UnregisterCallback(cb); };
@@ -389,7 +387,7 @@ namespace UGFramework.Runtime
             {
                 EventCallback<ChangeEvent<float>> cb = evt =>
                 {
-                    if (captured.IsValid()) captured.Call(n, evt.newValue);
+                    if (captured.IsValid()) captured.Call(el, evt.newValue);
                 };
                 sl.RegisterCallback(cb);
                 detach = () => { if (sl != null) sl.UnregisterCallback(cb); };
@@ -398,7 +396,7 @@ namespace UGFramework.Runtime
             {
                 EventCallback<ChangeEvent<bool>> cb = evt =>
                 {
-                    if (captured.IsValid()) captured.Call(n, evt.newValue);
+                    if (captured.IsValid()) captured.Call(el, evt.newValue);
                 };
                 tg.RegisterCallback(cb);
                 detach = () => { if (tg != null) tg.UnregisterCallback(cb); };
@@ -616,7 +614,7 @@ namespace UGFramework.Runtime
         {
             CallMethod("onDestroy");
             ClearAllListeners();
-            initialize = true;
+            initialize = false;
         }
 
         protected void Awake()
