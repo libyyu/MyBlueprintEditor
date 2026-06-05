@@ -15,8 +15,11 @@ do
 		self.m_UIRoot = nil
 		---@type Transform|nil
 		self.m_UGUIRoot = nil
+		---@type Transform|nil
+		self.m_UITKRoot = nil
 		---@type GameObject|nil
 		self.m_FGUIRoot = nil
+
 		self.m_panelSet = {}
 		self.m_ObjToPanel = setmetatable({}, {__mode = "k"})
 	end
@@ -24,6 +27,10 @@ do
 	---@return Transform|nil
 	function FGUIMan:GetUGUIRoot()
 		return self.m_UGUIRoot
+	end
+	---@return Transform|nil
+	function FGUIMan:GetUITKRoot()
+		return self.m_UITKRoot
 	end
 	---@return GameObject|nil
 	function FGUIMan:GetFGUIRoot()
@@ -81,6 +88,17 @@ do
 	    self.m_UGUIRoot = goCanvas.transform
 	end
 
+	function FGUIMan:InitUITKRoot()
+		if IsValidObject(self.m_UITKRoot) then return end
+
+		local goRoot = NewGameObject("UITKRoot");
+	    goRoot.transform.localPosition = Vector3(0, 0, 0);
+	    goRoot.transform.localScale = Vector3(1, 1, 1);
+	    goRoot.layer = UnityEngine.LayerMask.NameToLayer("UI");
+	    goRoot.transform:SetParent(self.m_UIRoot.transform)
+		self.m_UITKRoot = goRoot.transform
+	end
+
 	function FGUIMan:InitFGUIRoot()
 		if IsValidObject(self.m_FGUIRoot) then return end
 
@@ -128,6 +146,7 @@ do
 		if IsValidObject(object) then
 			self.m_UIRoot = object
 			self.m_UGUIRoot = self.m_UIRoot.transform:Find("UIRoot(2D)/Canvas").transform
+			self.m_UITKRoot = self.m_UIRoot.transform:Find("UITKRoot").transform
 			return
 		end
 		if not IsValidObject(self.m_UIRoot) then
@@ -137,6 +156,7 @@ do
 			self.m_UIRoot.tag = tag
 		end
 		self:InitUGUIRoot()
+		self:InitUITKRoot()
 		--FGUI暂时未实现，需要插件支持，先不创建FGUIRoot
 		--self:InitFGUIRoot()
 	end

@@ -80,10 +80,14 @@ do
 	
 	---@return Transform|nil
 	function FPanelLoader:GetUIRoot()
-		if self:IsFairyGui() or self:IsFairyGuiWindow() then
+		if self:IsUIToolkit() then
+			return FGUIMan.Instance():GetUITKRoot()
+		elseif self:IsUGUI() then
+			return FGUIMan.Instance():GetUGUIRoot()
+		elseif self:IsFairyGui() or self:IsFairyGuiWindow() then
 			return FGUIMan.Instance():GetFGUIRoot()
 		else
-			return FGUIMan.Instance():GetUGUIRoot()
+			return nil
 		end
 	end
 	---@return boolean
