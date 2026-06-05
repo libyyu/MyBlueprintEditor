@@ -2,7 +2,7 @@
 
 --********************代理实现基类***************--
 
-local FViewListRootProxyImplBase = FLua.Class("FViewListRootProxyImplBase")
+local FViewListRootProxyImplBase = FLua.Abstract("FViewListRootProxyImplBase")
 do
     function FViewListRootProxyImplBase:__constructor()
         self.m_RootWidget = nil
@@ -49,59 +49,46 @@ end
 
 --************默认代理实现, 使用List控件创建的ViewList**********--
 
-local FViewListRootProxyImplForListWidget = FLua.Class(FViewListRootProxyImplBase, "FViewListRootProxyImplForListWidget")
+local FViewListRootProxyImplForFairyGUIList = FLua.Class(FViewListRootProxyImplBase, "FViewListRootProxyImplForFairyGUIList")
 do
-    function FViewListRootProxyImplForListWidget:OnCreate()
-        if self.m_RootWidget:IsExtend("FairyGUI.GList") then
-            self.m_RootWidget.itemRenderer = function(index, go)
-                if self.m_ItemUpdateFunc then
-                    self.m_ItemUpdateFunc(go, index+1)
-                end
+    function FViewListRootProxyImplForFairyGUIList:OnCreate()
+        assert(self.m_RootWidget:IsExtend("FairyGUI.GList"), "FViewListRootProxyImplForFairyGUIList requires a GList as root widget")
+        self.m_RootWidget.itemRenderer = function(index, go)
+            if self.m_ItemUpdateFunc then
+                self.m_ItemUpdateFunc(go, index+1)
             end
-        else
         end
     end
 
-    function FViewListRootProxyImplForListWidget:OnDestroy()
-        if self.m_RootWidget and self.m_RootWidget:IsExtend("FairyGUI.GList") then
+    function FViewListRootProxyImplForFairyGUIList:OnDestroy()
+        if self.m_RootWidget then
             self.m_RootWidget.itemRenderer = nil
         end
 
         self.m_RootWidget = nil
     end
 
-    function FViewListRootProxyImplForListWidget:SetCount(count)
+    function FViewListRootProxyImplForFairyGUIList:SetCount(count)
         if not self:IsValid() then
             return
         end
-        if self.m_RootWidget:IsExtend("FairyGUI.GList") then
-            self.m_RootWidget.numItems = count
-        else
-        end
+        self.m_RootWidget.numItems = count
     end
 
-    function FViewListRootProxyImplForListWidget:GetCount()
+    function FViewListRootProxyImplForFairyGUIList:GetCount()
         if not self:IsValid() then
             return 0
         end
-        if self.m_RootWidget:IsExtend("FairyGUI.GList") then
-            return self.m_RootWidget.numItems
-        else
-            return 0
-        end
+        return self.m_RootWidget.numItems
     end
 
 
-    function FViewListRootProxyImplForListWidget:GetItemByIndex(index)
+    function FViewListRootProxyImplForFairyGUIList:GetItemByIndex(index)
         if not self:IsValid() then
             return nil
         end
-        if self.m_RootWidget:IsExtend("FairyGUI.GList") then
-            local childIndex = self.m_RootWidget:ItemIndexToChildIndex(index - 1)
-            return self.m_RootWidget:GetChildAt(childIndex)
-        else
-            return nil
-        end
+        local childIndex = self.m_RootWidget:ItemIndexToChildIndex(index - 1)
+        return self.m_RootWidget:GetChildAt(childIndex)
     end
 end
 --------------------------------------------------------------
@@ -113,9 +100,9 @@ function FViewListRootProxy:__constructor()
     self.m_ProxyImpl = nil
 end
 
-function FViewListRootProxy.createForListWidget()
+function FViewListRootProxy.createForFairyGUIList()
     local object = FViewListRootProxy()
-    object.m_ProxyImpl = FViewListRootProxyImplForListWidget()
+    object.m_ProxyImpl = FViewListRootProxyImplForFairyGUIList()
     return object
 end
 
