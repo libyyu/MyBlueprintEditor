@@ -100,9 +100,16 @@ function FViewListRootProxy:__constructor()
     self.m_ProxyImpl = nil
 end
 
-function FViewListRootProxy.createForFairyGUIList()
+function FViewListRootProxy.CreateProxyList(RootObject)
     local object = FViewListRootProxy()
-    object.m_ProxyImpl = FViewListRootProxyImplForFairyGUIList()
+    if RootObject:IsExtend("FairyGUI.GList") then
+        object.m_ProxyImpl = FViewListRootProxyImplForFairyGUIList()
+    --TODO: UGUI List
+    --TODO: UIToolkit List
+    else
+        error("Unsupported root object type for FViewListRootProxy: " .. tostring(RootObject))
+    end
+    object:SetRootWidget(RootObject)
     return object
 end
 
@@ -122,9 +129,6 @@ function FViewListRootProxy:GetItemByIndex(index)
     return self.m_ProxyImpl:GetItemByIndex(index)
 end
 
-function FViewListRootProxy:SetRootWidget(rootWidget)
-    self.m_ProxyImpl:SetRootWidget(rootWidget)
-end
 function FViewListRootProxy:OnCreate()
     self.m_ProxyImpl:OnCreate()
 end
