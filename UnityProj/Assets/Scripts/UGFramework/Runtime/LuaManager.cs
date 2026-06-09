@@ -62,9 +62,9 @@ namespace UGFramework.Runtime
             Instance = this;
             DontDestroyOnLoad(gameObject);
 
-            StaticLuaCallbacks.lua_Print = s => Debug.Log("[Lua]" + s);
-            StaticLuaCallbacks.lua_Warning = s => Debug.LogWarning("[Lua]" + s);
-            StaticLuaCallbacks.lua_Error = s => Debug.LogError("[Lua]" + s);
+            StaticLuaCallbacks.lua_Print = s => Debug.Log($"[{Time.frameCount}][Lua]" + s);
+            StaticLuaCallbacks.lua_Warning = s => Debug.LogWarning($"[{Time.frameCount}][Lua]" + s);
+            StaticLuaCallbacks.lua_Error = s => Debug.LogError($"[{Time.frameCount}][Lua]" + s);
         }
 
         private void Update()

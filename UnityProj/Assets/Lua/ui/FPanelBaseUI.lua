@@ -272,6 +272,10 @@ function FPanelBaseUI:DestroyPanelRaw()
 	if self.m_destroying then	--防重入 (可能造成 OnDestroy 多次调用)
 		return
 	end
+	
+	if not self.m_created then
+		return
+	end
 
 	self.m_destroying = true
 	self.m_invisibleFlag = _G.PanelInVisibleMask.None ---退出需要清状态
