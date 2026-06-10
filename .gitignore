@@ -76,3 +76,7 @@ __pycache__/
 *.pyc
 *.pyo
 
+UnityProj/.vscode
+UnityProj/.idea
+UnityProj/obj
+UnityProj/Temp
