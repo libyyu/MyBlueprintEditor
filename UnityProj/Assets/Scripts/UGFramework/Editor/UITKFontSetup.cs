@@ -21,6 +21,7 @@ using System.IO;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.TextCore.Text;     // FontAsset (UI Toolkit / TextCore)
+using UnityEngine.UIElements;        // PanelTextSettings (UI Toolkit)
 using UnityEditor;
 
 namespace UGFramework.Editor
