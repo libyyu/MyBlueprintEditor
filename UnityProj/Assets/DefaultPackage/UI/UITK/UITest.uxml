@@ -3,74 +3,65 @@
         UITest.uxml — UI 框架测试面板（UI Toolkit 后端）
         逻辑见 ui/FPanelUITestBase.lua（后端无关，走 self.m_bridge）
         测试目标：
-          1. 精确绑定按钮点击 (RegisterClick)
-          2. 文字设置/读取 (SetText / GetText)
-          3. 显隐控制 (SetDisplay)
-          4. 文本色 (SetColor)
-          5. 输入框 (SetInputText / RegisterSubmit / RegisterTextChange)
-          6. 滑块 (RegisterValueChange / SetSliderValue)
-          7. 开关 (RegisterValueChange / SetToggleValue)
-        元素 name 必须与 UGUI 版子节点 name 一致。
+          按钮点击 / 文本设读 / 显隐 / 文本色 / 输入框 / 滑块 / 开关 / 列表
+        元素 name 必须与 UGUI 版子节点 name 一致：
+          lbl_title lbl_status lbl_toggle_target
+          btn_test_text btn_test_display btn_test_gettext btn_test_color btn_close
+          input_name sld_volume tog_enable
+          list_scroll list_fixed
     -->
     <ui:VisualElement name="root" style="
-        width: 700px; max-width: 700px;
+        width: 1180px; max-width: 1180px;
         background-color: rgba(20,20,30,0.92);
         border-radius: 16px;
-        padding: 28px;
+        padding: 24px;
         position: absolute; left: 50%; top: 50%;
         translate: -50% -50%;
         flex-direction: column;
-        align-items: center;
+        align-items: stretch;
     ">
-        <!-- 标题 -->
+        <!-- 顶部：标题 / 状态 -->
         <ui:Label name="lbl_title" text="UI Toolkit Test Panel" style="
-            font-size: 24px;
-            color: white;
-            margin-bottom: 16px;
-            -unity-font-style: bold;
-            white-space: normal;
-            -unity-text-align: upper-center;
-            width: 100%;
+            font-size: 24px; color: white; margin-bottom: 6px;
+            -unity-font-style: bold; -unity-text-align: upper-center; white-space: normal;
         "/>
-
-        <!-- 状态输出 -->
         <ui:Label name="lbl_status" text="status: ready" style="
-            font-size: 18px;
-            color: rgb(180,220,180);
-            margin-bottom: 20px;
-            width: 100%;
-            white-space: normal;
-            -unity-text-align: upper-center;
+            font-size: 18px; color: rgb(180,220,180); margin-bottom: 16px;
+            -unity-text-align: upper-center; white-space: normal;
         "/>
 
-        <!-- 测试按钮组 -->
-        <ui:VisualElement name="btn_group" style="flex-direction: column; width: 100%; align-items: center;">
-            <ui:Button name="btn_test_text"    text="① SetText 测试"    style="width:560px; height:64px; font-size:24px; margin-bottom:12px; white-space:normal;"/>
-            <ui:Button name="btn_test_display" text="② SetDisplay 切换"  style="width:560px; height:64px; font-size:24px; margin-bottom:12px; white-space:normal;"/>
-            <ui:Button name="btn_test_gettext" text="③ GetText 读取"     style="width:560px; height:64px; font-size:24px; margin-bottom:12px; white-space:normal;"/>
-            <ui:Button name="btn_test_color"   text="④ SetColor 测试"    style="width:560px; height:64px; font-size:24px; margin-bottom:12px; white-space:normal;"/>
+        <!-- 主体：左右两栏 -->
+        <ui:VisualElement name="body" style="flex-direction: row; flex-grow: 1;">
+
+            <!-- 左栏：按钮 + 表单 -->
+            <ui:VisualElement name="col_left" style="width: 560px; flex-direction: column; margin-right: 16px;">
+                <ui:Button name="btn_test_text"    text="① SetText 测试"    style="height:56px; font-size:22px; margin-bottom:10px; white-space:normal;"/>
+                <ui:Button name="btn_test_display" text="② SetDisplay 切换"  style="height:56px; font-size:22px; margin-bottom:10px; white-space:normal;"/>
+                <ui:Button name="btn_test_gettext" text="③ GetText 读取"     style="height:56px; font-size:22px; margin-bottom:10px; white-space:normal;"/>
+                <ui:Button name="btn_test_color"   text="④ SetColor 测试"    style="height:56px; font-size:22px; margin-bottom:10px; white-space:normal;"/>
+
+                <ui:TextField name="input_name" label="输入" value="" style="font-size:20px; margin-top:6px; margin-bottom:10px;"/>
+                <ui:Slider name="sld_volume" low-value="0" high-value="1" value="0.5" style="margin-bottom:10px;"/>
+                <ui:Toggle name="tog_enable" label="启用开关" value="true" style="font-size:20px; margin-bottom:12px;"/>
+
+                <ui:Label name="lbl_toggle_target" text="★ 这个文字可以被隐藏 ★" style="
+                    font-size:22px; color: yellow; margin-bottom: 12px;
+                    -unity-text-align: upper-center; white-space: normal;
+                "/>
+                <ui:Button name="btn_close" text="关闭" style="
+                    height:64px; font-size:24px; background-color: rgb(180,60,60); color: white;
+                "/>
+            </ui:VisualElement>
+
+            <!-- 右栏：两个列表 -->
+            <ui:VisualElement name="col_right" style="width: 560px; flex-direction: column;">
+                <ui:Label text="FScrollList (虚拟滚动)" style="font-size:20px; color: rgb(200,225,255); margin-bottom:6px;"/>
+                <ui:ScrollView name="list_scroll" style="height: 340px; margin-bottom: 16px; background-color: rgba(10,10,16,0.6);"/>
+
+                <ui:Label text="FFixedList (固定列表)" style="font-size:20px; color: rgb(200,255,215); margin-bottom:6px;"/>
+                <ui:ScrollView name="list_fixed" style="height: 340px; background-color: rgba(10,10,16,0.6);"/>
+            </ui:VisualElement>
+
         </ui:VisualElement>
-
-        <!-- 表单控件（P3 事件测试）-->
-        <ui:TextField name="input_name" label="输入" value="" style="width:560px; font-size:22px; margin-top:8px; margin-bottom:12px;"/>
-        <ui:Slider name="sld_volume" low-value="0" high-value="1" value="0.5" style="width:560px; margin-bottom:12px;"/>
-        <ui:Toggle name="tog_enable" label="启用" value="true" style="font-size:22px; margin-bottom:16px;"/>
-
-        <!-- 可切换显隐的测试元素 -->
-        <ui:Label name="lbl_toggle_target" text="★ 这个文字可以被隐藏 ★" style="
-            font-size:24px; color: yellow;
-            margin-top: 8px; margin-bottom: 16px;
-            white-space: normal;
-            -unity-text-align: upper-center;
-            width: 100%;
-        "/>
-
-        <!-- 关闭按钮 -->
-        <ui:Button name="btn_close" text="关闭" style="
-            width:320px; height:72px;
-            font-size:28px;
-            background-color: rgb(180,60,60);
-            color: white;
-        "/>
     </ui:VisualElement>
 </ui:UXML>

@@ -19,6 +19,31 @@
 --   input_name / sld_volume / tog_enable   （可选）
 
 local FPanelBaseUI = require "ui.FPanelBaseUI"
+local FViewBaseUI  = require "ui.FViewBaseUI"
+local FScrollList  = require "ui.FScrollList"
+local FFixedList   = require "ui.FFixedList"
+
+-- ── 列表 item 的 View（后端无关）────────────────────────────────────────
+-- item 容器对象（GameObject / VisualElement）由列表代理供给，
+-- 这里只负责把数据写进去——通过子类提供的 SetItemText 适配两端文本组件。
+---@class FUITestItemView : FViewBaseUI
+local FUITestItemView = FLua.Class(FViewBaseUI, "FUITestItemView")
+do
+    function FUITestItemView:__constructor()
+        self.m_setItemText = nil   -- fun(itemObj, text)：由 panel 注入，适配后端
+    end
+    function FUITestItemView.new(setItemText)
+        local o = FUITestItemView()
+        o.m_setItemText = setItemText
+        return o
+    end
+    -- 列表把数据刷到本项时调用（FScrollList:SetData / FFixedList:SetData）
+    function FUITestItemView:SetData(data)
+        if self.m_setItemText and self.m_viewObj then
+            self.m_setItemText(self.m_viewObj, tostring(data))
+        end
+    end
+end
 
 ---@class FPanelUITestBase : FPanelBaseUI
 local FPanelUITestBase = FLua.Class(FPanelBaseUI, "FPanelUITestBase")
@@ -26,6 +51,8 @@ do
     function FPanelUITestBase:__constructor()
         self.m_toggleVisible = true   -- lbl_toggle_target 初始可见
         self.m_colorIndex = 0
+        self.m_scrollList = nil
+        self.m_fixedList = nil
     end
 
     --- 子类必须覆盖：返回资产路径（.uxml 或 .prefab）
@@ -85,8 +112,61 @@ do
             end)
         end
 
+        -- ⑤ 列表（容器存在才测）：FScrollList + FFixedList
+        self:SetupLists()
+
         self:SetStatus("OnCreate OK (" .. self:_BackendName() .. ") ✓")
         print("[FPanelUITest] OnCreate complete, backend =", self:_BackendName(), "bridge =", bridge)
+    end
+
+    -- ──────────────────────────────────────────────────────────────────
+    -- 列表测试（FScrollList 虚拟滚动 + FFixedList 固定列表）
+    -- 容器：list_scroll / list_fixed（UITK=ScrollView，UGUI=带 ScrollRect 的 GO）
+    -- item 模板与文本写入由子类提供（后端相关）：
+    --   self:MakeItemTemplate()        -> 返回新 item 节点（GameObject / VisualElement）
+    --   self:SetItemText(itemObj, str) -> 把文本写到 item 节点上
+    -- 子类未实现这两个钩子，或容器不存在时，自动跳过。
+    -- ──────────────────────────────────────────────────────────────────
+    function FPanelUITestBase:SetupLists()
+        if not self.MakeItemTemplate or not self.SetItemText then
+            return  -- 子类未提供后端相关的模板/写文本钩子
+        end
+        local bridge = self.m_bridge
+
+        local function setItemText(itemObj, text)
+            self:SetItemText(itemObj, text)
+        end
+        local opts = {
+            templateFn = function() return self:MakeItemTemplate() end,
+            itemHeight = 56,
+        }
+
+        -- FScrollList：虚拟滚动，item View 复用
+        local scrollContainer = bridge and bridge:Q("list_scroll")
+        if scrollContainer then
+            local list = FScrollList.Create(
+                function(itemObj, index) return FUITestItemView.new(setItemText) end,
+                function(view, index) end,   -- 额外刷新钩子，这里数据走 SetData
+                opts)
+            self:AttachSubView(scrollContainer, list, true)
+            local data = {}
+            for i = 1, 200 do data[i] = "Scroll Item #" .. i end
+            list:SetDataList(data)
+            self.m_scrollList = list
+        end
+
+        -- FFixedList：每项一个常驻 View
+        local fixedContainer = bridge and bridge:Q("list_fixed")
+        if fixedContainer then
+            local list = FFixedList.Create(
+                function(index) return FUITestItemView.new(setItemText) end,
+                opts)
+            self:AttachSubView(fixedContainer, list, true)
+            local data = {}
+            for i = 1, 30 do data[i] = "Fixed Item #" .. i end
+            list:SetDataList(data)
+            self.m_fixedList = list
+        end
     end
 
     -- ──────────────────────────────────────────────────────────────────
