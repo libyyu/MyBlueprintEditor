@@ -1,0 +1,57 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+    <!--
+        UITestLauncher.uxml — UI 框架测试入口（UI Toolkit 后端）
+        逻辑见 ui/FPanelUITestLauncher.lua
+          btn_open_uitk → 打开 FPanelUITestUITK
+          btn_open_ugui → 打开 FPanelUITestUGUI
+    -->
+    <ui:VisualElement name="root" style="
+        width: 560px; max-width: 560px;
+        background-color: rgba(20,20,30,0.92);
+        border-radius: 16px;
+        padding: 32px;
+        position: absolute; left: 50%; top: 50%;
+        translate: -50% -50%;
+        flex-direction: column;
+        align-items: center;
+    ">
+        <ui:Label name="lbl_title" text="UI 框架测试入口" style="
+            font-size: 26px;
+            color: white;
+            margin-bottom: 8px;
+            -unity-font-style: bold;
+            -unity-text-align: upper-center;
+            white-space: normal;
+            width: 100%;
+        "/>
+
+        <ui:Label name="lbl_status" text="请选择要测试的后端" style="
+            font-size: 18px;
+            color: rgb(180,220,180);
+            margin-bottom: 28px;
+            -unity-text-align: upper-center;
+            white-space: normal;
+            width: 100%;
+        "/>
+
+        <ui:Button name="btn_open_uitk" text="打开 UI Toolkit 测试面板" style="
+            width:480px; height:88px; font-size:26px;
+            margin-bottom:18px; white-space:normal;
+            background-color: rgb(48,96,160);
+            color: white;
+        "/>
+
+        <ui:Button name="btn_open_ugui" text="打开 UGUI 测试面板" style="
+            width:480px; height:88px; font-size:26px;
+            margin-bottom:28px; white-space:normal;
+            background-color: rgb(48,140,96);
+            color: white;
+        "/>
+
+        <ui:Button name="btn_close" text="关闭" style="
+            width:280px; height:72px; font-size:26px;
+            background-color: rgb(150,60,60);
+            color: white;
+        "/>
+    </ui:VisualElement>
+</ui:UXML>

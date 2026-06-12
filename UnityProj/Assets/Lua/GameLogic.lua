@@ -26,9 +26,8 @@ SM.on_scene_loaded = function(sceneName)
     local name = sceneName:match("([^/]+)$") or sceneName
     if name == 'MainMenu' or name == 'main_menu' then
         --require 'ui.FPanelMainMenu'.Instance():ShowPanel(true)
-        -- UI 框架测试面板：UITK 版（默认）/ UGUI 版（同一套逻辑，换后端）
-        require 'ui.FPanelUITestUITK'.Instance():ShowPanel(true)
-        --require 'ui.FPanelUITestUGUI'.Instance():ShowPanel(true)
+        -- UI 框架测试入口：两个按钮分别打开 UITK / UGUI 测试面板
+        require 'ui.FPanelUITestLauncher'.Instance():ShowPanel(true)
     end
 end
 
