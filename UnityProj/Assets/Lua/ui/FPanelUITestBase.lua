@@ -46,6 +46,8 @@ do
 end
 
 ---@class FPanelUITestBase : FPanelBaseUI
+---@field MakeItemTemplate fun(self:FPanelUITestBase):any  子类(后端相关)提供：返回新 item 节点(GameObject/VisualElement)
+---@field SetItemText fun(self:FPanelUITestBase, itemObj:any, text:string)  子类(后端相关)提供：把文本写到 item 节点
 local FPanelUITestBase = FLua.Class(FPanelBaseUI, "FPanelUITestBase")
 do
     function FPanelUITestBase:__constructor()
