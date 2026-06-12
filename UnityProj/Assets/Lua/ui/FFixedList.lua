@@ -9,7 +9,7 @@
 ]]
 
 local FViewBaseUI = require "ui.FViewBaseUI"
-local FFixedListRootProxy = require "ui.FFixedListRootProxy"
+local FViewListRootProxy = require "ui.FViewListRootProxy"
 local assert = assert
 
 local function logError (str, errLevel)
@@ -37,11 +37,16 @@ end
 local FFixedList = FLua.Class(FViewBaseUI, "FFixedList")
 do
 	function FFixedList:__constructor()
+		--- 后端无关的列表代理（FairyGUI / UIToolkit / UGUI），在 viewObj 就绪后懒创建
 		self.m_RootProxy = nil
 
 		self.m_itemViewConstructor = nil
 
 		self.m_itemViews = nil
+
+		--- UGUI / UIToolkit 后端创建 item 节点所需的选项 {templateFn=, itemHeight=}
+		--- FairyGUI 后端忽略（item 由 GList 池自动管理）
+		self.m_opts = nil
 	end
 	
 	--[[
@@ -49,12 +54,18 @@ do
 		param itemViewConstructor: 创建元素 View 实例
 			function itemViewConstructor (itemIndex)
 				return itemView
+		param opts: 可选，UGUI/UIToolkit 后端必填 templateFn
+			{
+				templateFn = function() return GameObject|VisualElement end,  -- item 节点模板
+				itemHeight = number,  -- 可选，固定行高(px)；不填则尝试自动测量
+			}
+			FairyGUI 后端可不传（item 由 GList 自动管理）
 	]]
-	function FFixedList.Create(itemViewConstructor)
+	function FFixedList.Create(itemViewConstructor, opts)
 		assert(itemViewConstructor, "itemViewConstructor is nil")
 		local obj = FFixedList()
 		obj.m_itemViewConstructor = itemViewConstructor
-		obj.m_RootProxy = FFixedListRootProxy.createForListWidget()
+		obj.m_opts = opts
 		return obj
 	end
 
@@ -62,11 +73,12 @@ do
 		简易地创建一个 FFixedList 实例，元素 View 的 OnCreate 调用 itemOnCreate
 		param itemOnCreate: 元素 View 的 OnCreate 调用此函数
 			function itemOnCreate (itemView, itemIndex)
+		param opts: 见 FFixedList.Create
 	]]
-	function FFixedList.CreateSimple(itemOnCreate)
+	function FFixedList.CreateSimple(itemOnCreate, opts)
 		return FFixedList.Create(function (index)
 			return FFixedList.CreateItemSimple(itemOnCreate, index)
-		end)
+		end, opts)
 	end
 
 	--[[
@@ -77,17 +89,37 @@ do
 		return SimpleItemView.new(itemOnCreate, index)
 	end
 
+	--- 在 viewObj 就绪后懒创建后端无关的列表代理
+	---@return FViewListRootProxy|nil
+	function FFixedList:_EnsureProxy()
+		if self.m_RootProxy then
+			return self.m_RootProxy
+		end
+		if not self.m_viewObj then
+			return nil
+		end
+		local backend = self:GetBackendType()
+		self.m_RootProxy = FViewListRootProxy.CreateByBackend(backend, self.m_opts)
+		return self.m_RootProxy
+	end
+
 	function FFixedList:GetItemCount()
 		self:_InitIfNeeded(true)		--初始化，以便在 OnCreate 前即可调用
-		return #self.m_itemViews
+		return self.m_itemViews and #self.m_itemViews or 0
 	end
 	
 	function FFixedList:SetItemCount(count)
 		self:_InitIfNeeded(false)		--初始化，以便在 OnCreate 前即可调用
-		
+
+		local proxy = self:_EnsureProxy()
+		if not proxy then
+			warn("FFixedList:SetItemCount called before viewObj ready")
+			return
+		end
+
 		local oldCount = self:GetItemCount()
 		if count > oldCount then
-			self.m_RootProxy:SetCount(count)
+			proxy:SetCount(count)
 			local currentCount = #self.m_itemViews	--数量可能已经发生变化
 			for i = currentCount + 1, count do
 				self:_AddView(i)
@@ -96,9 +128,9 @@ do
 			for i = oldCount, count + 1, -1 do
 				self:_RemoveView(i)
 			end
-			self.m_RootProxy:SetCount(count)
+			proxy:SetCount(count)
 		else
-			self.m_RootProxy:SetCount(count)
+			proxy:SetCount(count)
 		end
 		
 		assert(self:GetItemCount() == count)
@@ -169,7 +201,8 @@ do
 			self.m_itemViews = {}
 
 			if bSyncFromResource then
-				local itemCount = self.m_RootProxy:GetCount()
+				local proxy = self:_EnsureProxy()
+				local itemCount = proxy and proxy:GetCount() or 0
 				for i = 1, itemCount do
 					self:_AddView(i)
 				end
@@ -179,16 +212,22 @@ do
 
 	function FFixedList:UpdateSubViewObj()
 		--尽可能早设置viewObj
-		self.m_RootProxy:SetRootWidget(self.m_viewObj)
+		if self.m_viewObj then
+			local proxy = self:_EnsureProxy()
+			if proxy then proxy:SetRootWidget(self.m_viewObj) end
+		end
 	    FViewBaseUI.UpdateSubViewObj(self)
 	end
 
 	function FFixedList:OnCreateInternal()
-		self.m_RootProxy:SetRootWidget(self.m_viewObj)
-		self.m_RootProxy:SetItemUpdateFunc(function (itemWidget, index)
-			self:_OnListItemUpdate(itemWidget, index)
-		end)
-		self.m_RootProxy:OnCreate()
+		local proxy = self:_EnsureProxy()
+		if proxy then
+			proxy:SetRootWidget(self.m_viewObj)
+			proxy:SetItemUpdateFunc(function (itemWidget, index)
+				self:_OnListItemUpdate(itemWidget, index)
+			end)
+			proxy:OnCreate()
+		end
 		self:_InitIfNeeded(true)
 		--SetItemCount 时会调用 Item 的 OnCreate，因此此处不能调用，否则会重复调用
 		self:OnCreate()
@@ -217,6 +256,7 @@ do
 				end
 			end
 		end
+		--[[ 上方 self.m_RootProxy 此时必非 nil：_OnListItemUpdate 仅由代理回调触发 ]]
 
 		--重新绑定 (即使 m_viewObj 未变，其内部 SWidget 也可能已变化，必须重新绑定)
 		self:DetachSubView(itemView, true)
@@ -230,7 +270,10 @@ do
 			end
 			self.m_itemViews = nil
 		end
-		self.m_RootProxy:OnDestroy()
+		if self.m_RootProxy then
+			self.m_RootProxy:OnDestroy()
+			self.m_RootProxy = nil
+		end
 		FViewBaseUI.OnDestroyInternal(self)
 	end
 	
@@ -250,7 +293,8 @@ do
 		assert(index == #self.m_itemViews + 1)
 		local itemView = self:_CreateItemView(index)
 		self.m_itemViews[index] = itemView
-		local itemObj = self.m_RootProxy:GetItemByIndex(index)
+		local proxy = self:_EnsureProxy()
+		local itemObj = proxy and proxy:GetItemByIndex(index)
 		if itemObj then
 			self:_AttachSubView(itemObj, itemView, true)
 		end

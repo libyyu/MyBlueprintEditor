@@ -44,6 +44,19 @@ do
 		return self.m_viewRoot
 	end
 
+	---返回所属面板的后端类型（UGUI / UIkit / FairyGUI）。
+	---子 View 据此选择对应的列表/控件后端实现。无所属面板时默认 FairyGUI。
+	---@return integer PanelType
+	function FViewBaseUI:GetBackendType()
+		local root = self:GetRootView()
+		if root then
+			if root.IsUIToolkit and root:IsUIToolkit() then return PanelType.UIkit end
+			if root.IsUGUI and root:IsUGUI() then return PanelType.UGUI end
+			if root.IsFairyGui and root:IsFairyGui() then return PanelType.FairyGUI end
+		end
+		return PanelType.FairyGUI
+	end
+
 	---@return FViewBaseUI|nil
 	function FViewBaseUI:GetOwnerView()
 		return self.m_viewOwner

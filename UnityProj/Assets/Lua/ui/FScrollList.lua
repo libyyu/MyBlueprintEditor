@@ -1,5 +1,7 @@
 
+
 local FViewBaseUI = require "ui.FViewBaseUI"
+local FViewListRootProxy = require "ui.FViewListRootProxy"
 
 local FScrollList = FLua.Class(FViewBaseUI, "FScrollList")
 
@@ -62,15 +64,23 @@ function FScrollList:__constructor()
 	self._item_view_constructor = nil
 	self._item_update_func = nil
 	self._is_inited = false
+	--- 后端无关的列表代理（FairyGUI / UIToolkit / UGUI），在 viewObj 就绪后于 _Init 创建
+	self.m_proxy = nil
+	--- UGUI / UIToolkit 后端创建 item 节点所需的选项 {templateFn=, itemHeight=}
+	self._opts = nil
 end
 
-function FScrollList.Create(item_view_constructor, item_update_func)
+---@param item_view_constructor fun(itemObj:any, index:number):FViewBaseUI|nil
+---@param item_update_func fun(view:any, index:number)
+---@param opts table|nil UGUI/UIToolkit 后端必填 templateFn：{templateFn=fun():GameObject|VisualElement, itemHeight=number}
+function FScrollList.Create(item_view_constructor, item_update_func, opts)
 	if not item_update_func then
 		error("[FScrollList]update function can not be nil.")
 	end
 	local view = FScrollList()
 	view._item_view_constructor = item_view_constructor
 	view._item_update_func = item_update_func
+	view._opts = opts
 	return view
 end
 
@@ -106,7 +116,9 @@ function FScrollList:SetCountNoForceUpdate(count)
 		end
 	end
 
-	self.m_viewObj.numItems = count
+	if self.m_proxy then
+		self.m_proxy:SetCount(count)
+	end
 
 	return old_count ~= new_count
 end
@@ -123,23 +135,25 @@ function FScrollList:SetCount(count, ...)
 end
 
 function FScrollList:ForceUpdate()
-	self.m_viewObj:RefreshVirtualList()
+	if self.m_proxy then
+		self.m_proxy:Refresh()
+	end
 end
 
 function FScrollList:GetCount()
-	return self.m_viewObj.numItems
+	return self.m_proxy and self.m_proxy:GetCount() or 0
 end
 
 function FScrollList:_Init()
 	if not self:IsValid() or self._is_inited then
 		return
 	end
-	if not self.m_viewObj:IsExtend("FairyGUI.GList") then
-		error(string.format("[FScrollList] object <%s> is not a ScrollList.", tostring(self.m_viewObj)))
-	end
-	self.m_viewObj:SetVirtual()
-	self.m_viewObj.itemRenderer = function(cindex, itemObj)
-		local index = cindex + 1
+
+	-- 按所属面板后端创建列表代理（FairyGUI / UIToolkit / UGUI）
+	-- itemObj 由代理统一供给：FairyGUI = GList child；UITK/UGUI = 池化复用节点
+	self.m_proxy = FViewListRootProxy.CreateByBackend(self:GetBackendType(), self._opts)
+	self.m_proxy:SetRootWidget(self.m_viewObj)
+	self.m_proxy:SetItemUpdateFunc(function(itemObj, index)
 		if not self._is_inited then
 			return
 		end
@@ -167,7 +181,8 @@ function FScrollList:_Init()
 		else
 			self._item_update_func(itemObj, index)
 		end
-	end
+	end)
+	self.m_proxy:OnCreate()
 	self._is_inited = true
 end
 
@@ -188,8 +203,7 @@ function FScrollList:GetAllItem()
 end
 
 function FScrollList:GetItemObj(index)
-	local childIndex = self.m_viewObj:ItemIndexToChildIndex(index-1)
-	return self.m_viewObj:GetChild(childIndex)
+	return self.m_proxy and self.m_proxy:GetItemByIndex(index) or nil
 end
 
 
@@ -220,6 +234,11 @@ function FScrollList:OnDestroy()
 		end
 	end
 	self._view_list = {}
+
+	if self.m_proxy then
+		self.m_proxy:OnDestroy()
+		self.m_proxy = nil
+	end
 end
 
 function FScrollList:_GetWrappedView(index)
@@ -245,9 +264,12 @@ function FScrollList:TrySetViewData(view, index)
 end
 
 function FScrollList:BeforeDetached(view)
-	print("FScrollList:BeforeDetached")
-    self:SetCount(0, false)
-	self.m_viewObj.itemRenderer = nil
+	self:SetCount(0, false)
+	if self.m_proxy then
+		self.m_proxy:OnDestroy()
+		self.m_proxy = nil
+	end
+	self._is_inited = false
 end
 
 function FScrollList:GetDataList()
