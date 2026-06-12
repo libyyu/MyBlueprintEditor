@@ -69,22 +69,21 @@ do
 		param callback: function to be called on gc
 	]]
 
-	---@param self GcCallbacks
 	---@param callback function
-	---@return void
+	---@return GcCallbacks
 	function GcCallbacks:add(callback)
 		checkNonNil(callback, "add", 2, 2)
 
 		self:checkGcProxy()
 		local callbacks = self.m_callbacks
 		callbacks[#callbacks+1] = callback
+		return self
 	end
 	
 	--[[
 		call callbacks manually, and clear callbacks
 	]]
 
-	---@param self GcCallbacks
 	---@return void
 	function GcCallbacks:dispose()
 		self.m_needDisposeErrMsg = nil
@@ -102,11 +101,11 @@ do
 		param errMsg: add into error info when report error
 	]]
 
-	---@param self GcCallbacks
 	---@param errMsg string
-	---@return void
+	---@return GcCallbacks
 	function GcCallbacks:setNeedDispose(errMsg)
 		self.m_needDisposeErrMsg = errMsg or ""
+		return self
 	end
 	
 	---------------------------------
@@ -122,9 +121,6 @@ do
 	end
 
 	-- create gc proxy if need
-
-	---@param self GcCallbacks
-	---@return void
 	function GcCallbacks:checkGcProxy()
 		if self.m_gcProxy == nil then
 			self.m_callbacks = {}

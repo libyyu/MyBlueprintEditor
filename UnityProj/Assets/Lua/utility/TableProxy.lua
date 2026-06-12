@@ -38,10 +38,10 @@ do
 	
 	--[[
 		创建只读表
-		param table: 实际数据
+		param t: 实际数据
 	]]
 
-	---@param table table
+	---@param t table
 	---@return table
 	function TableProxy.createReadonlyTable(t)
 		return createTable(t)
@@ -49,16 +49,16 @@ do
 	
 	--[[
 		创建只读proxy (比表性能稍好)
-		param table: 实际数据
+		param t: 实际数据
 	]]
 
-	---@param table table
+	---@param t table
 	---@return userdata
 	function TableProxy.createReadonlyProxy(t)
 		return createProxy(t)
 	end
 	
-	local function getPropertyTableIndexer (propertyTable, table, who)
+	local function getPropertyTableIndexer (propertyTable, t, who)
 		checkNonNil(propertyTable, who, 3)
 		
 		--检查 property 是否只包含函数
@@ -68,13 +68,13 @@ do
 			end
 		end
 		
-		return function (t, k)
+		return function (_, k)
 			local prop = propertyTable[k]
 			if prop then
 				return prop()
 			else
-				if table then
-					return table[k]
+				if t then
+					return t[k]
 				else
 					return nil
 				end
@@ -85,11 +85,11 @@ do
 	--[[
 		创建包含属性的只读表
 		param propertyTable: 实际包含属性的 table，各属性为函数，调用后得到最终值
-		param table: 实际数据
+		param t: 实际数据
 	]]
 
 	---@param propertyTable table
-	---@param table table
+	---@param t table
 	---@return table
 	function TableProxy.createReadonlyPropertyTable(propertyTable, t)
 		return createTable(getPropertyTableIndexer(propertyTable, t, "createReadonlyPropertyTable"))
@@ -98,11 +98,11 @@ do
 	--[[
 		创建包含属性的只读proxy (比表性能稍好)
 		param propertyTable: 实际包含属性的 table，各属性为函数，调用后得到最终值
-		param table: 实际数据
+		param t: 实际数据
 	]]
 
 	---@param propertyTable table
-	---@param table table
+	---@param t table
 	---@return userdata
 	function TableProxy.createReadonlyPropertyProxy(propertyTable, t)
 		return createProxy(getPropertyTableIndexer(propertyTable, t, "createReadonlyPropertyTable"))
@@ -115,6 +115,7 @@ do
 	---@return EnvClass
 	function TableProxy.createEnvClass()
 
+		---@class EnvClass
 		local EnvClass = FLua.StaticClass()
 		do
 

@@ -23,7 +23,7 @@ local math_floor = math.floor
 local _VERSION = _VERSION
 local is_5_1 = (_VERSION == "Lua 5.1")
 
-local _ENV = nil
+--local _ENV = nil
 
 local malut = {}
 
