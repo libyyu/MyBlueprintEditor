@@ -374,8 +374,7 @@ do
 			if self.m_HideOnDestroy then
 				self:_SetPanelHide(self.m_panel)
 			else
-				if self:IsUIToolkit() then
-					-- UITK：通过 backend 销毁（清理 UIDocument + 宿主 GO）
+				if self:IsUIToolkit() or self:IsUGUI() then
 					self.m_panel:Destroy()
 				elseif self:IsFairyGui() then
 					if self:IsFairyGuiWindow() then
@@ -383,7 +382,7 @@ do
 					end
 					UnityEngine.Object.Destroy(self.m_fguiOwner)
 				else
-					UnityEngine.Object.Destroy(self.m_panel)
+					error("不支持的面板类型: " .. tostring(self:GetPanelResourceType()))
 				end
 			end
 

@@ -745,7 +745,7 @@ end
 --------------------------------------------------------------
 
 --******************对外接口类********************************--
-
+---@class FViewListRootProxy
 local FViewListRootProxy = FLua.Class("ECViewListRootProxy")
 function FViewListRootProxy:__constructor()
     self.m_ProxyImpl = nil
