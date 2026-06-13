@@ -618,12 +618,12 @@ function FPanelBaseUI:SetInvisibleFlagValid(flag, valid)
 		return
 	end
 
-	local currentVisible = (self.m_invisibleFlag == _G.PanelInVisibleMask.None)
-	if self.m_SubPanelList then
-		for _, subPanel in ipairs(self.m_SubPanelList) do
-			subPanel:SetInvisibleFlagValid(_G.PanelInVisibleMask.ParentPanel, not currentVisible)
-		end
-	end
+	-- local currentVisible = (self.m_invisibleFlag == _G.PanelInVisibleMask.None)
+	-- if self.m_SubPanelList then
+	-- 	for _, subPanel in ipairs(self.m_SubPanelList) do
+	-- 		subPanel:SetInvisibleFlagValid(_G.PanelInVisibleMask.ParentPanel, not currentVisible)
+	-- 	end
+	-- end
 
 	self:UpdateVisibleByFlag()
 end

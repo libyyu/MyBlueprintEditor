@@ -72,7 +72,7 @@ do
     -- ──────────────────────────────────────────────────────────────────
     function FPanelUITestBase:OnCreate()
         -- 先建树（UGUI），UITK 为空实现
-        self:BuildContent()
+        --self:BuildContent()
 
         local bridge = self.m_bridge
         if not bridge then
@@ -223,6 +223,7 @@ do
 
     function FPanelUITestBase:OnDestroy()
         print("[FPanelUITest] OnDestroy (" .. self:_BackendName() .. ")")
+        require "ui.FPanelUITestLauncher".Instance():SetVisible(true)
     end
 end
 

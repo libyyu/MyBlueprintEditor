@@ -33,11 +33,13 @@ do
 
         bridge:RegisterClick("btn_open_uitk", function()
             bridge:SetText("lbl_status", "打开 UI Toolkit 测试面板...")
+            self:SetVisible(false)
             require "ui.FPanelUITestUITK".Instance():ShowPanel(true)
         end)
 
         bridge:RegisterClick("btn_open_ugui", function()
             bridge:SetText("lbl_status", "打开 UGUI 测试面板...")
+            self:SetVisible(false)
             require "ui.FPanelUITestUGUI".Instance():ShowPanel(true)
         end)
 

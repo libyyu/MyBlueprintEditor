@@ -276,7 +276,29 @@ namespace XLua
 #endif
 		}
         
-		public void __Gen_Delegate_Imp11(UGFramework.Runtime.IView p0)
+		public void __Gen_Delegate_Imp11(UnityEngine.Vector2 p0)
+		{
+#if THREAD_SAFE || HOTFIX_ENABLE
+            lock (luaEnv.luaEnvLock)
+            {
+#endif
+                RealStatePtr L = luaEnv.L;
+                int errFunc = LuaAPI.pcall_prepare(L, errorFuncRef, luaReference);
+                ObjectTranslator translator = luaEnv.translator;
+                translator.PushUnityEngineVector2(L, p0);
+                
+                PCall(L, 1, 0, errFunc);
+                
+                
+                
+                LuaAPI.lua_settop(L, errFunc - 1);
+                
+#if THREAD_SAFE || HOTFIX_ENABLE
+            }
+#endif
+		}
+        
+		public void __Gen_Delegate_Imp12(UGFramework.Runtime.IView p0)
 		{
 #if THREAD_SAFE || HOTFIX_ENABLE
             lock (luaEnv.luaEnvLock)
@@ -332,6 +354,11 @@ namespace XLua
 			    return new UGFramework.Runtime.FTimerList.TimerCallback(__Gen_Delegate_Imp2);
 			}
 		
+		    if (type == typeof(UnityEngine.Events.UnityAction))
+			{
+			    return new UnityEngine.Events.UnityAction(__Gen_Delegate_Imp2);
+			}
+		
 		    if (type == typeof(CutRope.Game.LevelController.LuaStarDelegate))
 			{
 			    return new CutRope.Game.LevelController.LuaStarDelegate(__Gen_Delegate_Imp3);
@@ -377,9 +404,14 @@ namespace XLua
 			    return new UGFramework.Runtime.YooAssetsLuaBridge.LuaLoadAllLuaFilesCompleteCallback(__Gen_Delegate_Imp10);
 			}
 		
+		    if (type == typeof(UnityEngine.Events.UnityAction<UnityEngine.Vector2>))
+			{
+			    return new UnityEngine.Events.UnityAction<UnityEngine.Vector2>(__Gen_Delegate_Imp11);
+			}
+		
 		    if (type == typeof(UGFramework.Runtime.UIManager.LuaViewCallback))
 			{
-			    return new UGFramework.Runtime.UIManager.LuaViewCallback(__Gen_Delegate_Imp11);
+			    return new UGFramework.Runtime.UIManager.LuaViewCallback(__Gen_Delegate_Imp12);
 			}
 		
 		    return null;

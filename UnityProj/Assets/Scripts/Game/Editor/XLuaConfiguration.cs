@@ -24,7 +24,11 @@ public static class XLuaConfig
         typeof(YooAssetsLuaBridge.LuaLoadAllLuaFilesProgressCallback),
         typeof(YooAssetsLuaBridge.LuaLoadAllLuaFilesCompleteCallback),
         //FTimerList
-        typeof(FTimerList.TimerCallback)
+        typeof(FTimerList.TimerCallback),
+
+        typeof(UnityEngine.Events.UnityAction),
+        typeof(UnityEngine.Events.UnityAction<UnityEngine.Vector2>),
+        typeof(UnityEngine.UI.ScrollRect.ScrollRectEvent)
     };
 
     [LuaCallCSharp]
