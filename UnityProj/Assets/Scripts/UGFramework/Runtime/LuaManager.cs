@@ -119,11 +119,12 @@ namespace UGFramework.Runtime
                     env.Global.Set("UpdateLogicResult", false);
                 }
                 var begin = Time.realtimeSinceStartup;
-                while (!env.Global.Get<bool>("UpdateLogicDone")) await UniTask.Yield();
-                var UpdateLogicResult = env.Global.Get<bool>("UpdateLogicResult");
+                while (env.IsValid() && env.Global.IsValid() &&!env.Global.Get<bool>("UpdateLogicDone")) await UniTask.Yield();
+                var UpdateLogicResult = false;
+                if(env.IsValid() && env.Global.IsValid()) UpdateLogicResult = env.Global.Get<bool>("UpdateLogicResult");
                 var cost = Time.realtimeSinceStartup - begin;
                 Debug.Log($"[LuaManager] Update VM done, result={UpdateLogicResult} (t={cost:F1}s)");
-                return true;
+                return UpdateLogicResult;
             }
             catch (Exception e)
             {

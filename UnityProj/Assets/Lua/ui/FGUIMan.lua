@@ -102,23 +102,26 @@ do
 	function FGUIMan:InitFGUIRoot()
 		if IsValidObject(self.m_FGUIRoot) then return end
 
-		FairyGUI.StageCamera.LayerName = "FairyGUI"
-		local camearGo = NewGameObject("Stage Camera");
-	    camearGo.transform.localPosition = Vector3(2.790179, -5, 0);
-	    camearGo.transform.localScale = Vector3(1, 1, 1);
-	    camearGo.layer = UnityEngine.LayerMask.NameToLayer("FairyGUI")
+		CS.FairyGUI.StageCamera.LayerName = "FairyGUI"
 
-	    local cam = camearGo:AddComponent(UnityEngine.Camera)
-	    cam.clearFlags = UnityEngine.CameraClearFlags.Depth
-	    --cam.backgroundColor = Color(128,128,128,255)
-	    cam.cullingMask = bit.lshift(1,20)
-	    cam.orthographic = true;
-	    cam.orthographicSize = 5
-	    cam.nearClipPlane = -30;
-	    cam.farClipPlane = 30;
-	    cam.depth = 1
-	    camearGo:AddComponent(LuaHelper.GetClsType("FairyGUI.StageCamera"))
+		if UnityEngine.GameObject.Find("Stage Camera") then 
+		else
+			local camearGo = NewGameObject("Stage Camera");
+			camearGo.transform.localPosition = Vector3(2.790179, -5, 0);
+			camearGo.transform.localScale = Vector3(1, 1, 1);
+			camearGo.layer = UnityEngine.LayerMask.NameToLayer("FairyGUI")
 
+			local cam = camearGo:AddComponent(typeof(UnityEngine.Camera))
+			cam.clearFlags = UnityEngine.CameraClearFlags.Depth
+			--cam.backgroundColor = Color(128,128,128,255)
+			cam.cullingMask = 1 << 20
+			cam.orthographic = true
+			cam.orthographicSize = 5
+			cam.nearClipPlane = -30
+			cam.farClipPlane = 30
+			cam.depth = 1
+			camearGo:AddComponent(typeof(CS.FairyGUI.StageCamera))
+		end
 
 	    local goRoot = NewGameObject("FGUIRoot(2D)");
 	    goRoot.transform.localPosition = Vector3(0, 0, 0);
@@ -128,9 +131,9 @@ do
 		self.m_FGUIRoot = goRoot
 
 		print("GUIMan:InitFGUIRoot", self.m_FGUIRoot)
-		FairyGUI.GRoot.inst:SetContentScaleFactor(750, 1344, FairyGUI.UIContentScaler.ScreenMatchMode.MatchWidthOrHeight)
-		FairyGUI.Stage.inst.gameObject:GetComponent(FairyGUI.UIContentScaler).ignoreOrientation = true
-		print("Stage width:", FairyGUI.Stage.inst.width, FairyGUI.Stage.inst.height)
+		CS.FairyGUI.GRoot.inst:SetContentScaleFactor(750, 1344, CS.FairyGUI.UIContentScaler.ScreenMatchMode.MatchWidthOrHeight)
+		CS.FairyGUI.Stage.inst.gameObject:GetComponent(typeof(CS.FairyGUI.UIContentScaler)).ignoreOrientation = true
+		print("Stage width:", CS.FairyGUI.Stage.inst.width, CS.FairyGUI.Stage.inst.height)
 		print("Screen width:", UnityEngine.Screen.width, UnityEngine.Screen.height)
 	end
 
@@ -147,6 +150,7 @@ do
 			self.m_UIRoot = object
 			self.m_UGUIRoot = self.m_UIRoot.transform:Find("UIRoot(2D)/Canvas").transform
 			self.m_UITKRoot = self.m_UIRoot.transform:Find("UITKRoot").transform
+			self.m_FGUIRoot = self.m_UIRoot.transform:Find("FGUIRoot(2D)").gameObject
 			return
 		end
 		if not IsValidObject(self.m_UIRoot) then
@@ -157,8 +161,7 @@ do
 		end
 		self:InitUGUIRoot()
 		self:InitUITKRoot()
-		--FGUI暂时未实现，需要插件支持，先不创建FGUIRoot
-		--self:InitFGUIRoot()
+		self:InitFGUIRoot()
 	end
 
 	---@param panel FPanelBaseUI
