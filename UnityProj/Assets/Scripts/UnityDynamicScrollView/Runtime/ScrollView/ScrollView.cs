@@ -4,7 +4,7 @@
 // </copyright>
 // -----------------------------------------------------------------------
 
-namespace AillieoUtils
+namespace UGUIUtils
 {
     using System;
     using System.Collections;

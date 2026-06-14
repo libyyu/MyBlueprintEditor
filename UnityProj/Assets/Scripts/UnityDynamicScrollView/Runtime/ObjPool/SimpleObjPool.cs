@@ -1,10 +1,4 @@
-// -----------------------------------------------------------------------
-// <copyright file="SimpleObjPool.cs" company="AillieoTech">
-// Copyright (c) AillieoTech. All rights reserved.
-// </copyright>
-// -----------------------------------------------------------------------
-
-namespace AillieoUtils
+namespace UGUIUtils
 {
     using System;
     using System.Collections.Generic;

@@ -1,8 +1,8 @@
 {
-    "name": "AillieoUtils.UnityDynamicScrollView.Editor",
+    "name": "UnityDynamicScrollView.Editor",
     "rootNamespace": "",
     "references": [
-        "AillieoUtils.UnityDynamicScrollView"
+        "UnityDynamicScrollView"
     ],
     "includePlatforms": [
         "Editor"

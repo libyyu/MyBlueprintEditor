@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System;
-using AillieoUtils;
+using UGUIUtils;
 using UnityEngine.UI;
 using SObject = System.Object;
 using System.Text;
