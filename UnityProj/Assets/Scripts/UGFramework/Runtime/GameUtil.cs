@@ -362,28 +362,46 @@ namespace UGFramework.Runtime
             if (comp == null) return;
             comp.RemoveTimer(timerId);
         }
-        
+
+        private static readonly Dictionary<string, Type> _foundTypesCache = new Dictionary<string, Type>();
         public static Type FindType(string qualifiedTypeName) 
         {
+            if(_foundTypesCache.TryGetValue(qualifiedTypeName, out var type)) return type;
+
             Type t = Type.GetType(qualifiedTypeName);
 
             if (t != null)
             {
+                _foundTypesCache[qualifiedTypeName] = t;
                 return t;
             }
-            var Assemblies = System.AppDomain.CurrentDomain.GetAssemblies();
-            for (int n = 0; n < Assemblies.Length;n++ )
+            try
             {
-                var asm = Assemblies[n];
-                t = asm.GetType(qualifiedTypeName);
-                if (t != null)
-                    return t;
-                Type[] types = asm.GetExportedTypes();
-                foreach (Type ts in types)
+                var Assemblies = System.AppDomain.CurrentDomain.GetAssemblies();
+                for (int n = 0; n < Assemblies.Length; n++)
                 {
-                    if (ts.Name.Equals(qualifiedTypeName))
+                    var asm = Assemblies[n];
+                    if(asm.IsDynamic) continue;
+                    t = asm.GetType(qualifiedTypeName);
+                    if (t != null)
+                    {
+                        _foundTypesCache[qualifiedTypeName] = t;
                         return t;
+                    }
+                    Type[] types = asm.GetExportedTypes();
+                    foreach (Type ts in types)
+                    {
+                        if (ts.Name.Equals(qualifiedTypeName))
+                        {
+                            _foundTypesCache[qualifiedTypeName] = ts;
+                            return ts;
+                        }
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+
             }
             return null;
         }

@@ -213,7 +213,7 @@ do
     end
 
     --- ScrollRect 列表容器（带 Viewport + Content）。返回容器 GameObject。
-    --- FScrollList/FFixedList 内部按 GetBackendType()=UGUI 走 ScrollRect 虚拟列表代理。
+    --- FScrollList/FFixedList 内部按UGUI 走 ScrollRect 虚拟列表代理。
     local function mkScrollContainer(parent, name, y, h)
         local go, rt = newNode(name, parent)
         anchorTopCenter(rt, 560, h, y)

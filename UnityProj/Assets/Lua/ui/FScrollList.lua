@@ -151,7 +151,7 @@ function FScrollList:_Init()
 
 	-- 按所属面板后端创建列表代理（FairyGUI / UIToolkit / UGUI）
 	-- itemObj 由代理统一供给：FairyGUI = GList child；UITK/UGUI = 池化复用节点
-	self.m_proxy = FViewListRootProxy.CreateByBackend(self:GetBackendType(), self._opts)
+	self.m_proxy = FViewListRootProxy.CreateProxyList(self.m_viewObj, self._opts)
 	self.m_proxy:SetRootWidget(self.m_viewObj)
 	self.m_proxy:SetItemUpdateFunc(function(itemObj, index)
 		if not self._is_inited then

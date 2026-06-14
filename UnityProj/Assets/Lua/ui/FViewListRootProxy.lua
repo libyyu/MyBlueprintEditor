@@ -7,7 +7,7 @@
 ---
 --- 统一接口：SetRootWidget -> SetItemUpdateFunc -> OnCreate -> SetCount / GetItemByIndex / Refresh -> OnDestroy
 ---
---- FFixedList / FScrollList 通过 FViewListRootProxy.CreateByBackend(panel:GetBackendType(), opts)
+--- FFixedList / FScrollList 通过 FViewListRootProxy.CreateProxyList(ListRootObject, opts)
 --- 创建对应后端的代理，自身不再关心后端差异。
 ---
 --- opts（UGUI / UIToolkit 后端用，FairyGUI 忽略）：
@@ -15,7 +15,7 @@
 ---     itemHeight = number }                                          -- 行高(px)，可选；不填则尝试自动测量
 
 --********************代理实现基类***************--
-
+---@class FViewListRootProxyImplBase
 local FViewListRootProxyImplBase = FLua.Abstract("FViewListRootProxyImplBase")
 do
     function FViewListRootProxyImplBase:__constructor()
@@ -66,7 +66,7 @@ end
 
 
 --************默认代理实现, 使用List控件创建的ViewList**********--
-
+---@class FViewListRootProxyImplForFairyGUIList : FViewListRootProxyImplBase
 local FViewListRootProxyImplForFairyGUIList = FLua.Class(FViewListRootProxyImplBase, "FViewListRootProxyImplForFairyGUIList")
 do
     function FViewListRootProxyImplForFairyGUIList:OnCreate()
@@ -129,7 +129,7 @@ end
 --     listRoot:SetCount(1000)      -- 设置数据总数
 --   templateCreatorFn() 返回一个新建的 VisualElement 作为列表项模板
 --   item 高度由模板节点样式决定（USS 中定义 height），无需代码指定
-
+---@class FViewListRootProxyImplForUITKScrollView : FViewListRootProxyImplBase
 local FViewListRootProxyImplForUITKScrollView = FLua.Class(FViewListRootProxyImplBase, "FViewListRootProxyImplForUITKScrollView")
 do
     local DisplayStyle = CS.UnityEngine.UIElements.DisplayStyle
@@ -196,6 +196,7 @@ do
 
         -- 创建内容包装器
         self.m_contentWrapper = CS.UnityEngine.UIElements.VisualElement()
+        print(">>>>>", self.m_contentWrapper, self.m_contentWrapper.style)
         self.m_contentWrapper.style.position = Position.Relative
         self.m_contentWrapper.style.width = Length(100, LengthUnit.Percent)
         self.m_container:Add(self.m_contentWrapper)
@@ -472,6 +473,7 @@ end
 --   容器 GameObject 上需挂 UnityEngine.UI.ScrollRect（带 content / viewport）
 --   content 不要挂 LayoutGroup / ContentSizeFitter（会与手动定位冲突）
 --   item 高度优先用 opts.itemHeight；否则从模板节点 RectTransform 测量；测不到则默认 100
+---@class FViewListRootProxyImplForUGUIScrollView : FViewListRootProxyImplBase
 local FViewListRootProxyImplForUGUIScrollView = FLua.Class(FViewListRootProxyImplBase, "FViewListRootProxyImplForUGUIScrollView")
 do
     local ScrollRect    = CS.UnityEngine.UI.ScrollRect
@@ -748,71 +750,33 @@ end
 ---@class FViewListRootProxy
 local FViewListRootProxy = FLua.Class("ECViewListRootProxy")
 function FViewListRootProxy:__constructor()
+    ---@type FViewListRootProxyImplBase
     self.m_ProxyImpl = nil
 end
 
----按面板后端类型创建空代理（不绑定 widget，也不 OnCreate）。
----调用者负责后续 SetRootWidget(viewObj) -> SetItemUpdateFunc(fn) -> OnCreate()。
----这是 FFixedList / FScrollList 等"在 viewObj 就绪后才知道后端"场景的统一入口。
----@param backend integer PanelType.FairyGUI / PanelType.UIkit / PanelType.UGUI
----@param opts table|nil {templateFn=fun():GameObject|VisualElement, itemHeight=number}
----@return FViewListRootProxy
-function FViewListRootProxy.CreateByBackend(backend, opts)
-    opts = opts or {}
-    local object = FViewListRootProxy()
+function FViewListRootProxy.CreateProxyList(RootObject, opts)
     local impl
-    if backend == PanelType.FairyGUI then
-        impl = FViewListRootProxyImplForFairyGUIList()
-    elseif backend == PanelType.UIkit then
+    local rootListObj
+    print("FViewListRootProxy.CreateProxyList, RootObject:", RootObject, "opts:", opts)
+    if RootObject:IsExtend("UnityEngine.UIElements.VisualElement") then
+        rootListObj = RootObject
         impl = FViewListRootProxyImplForUITKScrollView()
-    elseif backend == PanelType.UGUI then
+    elseif RootObject:IsExtend("UnityEngine.GameObject") then
+        rootListObj = RootObject:GetComponentInChildren(typeof(CS.UnityEngine.UI.ScrollRect), true)
         impl = FViewListRootProxyImplForUGUIScrollView()
+    elseif RootObject:IsExtend("FairyGUI.GList") then
+        impl = FViewListRootProxyImplForFairyGUIList()
     else
-        error("FViewListRootProxy.CreateByBackend: unsupported backend " .. tostring(backend))
+        error("Unsupported root object type for FViewListRootProxy: " .. tostring(RootObject))
     end
     -- UGUI / UITK 需要 templateFn 创建 item 节点；itemHeight 可选覆盖。FairyGUI 忽略。
     if impl.SetTemplateFn and opts.templateFn then impl:SetTemplateFn(opts.templateFn) end
     if impl.SetItemHeight and opts.itemHeight then impl:SetItemHeight(opts.itemHeight) end
-    object.m_ProxyImpl = impl
-    return object
-end
-
-function FViewListRootProxy.CreateProxyList(RootObject)
     local object = FViewListRootProxy()
-    if RootObject:IsExtend("FairyGUI.GList") then
-        object.m_ProxyImpl = FViewListRootProxyImplForFairyGUIList()
-    --TODO: UGUI List
-    else
-        error("Unsupported root object type for FViewListRootProxy: " .. tostring(RootObject))
-    end
-    object:SetRootWidget(RootObject)
-    return object
-end
-
----创建 UIToolkit ScrollView / VisualElement 容器代理
----@param bridge UITKLuaBridge  由 self.m_bridge 传入
----@param containerName string  UXML 里 ScrollView（或容器 VisualElement）的 name
----@param templateFn fun():VisualElement|nil  可选，返回一个新建 VisualElement 作为 item 模板；nil 则用空 VisualElement
----@return FViewListRootProxy
-function FViewListRootProxy.CreateProxyUITK(bridge, containerName, templateFn)
-    assert(bridge, "FViewListRootProxy.CreateProxyUITK: bridge is nil")
-    assert(containerName and #containerName > 0, "FViewListRootProxy.CreateProxyUITK: containerName is required")
-
-    -- 通过 bridge 拿到 VisualElement
-    local ve = bridge:Q(containerName)
-    assert(ve, "FViewListRootProxy.CreateProxyUITK: element '" .. containerName .. "' not found in UIDocument")
-
-    local object = FViewListRootProxy()
-    local impl = FViewListRootProxyImplForUITKScrollView()
-    if templateFn then
-        impl:SetTemplateFn(templateFn)
-    end
     object.m_ProxyImpl = impl
-    object:SetRootWidget(ve)
-    object:OnCreate()   -- 触发 OnCreate 让 impl 初始化 container
+    object:SetRootWidget(rootListObj)
     return object
 end
-
 
 function FViewListRootProxy:SetCount(count)
     self.m_ProxyImpl:SetCount(count)

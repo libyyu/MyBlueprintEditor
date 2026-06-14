@@ -33,7 +33,7 @@ do
 		self.m_onCreateFunc(self, self.m_index)
 	end
 end
-
+---@class FFixedList:FViewBaseUI
 local FFixedList = FLua.Class(FViewBaseUI, "FFixedList")
 do
 	function FFixedList:__constructor()
@@ -98,8 +98,7 @@ do
 		if not self.m_viewObj then
 			return nil
 		end
-		local backend = self:GetBackendType()
-		self.m_RootProxy = FViewListRootProxy.CreateByBackend(backend, self.m_opts)
+		self.m_RootProxy = FViewListRootProxy.CreateProxyList(self.m_viewObj, self.m_opts)
 		return self.m_RootProxy
 	end
 

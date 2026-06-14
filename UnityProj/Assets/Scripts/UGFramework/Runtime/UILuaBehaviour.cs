@@ -72,7 +72,7 @@ namespace UGFramework.Runtime
             {
                 var e = _explicitClicks[i];
                 if (e.button != null) e.button.onClick.RemoveListener(e.action);
-                e.lua?.Dispose();
+                if(e.lua != null && e.lua.IsValid()) e.lua.Dispose();
             }
             _explicitClicks.Clear();
             ClearEntries(_explicitSubmits);
