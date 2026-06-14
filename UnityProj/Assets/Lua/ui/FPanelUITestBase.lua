@@ -223,6 +223,7 @@ do
 
     function FPanelUITestBase:OnDestroy()
         print("[FPanelUITest] OnDestroy (" .. self:_BackendName() .. ")")
+        self:DetachAllSubView(true)
         require "ui.FPanelUITestLauncher".Instance():SetVisible(true)
     end
 end

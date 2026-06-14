@@ -307,8 +307,8 @@ do
 	---@param bInvokeOnDestroy boolean?
 	function FViewBaseUI:DetachAllSubView(bInvokeOnDestroy)
 		if self.m_subViews then
-			for _, subView in ipairs(self.m_subViews) do
-				self:DetachSubView(subView, bInvokeOnDestroy)
+			for i = #self.m_subViews, 1, -1 do
+				self:DetachSubView(self.m_subViews[i], bInvokeOnDestroy)
 			end
 		end
 	end
