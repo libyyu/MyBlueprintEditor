@@ -22,6 +22,22 @@ function Callbacks:add(func)
 	callbacks[#callbacks+1] = func
 end
 
+function Callbacks:addUnique(func)
+	local callbacks = self.callbacks
+	if not callbacks then
+		callbacks = {}
+		self.callbacks = callbacks
+	end
+
+	for _, callback in ipairs(callbacks) do
+		if callback == func then
+			return
+		end
+	end
+
+	callbacks[#callbacks+1] = func
+end
+
 function Callbacks:remove(func)
 	local callbacks = self.callbacks
 	if callbacks then

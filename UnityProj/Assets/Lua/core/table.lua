@@ -27,6 +27,16 @@ if _VERSION == 'Lua 5.1' then
   table.unpack = unpack
 end
 
+if not table.getn then
+    table.getn = function(t)
+        local n = 0
+        for k, v in pairs(t) do
+            n = n + 1
+        end
+        return n
+    end
+end
+
 -- clear the table
 function table.clear(self)
     assert(type(self) == "table")

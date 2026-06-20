@@ -2,6 +2,7 @@ require "core.string"
 require "core.path"
 require "core.table"
 require "core.os"
+require "core.math"
 
 
 local filter = require "core.filter"
@@ -18,3 +19,12 @@ end
 function val(s)
 	return _g.filter:handle(s)
 end
+
+_G.null = setmetatable({}, {
+	__index=function(...)
+		error("error to access nil object")
+	end, 
+	__newindex=function(...)
+		error("error to access nil object")
+	end
+})

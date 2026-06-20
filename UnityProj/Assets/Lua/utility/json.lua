@@ -32,7 +32,7 @@
 local math = require('math')
 local string = require("string")
 local table = require("table")
-
+local load = load or loadstring
 -----------------------------------------------------------------------------
 -- Module declaration
 -----------------------------------------------------------------------------
@@ -238,7 +238,7 @@ function decode_scanNumber(s,startPos)
     endPos = endPos + 1
   end
   local stringValue = 'return ' .. string.sub(s,startPos, endPos-1)
-  local stringEval = loadstring(stringValue)
+  local stringEval = load(stringValue)
   assert(stringEval, 'Failed to scan number [ ' .. stringValue .. '] in JSON string at position ' .. startPos .. ' : ' .. endPos)
   return stringEval(), endPos
 end
@@ -261,7 +261,7 @@ function decode_scanNumberToString(s,startPos)
     endPos = endPos + 1
   end
   local stringValue = 'return ' .. "\"" .. string.sub(s,startPos, endPos-1) .."\""
-  local stringEval = loadstring(stringValue)
+  local stringEval = load(stringValue)
   assert(stringEval, 'Failed to scan number [ ' .. stringValue .. '] in JSON string at position ' .. startPos .. ' : ' .. endPos)
   return stringEval(), endPos
 end

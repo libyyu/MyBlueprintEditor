@@ -271,7 +271,7 @@ namespace UGFramework.Runtime
                     byte[] bytes = textAsset?.bytes;
                     handle.Release();
 #if UNITY_EDITOR
-                    luaPath = relativePath;
+                    luaPath = Application.dataPath + "/../" + relativePath;
 #endif
                     return bytes;
                 }
