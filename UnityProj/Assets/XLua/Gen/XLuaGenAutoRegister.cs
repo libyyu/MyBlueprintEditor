@@ -70,10 +70,16 @@ namespace XLua.CSObjectWrap
             translator.DelayWrapLoader(typeof(UGFramework.Runtime.UITKLuaBridge), UGFrameworkRuntimeUITKLuaBridgeWrap.__Register);
         
         
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.IStyle), UnityEngineUIElementsIStyleWrap.__Register);
+        
+        
             translator.DelayWrapLoader(typeof(UnityEngine.UIElements.VisualElement), UnityEngineUIElementsVisualElementWrap.__Register);
         
         
             translator.DelayWrapLoader(typeof(UnityEngine.UIElements.VisualElementExtensions), UnityEngineUIElementsVisualElementExtensionsWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UIToolkitExtensions), UIToolkitExtensionsWrap.__Register);
         
         
             translator.DelayWrapLoader(typeof(UnityEngine.UIElements.UQueryExtensions), UnityEngineUIElementsUQueryExtensionsWrap.__Register);
@@ -103,22 +109,22 @@ namespace XLua.CSObjectWrap
             translator.DelayWrapLoader(typeof(UnityEngine.UIElements.ScrollView), UnityEngineUIElementsScrollViewWrap.__Register);
         
         
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.Scroller), UnityEngineUIElementsScrollerWrap.__Register);
+        
+        
             translator.DelayWrapLoader(typeof(UnityEngine.UIElements.ProgressBar), UnityEngineUIElementsProgressBarWrap.__Register);
         
         
             translator.DelayWrapLoader(typeof(UnityEngine.UIElements.DropdownField), UnityEngineUIElementsDropdownFieldWrap.__Register);
         
         
-            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.StyleEnum<UnityEngine.UIElements.DisplayStyle>), UnityEngineUIElementsStyleEnum_1_UnityEngineUIElementsDisplayStyle_Wrap.__Register);
-        
-        
-            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.StyleEnum<UnityEngine.UIElements.Visibility>), UnityEngineUIElementsStyleEnum_1_UnityEngineUIElementsVisibility_Wrap.__Register);
-        
-        
             translator.DelayWrapLoader(typeof(UnityEngine.UIElements.DisplayStyle), UnityEngineUIElementsDisplayStyleWrap.__Register);
         
         
             translator.DelayWrapLoader(typeof(UnityEngine.UIElements.Visibility), UnityEngineUIElementsVisibilityWrap.__Register);
+        
+        
+            translator.DelayWrapLoader(typeof(UnityEngine.UIElements.ScrollViewMode), UnityEngineUIElementsScrollViewModeWrap.__Register);
         
         
             translator.DelayWrapLoader(typeof(UGFramework.Runtime.AudioManager), UGFrameworkRuntimeAudioManagerWrap.__Register);

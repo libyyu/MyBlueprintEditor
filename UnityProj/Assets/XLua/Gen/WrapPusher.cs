@@ -28,6 +28,7 @@ namespace XLua
 			translator.RegisterPushAndGetAndUpdate<UnityEngine.Ray2D>(translator.PushUnityEngineRay2D, translator.GetUnityEngineRay2D, translator.UpdateUnityEngineRay2D);
 			translator.RegisterPushAndGetAndUpdate<UnityEngine.UIElements.DisplayStyle>(translator.PushUnityEngineUIElementsDisplayStyle, translator.GetUnityEngineUIElementsDisplayStyle, translator.UpdateUnityEngineUIElementsDisplayStyle);
 			translator.RegisterPushAndGetAndUpdate<UnityEngine.UIElements.Visibility>(translator.PushUnityEngineUIElementsVisibility, translator.GetUnityEngineUIElementsVisibility, translator.UpdateUnityEngineUIElementsVisibility);
+			translator.RegisterPushAndGetAndUpdate<UnityEngine.UIElements.ScrollViewMode>(translator.PushUnityEngineUIElementsScrollViewMode, translator.GetUnityEngineUIElementsScrollViewMode, translator.UpdateUnityEngineUIElementsScrollViewMode);
 		
 		}
         
@@ -727,6 +728,90 @@ namespace XLua
             }
         }
         
+        static int UnityEngineUIElementsScrollViewMode_TypeID = -1;
+		static int UnityEngineUIElementsScrollViewMode_EnumRef = -1;
+        
+        public static void PushUnityEngineUIElementsScrollViewMode(this ObjectTranslator thiz, RealStatePtr L, UnityEngine.UIElements.ScrollViewMode val)
+        {
+            if (UnityEngineUIElementsScrollViewMode_TypeID == -1)
+            {
+			    bool is_first;
+                UnityEngineUIElementsScrollViewMode_TypeID = thiz.getTypeId(L, typeof(UnityEngine.UIElements.ScrollViewMode), out is_first);
+				
+				if (UnityEngineUIElementsScrollViewMode_EnumRef == -1)
+				{
+				    Utils.LoadCSTable(L, typeof(UnityEngine.UIElements.ScrollViewMode));
+				    UnityEngineUIElementsScrollViewMode_EnumRef = LuaAPI.luaL_ref(L, LuaIndexes.LUA_REGISTRYINDEX);
+				}
+				
+            }
+			
+			if (LuaAPI.xlua_tryget_cachedud(L, (int)val, UnityEngineUIElementsScrollViewMode_EnumRef) == 1)
+            {
+			    return;
+			}
+			
+            IntPtr buff = LuaAPI.xlua_pushstruct(L, 4, UnityEngineUIElementsScrollViewMode_TypeID);
+            if (!CopyByValue_Gen.Pack(buff, 0, (int)val))
+            {
+                throw new Exception("pack fail fail for UnityEngine.UIElements.ScrollViewMode ,value="+val);
+            }
+			
+			LuaAPI.lua_getref(L, UnityEngineUIElementsScrollViewMode_EnumRef);
+			LuaAPI.lua_pushvalue(L, -2);
+			LuaAPI.xlua_rawseti(L, -2, (int)val);
+			LuaAPI.lua_pop(L, 1);
+			
+        }
+		
+        public static void GetUnityEngineUIElementsScrollViewMode(this ObjectTranslator thiz, RealStatePtr L, int index, out UnityEngine.UIElements.ScrollViewMode val)
+        {
+		    LuaTypes type = LuaAPI.lua_type(L, index);
+            if (type == LuaTypes.LUA_TUSERDATA )
+            {
+			    if (LuaAPI.xlua_gettypeid(L, index) != UnityEngineUIElementsScrollViewMode_TypeID)
+				{
+				    throw new Exception("invalid userdata for UnityEngine.UIElements.ScrollViewMode");
+				}
+				
+                IntPtr buff = LuaAPI.lua_touserdata(L, index);
+				int e;
+                if (!CopyByValue_Gen.UnPack(buff, 0, out e))
+                {
+                    throw new Exception("unpack fail for UnityEngine.UIElements.ScrollViewMode");
+                }
+				val = (UnityEngine.UIElements.ScrollViewMode)e;
+                
+            }
+            else
+            {
+                val = (UnityEngine.UIElements.ScrollViewMode)thiz.objectCasters.GetCaster(typeof(UnityEngine.UIElements.ScrollViewMode))(L, index, null);
+            }
+        }
+		
+        public static void UpdateUnityEngineUIElementsScrollViewMode(this ObjectTranslator thiz, RealStatePtr L, int index, UnityEngine.UIElements.ScrollViewMode val)
+        {
+		    
+            if (LuaAPI.lua_type(L, index) == LuaTypes.LUA_TUSERDATA)
+            {
+			    if (LuaAPI.xlua_gettypeid(L, index) != UnityEngineUIElementsScrollViewMode_TypeID)
+				{
+				    throw new Exception("invalid userdata for UnityEngine.UIElements.ScrollViewMode");
+				}
+				
+                IntPtr buff = LuaAPI.lua_touserdata(L, index);
+                if (!CopyByValue_Gen.Pack(buff, 0,  (int)val))
+                {
+                    throw new Exception("pack fail for UnityEngine.UIElements.ScrollViewMode ,value="+val);
+                }
+            }
+			
+            else
+            {
+                throw new Exception("try to update a data with lua type:" + LuaAPI.lua_type(L, index));
+            }
+        }
+        
         
 		// table cast optimze
 		
@@ -798,6 +883,12 @@ namespace XLua
 				translator.PushUnityEngineUIElementsVisibility(L, array[index]);
 				return true;
 			}
+			else if (type == typeof(UnityEngine.UIElements.ScrollViewMode[]))
+			{
+			    UnityEngine.UIElements.ScrollViewMode[] array = obj as UnityEngine.UIElements.ScrollViewMode[];
+				translator.PushUnityEngineUIElementsScrollViewMode(L, array[index]);
+				return true;
+			}
             return false;
 		}
 		
@@ -861,6 +952,12 @@ namespace XLua
 			else if (type == typeof(UnityEngine.UIElements.Visibility[]))
 			{
 			    UnityEngine.UIElements.Visibility[] array = obj as UnityEngine.UIElements.Visibility[];
+				translator.Get(L, obj_idx, out array[array_idx]);
+				return true;
+			}
+			else if (type == typeof(UnityEngine.UIElements.ScrollViewMode[]))
+			{
+			    UnityEngine.UIElements.ScrollViewMode[] array = obj as UnityEngine.UIElements.ScrollViewMode[];
 				translator.Get(L, obj_idx, out array[array_idx]);
 				return true;
 			}

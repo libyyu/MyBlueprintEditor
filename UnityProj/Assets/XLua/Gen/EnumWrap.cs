@@ -132,4 +132,68 @@ namespace XLua.CSObjectWrap
 		}
 	}
     
+    public class UnityEngineUIElementsScrollViewModeWrap
+    {
+		public static void __Register(RealStatePtr L)
+        {
+		    ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+		    Utils.BeginObjectRegister(typeof(UnityEngine.UIElements.ScrollViewMode), L, translator, 0, 0, 0, 0);
+			Utils.EndObjectRegister(typeof(UnityEngine.UIElements.ScrollViewMode), L, translator, null, null, null, null, null);
+			
+			Utils.BeginClassRegister(typeof(UnityEngine.UIElements.ScrollViewMode), L, null, 4, 0, 0);
+
+            
+            Utils.RegisterObject(L, translator, Utils.CLS_IDX, "Vertical", UnityEngine.UIElements.ScrollViewMode.Vertical);
+            
+            Utils.RegisterObject(L, translator, Utils.CLS_IDX, "Horizontal", UnityEngine.UIElements.ScrollViewMode.Horizontal);
+            
+            Utils.RegisterObject(L, translator, Utils.CLS_IDX, "VerticalAndHorizontal", UnityEngine.UIElements.ScrollViewMode.VerticalAndHorizontal);
+            
+
+			Utils.RegisterFunc(L, Utils.CLS_IDX, "__CastFrom", __CastFrom);
+            
+            Utils.EndClassRegister(typeof(UnityEngine.UIElements.ScrollViewMode), L, translator);
+        }
+		
+		[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+        static int __CastFrom(RealStatePtr L)
+		{
+			ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+			LuaTypes lua_type = LuaAPI.lua_type(L, 1);
+            if (lua_type == LuaTypes.LUA_TNUMBER)
+            {
+                translator.PushUnityEngineUIElementsScrollViewMode(L, (UnityEngine.UIElements.ScrollViewMode)LuaAPI.xlua_tointeger(L, 1));
+            }
+			
+            else if(lua_type == LuaTypes.LUA_TSTRING)
+            {
+
+			    if (LuaAPI.xlua_is_eq_str(L, 1, "Vertical"))
+                {
+                    translator.PushUnityEngineUIElementsScrollViewMode(L, UnityEngine.UIElements.ScrollViewMode.Vertical);
+                }
+				else if (LuaAPI.xlua_is_eq_str(L, 1, "Horizontal"))
+                {
+                    translator.PushUnityEngineUIElementsScrollViewMode(L, UnityEngine.UIElements.ScrollViewMode.Horizontal);
+                }
+				else if (LuaAPI.xlua_is_eq_str(L, 1, "VerticalAndHorizontal"))
+                {
+                    translator.PushUnityEngineUIElementsScrollViewMode(L, UnityEngine.UIElements.ScrollViewMode.VerticalAndHorizontal);
+                }
+				else
+                {
+                    return LuaAPI.luaL_error(L, "invalid string for UnityEngine.UIElements.ScrollViewMode!");
+                }
+
+            }
+			
+            else
+            {
+                return LuaAPI.luaL_error(L, "invalid lua type for UnityEngine.UIElements.ScrollViewMode! Expect number or string, got + " + lua_type);
+            }
+
+            return 1;
+		}
+	}
+    
 }

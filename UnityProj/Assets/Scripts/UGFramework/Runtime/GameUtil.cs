@@ -399,7 +399,7 @@ namespace UGFramework.Runtime
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
 
             }

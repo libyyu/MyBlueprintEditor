@@ -373,7 +373,7 @@ namespace XLua.CSObjectWrap
                 ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
 			
                 UnityEngine.UIElements.ScrollView gen_to_be_invoked = (UnityEngine.UIElements.ScrollView)translator.FastGetCSObj(L, 1);
-                translator.Push(L, gen_to_be_invoked.mode);
+                translator.PushUnityEngineUIElementsScrollViewMode(L, gen_to_be_invoked.mode);
             } catch(System.Exception gen_e) {
                 return LuaAPI.luaL_error(L, "c# exception:" + gen_e);
             }

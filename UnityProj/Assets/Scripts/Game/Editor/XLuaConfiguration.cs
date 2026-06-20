@@ -57,8 +57,10 @@ public static class XLuaConfig
 
         // UnityEngine.UIElements 核心类型
         // Lua 可通过 bridge:Q() 拿到 VisualElement 并操作属性
+        typeof(IStyle),
         typeof(VisualElement),
         typeof(VisualElementExtensions),  // Q<T>() 扩展方法所在类
+        typeof(UIToolkitExtensions),
         typeof(UQueryExtensions),          // Query / ToList
         typeof(UIDocument),
         typeof(PanelSettings),
@@ -68,11 +70,27 @@ public static class XLuaConfig
         typeof(Toggle),
         typeof(Slider),
         typeof(ScrollView),
+        typeof(Scroller),
         typeof(ProgressBar),
         typeof(DropdownField),
-        typeof(StyleEnum<DisplayStyle>),
-        typeof(StyleEnum<Visibility>),
         typeof(DisplayStyle),
         typeof(Visibility),
+        typeof(ScrollViewMode),
+
+        //StyleEnum
+        //typeof(StyleEnum<UnityEngine.UIElements.Align>),
+        //typeof(StyleEnum<UnityEngine.UIElements.DisplayStyle>),
+        //typeof(StyleEnum<UnityEngine.UIElements.FlexDirection>),
+        //typeof(StyleEnum<UnityEngine.UIElements.Wrap>),
+        //typeof(StyleEnum<UnityEngine.UIElements.Justify>),
+        //typeof(StyleEnum<UnityEngine.UIElements.Overflow>),
+        //typeof(StyleEnum<UnityEngine.UIElements.Position>),
+        //typeof(StyleEnum<UnityEngine.UIElements.TextOverflow>),
+        //typeof(StyleEnum<UnityEngine.FontStyle>),
+        //typeof(StyleEnum<UnityEngine.UIElements.OverflowClipBox>),
+        //typeof(StyleEnum<UnityEngine.TextAnchor>),
+        //typeof(StyleEnum<UnityEngine.UIElements.TextOverflowPosition>),
+        //typeof(StyleEnum<UnityEngine.UIElements.Visibility>),
+        //typeof(StyleEnum<UnityEngine.UIElements.WhiteSpace>),
     };
 }

@@ -23,6 +23,7 @@
 		<type fullname="UGFramework.Runtime.UITKPanelBackend" preserve="all"/>
 		<type fullname="UGFramework.Runtime.IUIPanelBridge" preserve="all"/>
 		<type fullname="UGFramework.Runtime.UITKLuaBridge" preserve="all"/>
+		<type fullname="UIToolkitExtensions" preserve="all"/>
 		<type fullname="UGFramework.Runtime.AudioManager" preserve="all"/>
 		<type fullname="UGFramework.Runtime.FTimerListBehavior" preserve="all"/>
 		<type fullname="UGFramework.Runtime.GameUtil" preserve="all"/>
@@ -34,7 +35,8 @@
 	</assembly>
 
 	<assembly fullname="UnityEngine.UIElementsModule">
-	    <type fullname="UnityEngine.UIElements.VisualElement" preserve="all"/>
+	    <type fullname="UnityEngine.UIElements.IStyle" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.VisualElement" preserve="all"/>
 		<type fullname="UnityEngine.UIElements.VisualElementExtensions" preserve="all"/>
 		<type fullname="UnityEngine.UIElements.UQueryExtensions" preserve="all"/>
 		<type fullname="UnityEngine.UIElements.UIDocument" preserve="all"/>
@@ -45,12 +47,12 @@
 		<type fullname="UnityEngine.UIElements.Toggle" preserve="all"/>
 		<type fullname="UnityEngine.UIElements.Slider" preserve="all"/>
 		<type fullname="UnityEngine.UIElements.ScrollView" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.Scroller" preserve="all"/>
 		<type fullname="UnityEngine.UIElements.ProgressBar" preserve="all"/>
 		<type fullname="UnityEngine.UIElements.DropdownField" preserve="all"/>
-		<type fullname="UnityEngine.UIElements.StyleEnum`1[UnityEngine.UIElements.DisplayStyle]" preserve="all"/>
-		<type fullname="UnityEngine.UIElements.StyleEnum`1[UnityEngine.UIElements.Visibility]" preserve="all"/>
 		<type fullname="UnityEngine.UIElements.DisplayStyle" preserve="all"/>
 		<type fullname="UnityEngine.UIElements.Visibility" preserve="all"/>
+		<type fullname="UnityEngine.UIElements.ScrollViewMode" preserve="all"/>
 		
 	</assembly>
 

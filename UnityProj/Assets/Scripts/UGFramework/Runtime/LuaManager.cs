@@ -262,49 +262,60 @@ namespace UGFramework.Runtime
             string relativePath = luaAddressPrefix + luaPath.Replace('.', '/') + ".lua";
 
             var package = YooAssets.GetPackage("DefaultPackage");
-            if (null == package) return null;
-
-            var handle = package.LoadAssetSync<TextAsset>(relativePath);
-            if (null == handle) return null;
-
-            var textAsset = handle.AssetObject as TextAsset;
-            if (null == textAsset) return null;
-            handle.Release();
-            return textAsset.bytes;
-#else
-            if (!YooAssetsLuaBridge.HasLuaFile(luaPath))
+            if (null != package)
             {
-                return null;
-            }
-
-            var handle = YooAssetsLuaBridge.GetLuaAssetHandle(luaPath);
-            if (handle == null)
-            {
-                Debug.LogWarning($"[LuaManager] Lua bundle not init; {luaPath}");
-                return null;
-            }
-
-            string assetPath  = YooAssetsLuaBridge.GetLuaAssetPath(luaPath);
-            if(string.IsNullOrEmpty(assetPath))
-            {
-                Debug.LogWarning($"[LuaManager] Lua not found: '{luaPath}'");
-                return null;
-            }
-
-            var textAsset = handle.AssetObject as TextAsset;
-            var bytes = textAsset?.bytes;
-            if (bytes == null)
-            {
-                Debug.LogWarning($"[LuaManager] Lua not found: '{assetPath}' (require '{luaPath}')");
-                return null;
-            }
-
-            YooAssetsLuaBridge.ReleaseLuaAssetHandle(luaPath);
-
-            // 把实际加载到的路径回写给 xLua（用于错误堆栈）
-            luaPath = assetPath;
-            return bytes;
+                var handle = package.LoadAssetSync<TextAsset>(relativePath);
+                if(null != handle)
+                {
+                    var textAsset = handle.AssetObject as TextAsset;
+                    byte[] bytes = textAsset?.bytes;
+                    handle.Release();
+#if UNITY_EDITOR
+                    luaPath = relativePath;
 #endif
+                    return bytes;
+                }
+            }
+#else
+            if (YooAssetsLuaBridge.HasLuaFile(luaPath))
+            {
+                var handle = YooAssetsLuaBridge.GetLuaAssetHandle(luaPath);
+                if (handle == null)
+                {
+                    Debug.LogWarning($"[LuaManager] Lua bundle not init; {luaPath}");
+                    return null;
+                }
+
+                string assetPath = YooAssetsLuaBridge.GetLuaAssetPath(luaPath);
+                if (string.IsNullOrEmpty(assetPath))
+                {
+                    Debug.LogWarning($"[LuaManager] Lua not found: '{luaPath}'");
+                    return null;
+                }
+
+                var textAsset = handle.AssetObject as TextAsset;
+                var bytes = textAsset?.bytes;
+                if (bytes == null)
+                {
+                    Debug.LogWarning($"[LuaManager] Lua not found: '{assetPath}' (require '{luaPath}')");
+                    return null;
+                }
+
+                YooAssetsLuaBridge.ReleaseLuaAssetHandle(luaPath);
+
+                // 把实际加载到的路径回写给 xLua（用于错误堆栈）
+                luaPath = assetPath;
+                return bytes;
+            }
+#endif
+
+            var path = luaPath.Replace(".lua", "").Replace(".", "/") + ".lua.txt";
+            var tex = Resources.Load<TextAsset>(path);
+            if (tex != null)
+            {
+                luaPath = path;
+            }
+            return tex?.bytes;
         }
 
         public async UniTask<bool> PreloadAllScript(string packageName)

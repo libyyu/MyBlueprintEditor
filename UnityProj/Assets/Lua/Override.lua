@@ -68,6 +68,31 @@ do --UnityEngine.GameObject
 		return self.activeSelf
 	end
 
+	do
+		local mt = GameUtil.GetMetaTable("UnityEngine.UIElements.InlineStyleAccess")
+		print("-------------", mt and mt.__index)
+		local visualIStyleIndex = mt.__index
+		local visualIStyleNewIndex = mt.__newindex
+		rawset(mt, "__index", function(self, key)
+			--print("visualIStyleIndex __index", key)
+			
+			if CS.UIToolkitExtensions['get_' .. key] then
+				return CS.UIToolkitExtensions['get_' .. key](self)
+			end
+
+			return visualIStyleIndex(self, key)   -- 调用原始 __index 函数
+		end)
+		rawset(mt, "__newindex", function(self, key, value)
+			--print("visualIStyleIndex __newindex", key, value)
+
+			if CS.UIToolkitExtensions['set_' .. key] then
+				CS.UIToolkitExtensions['set_' .. key](self, value)
+				return
+			end
+			return visualIStyleNewIndex(self, key, value)   -- 调用原始 __newindex 函数
+		end)
+	end
+
 	local mt2 = GameUtil.GetMethodTable("UnityEngine.UIElements.VisualElement")
 	if mt2 then
 		print("Override UnityEngine.UIElements.VisualElement")

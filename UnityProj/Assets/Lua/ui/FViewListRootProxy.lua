@@ -196,7 +196,7 @@ do
 
         -- 创建内容包装器
         self.m_contentWrapper = CS.UnityEngine.UIElements.VisualElement()
-        print(">>>>>", self.m_contentWrapper, self.m_contentWrapper.style)
+        print(">>>>>", self.m_contentWrapper, self.m_contentWrapper.style, self.m_contentWrapper.style.position)
         self.m_contentWrapper.style.position = Position.Relative
         self.m_contentWrapper.style.width = Length(100, LengthUnit.Percent)
         self.m_container:Add(self.m_contentWrapper)
@@ -216,7 +216,7 @@ do
             self:_OnScroll()
         end
         if self.m_scrollView.verticalScroller then
-            self.m_scrollView.verticalScroller.valueChanged:AddCallback(self.m_scrollCallback)
+            self.m_scrollView.verticalScroller:valueChanged('+', self.m_scrollCallback)
         end
     end
 
@@ -269,7 +269,7 @@ do
     function FViewListRootProxyImplForUITKScrollView:OnDestroy()
         -- 取消滚动监听
         if self.m_scrollView and self.m_scrollView.verticalScroller and self.m_scrollCallback then
-            self.m_scrollView.verticalScroller.valueChanged:RemoveCallback(self.m_scrollCallback)
+            self.m_scrollView.verticalScroller:valueChanged('-', self.m_scrollCallback)
         end
         self.m_scrollCallback = nil
 
