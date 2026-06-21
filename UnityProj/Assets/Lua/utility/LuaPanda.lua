@@ -949,7 +949,7 @@ function this.reGetSock()
     sock = lua_extension and lua_extension.luasocket and lua_extension.luasocket().tcp();
     if sock == nil then
         --call normal luasocket
-       if pcall(function() sock =  require("socket.core").tcp(); end) then
+       if pcall(function() sock =  require("luasocket.core").tcp(); end) then
             this.printToConsole("reGetSock success");
        else
             --call custom function to get socket

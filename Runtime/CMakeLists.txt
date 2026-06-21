@@ -167,6 +167,7 @@ set(RUNTIME_PUBLIC_HEADERS
 # ---------------------------------------------------------------------------
 option(BLUEPRINT_LUA "Enable Lua scripting support (requires Lua 5.4)" ON)
 option(BLUEPRINT_LINK_XLUA "Enable XLua scripting support (requires Lua 5.4)" ON)
+option(BLUEPRINT_LUASOCKET "Enable LuaSocket support (requires Lua)" ON)
 
 # RUNTIME_NAME – override the output file name of the BlueprintRuntime library.
 if(NOT DEFINED RUNTIME_NAME OR RUNTIME_NAME STREQUAL "")
@@ -493,6 +494,26 @@ if(BLUEPRINT_LUA)
     message(STATUS "[BlueprintRuntime] Lua scripting enabled (${_LUA_LIB_TYPE}, include: ${LUA_INCLUDE_DIR})")
 endif()
 
+if(BLUEPRINT_LUASOCKET AND BLUEPRINT_LUA)
+    if(TARGET luasocket_s)
+        target_link_libraries(BlueprintRuntime PRIVATE luasocket_s)
+        target_include_directories(BlueprintRuntime PRIVATE
+            ${BLUEPRINT_ROOT_DIR}/external/lsocket
+        )
+        target_compile_definitions(BlueprintRuntime PRIVATE BLUEPRINT_HAS_LUASOCKET)
+        message(STATUS "[BlueprintRuntime] luasocket_s linked → Lua Socket nodes enabled")
+    else()
+        add_subdirectory("${BLUEPRINT_ROOT_DIR}/external/lsocket"
+                    "${CMAKE_CURRENT_BINARY_DIR}/lsocket")
+        target_link_libraries(BlueprintRuntime PRIVATE luasocket_s)
+        target_include_directories(BlueprintRuntime PRIVATE
+            ${BLUEPRINT_ROOT_DIR}/external/lsocket
+        )
+        target_compile_definitions(BlueprintRuntime PRIVATE BLUEPRINT_HAS_LUASOCKET)
+        message(STATUS "[BlueprintRuntime] luasocket_s linked (standalone) → Lua Socket nodes enabled")
+    endif()
+endif()
+
 # HTTPS support via OpenSSL (桌面平台；Emscripten 用浏览器 fetch，不需要)
 #
 # 查找顺序：
@@ -728,6 +749,14 @@ if(BLUEPRINT_LUA AND TARGET ${LUA_LIBRARIES})
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}   # .dll on Windows
         )
     endif()
+    if(BLUEPRINT_LUASOCKET AND TARGET luasocket_s)
+        install(TARGETS luasocket_s
+            EXPORT BlueprintRuntimeTargets
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}   # .dll on Windows
+        )
+    endif()
 endif()
 
 install(FILES ${RUNTIME_PUBLIC_HEADERS}
@@ -793,6 +822,7 @@ install(FILES
 option(BUILD_BUNDLE    "Build merged static library BlueprintBundle for engine delivery" OFF)
 option(BUNDLE_LUA      "Include liblua54 in BlueprintBundle (OFF = use external Lua VM)" OFF)
 option(BUNDLE_PROTOBUF "Include libprotobuf_s in BlueprintBundle" OFF)
+option(BUNDLE_LUASOCKET "Include libluasocket in BlueprintBundle" OFF)
 # lprotos_s 跟随 BUNDLE_LUA + BUNDLE_PROTOBUF：两者都开时自动合并
 
 if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
@@ -831,6 +861,11 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
     if(BLUEPRINT_LUA AND BUNDLE_LUA AND BUNDLE_PROTOBUF AND TARGET lprotos_s)
         list(APPEND _BUNDLE_INPUTS $<TARGET_FILE:lprotos_s>)
         message(STATUS "[BlueprintBundle] lprotos_s WILL be merged (BUNDLE_LUA=ON + BUNDLE_PROTOBUF=ON)")
+    endif()
+
+    if(BLUEPRINT_LUA AND BUNDLE_LUA AND BUNDLE_LUASOCKET AND TARGET luasocket_s)
+        list(APPEND _BUNDLE_INPUTS $<TARGET_FILE:luasocket_s>)
+        message(STATUS "[BlueprintBundle] luasocket_s WILL be merged (BUNDLE_LUA=ON + BUNDLE_LUASOCKET=ON)")
     endif()
 
     # Output path ------------------------------------------------------------
@@ -919,6 +954,9 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
         if(BUNDLE_LUA AND BUNDLE_PROTOBUF AND TARGET lprotos_s)
             list(APPEND _RESOLVED_INPUTS "${CMAKE_BINARY_DIR}/external/lprotos/liblprotos_s.a")
         endif()
+        if(BUNDLE_LUA AND BUNDLE_LUASOCKET AND TARGET luasocket_s)
+            list(APPEND _RESOLVED_INPUTS "${CMAKE_BINARY_DIR}/external/lsocket/libluasocket_s.a")
+        endif()
 
         if(APPLE)
             find_program(_APPLE_LIBTOOL libtool HINTS /usr/bin /usr/local/bin)
@@ -969,6 +1007,12 @@ if(_RUNTIME_LIB_TYPE STREQUAL "STATIC")
                 COMMAND ${CMAKE_COMMAND} -E echo "ADDLIB $<TARGET_FILE:lprotos_s>"             >> "${_MRI_FILE}"
             )
             list(APPEND _BUNDLE_DEPENDS lprotos_s)
+        endif()
+        if(BUNDLE_LUA AND BUNDLE_LUASOCKET AND TARGET luasocket_s)
+            list(APPEND _MRI_ECHO_CMDS
+                COMMAND ${CMAKE_COMMAND} -E echo "ADDLIB $<TARGET_FILE:luasocket_s>"             >> "${_MRI_FILE}"
+            )
+            list(APPEND _BUNDLE_DEPENDS luasocket_s)
         endif()
         list(APPEND _MRI_ECHO_CMDS
             COMMAND ${CMAKE_COMMAND} -E echo "SAVE"                                            >> "${_MRI_FILE}"

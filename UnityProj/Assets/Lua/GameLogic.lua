@@ -1,6 +1,7 @@
 -- GameLogic.lua
 -- 游戏主逻辑入口（Phase 4）
 -- 由 LuaManager.RunGameLuaVM("GameLogic") 加载
+require("utility.LuaPanda").start()
 
 print("[GameLogic] *** Game phase start ***")
 require "preload"

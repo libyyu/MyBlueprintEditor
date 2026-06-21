@@ -12,6 +12,12 @@
 #include "LuaBindings.h"
 #include <lua.hpp>
 
+#ifdef WITH_LUASOCKET
+	// 额外注册 luasocket 库（如果编译时包含了）
+extern int luaopen_socket_core(lua_State* L);
+extern int luaopen_mime_core(lua_State* L);
+#endif
+
 namespace NodeEditor {
 namespace Runtime {
 
@@ -25,6 +31,14 @@ void RegisterLuaJsonHttpLibs(lua_State* L)
     RegisterLuaJsonLib(L);
     RegisterLuaHttpLib(L);
     RegisterLuaFileLib(L);
+
+#ifdef WITH_LUASOCKET
+    // 额外注册 luasocket 库（如果编译时包含了）
+	luaL_requiref(L, "luasocket", luaopen_socket_core, 0);
+	luaL_requiref(L, "luasocket.core", luaopen_socket_core, 0);
+	luaL_requiref(L, "luasocket.mime", luaopen_mime_core, 0);
+#endif
+
 }
 
 } // namespace Runtime
