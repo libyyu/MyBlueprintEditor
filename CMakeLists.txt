@@ -69,6 +69,7 @@ endif()
 if(MSVC)
     add_compile_options(/utf-8)
     add_compile_options(/W0)  # MSVC: 禁用所有警告
+    add_link_options(/IGNORE:4217)
 endif()
 
 # ImGui math operators — defined via target_compile_definitions(imgui PUBLIC ...) below.
@@ -138,6 +139,23 @@ if(BLUEPRINT_LUA AND TARGET lua54)
             EXPORT BlueprintRuntimeTargets
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         )
+    endif()
+
+    if(TARGET luasocket_s)
+        target_include_directories(luasocket_s BEFORE PUBLIC
+            $<BUILD_INTERFACE:${LUA_INCLUDE_DIR}>)
+    endif()
+    if(TARGET luasocket)
+        target_include_directories(luasocket BEFORE PRIVATE
+            $<BUILD_INTERFACE:${LUA_INCLUDE_DIR}>)
+    endif()
+    if(TARGET luasocket_s)
+        target_link_libraries(BlueprintRuntime PRIVATE luasocket_s)
+        target_include_directories(BlueprintRuntime PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/external/lsocket
+        )
+        target_compile_definitions(BlueprintRuntime PRIVATE BLUEPRINT_HAS_LUASOCKET)
+        message(STATUS "[luasocket] luasocket_s linked into BlueprintRuntime → Lua Socket bindings enabled")
     endif()
 endif()
 
