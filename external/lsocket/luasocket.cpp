@@ -117,18 +117,18 @@ LUASOCKET_API int luaopen_socket_core(lua_State *L) {
 }
 
 
-extern LUASOCKET_API int luaopen_mime_core(lua_State *L);
-extern "C" {
-    LUASOCKET_API int luaopen_lsocket(lua_State* L) {
-        int top = lua_gettop(L);
-        luaopen_socket_core(L);
-        //luaopen_mime_core(L);
-        top = lua_gettop(L);
-        //lua_settop(L, top);  // restore stack top
-        return 1;
-    }
+// //extern LUASOCKET_API int luaopen_mime_core(lua_State *L);
+// extern "C" {
+//     LUASOCKET_API int luaopen_lsocket(lua_State* L) {
+//         int top = lua_gettop(L);
+//         luaopen_socket_core(L);
+//         //luaopen_mime_core(L);
+//         top = lua_gettop(L);
+//         //lua_settop(L, top);  // restore stack top
+//         return 1;
+//     }
 
-    LUASOCKET_API int luaopen_liblsocket(lua_State* L) {
-        return luaopen_lsocket(L);
-    }
-}
+//     LUASOCKET_API int luaopen_liblsocket(lua_State* L) {
+//         return luaopen_lsocket(L);
+//     }
+// }
