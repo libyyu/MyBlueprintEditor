@@ -43,12 +43,15 @@ namespace UGFramework.Runtime
         {
             if (!IsValid) return;
             // UIDocument 用 rootVisualElement 的 display 控制显隐
+            // 注意：UITK 不能像 UGUI 那样 SetActive(false) 禁用宿主 GO，
+            // 因为 UIDocument 在 GO inactive 时会从 Panel 列表移除自身，
+            // 再次 SetActive(true) 时 VisualElement 树会被重建，导致所有
+            // RegisterCallback 注册的事件监听器失效（元素引用变为旧树）。
+            // 因此 UITK 只通过 display 样式控制显隐，GO 始终保持 active。
             if (_doc != null && _doc.rootVisualElement != null)
                 _doc.rootVisualElement.style.display = visible
                     ? DisplayStyle.Flex
                     : DisplayStyle.None;
-            // 同步 GO active，保持与 UGUI 行为一致（用于 IsValid 检查等）
-            _hostGO.SetActive(visible);
         }
 
         public bool GetVisible()
@@ -56,7 +59,8 @@ namespace UGFramework.Runtime
             if (!IsValid) return false;
             if (_doc != null && _doc.rootVisualElement != null)
                 return _doc.rootVisualElement.style.display != DisplayStyle.None;
-            return _hostGO.activeSelf;
+            // GO 始终 active（UITK 不通过 SetActive 控制显隐），不可见即未创建
+            return false;
         }
 
         public void SetSortingOrder(int order)
