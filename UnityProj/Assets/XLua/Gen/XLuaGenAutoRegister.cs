@@ -49,9 +49,6 @@ namespace XLua.CSObjectWrap
             translator.DelayWrapLoader(typeof(CutRope.Game.Star), CutRopeGameStarWrap.__Register);
         
         
-            translator.DelayWrapLoader(typeof(CutRope.Game.UI.UIController), CutRopeGameUIUIControllerWrap.__Register);
-        
-        
             translator.DelayWrapLoader(typeof(CutRope.Game.RopeVisualSetup), CutRopeGameRopeVisualSetupWrap.__Register);
         
         
@@ -140,9 +137,6 @@ namespace XLua.CSObjectWrap
         
         
             translator.DelayWrapLoader(typeof(UGFramework.Runtime.UILuaBehaviour), UGFrameworkRuntimeUILuaBehaviourWrap.__Register);
-        
-        
-            translator.DelayWrapLoader(typeof(UGFramework.Runtime.UIManager), UGFrameworkRuntimeUIManagerWrap.__Register);
         
         
             translator.DelayWrapLoader(typeof(UGFramework.Runtime.YooAssetsLuaBridge), UGFrameworkRuntimeYooAssetsLuaBridgeWrap.__Register);

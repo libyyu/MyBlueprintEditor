@@ -12,7 +12,6 @@
 		<type fullname="CutRope.Game.RopeRenderer" preserve="all"/>
 		<type fullname="CutRope.Game.RopeSpawner" preserve="all"/>
 		<type fullname="CutRope.Game.Star" preserve="all"/>
-		<type fullname="CutRope.Game.UI.UIController" preserve="all"/>
 		<type fullname="CutRope.Game.RopeVisualSetup" preserve="all"/>
 		
 	</assembly>
@@ -29,7 +28,6 @@
 		<type fullname="UGFramework.Runtime.GameUtil" preserve="all"/>
 		<type fullname="UGFramework.Runtime.SceneLoader" preserve="all"/>
 		<type fullname="UGFramework.Runtime.UILuaBehaviour" preserve="all"/>
-		<type fullname="UGFramework.Runtime.UIManager" preserve="all"/>
 		<type fullname="UGFramework.Runtime.YooAssetsLuaBridge" preserve="all"/>
 		
 	</assembly>

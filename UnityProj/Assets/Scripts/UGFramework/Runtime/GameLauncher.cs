@@ -9,9 +9,11 @@
 //
 // VM 主从关系：xLua 是主，BlueprintRuntime 共享 xLua 的 lua_State（不拥有）。
 
+using System.Diagnostics;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UIElements;
+using Debug = UnityEngine.Debug;
 
 namespace UGFramework.Runtime
 {
@@ -24,7 +26,11 @@ namespace UGFramework.Runtime
     {
         [Header("配置")]
         public string packageName    = "DefaultPackage";
-
+#if !UNITY_EDITOR && !UNITY_WEBGL
+        [Tooltip("是否跳过更新")]
+        public bool skipUpdate = false;
+#endif
+        
         [Tooltip("更新阶段 Lua 入口（require 路径，无 .lua 后缀）")]
         public string updateLuaEntry = "UpdateLogic";
 
@@ -75,6 +81,10 @@ namespace UGFramework.Runtime
 
         private async void Start()
         {
+            // AudioManager
+            if (AudioManager.Instance == null)
+                gameObject.AddComponent<AudioManager>();
+            
             // ── Phase 1：本地资源库初始化 ─────────────────────────────
             Debug.Log("[GameLauncher] === Phase 1: local init ===");
             if (!await _yooInit.LaunchInitUpdateStage(packageName))
@@ -90,18 +100,22 @@ namespace UGFramework.Runtime
                 Debug.LogError("[GameLauncher] Phase 2 failed, abort.");
                 return;
             }
-
+            
+#if !UNITY_EDITOR && !UNITY_WEBGL
+            bool update = skipUpdate;
+#else
+            bool update = true;
+#endif
             // ── Phase 3：UpdateLogic.lua 启动（检查更新）─────────────
-            Debug.Log("[GameLauncher] === Phase 3: UpdateLogic VM ===");
-            if (!await _lua.RunUpdateLuaVM(updateLuaEntry))
+            Debug.Log($"[GameLauncher] === Phase 3: UpdateLogic VM ({update}) ===");
+            if (update)
             {
-                Debug.LogError("[GameLauncher] Phase 3 failed, abort.");
-                return;
+                if (!await _lua.RunUpdateLuaVM(updateLuaEntry))
+                {
+                    Debug.LogError("[GameLauncher] Phase 3 failed, abort.");
+                    return;
+                }
             }
-
-            // AudioManager
-            if (AudioManager.Instance == null)
-                gameObject.AddComponent<AudioManager>();
 
             // ── Phase 4：GameLogic.lua 启动（xLua 为主 VM）───────────
             // 内部顺序：

@@ -298,28 +298,6 @@ namespace XLua
 #endif
 		}
         
-		public void __Gen_Delegate_Imp12(UGFramework.Runtime.IView p0)
-		{
-#if THREAD_SAFE || HOTFIX_ENABLE
-            lock (luaEnv.luaEnvLock)
-            {
-#endif
-                RealStatePtr L = luaEnv.L;
-                int errFunc = LuaAPI.pcall_prepare(L, errorFuncRef, luaReference);
-                ObjectTranslator translator = luaEnv.translator;
-                translator.PushAny(L, p0);
-                
-                PCall(L, 1, 0, errFunc);
-                
-                
-                
-                LuaAPI.lua_settop(L, errFunc - 1);
-                
-#if THREAD_SAFE || HOTFIX_ENABLE
-            }
-#endif
-		}
-        
 		
 		public override Delegate GetDelegateByType(Type type)
 		{
@@ -407,11 +385,6 @@ namespace XLua
 		    if (type == typeof(UnityEngine.Events.UnityAction<UnityEngine.Vector2>))
 			{
 			    return new UnityEngine.Events.UnityAction<UnityEngine.Vector2>(__Gen_Delegate_Imp11);
-			}
-		
-		    if (type == typeof(UGFramework.Runtime.UIManager.LuaViewCallback))
-			{
-			    return new UGFramework.Runtime.UIManager.LuaViewCallback(__Gen_Delegate_Imp12);
 			}
 		
 		    return null;
