@@ -26,10 +26,9 @@ namespace UGFramework.Runtime
     {
         [Header("配置")]
         public string packageName    = "DefaultPackage";
-#if !UNITY_EDITOR && !UNITY_WEBGL
+
         [Tooltip("是否跳过更新")]
         public bool skipUpdate = false;
-#endif
         
         [Tooltip("更新阶段 Lua 入口（require 路径，无 .lua 后缀）")]
         public string updateLuaEntry = "UpdateLogic";
