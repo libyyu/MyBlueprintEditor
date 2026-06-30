@@ -1,0 +1,14 @@
+[configuration]
+
+entry_symbol = "blueprint_library_init"
+compatibility_minimum = "4.5"
+
+[libraries]
+
+windows.debug.x86_64   = "res://bin/blueprint_gdext.windows.template_debug.x86_64.dll"
+windows.release.x86_64 = "res://bin/blueprint_gdext.windows.template_debug.x86_64.dll"
+
+[dependencies]
+
+windows.debug.x86_64   = { "res://bin/BlueprintRuntime.dll" : "" }
+windows.release.x86_64 = { "res://bin/BlueprintRuntime.dll" : "" }

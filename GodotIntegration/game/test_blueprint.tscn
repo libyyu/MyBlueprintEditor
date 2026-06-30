@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://test_blueprint.gd" id="1_root"]
+
+[node name="TestRoot" type="Node"]
+script = ExtResource("1_root")
+
+[node name="BlueprintNode" type="BlueprintNode" parent="."]
+blueprint_path = "res://blueprints/blueprint_1_1.bjson"
+autorun = true
+tick_enabled = true

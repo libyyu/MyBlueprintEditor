@@ -103,6 +103,52 @@ typedef void (*BP_LogCallback)(BP_LogLevel level, const char* message);
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_InitDefaultHttpClient(void);
 
 // ---------------------------------------------------------------------------
+// Host file system bridge (C callback)  — **PROCESS-GLOBAL**
+// ---------------------------------------------------------------------------
+//
+// Lets a host engine (Godot / Unity / custom) serve all file reads through its
+// own virtual file system instead of the built-in DefaultFileSystem (which uses
+// raw std::ifstream and does NOT work on WebGL / packed builds / mini-games).
+//
+// This is the C-ABI-safe alternative to SetDefaultFileSystem(): only a plain C
+// function pointer crosses the DLL boundary — no std::shared_ptr / std::string,
+// no cross-DLL vtable. Internally the runtime wraps the callback into an
+// IFileSystem and installs it via SetDefaultFileSystem().
+//
+// Affects every BPRunner in the process (present and future). Call once at
+// startup, BEFORE loading any blueprint.
+//
+// The read callback must:
+//   - Resolve `path` (may be relative; combine with the runner base dir as set
+//     by BP_LoadFromFile / BP_SetBasePath — paths are passed through verbatim).
+//   - On success: allocate a buffer, copy the file bytes, write the pointer to
+//     *outData and the byte count to *outSize, return 1.
+//   - On failure (not found / read error): return 0 (outData/outSize untouched).
+//
+// Memory ownership: the runtime calls `free_cb(ptr, userdata)` to release each
+// buffer it received from `read_cb`. If free_cb is NULL the runtime assumes the
+// buffer is statically owned by the host and does NOT free it.
+//
+// The exists callback returns 1 if the path exists, 0 otherwise. May be NULL,
+// in which case existence is inferred from a successful read.
+
+/// Read-file callback. Return 1 and fill *outData/*outSize on success, else 0.
+typedef int (BLUEPRINT_CAPI_CALL *BP_FileReadFn)(
+    const char* path, char** outData, int* outSize, void* userdata);
+
+/// Free-buffer callback for memory returned by BP_FileReadFn. May be NULL.
+typedef void (BLUEPRINT_CAPI_CALL *BP_FileFreeFn)(char* data, void* userdata);
+
+/// File-exists callback. Return 1 if path exists, 0 otherwise. May be NULL.
+typedef int (BLUEPRINT_CAPI_CALL *BP_FileExistsFn)(const char* path, void* userdata);
+
+/// Install a host file-reader. Pass read_cb=NULL to restore the built-in
+/// DefaultFileSystem. userdata is passed back to every callback unchanged.
+/// Process-global; thread-safe to call once at startup.
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetFileReader(
+    BP_FileReadFn read_cb, BP_FileFreeFn free_cb, BP_FileExistsFn exists_cb, void* userdata);
+
+// ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
 

@@ -8,6 +8,7 @@
 #include "BuiltinHandlers.h"
 #include "BuiltinNodeDefs.h"
 #include "MainThreadDispatcher.h"
+#include "FileSystem.h"
 #include "Http/IHttpClient.h"
 
 #include <cstring>
@@ -26,6 +27,23 @@
 #  endif
 #  include <windows.h>
 #  undef IsLoggingEnabled
+// windows.h maps these to the *A/*W variants via macros, which breaks the
+// IFileSystem virtual method names (DeleteFile -> DeleteFileA etc.).
+#  ifdef DeleteFile
+#    undef DeleteFile
+#  endif
+#  ifdef ReadFile
+#    undef ReadFile
+#  endif
+#  ifdef WriteFile
+#    undef WriteFile
+#  endif
+#  ifdef GetFileSize
+#    undef GetFileSize
+#  endif
+#  ifdef CreateDirectory
+#    undef CreateDirectory
+#  endif
 #elif defined(__linux__)
 #  include <unistd.h>
 #elif defined(__APPLE__)
@@ -42,6 +60,104 @@ namespace {
     std::mutex  s_globalEntryMutex;
     std::string s_globalLuaEntry;
 } // anonymous namespace
+
+// ---------------------------------------------------------------------------
+// Host file system bridge: wrap C callbacks into an IFileSystem.
+// Path-helper methods (GetBaseName/GetDirName/JoinPath) are pure string ops and
+// are reimplemented locally so they work even on WebGL where DefaultFileSystem
+// may be disabled. Write/dir operations are unsupported (host serves read-only
+// resources); blueprint loading only needs ReadFile + FileExists.
+// ---------------------------------------------------------------------------
+namespace {
+
+class CallbackFileSystem : public IFileSystem
+{
+public:
+    CallbackFileSystem(BP_FileReadFn rd, BP_FileFreeFn fr, BP_FileExistsFn ex, void* ud)
+        : m_read(rd), m_free(fr), m_exists(ex), m_ud(ud) {}
+
+    bool ReadFile(const std::string& path, std::string& outContent, std::string& outError) override
+    {
+        if (!m_read) { outError = "no host read callback"; return false; }
+        char* data = nullptr; int size = 0;
+        int ok = m_read(path.c_str(), &data, &size, m_ud);
+        if (!ok || data == nullptr || size < 0) {
+            outError = "host read failed: " + path;
+            if (data && m_free) m_free(data, m_ud);
+            return false;
+        }
+        // assign(ptr, len) is length-based and binary-safe — does NOT require
+        // the host buffer to be NUL-terminated.
+        outContent.assign(data, static_cast<size_t>(size));
+        if (m_free) m_free(data, m_ud);
+        return true;
+    }
+
+    bool WriteFile(const std::string&, const std::string&, std::string& outError) override
+    { outError = "WriteFile not supported by host file reader"; return false; }
+    bool AppendFile(const std::string&, const std::string&, std::string& outError) override
+    { outError = "AppendFile not supported by host file reader"; return false; }
+
+    bool FileExists(const std::string& path) override
+    {
+        if (m_exists) return m_exists(path.c_str(), m_ud) != 0;
+        // Fallback: infer existence from a successful read.
+        std::string c, e;
+        return ReadFile(path, c, e);
+    }
+
+    int64_t GetFileSize(const std::string& path) override
+    {
+        std::string c, e;
+        if (!ReadFile(path, c, e)) return -1;
+        return static_cast<int64_t>(c.size());
+    }
+
+    bool ListDir(const std::string&, const std::string&,
+                 std::vector<std::string>&, std::string& outError) override
+    { outError = "ListDir not supported by host file reader"; return false; }
+    bool MakeDir(const std::string&, std::string& outError) override
+    { outError = "MakeDir not supported by host file reader"; return false; }
+    bool DeleteFile(const std::string&, bool, std::string& outError) override
+    { outError = "DeleteFile not supported by host file reader"; return false; }
+
+    std::string GetBaseName(const std::string& path) override
+    {
+        size_t p = path.find_last_of("/\\");
+        return (p == std::string::npos) ? path : path.substr(p + 1);
+    }
+    std::string GetDirName(const std::string& path) override
+    {
+        size_t p = path.find_last_of("/\\");
+        return (p == std::string::npos) ? std::string() : path.substr(0, p);
+    }
+    std::string JoinPath(const std::string& base, const std::string& part) override
+    {
+        if (base.empty()) return part;
+        char last = base.back();
+        if (last == '/' || last == '\\') return base + part;
+        return base + "/" + part;
+    }
+
+private:
+    BP_FileReadFn   m_read;
+    BP_FileFreeFn   m_free;
+    BP_FileExistsFn m_exists;
+    void*           m_ud;
+};
+
+} // anonymous namespace
+
+extern "C" BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetFileReader(
+    BP_FileReadFn read_cb, BP_FileFreeFn free_cb, BP_FileExistsFn exists_cb, void* userdata)
+{
+    if (read_cb == nullptr) {
+        // Restore built-in default file system.
+        SetDefaultFileSystem(nullptr);
+        return;
+    }
+    SetDefaultFileSystem(std::make_shared<CallbackFileSystem>(read_cb, free_cb, exists_cb, userdata));
+}
 
 // ---------------------------------------------------------------------------
 // Internal wrapper: wraps BlueprintRunner + last-error string
@@ -247,7 +363,8 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadFromFile(BP_Runner runner, 
     // 确保 FuncLib.* 节点等依赖函数库的功能可以正常执行
     if (!w->runner.LoadFromFileWithDeps(std::string(filePath)))
     {
-        w->lastError = std::string("LoadFromFile failed: ") + filePath;
+        w->lastError = std::string("LoadFromFile failed: ") + filePath +
+                       " | detail: " + w->runner.GetLastError();
         return 1;
     }
     // basePath 已由 LoadFromFileWithDeps 自动设置到 runner.m_loadedFileDir，

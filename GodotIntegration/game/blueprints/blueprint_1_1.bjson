@@ -1,0 +1,1646 @@
+{
+    "runtime": {
+    "fileType": "runtime",
+    "metadata": {
+        "schemaVersion": 2,
+        "blueprintClass": 0,
+        "name": "blueprint_1_1",
+        "description": "Blueprint Editor file",
+        "version": ""
+    },
+    "nodes": [
+        {
+            "id": 1,
+            "definitionId": "OnBeginPlay",
+            "definitionVersion": 1,
+            "name": "关卡开始",
+            "pins": [
+                {
+                    "id": 2,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "definitionId": "Rope.SpawnAll",
+            "definitionVersion": 1,
+            "name": "生成所有绳子",
+            "pins": [
+                {
+                    "id": 4,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 5,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 6,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "Count"
+                }
+            ]
+        },
+        {
+            "id": 7,
+            "definitionId": "UI.Open",
+            "definitionVersion": 1,
+            "name": "打开 HUD",
+            "pins": [
+                {
+                    "id": 8,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 9,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Address",
+                    "defaultValue": "UI/HUD"
+                },
+                {
+                    "id": 10,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Param",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 11,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 12,
+            "definitionId": "HUD.Sync",
+            "definitionVersion": 1,
+            "name": "初始化 HUD",
+            "pins": [
+                {
+                    "id": 13,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 14,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "Score",
+                    "defaultValue": 0
+                },
+                {
+                    "id": 15,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 16,
+            "definitionId": "Obstacle.SetMoving",
+            "definitionVersion": 1,
+            "name": "启动障碍物",
+            "pins": [
+                {
+                    "id": 17,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 18,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Name",
+                    "defaultValue": "Obstacle"
+                },
+                {
+                    "id": 19,
+                    "kind": 0,
+                    "dataType": 1,
+                    "name": "Moving",
+                    "defaultValue": false
+                },
+                {
+                    "id": 20,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Speed",
+                    "defaultValue": 1.5
+                },
+                {
+                    "id": 21,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Range",
+                    "defaultValue": 2.5
+                },
+                {
+                    "id": 22,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 23,
+            "definitionId": "OnTick",
+            "definitionVersion": 1,
+            "name": "每帧驱动",
+            "pins": [
+                {
+                    "id": 24,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 25,
+                    "kind": 1,
+                    "dataType": 3,
+                    "name": "DeltaTime"
+                }
+            ]
+        },
+        {
+            "id": 26,
+            "definitionId": "GameEvent.OnStarCollected",
+            "definitionVersion": 1,
+            "name": "检测星星收集",
+            "pins": [
+                {
+                    "id": 27,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 28,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onCollected",
+                    "isExec": true
+                },
+                {
+                    "id": 29,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onEmpty",
+                    "isExec": true
+                },
+                {
+                    "id": 30,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "StarIndex"
+                },
+                {
+                    "id": 31,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "Total"
+                }
+            ]
+        },
+        {
+            "id": 32,
+            "definitionId": "Camera.Shake",
+            "definitionVersion": 1,
+            "name": "收集星星震屏",
+            "pins": [
+                {
+                    "id": 33,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 34,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Intensity",
+                    "defaultValue": 0.14999999999999999
+                },
+                {
+                    "id": 35,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Duration",
+                    "defaultValue": 0.14999999999999999
+                },
+                {
+                    "id": 36,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 37,
+            "definitionId": "HUD.Sync",
+            "definitionVersion": 1,
+            "name": "收集后同步 HUD",
+            "pins": [
+                {
+                    "id": 38,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 39,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "Score",
+                    "defaultValue": 0
+                },
+                {
+                    "id": 40,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 41,
+            "definitionId": "GameEvent.OnCut",
+            "definitionVersion": 1,
+            "name": "检测切绳",
+            "pins": [
+                {
+                    "id": 42,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 43,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onCut",
+                    "isExec": true
+                },
+                {
+                    "id": 44,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onEmpty",
+                    "isExec": true
+                },
+                {
+                    "id": 45,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "CutCount"
+                },
+                {
+                    "id": 46,
+                    "kind": 1,
+                    "dataType": 3,
+                    "name": "X"
+                },
+                {
+                    "id": 47,
+                    "kind": 1,
+                    "dataType": 3,
+                    "name": "Y"
+                }
+            ]
+        },
+        {
+            "id": 48,
+            "definitionId": "Camera.Shake",
+            "definitionVersion": 1,
+            "name": "切绳震屏",
+            "pins": [
+                {
+                    "id": 49,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 50,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Intensity",
+                    "defaultValue": 0.25
+                },
+                {
+                    "id": 51,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Duration",
+                    "defaultValue": 0.20000000000000001
+                },
+                {
+                    "id": 52,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 53,
+            "definitionId": "HUD.Sync",
+            "definitionVersion": 1,
+            "name": "切绳后同步 HUD",
+            "pins": [
+                {
+                    "id": 54,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 55,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "Score",
+                    "defaultValue": 0
+                },
+                {
+                    "id": 56,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 57,
+            "definitionId": "CustomEventNode",
+            "definitionVersion": 1,
+            "name": "事件：糖果吃掉（通关）",
+            "pins": [
+                {
+                    "id": 58,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 59,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "EventName"
+                }
+            ],
+            "nodeData": {
+                "EventName": "事件：糖果吃掉（通关）"
+            }
+        },
+        {
+            "id": 60,
+            "definitionId": "Camera.Shake",
+            "definitionVersion": 1,
+            "name": "通关震屏",
+            "pins": [
+                {
+                    "id": 61,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 62,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Intensity",
+                    "defaultValue": 0.40000000000000002
+                },
+                {
+                    "id": 63,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Duration",
+                    "defaultValue": 0.29999999999999999
+                },
+                {
+                    "id": 64,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 65,
+            "definitionId": "Level.CalcStarsByCollected",
+            "definitionVersion": 1,
+            "name": "计算星级（按收集）",
+            "pins": [
+                {
+                    "id": 66,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 67,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 68,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "Stars"
+                },
+                {
+                    "id": 69,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "Collected"
+                },
+                {
+                    "id": 70,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "Total"
+                }
+            ]
+        },
+        {
+            "id": 71,
+            "definitionId": "Score.Calc",
+            "definitionVersion": 1,
+            "name": "计算分数",
+            "pins": [
+                {
+                    "id": 72,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 73,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "Base",
+                    "defaultValue": 100
+                },
+                {
+                    "id": 74,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "StarBonus",
+                    "defaultValue": 50
+                },
+                {
+                    "id": 75,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "CutPenalty",
+                    "defaultValue": 10
+                },
+                {
+                    "id": 76,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 77,
+                    "kind": 1,
+                    "dataType": 2,
+                    "name": "Score"
+                }
+            ]
+        },
+        {
+            "id": 78,
+            "definitionId": "Level.Complete",
+            "definitionVersion": 1,
+            "name": "通关存档",
+            "pins": [
+                {
+                    "id": 79,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 80,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "Stars",
+                    "defaultValue": 0
+                },
+                {
+                    "id": 81,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "Score",
+                    "defaultValue": 0
+                },
+                {
+                    "id": 82,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 83,
+            "definitionId": "Level.SetResult",
+            "definitionVersion": 1,
+            "name": "设置通关结果",
+            "pins": [
+                {
+                    "id": 84,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 85,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "Stars",
+                    "defaultValue": 0
+                },
+                {
+                    "id": 86,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "Score",
+                    "defaultValue": 0
+                },
+                {
+                    "id": 87,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 88,
+            "definitionId": "UI.CloseAll",
+            "definitionVersion": 1,
+            "name": "关闭所有面板",
+            "pins": [
+                {
+                    "id": 89,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 90,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 91,
+            "definitionId": "Timer.Wait",
+            "definitionVersion": 1,
+            "name": "延迟 0.5s",
+            "pins": [
+                {
+                    "id": 92,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 93,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "TimerId",
+                    "defaultValue": "win_delay"
+                },
+                {
+                    "id": 94,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Duration",
+                    "defaultValue": 0.5
+                },
+                {
+                    "id": 95,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "DeltaTime",
+                    "defaultValue": 0
+                },
+                {
+                    "id": 98,
+                    "kind": 0,
+                    "dataType": 1,
+                    "name": "Enabled",
+                    "defaultValue": false
+                },
+                {
+                    "id": 96,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onTick",
+                    "isExec": true
+                },
+                {
+                    "id": 97,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onDone",
+                    "isExec": true
+                },
+                {
+                    "id": 99,
+                    "kind": 1,
+                    "dataType": 3,
+                    "name": "Elapsed"
+                },
+                {
+                    "id": 100,
+                    "kind": 1,
+                    "dataType": 3,
+                    "name": "Progress"
+                }
+            ]
+        },
+        {
+            "id": 101,
+            "definitionId": "UI.Open",
+            "definitionVersion": 1,
+            "name": "打开通关面板",
+            "pins": [
+                {
+                    "id": 102,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 103,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Address",
+                    "defaultValue": "UI/LevelComplete"
+                },
+                {
+                    "id": 104,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Param",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 105,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 106,
+            "definitionId": "CustomEventNode",
+            "definitionVersion": 1,
+            "name": "事件：糖果失败",
+            "pins": [
+                {
+                    "id": 107,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 108,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "EventName"
+                }
+            ],
+            "nodeData": {
+                "EventName": "事件：糖果失败"
+            }
+        },
+        {
+            "id": 109,
+            "definitionId": "Camera.Shake",
+            "definitionVersion": 1,
+            "name": "失败震屏",
+            "pins": [
+                {
+                    "id": 110,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 111,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Intensity",
+                    "defaultValue": 0.5
+                },
+                {
+                    "id": 112,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Duration",
+                    "defaultValue": 0.40000000000000002
+                },
+                {
+                    "id": 113,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 114,
+            "definitionId": "UI.CloseAll",
+            "definitionVersion": 1,
+            "name": "关闭所有面板（失败）",
+            "pins": [
+                {
+                    "id": 115,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 116,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 117,
+            "definitionId": "UI.Open",
+            "definitionVersion": 1,
+            "name": "打开失败面板",
+            "pins": [
+                {
+                    "id": 118,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 119,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Address",
+                    "defaultValue": "UI/LevelFailed"
+                },
+                {
+                    "id": 120,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "Param",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 121,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 122,
+            "definitionId": "CustomEventNode",
+            "definitionVersion": 1,
+            "name": "事件：暂停",
+            "pins": [
+                {
+                    "id": 123,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 124,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "EventName"
+                }
+            ],
+            "nodeData": {
+                "EventName": "事件：暂停"
+            }
+        },
+        {
+            "id": 125,
+            "definitionId": "Level.Pause",
+            "definitionVersion": 1,
+            "name": "暂停关卡",
+            "pins": [
+                {
+                    "id": 126,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 127,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 128,
+            "definitionId": "Timer.Wait",
+            "definitionVersion": 1,
+            "name": "通关延迟计时器（OnTick 驱动）",
+            "pins": [
+                {
+                    "id": 129,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 130,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "TimerId",
+                    "defaultValue": "win_delay"
+                },
+                {
+                    "id": 131,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "Duration",
+                    "defaultValue": 0.5
+                },
+                {
+                    "id": 132,
+                    "kind": 0,
+                    "dataType": 3,
+                    "name": "DeltaTime",
+                    "defaultValue": 0
+                },
+                {
+                    "id": 135,
+                    "kind": 0,
+                    "dataType": 1,
+                    "name": "Enabled",
+                    "defaultValue": false
+                },
+                {
+                    "id": 133,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onTick",
+                    "isExec": true
+                },
+                {
+                    "id": 134,
+                    "kind": 1,
+                    "dataType": 0,
+                    "name": "onDone",
+                    "isExec": true
+                },
+                {
+                    "id": 136,
+                    "kind": 1,
+                    "dataType": 3,
+                    "name": "Elapsed"
+                },
+                {
+                    "id": 137,
+                    "kind": 1,
+                    "dataType": 3,
+                    "name": "Progress"
+                }
+            ]
+        },
+        {
+            "id": 166,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print String",
+            "pins": [
+                {
+                    "id": 167,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 168,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": "1_1 start"
+                },
+                {
+                    "id": 169,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 172,
+            "definitionId": "PrintString",
+            "definitionVersion": 1,
+            "name": "Print String",
+            "pins": [
+                {
+                    "id": 173,
+                    "kind": 0,
+                    "dataType": 0,
+                    "isExec": true
+                },
+                {
+                    "id": 174,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "In String",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 175,
+                    "kind": 1,
+                    "dataType": 0,
+                    "isExec": true
+                }
+            ]
+        },
+        {
+            "id": 176,
+            "definitionId": "AppendString",
+            "definitionVersion": 1,
+            "name": "Append String",
+            "pins": [
+                {
+                    "id": 177,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "A",
+                    "defaultValue": "Rope Count:"
+                },
+                {
+                    "id": 178,
+                    "kind": 0,
+                    "dataType": 4,
+                    "name": "B",
+                    "defaultValue": ""
+                },
+                {
+                    "id": 179,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Result"
+                }
+            ]
+        },
+        {
+            "id": 180,
+            "definitionId": "IntToString",
+            "definitionVersion": 1,
+            "name": "Int To String",
+            "pins": [
+                {
+                    "id": 181,
+                    "kind": 0,
+                    "dataType": 2,
+                    "name": "Value",
+                    "defaultValue": 0
+                },
+                {
+                    "id": 182,
+                    "kind": 1,
+                    "dataType": 4,
+                    "name": "Result"
+                }
+            ]
+        }
+    ],
+    "links": [
+        {
+            "id": 140,
+            "startPinId": 11,
+            "endPinId": 13,
+            "isEnabled": true
+        },
+        {
+            "id": 141,
+            "startPinId": 15,
+            "endPinId": 17,
+            "isEnabled": true
+        },
+        {
+            "id": 142,
+            "startPinId": 24,
+            "endPinId": 27,
+            "isEnabled": true
+        },
+        {
+            "id": 143,
+            "startPinId": 28,
+            "endPinId": 33,
+            "isEnabled": true
+        },
+        {
+            "id": 144,
+            "startPinId": 36,
+            "endPinId": 38,
+            "isEnabled": true
+        },
+        {
+            "id": 145,
+            "startPinId": 29,
+            "endPinId": 42,
+            "isEnabled": true
+        },
+        {
+            "id": 146,
+            "startPinId": 40,
+            "endPinId": 42,
+            "isEnabled": true
+        },
+        {
+            "id": 147,
+            "startPinId": 43,
+            "endPinId": 49,
+            "isEnabled": true
+        },
+        {
+            "id": 148,
+            "startPinId": 52,
+            "endPinId": 54,
+            "isEnabled": true
+        },
+        {
+            "id": 149,
+            "startPinId": 25,
+            "endPinId": 132,
+            "isEnabled": true
+        },
+        {
+            "id": 150,
+            "startPinId": 134,
+            "endPinId": 102,
+            "isEnabled": true
+        },
+        {
+            "id": 151,
+            "startPinId": 58,
+            "endPinId": 61,
+            "isEnabled": true
+        },
+        {
+            "id": 152,
+            "startPinId": 64,
+            "endPinId": 66,
+            "isEnabled": true
+        },
+        {
+            "id": 153,
+            "startPinId": 67,
+            "endPinId": 72,
+            "isEnabled": true
+        },
+        {
+            "id": 154,
+            "startPinId": 76,
+            "endPinId": 79,
+            "isEnabled": true
+        },
+        {
+            "id": 155,
+            "startPinId": 68,
+            "endPinId": 80,
+            "isEnabled": true
+        },
+        {
+            "id": 156,
+            "startPinId": 68,
+            "endPinId": 85,
+            "isEnabled": true
+        },
+        {
+            "id": 157,
+            "startPinId": 77,
+            "endPinId": 81,
+            "isEnabled": true
+        },
+        {
+            "id": 158,
+            "startPinId": 77,
+            "endPinId": 86,
+            "isEnabled": true
+        },
+        {
+            "id": 159,
+            "startPinId": 82,
+            "endPinId": 84,
+            "isEnabled": true
+        },
+        {
+            "id": 160,
+            "startPinId": 87,
+            "endPinId": 89,
+            "isEnabled": true
+        },
+        {
+            "id": 161,
+            "startPinId": 107,
+            "endPinId": 110,
+            "isEnabled": true
+        },
+        {
+            "id": 162,
+            "startPinId": 113,
+            "endPinId": 115,
+            "isEnabled": true
+        },
+        {
+            "id": 163,
+            "startPinId": 116,
+            "endPinId": 118,
+            "isEnabled": true
+        },
+        {
+            "id": 164,
+            "startPinId": 123,
+            "endPinId": 126,
+            "isEnabled": true
+        },
+        {
+            "id": 165,
+            "startPinId": 90,
+            "endPinId": 129,
+            "isEnabled": true
+        },
+        {
+            "id": 170,
+            "startPinId": 2,
+            "endPinId": 167,
+            "isEnabled": true
+        },
+        {
+            "id": 171,
+            "startPinId": 169,
+            "endPinId": 4,
+            "isEnabled": true
+        },
+        {
+            "id": 183,
+            "startPinId": 6,
+            "endPinId": 181,
+            "isEnabled": true
+        },
+        {
+            "id": 184,
+            "startPinId": 182,
+            "endPinId": 178,
+            "isEnabled": true
+        },
+        {
+            "id": 185,
+            "startPinId": 5,
+            "endPinId": 173,
+            "isEnabled": true
+        },
+        {
+            "id": 186,
+            "startPinId": 175,
+            "endPinId": 8,
+            "isEnabled": true
+        },
+        {
+            "id": 187,
+            "startPinId": 179,
+            "endPinId": 174,
+            "isEnabled": true
+        }
+    ]
+},
+    "editor": {
+    "fileType": "editor",
+    "metadata": {
+        "author": "",
+        "createdAt": "",
+        "updatedAt": ""
+    },
+    "nodes": [
+        {
+            "id": 1,
+            "position": {
+                "x": -577,
+                "y": -180
+            },
+            "size": {
+                "width": 121,
+                "height": 72
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 3,
+            "position": {
+                "x": -85,
+                "y": -180
+            },
+            "size": {
+                "width": 141,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 7,
+            "position": {
+                "x": 487,
+                "y": -193
+            },
+            "size": {
+                "width": 257,
+                "height": 134
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 12,
+            "position": {
+                "x": 792,
+                "y": -193
+            },
+            "size": {
+                "width": 221,
+                "height": 103
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 16,
+            "position": {
+                "x": 1160,
+                "y": -192
+            },
+            "size": {
+                "width": 244,
+                "height": 196
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 23,
+            "position": {
+                "x": -403,
+                "y": 236
+            },
+            "size": {
+                "width": 123,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 26,
+            "position": {
+                "x": -40,
+                "y": 232
+            },
+            "size": {
+                "width": 175,
+                "height": 156
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 32,
+            "position": {
+                "x": 392,
+                "y": 92
+            },
+            "size": {
+                "width": 242,
+                "height": 134
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 37,
+            "position": {
+                "x": 728,
+                "y": 92
+            },
+            "size": {
+                "width": 221,
+                "height": 103
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 41,
+            "position": {
+                "x": 1224,
+                "y": 248
+            },
+            "size": {
+                "width": 159,
+                "height": 184
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 48,
+            "position": {
+                "x": 1444,
+                "y": 248
+            },
+            "size": {
+                "width": 242,
+                "height": 134
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 53,
+            "position": {
+                "x": 2072,
+                "y": 236
+            },
+            "size": {
+                "width": 221,
+                "height": 103
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 57,
+            "position": {
+                "x": -577,
+                "y": 480
+            },
+            "size": {
+                "width": 217,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 60,
+            "position": {
+                "x": -232,
+                "y": 479
+            },
+            "size": {
+                "width": 242,
+                "height": 134
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 65,
+            "position": {
+                "x": 120,
+                "y": 480
+            },
+            "size": {
+                "width": 189,
+                "height": 156
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 71,
+            "position": {
+                "x": 428,
+                "y": 478
+            },
+            "size": {
+                "width": 300,
+                "height": 165
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 78,
+            "position": {
+                "x": 856,
+                "y": 480
+            },
+            "size": {
+                "width": 133,
+                "height": 128
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 83,
+            "position": {
+                "x": 1124,
+                "y": 480
+            },
+            "size": {
+                "width": 148,
+                "height": 128
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 88,
+            "position": {
+                "x": 1428,
+                "y": 476
+            },
+            "size": {
+                "width": 148,
+                "height": 72
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 91,
+            "position": {
+                "x": 1688,
+                "y": -160
+            },
+            "size": {
+                "width": 319,
+                "height": 196
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 101,
+            "position": {
+                "x": 2279,
+                "y": 508
+            },
+            "size": {
+                "width": 257,
+                "height": 134
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 106,
+            "position": {
+                "x": -570,
+                "y": 716
+            },
+            "size": {
+                "width": 162,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 109,
+            "position": {
+                "x": -200,
+                "y": 716
+            },
+            "size": {
+                "width": 242,
+                "height": 134
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 114,
+            "position": {
+                "x": 232,
+                "y": 716
+            },
+            "size": {
+                "width": 203,
+                "height": 72
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 117,
+            "position": {
+                "x": 600,
+                "y": 716
+            },
+            "size": {
+                "width": 257,
+                "height": 134
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 122,
+            "position": {
+                "x": -559,
+                "y": 988
+            },
+            "size": {
+                "width": 135,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 125,
+            "position": {
+                "x": -339,
+                "y": 988
+            },
+            "size": {
+                "width": 121,
+                "height": 72
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 128,
+            "position": {
+                "x": 1817,
+                "y": 478
+            },
+            "size": {
+                "width": 319,
+                "height": 193
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 166,
+            "position": {
+                "x": -408,
+                "y": -178
+            },
+            "size": {
+                "width": 260,
+                "height": 103
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 172,
+            "position": {
+                "x": 192,
+                "y": -192
+            },
+            "size": {
+                "width": 152,
+                "height": 100
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 176,
+            "position": {
+                "x": -160,
+                "y": 14
+            },
+            "size": {
+                "width": 366,
+                "height": 71
+            },
+            "isCollapsed": false
+        },
+        {
+            "id": 180,
+            "position": {
+                "x": -168,
+                "y": -36
+            },
+            "size": {
+                "width": 271,
+                "height": 40
+            },
+            "isCollapsed": false
+        }
+    ],
+    "viewInfo": {
+        "viewPosition": { "x": 0, "y": 0 },
+        "viewScale": 1
+    }
+}
+}
