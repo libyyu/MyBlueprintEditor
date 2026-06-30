@@ -38,25 +38,16 @@ static void bp_output_trampoline(BP_LogLevel level, const char *message) {
     }
 }
 
-// Install the Godot FileAccess-backed reader exactly once per process, so all
-// blueprint loads (and their auto-resolved dependencies) go through Godot's VFS.
+// Safety net: ensure the Godot file reader is installed even if the project did
+// not add a GameLauncher. Process-level; the GameLauncher is the intended owner
+// of this (and of the Lua searcher), but a standalone BlueprintNode must still
+// be able to read res:// blueprints.
 static bool s_file_reader_installed = false;
 
 static void ensure_file_reader() {
     if (s_file_reader_installed) return;
-    // Empty res_root: BlueprintNode passes already-qualified res:// paths, and
-    // dependency paths are resolved relative to the blueprint dir we set via
-    // BP_SetBasePath, which the bridge keeps in Godot path form.
     install_godot_file_reader("");
     s_file_reader_installed = true;
-}
-
-// Parent directory (Godot path form) of a blueprint path, used as base dir for
-// dependency resolution.
-static String parent_dir(const String &path) {
-    int slash = path.rfind("/");
-    if (slash < 0) return String();
-    return path.substr(0, slash);
 }
 
 BlueprintNode::BlueprintNode() {}
@@ -75,7 +66,7 @@ void BlueprintNode::_ready() {
     }
 
     BP_InitDefaultHttpClient();
-    ensure_file_reader(); // route all reads through Godot FileAccess (res://, web, pck)
+    ensure_file_reader(); // safety net; GameLauncher normally does this process-wide
 
     _runner = static_cast<void *>(BP_CreateRunner());
     if (!_runner) {
@@ -87,11 +78,12 @@ void BlueprintNode::_ready() {
     BP_SetPrintCallback(r, bp_output_trampoline);
     BP_SetLogCallback(r, bp_output_trampoline);
 
-    if (!_blueprint_path.is_empty()) {
+    // The Lua require searcher is owned by GameLauncher (process-level), not by
+    // individual nodes. autorun is only a convenience for a self-contained
+    // blueprint; anything using Lua modules expects a GameLauncher in the scene.
+    if (_autorun && !_blueprint_path.is_empty()) {
         load_blueprint(_blueprint_path);
-        if (_autorun && _loaded) {
-            execute();
-        }
+        if (_loaded) execute();
     }
 }
 
@@ -116,6 +108,9 @@ void BlueprintNode::_exit_tree() {
 bool BlueprintNode::load_blueprint(const String &path) {
     if (!_runner) return false;
     BP_Runner r = static_cast<BP_Runner>(_runner);
+
+    // NOTE: the Lua module searcher is process-level and owned by GameLauncher.
+    // Loading any number of blueprints never touches it.
 
     // With the Godot file reader installed, BP_LoadFromFile reads the blueprint
     // AND auto-loads metadata.dependencies — all through Godot FileAccess.

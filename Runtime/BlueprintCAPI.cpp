@@ -10,6 +10,10 @@
 #include "MainThreadDispatcher.h"
 #include "FileSystem.h"
 #include "Http/IHttpClient.h"
+#ifdef BLUEPRINT_HAS_LUA
+#  include "LuaScriptEngine.h"
+#  include <lua.hpp>   // luaL_loadbuffer / LUA_OK / lua_error used by hostLuaSearcher
+#endif
 
 #include <cstring>
 #include <string>
@@ -402,6 +406,103 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadLuaScript(BP_Runner runner,
     w->lastError.clear();
 #endif
     return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Host-provided Lua module resolver (project-layer owns the "where" logic)
+// ---------------------------------------------------------------------------
+// The engine stays agnostic about HOW Lua modules are located. The host (e.g.
+// the Godot GDExtension layer) registers a C callback that, given a module name
+// ("a.b.c"), returns the module's source bytes (resolved however the host
+// likes: res:// roots, FileAccess, embedded blobs, network, ...). The engine
+// installs a thin package.searchers[1] entry that calls this callback and
+// compiles whatever source it returns. No file-system policy lives in the engine.
+namespace {
+    BP_LuaModuleResolveFn s_luaModResolve = nullptr;
+    BP_LuaModuleFreeFn    s_luaModFree    = nullptr;
+    void*                 s_luaModUd      = nullptr;
+}
+
+#ifdef BLUEPRINT_HAS_LUA
+// The C function inserted into package.searchers; bridges to the host resolver.
+static int hostLuaSearcher(lua_State* L)
+{
+    const char* modname = luaL_checkstring(L, 1);
+    if (!s_luaModResolve || !modname) {
+        lua_pushfstring(L, "\n\t[host-searcher] no resolver for '%s'", modname ? modname : "?");
+        return 1;
+    }
+    char* data = nullptr; int size = 0; char* chunkName = nullptr;
+    int ok = s_luaModResolve(modname, &data, &size, &chunkName, s_luaModUd);
+    if (!ok || data == nullptr || size < 0) {
+        if (data && s_luaModFree) s_luaModFree(data, s_luaModUd);
+        if (chunkName && s_luaModFree) s_luaModFree(chunkName, s_luaModUd);
+        lua_pushfstring(L, "\n\t[host-searcher] module not found: '%s'", modname);
+        return 1;
+    }
+    std::string cn = chunkName ? std::string("@") + chunkName : std::string("@") + modname;
+    int loadRc = luaL_loadbuffer(L, data, static_cast<size_t>(size), cn.c_str());
+    if (data && s_luaModFree) s_luaModFree(data, s_luaModUd);
+    if (chunkName && s_luaModFree) s_luaModFree(chunkName, s_luaModUd);
+    if (loadRc != LUA_OK) {
+        return lua_error(L); // syntax error: propagate per Lua searcher contract
+    }
+    return 1; // success: return the compiled chunk
+}
+#endif
+
+extern "C" BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_SetLuaModuleResolver(
+    BP_Runner runner, BP_LuaModuleResolveFn resolve_cb, BP_LuaModuleFreeFn free_cb, void* userdata)
+{
+#ifdef BLUEPRINT_HAS_LUA
+    // The resolver + searcher are PROCESS-LEVEL: the Lua VM is a shared singleton,
+    // so package.searchers carries a single entry regardless of runner count.
+    // `runner` may be NULL — callers like GameLauncher have no runner yet and
+    // want to configure resolution once at startup. In that case we use the
+    // process-default shared Lua engine (created on demand).
+    LuaScriptEngine* engine = nullptr;
+    if (runner) {
+        engine = asWrapper(runner)->runner.GetLuaEngine();
+    } else {
+        auto def = NodeEditor::Runtime::LuaScriptEngineRegistry::GetDefault();
+        engine = def.get();
+    }
+    if (!engine) return 1;
+
+    s_luaModResolve = resolve_cb;
+    s_luaModFree    = free_cb;
+    s_luaModUd      = userdata;
+    if (resolve_cb) {
+        engine->SetSearcher(&hostLuaSearcher); // insert at package.searchers[1]
+    }
+    return 0;
+#else
+    (void)runner; (void)resolve_cb; (void)free_cb; (void)userdata;
+    return 0;
+#endif
+}
+
+extern "C" BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_ResetSharedLuaVM(void)
+{
+#ifdef BLUEPRINT_HAS_LUA
+    // Tear down the process-default shared Lua engine, closing its lua_State.
+    // The next runner that touches Lua (or the next BP_SetLuaModuleResolver call
+    // with runner=NULL) lazily creates a brand-new VM. This is the building
+    // block for a two-phase (update VM -> game VM) startup: run the update phase
+    // on a temporary VM, call BP_ResetSharedLuaVM() to discard it, then build a
+    // fresh VM for the game phase that loads the just-updated Lua/blueprints.
+    //
+    // Note: any BPRunner still bound to the old engine must be destroyed BEFORE
+    // calling this (its shared_ptr keeps the old VM alive otherwise). In the
+    // Godot host, the update-phase runner is queue_free'd first.
+    NodeEditor::Runtime::LuaScriptEngineRegistry::SetDefault(nullptr);
+
+    // Also clear the host searcher binding; the new VM has no searchers yet, so
+    // the host re-installs its resolver after creating the game VM.
+    s_luaModResolve = nullptr;
+    s_luaModFree    = nullptr;
+    s_luaModUd      = nullptr;
+#endif
 }
 
 /// Set the global Lua entry path used by all runners when loading blueprints.

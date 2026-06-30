@@ -3,6 +3,7 @@
 
 #include "register_types.h"
 #include "blueprint_node.h"
+#include "game_launcher.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
@@ -15,6 +16,7 @@ void initialize_blueprint_module(ModuleInitializationLevel p_level) {
     if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
         return;
     }
+    GDREGISTER_CLASS(GameLauncher);
     GDREGISTER_CLASS(BlueprintNode);
 }
 

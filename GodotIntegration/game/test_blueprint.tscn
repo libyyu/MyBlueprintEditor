@@ -5,7 +5,10 @@
 [node name="TestRoot" type="Node"]
 script = ExtResource("1_root")
 
+[node name="GameLauncher" type="GameLauncher" parent="."]
+lua_roots = PackedStringArray("res://lua", "res://blueprints")
+auto_setup = true
+
 [node name="BlueprintNode" type="BlueprintNode" parent="."]
-blueprint_path = "res://blueprints/blueprint_1_1.bjson"
-autorun = true
+autorun = false
 tick_enabled = true

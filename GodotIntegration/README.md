@@ -1,26 +1,46 @@
-# BlueprintRuntime × Godot 4.5 集成（阶段 0-1 骨架）
+# BlueprintRuntime × Godot 4.5 集成
 
-把你的 C++ 蓝图引擎 `BlueprintRuntime` 通过 GDExtension 接入 Godot 4.5。
-这是迁移路线的**阶段 1 验证点**：在真实 Godot 游戏循环里加载并运行 `blueprint_1_1.bjson`。
+把 C++ 蓝图引擎 `BlueprintRuntime` 通过 GDExtension 接入 Godot 4.5，从 Unity 迁移而来。
+**已验证可跑**：真实 Godot 游戏循环里加载并运行蓝图，资源/Lua 走 Godot VFS，支持双 VM 热更。
+
+> 详细文档见 `docs/`：
+> - **01-build-all-platforms.md** — 全平台编译（Win/Linux/macOS/Android/iOS/WebGL/小游戏）
+> - **02-dev-integration.md** — 开发接入步骤 + API
+> - **03-update-and-launcher.md** — 更新阶段（单/双 VM）+ GameLauncher 机制
+
+## 已完成能力
+
+| 能力 | 实现 |
+|------|------|
+| 蓝图加载 + 每帧 Tick | `BlueprintNode`（等价 Unity BlueprintBehaviour） |
+| 进程级启动 | `GameLauncher`（装文件桥 + Lua 解析器，对齐 Unity GameLauncher） |
+| 资源加载（三端通吃） | `BP_SetFileReader` → `godot_file_bridge` → Godot FileAccess |
+| 依赖蓝图自动加载 | `BP_LoadFromFile` 读 `metadata.dependencies`，经文件桥拉取 |
+| Lua require 按需加载 | `BP_SetLuaModuleResolver` → `godot_lua_loader`（免预载） |
+| 双 VM 热更 | `begin/end_update_phase` + `BP_ResetSharedLuaVM` |
+| 中文显示 | `String::utf8()` 解码（修复 Latin-1 乱码） |
 
 ## 目录结构
 
 ```
 GodotIntegration/
 ├── godot-cpp/                 # godot-cpp 4.5（git clone，已就位）
+├── docs/                      # 全平台编译 / 接入 / 更新机制文档
 ├── src/                       # GDExtension C++ 绑定层
 │   ├── blueprint_node.h/.cpp  # BlueprintNode：把 C API 包成 Godot Node
-│   └── register_types.h/.cpp  # GDExtension 入口，注册 BlueprintNode
+│   ├── game_launcher.h/.cpp   # GameLauncher：进程级启动 + 双 VM 热更
+│   ├── godot_file_bridge.*    # 文件读取 → Godot FileAccess
+│   ├── godot_lua_loader.*     # Lua require → res://lua/...
+│   └── register_types.*       # GDExtension 入口，注册两个类
 ├── CMakeLists.txt             # 链接 godot-cpp + BlueprintRuntime
 └── game/                      # Godot 工程（用 Godot 4.5 打开这个目录）
     ├── project.godot
-    ├── test_blueprint.tscn    # 测试场景
-    ├── test_blueprint.gd      # 驱动脚本
-    ├── blueprints/blueprint_1_1.bjson
+    ├── test_blueprint.tscn/.gd        # 测试场景 + 驱动脚本
+    ├── blueprints/*.bjson
     └── bin/
-        ├── blueprint.gdextension          # 扩展清单
-        ├── blueprint_gdext.*.dll          # 编译产物（CMake 生成）
-        └── BlueprintRuntime.dll           # 引擎本体（自动拷入）
+        ├── blueprint.gdextension      # 扩展清单
+        ├── blueprint_gdext.*.dll      # 编译产物
+        └── BlueprintRuntime.dll       # 引擎本体（自动拷入）
 ```
 
 ## 关键设计
