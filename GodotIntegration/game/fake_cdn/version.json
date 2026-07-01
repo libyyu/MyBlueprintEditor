@@ -1,0 +1,12 @@
+{
+  "min_engine": "4.5",
+  "packs": [
+    {
+      "name": "game.pck",
+      "sha256": "a5791d49e4fe50c782b44d9496938f2b29632ead291041f84e1d8c2e79f249f0",
+      "size": 1384,
+      "url": "res://fake_cdn/1.0.1/game.pck"
+    }
+  ],
+  "version": "1.0.1"
+}

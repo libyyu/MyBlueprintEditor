@@ -13,6 +13,7 @@ config/features=PackedStringArray("4.5", "Forward Plus")
 Launcher="*res://framework/GameLauncher.tscn"
 SceneService="*res://framework/SceneService.gd"
 UiService="*res://framework/UiService.gd"
+UpdateService="*res://framework/UpdateService.gd"
 
 [debug]
 
