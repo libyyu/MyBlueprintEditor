@@ -295,10 +295,28 @@ namespace UGFramework.Runtime
             [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
             public delegate void LogCallbackDelegate(BPLogLevel level,
                 [MarshalAs(UnmanagedType.LPStr)] string message);
-
             /// <summary>Node handler callback: ctx=execution context, userdata=GCHandle ptr. Return 1=ok, 0=fail.</summary>
             [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
             public delegate int HandlerDelegate(IntPtr ctx, IntPtr userdata);
+
+            // --- File reader callbacks (BP_SetFileReader) ---
+            /// <summary>Read-file callback. Return 1 and fill *outData/*outSize on success, else 0.</summary>
+            [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+            public delegate int FileReadFnDelegate(
+                [MarshalAs(UnmanagedType.LPStr)] string path,
+                out IntPtr outData,
+                out int outSize,
+                IntPtr userdata);
+
+            /// <summary>Free-buffer callback for memory returned by FileReadFnDelegate. May be NULL.</summary>
+            [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+            public delegate void FileFreeFnDelegate(IntPtr data, IntPtr userdata);
+
+            /// <summary>File-exists callback. Return 1 if path exists, 0 otherwise. May be NULL.</summary>
+            [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+            public delegate int FileExistsFnDelegate(
+                [MarshalAs(UnmanagedType.LPStr)] string path,
+                IntPtr userdata);
 
             // --- Lifecycle ---
             [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
@@ -560,6 +578,17 @@ namespace UGFramework.Runtime
             [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
             public static extern void BP_WriteCrashDump(
                 [MarshalAs(UnmanagedType.LPStr)] string reason);
+
+            // --- Host file reader (BP_SetFileReader) ---
+            /// <summary>Install a host file-reader. Pass read_cb=NULL to restore the built-in
+            /// DefaultFileSystem. userdata is passed back to every callback unchanged.
+            /// Process-global; thread-safe to call once at startup.</summary>
+            [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
+            public static extern void BP_SetFileReader(
+                FileReadFnDelegate read_cb,
+                FileFreeFnDelegate free_cb,
+                FileExistsFnDelegate exists_cb,
+                IntPtr userdata);
 
             [DllImport(NativeLib.DLL, CallingConvention = CallingConvention.Cdecl)]
             public static extern void BP_SetExternalLuaState(IntPtr runner, IntPtr L);
@@ -1159,6 +1188,110 @@ namespace UGFramework.Runtime
             /// Useful for diagnosing hangs or abnormal states.</summary>
             public static void WriteCrashDump(string reason = null) =>
                 Native.BP_WriteCrashDump(reason ?? "manual");
+
+            // ---------------------------------------------------------------------
+            // Host file reader (BP_SetFileReader)
+            //
+            // Allows the host (Unity) to override how BlueprintRuntime resolves and
+            // reads files (e.g. redirect to StreamingAssets, AssetBundle, VFS…).
+            // Process-global; typically called once at startup.
+            //
+            // We keep strong refs to the managed delegates + allocated read buffers
+            // so the GC / native side won't crash on callback dispatch.
+            // ---------------------------------------------------------------------
+
+            // Strong refs to prevent GC while native side holds function pointers.
+            private static Native.FileReadFnDelegate s_fileReadDelegate;
+            private static Native.FileFreeFnDelegate s_fileFreeDelegate;
+            private static Native.FileExistsFnDelegate s_fileExistsDelegate;
+
+            /// <summary>User read callback signature. Return byte[] on success, or null on failure.</summary>
+            public delegate byte[] FileReadHandler(string path);
+
+            /// <summary>User exists callback signature. Return true if the path exists.</summary>
+            public delegate bool FileExistsHandler(string path);
+
+            /// <summary>
+            /// Install a managed file-reader. All file loads inside BlueprintRuntime
+            /// (LoadFromFile / embedded Lua / relative-path resolution) will be routed
+            /// through <paramref name="readHandler"/> and <paramref name="existsHandler"/>.
+            ///
+            /// Pass <c>readHandler = null</c> to restore the built-in DefaultFileSystem.
+            /// Process-global; thread-safe to call once at startup.
+            /// </summary>
+            /// <param name="readHandler">Reads the file and returns its bytes, or null on failure.</param>
+            /// <param name="existsHandler">Optional existence probe; if null, existence is inferred from a read attempt.</param>
+            public static void SetFileReader(FileReadHandler readHandler, FileExistsHandler existsHandler = null)
+            {
+                if (readHandler == null)
+                {
+                    // Restore built-in DefaultFileSystem
+                    Native.BP_SetFileReader(null, null, null, IntPtr.Zero);
+                    s_fileReadDelegate = null;
+                    s_fileFreeDelegate = null;
+                    s_fileExistsDelegate = null;
+                    return;
+                }
+
+                s_fileReadDelegate = (string path, out IntPtr outData, out int outSize, IntPtr userdata) =>
+                {
+                    outData = IntPtr.Zero;
+                    outSize = 0;
+                    try
+                    {
+                        byte[] bytes = readHandler(path);
+                        if (bytes == null) return 0;
+
+                        // Allocate unmanaged buffer; freed by s_fileFreeDelegate.
+                        IntPtr buf = Marshal.AllocHGlobal(bytes.Length);
+                        if (bytes.Length > 0)
+                            Marshal.Copy(bytes, 0, buf, bytes.Length);
+                        outData = buf;
+                        outSize = bytes.Length;
+                        return 1;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"[Blueprint] FileReader('{path}') threw: {ex}");
+                        return 0;
+                    }
+                };
+
+                s_fileFreeDelegate = (IntPtr data, IntPtr userdata) =>
+                {
+                    if (data != IntPtr.Zero)
+                        Marshal.FreeHGlobal(data);
+                };
+
+                if (existsHandler != null)
+                {
+                    s_fileExistsDelegate = (string path, IntPtr userdata) =>
+                    {
+                        try { return existsHandler(path) ? 1 : 0; }
+                        catch (Exception ex)
+                        {
+                            Debug.LogError($"[Blueprint] FileExists('{path}') threw: {ex}");
+                            return 0;
+                        }
+                    };
+                }
+                else
+                {
+                    s_fileExistsDelegate = null;
+                }
+
+                Native.BP_SetFileReader(
+                    s_fileReadDelegate,
+                    s_fileFreeDelegate,
+                    s_fileExistsDelegate,
+                    IntPtr.Zero);
+            }
+
+            /// <summary>Restore the built-in DefaultFileSystem and release managed callbacks.</summary>
+            public static void RestoreDefaultFileReader()
+            {
+                SetFileReader(null, null);
+            }
 
             /// <summary>Initialize the default HTTP client (cpp-httplib on native,
             /// emscripten_fetch on WebGL). Required before any LLM.* / HTTP.* node
