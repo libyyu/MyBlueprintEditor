@@ -300,17 +300,33 @@ namespace UGFramework.Runtime
             public delegate int HandlerDelegate(IntPtr ctx, IntPtr userdata);
 
             // --- File reader callbacks (BP_SetFileReader) ---
+            //
+            // C signature:
+            //   typedef int (*BP_FileReadFn)(const char* path,
+            //                                char** outData, int* outSize, void* userdata);
+            //   typedef void (*BP_FileFreeFn)(char* data, void* userdata);
+            //
+            // Marshaling notes:
+            //   * `char** outData` → `out IntPtr outData`. We must allocate a raw
+            //      byte buffer (Marshal.AllocHGlobal), copy UTF-8/binary bytes into
+            //      it, and store its address into outData. Native side treats the
+            //      buffer as `char*` and copies `outSize` bytes via
+            //      `outContent.assign(data, size)` — length-based, NUL-terminator
+            //      is NOT required.
+            //   * `char*  data`     → `IntPtr data` in the free callback; this is
+            //      the same pointer we returned above, freed with FreeHGlobal.
+            //   * `void*  userdata` → `IntPtr userdata` (opaque, unchanged).
             /// <summary>Read-file callback. Return 1 and fill *outData/*outSize on success, else 0.</summary>
             [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
             public delegate int FileReadFnDelegate(
                 [MarshalAs(UnmanagedType.LPStr)] string path,
-                out IntPtr outData,
-                out int outSize,
+                out IntPtr outData, // char** — receives address of a byte buffer we allocate
+                out int outSize, // int*   — number of bytes in that buffer
                 IntPtr userdata);
 
             /// <summary>Free-buffer callback for memory returned by FileReadFnDelegate. May be NULL.</summary>
             [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-            public delegate void FileFreeFnDelegate(IntPtr data, IntPtr userdata);
+            public delegate void FileFreeFnDelegate(IntPtr data, IntPtr userdata); // char* data
 
             /// <summary>File-exists callback. Return 1 if path exists, 0 otherwise. May be NULL.</summary>
             [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -1205,31 +1221,66 @@ namespace UGFramework.Runtime
             private static Native.FileFreeFnDelegate s_fileFreeDelegate;
             private static Native.FileExistsFnDelegate s_fileExistsDelegate;
 
-            /// <summary>User read callback signature. Return byte[] on success, or null on failure.</summary>
-            public delegate byte[] FileReadHandler(string path);
+            /// <summary>
+            /// User read callback signature (text).
+            /// Return the file contents as a string on success, or <c>null</c> on failure.
+            /// The string will be encoded as UTF-8 before being handed to native code
+            /// (matching C++ side's <c>outContent.assign(data, size)</c>, which is length-based
+            /// and binary-safe — no NUL terminator required).
+            /// </summary>
+            public delegate string FileReadHandler(string path);
+
+            /// <summary>
+            /// User read callback signature (raw bytes).
+            /// Return the file contents as a byte[] on success, or <c>null</c> on failure.
+            /// Prefer this overload when the file is truly binary; for text (JSON / Lua / bjson)
+            /// use <see cref="FileReadHandler"/>.
+            /// </summary>
+            public delegate byte[] FileReadBytesHandler(string path);
 
             /// <summary>User exists callback signature. Return true if the path exists.</summary>
             public delegate bool FileExistsHandler(string path);
 
             /// <summary>
-            /// Install a managed file-reader. All file loads inside BlueprintRuntime
+            /// Install a managed text file-reader. All file loads inside BlueprintRuntime
             /// (LoadFromFile / embedded Lua / relative-path resolution) will be routed
             /// through <paramref name="readHandler"/> and <paramref name="existsHandler"/>.
             ///
             /// Pass <c>readHandler = null</c> to restore the built-in DefaultFileSystem.
-            /// Process-global; thread-safe to call once at startup.
+            /// Process-global; typically called once at startup.
             /// </summary>
-            /// <param name="readHandler">Reads the file and returns its bytes, or null on failure.</param>
+            /// <param name="readHandler">Reads the file and returns its text (UTF-8), or null on failure.</param>
             /// <param name="existsHandler">Optional existence probe; if null, existence is inferred from a read attempt.</param>
             public static void SetFileReader(FileReadHandler readHandler, FileExistsHandler existsHandler = null)
             {
                 if (readHandler == null)
                 {
-                    // Restore built-in DefaultFileSystem
-                    Native.BP_SetFileReader(null, null, null, IntPtr.Zero);
-                    s_fileReadDelegate = null;
-                    s_fileFreeDelegate = null;
-                    s_fileExistsDelegate = null;
+                    RestoreDefaultFileReader();
+                    return;
+                }
+
+                // Adapt string → byte[] (UTF-8) and forward to the bytes-based installer.
+                SetFileReader(
+                    (string path) =>
+                    {
+                        string text = readHandler(path);
+                        if (text == null) return null;
+                        // Do NOT append a NUL — C++ side uses length-based assign(data, size).
+                        return Encoding.UTF8.GetBytes(text);
+                    },
+                    existsHandler);
+            }
+
+            /// <summary>
+            /// Install a managed binary file-reader. Same semantics as the string overload,
+            /// but returns raw bytes — use this for truly binary payloads.
+            /// Pass <c>readHandler = null</c> to restore the built-in DefaultFileSystem.
+            /// </summary>
+            public static void SetFileReader(FileReadBytesHandler readHandler, FileExistsHandler existsHandler = null)
+            {
+                if (readHandler == null)
+                {
+                    RestoreDefaultFileReader();
                     return;
                 }
 
@@ -1242,8 +1293,8 @@ namespace UGFramework.Runtime
                         byte[] bytes = readHandler(path);
                         if (bytes == null) return 0;
 
-                        // Allocate unmanaged buffer; freed by s_fileFreeDelegate.
-                        IntPtr buf = Marshal.AllocHGlobal(bytes.Length);
+                        // Allocate unmanaged buffer; freed by s_fileFreeDelegate after native copies it.
+                        IntPtr buf = Marshal.AllocHGlobal(bytes.Length == 0 ? 1 : bytes.Length);
                         if (bytes.Length > 0)
                             Marshal.Copy(bytes, 0, buf, bytes.Length);
                         outData = buf;
@@ -1290,7 +1341,10 @@ namespace UGFramework.Runtime
             /// <summary>Restore the built-in DefaultFileSystem and release managed callbacks.</summary>
             public static void RestoreDefaultFileReader()
             {
-                SetFileReader(null, null);
+                Native.BP_SetFileReader(null, null, null, IntPtr.Zero);
+                s_fileReadDelegate = null;
+                s_fileFreeDelegate = null;
+                s_fileExistsDelegate = null;
             }
 
             /// <summary>Initialize the default HTTP client (cpp-httplib on native,
