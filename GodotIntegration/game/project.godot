@@ -10,6 +10,7 @@ config/features=PackedStringArray("4.5", "Forward Plus")
 
 [autoload]
 
+Launcher="*res://framework/GameLauncher.tscn"
 SceneService="*res://framework/SceneService.gd"
 UiService="*res://framework/UiService.gd"
 

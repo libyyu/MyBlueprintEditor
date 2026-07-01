@@ -4,6 +4,9 @@
 #include "blueprint_node.h"
 #include "godot_file_bridge.h"
 #include "godot_lua_loader.h"
+#ifdef BLUEPRINT_HAS_LUA
+#include "godot_lua_bindings.h"
+#endif
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -70,6 +73,21 @@ void GameLauncher::end_update_phase() {
     UtilityFunctions::print("[GameLauncher] update phase ended; fresh game VM ready");
 }
 
+void GameLauncher::bind_lua_api(BlueprintNode *node) {
+    if (node == nullptr || node->runner_ptr() == nullptr) {
+        UtilityFunctions::printerr("[GameLauncher] bind_lua_api: node has no runner (load a blueprint first)");
+        return;
+    }
+#ifdef BLUEPRINT_HAS_LUA
+    // Use the node itself as tree context: it can reach /root/ autoloads
+    // (SceneService/UiService) and stays valid in the current scene, whereas
+    // this GameLauncher may live in a Boot scene already replaced by change_scene.
+    register_godot_lua_bindings(node->runner_ptr(), node);
+#else
+    UtilityFunctions::printerr("[GameLauncher] bind_lua_api: built without Lua (GDEXT_WITH_LUA=OFF)");
+#endif
+}
+
 void GameLauncher::set_lua_roots(const PackedStringArray &roots) { _lua_roots = roots; }
 PackedStringArray GameLauncher::get_lua_roots() const { return _lua_roots; }
 void GameLauncher::set_auto_setup(bool v) { _auto_setup = v; }
@@ -81,6 +99,7 @@ void GameLauncher::_bind_methods() {
     ClassDB::bind_method(D_METHOD("begin_update_phase"), &GameLauncher::begin_update_phase);
     ClassDB::bind_method(D_METHOD("end_update_phase"), &GameLauncher::end_update_phase);
     ClassDB::bind_method(D_METHOD("in_update_phase"), &GameLauncher::in_update_phase);
+    ClassDB::bind_method(D_METHOD("bind_lua_api", "node"), &GameLauncher::bind_lua_api);
 
     ClassDB::bind_method(D_METHOD("set_lua_roots", "roots"), &GameLauncher::set_lua_roots);
     ClassDB::bind_method(D_METHOD("get_lua_roots"), &GameLauncher::get_lua_roots);

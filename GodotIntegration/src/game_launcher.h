@@ -64,6 +64,11 @@ public:
     // Whether an update phase is currently active.
     bool in_update_phase() const { return _update_node != nullptr; }
 
+    // Register the project-layer Scene.*/UI.* Lua tables onto the given node's
+    // Lua VM (via BP_GetLuaState). Call after the node has loaded a blueprint.
+    // Lets Lua scripts drive Godot SceneService/UiService. Engine untouched.
+    void bind_lua_api(BlueprintNode *node);
+
     // Whether process-level setup has completed.
     bool is_ready() const { return _did_setup; }
 

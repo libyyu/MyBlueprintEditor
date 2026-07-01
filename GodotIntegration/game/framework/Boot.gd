@@ -11,7 +11,7 @@ extends Node
 ## 本 Demo 用 GDScript 模拟"更新进度"以聚焦框架；真实项目中更新逻辑可写在
 ## 更新蓝图/Lua 里，通过 upd.get_var_bool("UpdateLogicDone") 轮询（见 docs/03）。
 
-@onready var launcher: GameLauncher = $GameLauncher
+@onready var launcher := get_node("/root/Launcher")  # autoload 单例（避免与类型名 GameLauncher 撞名）
 
 func _ready() -> void:
 	print("========== Boot: framework smoke test ==========")

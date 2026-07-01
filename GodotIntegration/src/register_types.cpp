@@ -4,6 +4,9 @@
 #include "register_types.h"
 #include "blueprint_node.h"
 #include "game_launcher.h"
+#ifdef BLUEPRINT_HAS_LUA
+#include "godot_lua_bindings.h"   // GdUiClickRelay
+#endif
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
@@ -18,6 +21,13 @@ void initialize_blueprint_module(ModuleInitializationLevel p_level) {
     }
     GDREGISTER_CLASS(GameLauncher);
     GDREGISTER_CLASS(BlueprintNode);
+#ifdef BLUEPRINT_HAS_LUA
+    // Internal relays used by the project-layer Lua UI bridge. Must be
+    // registered here at init time — registering a GDExtension class at runtime
+    // crashes Godot.
+    GDREGISTER_INTERNAL_CLASS(GdUiClickRelay);      // UI.on_click
+    GDREGISTER_INTERNAL_CLASS(GdUiPanelReadyRelay); // UI.open_panel_async
+#endif
 }
 
 void uninitialize_blueprint_module(ModuleInitializationLevel p_level) {

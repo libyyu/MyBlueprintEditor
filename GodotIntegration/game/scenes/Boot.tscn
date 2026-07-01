@@ -4,7 +4,3 @@
 
 [node name="Boot" type="Node"]
 script = ExtResource("1")
-
-[node name="GameLauncher" type="GameLauncher" parent="."]
-lua_roots = PackedStringArray("res://lua", "res://blueprints")
-auto_setup = false

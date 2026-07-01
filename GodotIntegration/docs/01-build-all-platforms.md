@@ -28,6 +28,25 @@
 
 ---
 
+## 0.1 GDExtension（第③层）的 CMake 选项 —— 全平台通用
+
+`GodotIntegration/CMakeLists.txt` 已做成**跨平台**：平台通过 `WIN32 / APPLE / ANDROID /
+EMSCRIPTEN / CMAKE_SYSTEM_NAME` 自动识别，产物名 `blueprint_gdext.<plat>.template_debug.<arch>`
+自动推导。两个关键选项：
+
+| 选项 | 默认 | 说明 |
+|------|------|------|
+| `GDEXT_WITH_LUA` | `ON` | 是否编译 Scene/UI 的 Lua 绑定（`godot_lua_bindings.cpp`）并启用 `BLUEPRINT_HAS_LUA`。**必须与引擎的 `BLUEPRINT_LUA` 一致**：引擎带 Lua → 这里 ON；引擎 `build-nolua`（`BLUEPRINT_LUA=OFF`）→ 这里 `-DGDEXT_WITH_LUA=OFF` |
+| `BP_BUILD_DIR` | 按平台自动 | 指定从哪个引擎 build 目录取产物+Lua 头。Win 默认 `build-windows`、Web 默认 `build-wasm`；Linux/macOS/Android/iOS 建议显式 `-DBP_BUILD_DIR=build-<platform>` |
+
+**链接方式自动切换**（对齐引擎产物形态）：
+- 桌面（Win/Linux/macOS）+ Android：引擎是 **shared**，GDExtension 链 import lib 并把 dll/so/dylib 拷到 `game/bin/`。
+- Web / iOS：引擎是 **static `.a`**（且已把 Lua bake 进去），GDExtension **静态链接**引擎，不拷 dll。
+
+> `GDEXT_WITH_LUA=OFF` 时：不编 `godot_lua_bindings.cpp`，`BlueprintNode.run_lua` / `GameLauncher.bind_lua_api` 变为打印告警的空实现，`GdUiClickRelay` 不注册 —— 全部用 `#ifdef BLUEPRINT_HAS_LUA` 守卫，可干净编过（需配套用 `BLUEPRINT_LUA=OFF` 编的引擎，否则链接会缺少 `BP_ResetSharedLuaVM` 等 Lua 相关符号）。
+
+---
+
 ## 1. Windows (x86_64, MSVC)
 
 ### ① 引擎核心

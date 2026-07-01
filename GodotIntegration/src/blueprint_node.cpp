@@ -17,6 +17,10 @@
 // the include dir is wired up in CMakeLists.txt.
 extern "C" {
 #include "BlueprintCAPI.h"
+#ifdef BLUEPRINT_HAS_LUA
+#include <lua.h>
+#include <lauxlib.h>
+#endif
 }
 
 using namespace godot;
@@ -164,6 +168,40 @@ void BlueprintNode::tick(double delta) {
     BP_Tick(r, static_cast<float>(delta));
 }
 
+bool BlueprintNode::run_lua_file(const String &path) {
+    if (!_runner) return false;
+    // BP_LoadLuaScript reads via the engine's IFileSystem (our Godot file bridge),
+    // so res:// / web / pck all work.
+    return BP_LoadLuaScript(static_cast<BP_Runner>(_runner), path.utf8().get_data()) == 0;
+}
+
+bool BlueprintNode::run_lua(const String &code) {
+    if (!_runner) return false;
+#ifdef BLUEPRINT_HAS_LUA
+    lua_State *L = BP_GetLuaState(static_cast<BP_Runner>(_runner));
+    if (L == nullptr) {
+        UtilityFunctions::printerr("[BlueprintNode] run_lua: no Lua VM (load a blueprint first)");
+        return false;
+    }
+    CharString c = code.utf8();
+    if (luaL_loadbuffer(L, c.get_data(), c.length(), "=run_lua") != LUA_OK) {
+        String e = String::utf8(lua_tostring(L, -1)); lua_pop(L, 1);
+        UtilityFunctions::printerr(String("[BlueprintNode] run_lua compile: ") + e);
+        return false;
+    }
+    if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
+        String e = String::utf8(lua_tostring(L, -1)); lua_pop(L, 1);
+        UtilityFunctions::printerr(String("[BlueprintNode] run_lua exec: ") + e);
+        return false;
+    }
+    return true;
+#else
+    (void)code;
+    UtilityFunctions::printerr("[BlueprintNode] run_lua: built without Lua (GDEXT_WITH_LUA=OFF)");
+    return false;
+#endif
+}
+
 bool BlueprintNode::is_loaded() const { return _loaded; }
 
 String BlueprintNode::get_last_error() const {
@@ -252,6 +290,8 @@ void BlueprintNode::_bind_methods() {
     ClassDB::bind_method(D_METHOD("is_loaded"), &BlueprintNode::is_loaded);
     ClassDB::bind_method(D_METHOD("get_last_error"), &BlueprintNode::get_last_error);
     ClassDB::bind_method(D_METHOD("get_dependencies", "path"), &BlueprintNode::get_dependencies);
+    ClassDB::bind_method(D_METHOD("run_lua_file", "path"), &BlueprintNode::run_lua_file);
+    ClassDB::bind_method(D_METHOD("run_lua", "code"), &BlueprintNode::run_lua);
 
     ClassDB::bind_method(D_METHOD("set_var_int", "name", "value"), &BlueprintNode::set_var_int);
     ClassDB::bind_method(D_METHOD("get_var_int", "name"), &BlueprintNode::get_var_int);

@@ -57,6 +57,15 @@ public:
     void tick(double delta);
     bool is_loaded() const;
     String get_last_error() const;
+
+    // Load a Lua script file into this runner's VM (require-resolved, runs it).
+    bool run_lua_file(const String &path);
+    // Execute an inline Lua chunk in this runner's VM (project-layer helper).
+    bool run_lua(const String &code);
+
+    // Internal (C++ only): the raw BP_Runner handle, for project-layer code that
+    // needs the runner's lua_State via BP_GetLuaState (e.g. godot_lua_bindings).
+    void *runner_ptr() const { return _runner; }
     // Query the dependency paths declared in a blueprint file's metadata
     // (without loading it). Useful for verifying the resource graph.
     PackedStringArray get_dependencies(const String &path) const;
