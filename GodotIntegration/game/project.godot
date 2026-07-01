@@ -5,8 +5,13 @@ config_version=5
 [application]
 
 config/name="Blueprint Godot Test"
-run/main_scene="res://test_blueprint.tscn"
+run/main_scene="res://scenes/Boot.tscn"
 config/features=PackedStringArray("4.5", "Forward Plus")
+
+[autoload]
+
+SceneService="*res://framework/SceneService.gd"
+UiService="*res://framework/UiService.gd"
 
 [debug]
 
