@@ -1,4 +1,7 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace UGFramework.Runtime
@@ -34,7 +37,7 @@ namespace UGFramework.Runtime
 
         [Tooltip("Call Tick(deltaTime) every frame in Update()")]
         public bool tickEveryFrame = true;
-
+        
         /// <summary>Access the underlying runner for variable read/write and handler registration.</summary>
         public BlueprintRuntime.BPRunner Runner { get; private set; }
 
@@ -58,7 +61,100 @@ namespace UGFramework.Runtime
             }
         }
 
-        protected virtual void Start()
+        protected async void ExecuteBlueprint()
+        {
+            if (Runner == null || Runner.IsLoaded) return;
+            try
+            {
+                Dictionary<string, string> context = null;
+                if (blueprintJson != null)
+                {
+                    context = await LoadBJsonFromTextAsync(blueprintJson.text);
+                }
+                else if (!string.IsNullOrEmpty(blueprintFilePath))
+                {
+                    context = await LoadBJsonAsync(blueprintFilePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[Blueprint] Load error: {ex.Message}");
+            }
+        }
+
+        private async UniTask<string> LoadBJson(string filePath)
+        {
+            ReturnTuple<bool, string> result = new ReturnTuple<bool, string>();
+            result.value_0 = false;
+            YooAssetsLuaBridge.LoadAsset("DefaultPackage", filePath, (success, o, err) =>
+            {
+                result.value_0 = true;
+                if (success && o is TextAsset)
+                {
+                    result.value_1 = (o as TextAsset).text;
+                }
+            });
+            while (!result.value_0)
+            {
+                await UniTask.Yield();
+            }
+            return result.value_1;
+        }
+
+        protected async UniTask<Dictionary<string, string>> LoadBJsonAsync(string filePath)
+        {
+            var jsonStr = await LoadBJson(filePath);
+            if (string.IsNullOrEmpty(jsonStr))
+            {
+                Debug.LogError($"[Blueprint] Load '${filePath}' error: context is empty");
+                return null;
+            }
+            var context = await LoadBJsonFromTextAsync(jsonStr);
+            if (context != null)
+            {
+                context[filePath] = jsonStr;
+            }
+            return context;
+        }
+        protected async UniTask<Dictionary<string, string>> LoadBJsonFromTextAsync(string jsonStr)
+        {
+            if (string.IsNullOrEmpty(jsonStr))
+            {
+                Debug.LogError($"[Blueprint] error: context is empty");
+                return null;
+            }
+            
+            var meta = BlueprintRuntime.BPRunner.ParseMetaFromJson(jsonStr);
+            if (meta == null)
+            {
+                Debug.LogError($"[Blueprint] error: meta is null");
+                return null;
+            }
+            Dictionary<string, string> context = new Dictionary<string, string>();
+            
+            bool bHasError = false;
+            for (int i = 0; i < meta.DependencyCount; ++i)
+            {
+                var dep = meta.GetDependency(i);
+                var depStr = await LoadBJson(dep);
+                if (depStr != null)
+                {
+                    context[dep] = depStr;
+                }
+                else
+                {
+                    bHasError = true;
+                    Debug.LogError($"[Blueprint] error: load dependency '{dep}' error");
+                }
+            }
+
+            if (bHasError)
+                return null;
+            
+            return context;
+        }
+
+        private async void Start()
         {
             if (autoExecute && Runner.IsLoaded)
             {

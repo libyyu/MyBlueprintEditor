@@ -1,0 +1,20 @@
+{
+    "name": "Pet.Runtime",
+    "rootNamespace": "Pet.Runtime",
+    "references": [
+        "UGFramework.Runtime",
+        "YooAsset",
+        "XLua.Runtime",
+        "Unity.TextMeshPro",
+        "UniTask"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
