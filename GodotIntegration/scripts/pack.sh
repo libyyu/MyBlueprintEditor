@@ -9,10 +9,18 @@
 #   ANDROID_NDK_HOME     Android NDK（android 需要）
 #   (Emscripten)         web / minigame 前先 source emsdk_env
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/pack_common.sh"
 
+prepare_target() {
+  if is_windows_host; then
+    TARGET="windows"
+  fi
+}
+
+
 TARGET="${1:-}"
+[[ -n "$TARGET" ]] || prepare_target
 [[ -n "$TARGET" ]] || die "用法: bash pack.sh <windows|linux|macos|android|ios|web|minigame|patch|all>"
 
 pack_desktop() {  # $1 = windows|linux|macos ; $2 = preset名 ; $3 = 输出文件
