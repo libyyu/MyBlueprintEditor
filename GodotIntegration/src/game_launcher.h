@@ -28,13 +28,13 @@ class GameLauncher : public Node {
     GDCLASS(GameLauncher, Node)
 
 private:
-    PackedStringArray _lua_roots;     // require search roots, e.g. ["res://lua"]
     bool _auto_setup = true;          // run setup() automatically in _ready
     bool _did_setup = false;          // process-level guard
     BlueprintNode *_update_node = nullptr; // dedicated update-phase runner
-
+#ifdef BLUEPRINT_HAS_LUA
+    PackedStringArray _lua_roots;     // require search roots, e.g. ["res://lua"]
     void install_resolver();          // (re)bind Lua require resolver to current VM
-
+#endif
 protected:
     static void _bind_methods();
 
@@ -64,17 +64,20 @@ public:
     // Whether an update phase is currently active.
     bool in_update_phase() const { return _update_node != nullptr; }
 
+    // Whether process-level setup has completed.
+    bool is_ready() const { return _did_setup; }
+
+#ifdef BLUEPRINT_HAS_LUA
     // Register the project-layer Scene.*/UI.* Lua tables onto the given node's
     // Lua VM (via BP_GetLuaState). Call after the node has loaded a blueprint.
     // Lets Lua scripts drive Godot SceneService/UiService. Engine untouched.
     void bind_lua_api(BlueprintNode *node);
 
-    // Whether process-level setup has completed.
-    bool is_ready() const { return _did_setup; }
-
     // Configure Lua require roots BEFORE setup() (or call setup() again is a no-op).
     void set_lua_roots(const PackedStringArray &roots);
     PackedStringArray get_lua_roots() const;
+
+#endif
 
     void set_auto_setup(bool v);
     bool get_auto_setup() const;

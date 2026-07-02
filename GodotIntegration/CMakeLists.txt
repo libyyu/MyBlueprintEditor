@@ -142,10 +142,10 @@ set(BP_GDEXT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/register_types.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/blueprint_node.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/game_launcher.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/godot_file_bridge.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/godot_lua_loader.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/godot_file_bridge.cpp")
 
 if(GDEXT_WITH_LUA)
+    list(APPEND BP_GDEXT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/godot_lua_loader.cpp")
     list(APPEND BP_GDEXT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/godot_lua_bindings.cpp")
 endif()
 

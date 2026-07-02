@@ -2,25 +2,35 @@
 # 被 pack_android.sh / pack_web.sh / pack_minigame.sh / pack_ios.sh source。
 #
 # 三层构建顺序（所有平台一致）：
-#   ① 引擎核心 BlueprintRuntime  → 用仓库根 build.sh
+#   ① 引擎核心 BlueprintRuntime  → 用仓库根 build.sh（内部走 busybox）
 #   ② GDExtension blueprint_gdext → 用 GodotIntegration/CMakeLists.txt（跨平台已就绪）
-#   ③ Godot 导出                  → godot --headless --export-*
+#   ③ Godot 导出                  → godot --headless --export-release
+#
+# 运行方式（二选一）：
+#   - 真 bash（推荐）：bash scripts/pack.sh <target>
+#   - RunShell.bat（busybox，Windows）：RunShell.bat pack.sh <target>
+#     RunShell.bat 会 set USE_BUSYBOX=1，本脚本据此用 $0 兜底定位目录。
 set -euo pipefail
 HOST_OS="$(uname -s)"
+
+# 是否用 RunShell.bat（busybox）驱动。RunShell.bat 会 set USE_BUSYBOX=1。
+# 用 ${VAR:-} 兜底：即使外部没定义该变量，set -u 下也不会报 "parameter not set"。
 IS_BUSYBOX=
-if [ "$USE_BUSYBOX" = "1" ]; then
+if [ "${USE_BUSYBOX:-}" = "1" ]; then
   IS_BUSYBOX=true
 fi
-if [ "`uname -s`" = "Darwin" ]; then
-	IS_MACOSX=true
+
+IS_MACOSX=
+if [ "$HOST_OS" = "Darwin" ]; then
+  IS_MACOSX=true
 fi
 
-if [ ! "$SCRIPT_DIR" ] ; then
-  # busybox不支持BASH_SOURCE
+# 定位脚本自身目录。busybox 的 sh 不可靠支持 ${BASH_SOURCE}，用 $0 兜底。
+if [ -z "${SCRIPT_DIR:-}" ] ; then
   if [ "$IS_BUSYBOX" = "true" ]; then
     SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
   else
-    SCRIPT_DIR=$(dirname "${BASH_SOURCE}")
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE:-$0}")" && pwd)"
   fi
 fi
 
@@ -47,11 +57,12 @@ is_windows_host() {
     esac
 }
 
-# 在仓库根跑 build.sh（Windows 走 busybox）
+# 在仓库根跑 build.sh。Windows 下用仓库自带 busybox 驱动（build.sh 依赖它）；
+# 其它平台用系统 sh。
 run_build_sh() {
-  log "① running $*"
+  log "① running build.sh $*"
   local args="$*"
-  local tmpdir=`pwd`
+  local tmpdir; tmpdir="$(pwd)"
   cd "$REPO_ROOT"
   sh build.sh $args
   cd "$tmpdir"

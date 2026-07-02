@@ -19,8 +19,10 @@ extern "C" {
 using namespace godot;
 
 GameLauncher::GameLauncher() {
+#ifdef BLUEPRINT_HAS_LUA
     // Sensible default require root.
     _lua_roots.append("res://lua");
+#endif
 }
 
 void GameLauncher::_ready() {
@@ -31,7 +33,7 @@ void GameLauncher::_ready() {
     // either way it runs before anything loads a blueprint.
     if (_auto_setup) setup();
 }
-
+#ifdef BLUEPRINT_HAS_LUA
 void GameLauncher::install_resolver() {
     // (Re)bind the host Lua require resolver to the CURRENT default shared VM.
     // Called by setup() and again after BP_ResetSharedLuaVM() so the freshly
@@ -39,13 +41,16 @@ void GameLauncher::install_resolver() {
     // targets the process-default VM (created on demand).
     install_godot_lua_loader(nullptr, _lua_roots);
 }
+#endif
 
 bool GameLauncher::setup() {
     if (_did_setup) return true;
     // Process-level environment — needed by EVERY phase (update + game):
     BP_InitDefaultHttpClient();        // LLM/http nodes
     install_godot_file_reader("");     // all file reads -> Godot FileAccess
+#ifdef BLUEPRINT_HAS_LUA
     install_resolver();                // require -> res://lua/...
+#endif
     _did_setup = true;
     UtilityFunctions::print("[GameLauncher] setup complete (file reader + lua resolver)");
     return true;
@@ -69,7 +74,9 @@ void GameLauncher::end_update_phase() {
         _update_node = nullptr;
     }
     BP_ResetSharedLuaVM();   // discard the update VM
+#ifdef BLUEPRINT_HAS_LUA
     install_resolver();      // re-bind resolver to the fresh game VM (created on demand)
+#endif
     UtilityFunctions::print("[GameLauncher] update phase ended; fresh game VM ready");
 }
 
@@ -87,9 +94,10 @@ void GameLauncher::bind_lua_api(BlueprintNode *node) {
     UtilityFunctions::printerr("[GameLauncher] bind_lua_api: built without Lua (GDEXT_WITH_LUA=OFF)");
 #endif
 }
-
+#ifdef BLUEPRINT_HAS_LUA
 void GameLauncher::set_lua_roots(const PackedStringArray &roots) { _lua_roots = roots; }
 PackedStringArray GameLauncher::get_lua_roots() const { return _lua_roots; }
+#endif
 void GameLauncher::set_auto_setup(bool v) { _auto_setup = v; }
 bool GameLauncher::get_auto_setup() const { return _auto_setup; }
 
@@ -99,12 +107,13 @@ void GameLauncher::_bind_methods() {
     ClassDB::bind_method(D_METHOD("begin_update_phase"), &GameLauncher::begin_update_phase);
     ClassDB::bind_method(D_METHOD("end_update_phase"), &GameLauncher::end_update_phase);
     ClassDB::bind_method(D_METHOD("in_update_phase"), &GameLauncher::in_update_phase);
+#ifdef BLUEPRINT_HAS_LUA
     ClassDB::bind_method(D_METHOD("bind_lua_api", "node"), &GameLauncher::bind_lua_api);
-
     ClassDB::bind_method(D_METHOD("set_lua_roots", "roots"), &GameLauncher::set_lua_roots);
     ClassDB::bind_method(D_METHOD("get_lua_roots"), &GameLauncher::get_lua_roots);
     ADD_PROPERTY(PropertyInfo(Variant::PACKED_STRING_ARRAY, "lua_roots"),
                  "set_lua_roots", "get_lua_roots");
+#endif
 
     ClassDB::bind_method(D_METHOD("set_auto_setup", "v"), &GameLauncher::set_auto_setup);
     ClassDB::bind_method(D_METHOD("get_auto_setup"), &GameLauncher::get_auto_setup);
