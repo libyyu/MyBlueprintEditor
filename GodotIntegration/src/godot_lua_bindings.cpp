@@ -491,11 +491,29 @@ int l_timer_reset(lua_State *L) {
 }
 
 // ---- Log.* ----
+// 变参、print 风格：Log.info("a", 1, true, tbl) —— 每个参数经 Lua tostring 转字符串，
+// 以空格连接成一条消息，再交给 LogService（异步写盘 + 控制台）。
 static int log_common(lua_State *L, const char *method) {
-    const char *msg = luaL_checkstring(L, 1);
+    int n = lua_gettop(L);
+    luaL_Buffer b;
+    luaL_buffinit(L, &b);
+    for (int i = 1; i <= n; ++i) {
+        // 用 luaL_tolstring：等价 Lua 的 tostring（会走 __tostring 元方法），把结果压栈
+        size_t len = 0;
+        const char *s = luaL_tolstring(L, i, &len);   // push 转换结果
+        luaL_addlstring(&b, s, len);
+        lua_pop(L, 1);                                 // 弹出 tolstring 的结果
+        if (i < n) luaL_addchar(&b, ' ');
+    }
+    luaL_pushresult(&b);                               // 栈顶 = 拼好的消息串
+    size_t mlen = 0;
+    const char *msg = lua_tolstring(L, -1, &mlen);
+    String gmsg = String::utf8(msg ? msg : "", (int)mlen);
+    lua_pop(L, 1);
+
     Node *s = autoload("LogService");
-    if (s) s->call(method, String::utf8(msg));
-    else UtilityFunctions::print(String("[Log] ") + String::utf8(msg)); // 无服务时兜底
+    if (s) s->call(method, gmsg);
+    else UtilityFunctions::print(String("[Log] ") + gmsg); // 无服务时兜底
     return 0;
 }
 int l_log_debug(lua_State *L) { return log_common(L, "debug"); }

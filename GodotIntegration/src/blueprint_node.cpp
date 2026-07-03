@@ -93,11 +93,9 @@ void BlueprintNode::_ready() {
 
 void BlueprintNode::_process(double delta) {
     if (Engine::get_singleton()->is_editor_hint()) return;
-    if (!_runner || !_tick_enabled) return;
+    if (!_runner || !_tick_enabled || !_loaded) return;
 
     BP_Runner r = static_cast<BP_Runner>(_runner);
-    // Process async results posted from background threads, then advance timers.
-    BP_DrainQueue();
     BP_Tick(r, static_cast<float>(delta));
 }
 
@@ -110,7 +108,10 @@ void BlueprintNode::_exit_tree() {
 }
 
 bool BlueprintNode::load_blueprint(const String &path) {
+    // Can't load without a runner
     if (!_runner) return false;
+    // Can't load twice
+    if (_loaded) return false;
     BP_Runner r = static_cast<BP_Runner>(_runner);
 
     // NOTE: the Lua module searcher is process-level and owned by GameLauncher.
@@ -135,6 +136,8 @@ bool BlueprintNode::load_blueprint(const String &path) {
 
 bool BlueprintNode::load_from_json(const String &json) {
     if (!_runner) return false;
+    // Can't load twice
+    if (_loaded) return false;
     BP_Runner r = static_cast<BP_Runner>(_runner);
     int rc = BP_LoadFromJson(r, json.utf8().get_data());
     _loaded = (rc == 0);
@@ -162,9 +165,8 @@ bool BlueprintNode::dispatch_event(const String &event_id) {
 }
 
 void BlueprintNode::tick(double delta) {
-    if (!_runner) return;
+    if (!_runner || !_loaded) return;
     BP_Runner r = static_cast<BP_Runner>(_runner);
-    BP_DrainQueue();
     BP_Tick(r, static_cast<float>(delta));
 }
 

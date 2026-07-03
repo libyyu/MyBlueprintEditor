@@ -120,6 +120,29 @@ GDScript 侧 `InputService` 额外提供：`get_vector(nx,px,ny,py)`（归一化
 
 > 默认 InputMap action 在 `project.godot` 的 `[input]` 段定义：`move_left/right/up/down`（WASD）。`ui_confirm`/`ui_cancel` 用 Godot 内置。业务按需在编辑器 Project → Input Map 里加更多，Lua/GDScript 用同一 action 名即可，跨平台一致。
 
+### Timer 全局表（逻辑计时器，对齐 Unity FTimerListBehavior/timer.lua）
+
+GDScript 侧对应 `TimerService`（autoload），Lua 侧 `Timer` 表转发。计时基于每帧 delta 累计，跨平台一致。
+
+| 表.函数 | 参数 | 说明 |
+|---|---|---|
+| `Timer.after(ttl, fn [,late])` | ttl 秒, fn Lua 函数, late 可选 | 延迟 ttl 秒触发**一次**，返回 timer id |
+| `Timer.every(ttl, fn [,late])` | | 每隔 ttl 秒**循环**触发，返回 timer id |
+| `Timer.cancel(id)` | | 取消计时器 |
+| `Timer.reset(id)` | | 重置（重新倒计时）|
+
+GDScript 侧 `TimerService.after/every/cancel/reset/clear/count`，`late=true` 走 late 链（对齐 Unity Update/LateUpdate）。Tick 期间增删安全（pending 暂存，帧末合并）。
+
+### Log 全局表（分级文件日志，对齐 Unity FileLoggger）
+
+GDScript 侧对应 `LogService`（autoload），Lua 侧 `Log` 表转发。
+
+| 表.函数 | 说明 |
+|---|---|
+| `Log.debug/info/warn/error(msg)` | 分级日志，格式 `[yyyyMMddHHmmss]-[级别]msg`，写 `user://logs/gamelog.log`（启动清空重建）+ 控制台（error 走 printerr）|
+
+`LogService` 属性：`file_enabled`（Web/小游戏无持久 FS 可设 false 仅控制台）、`min_level`（低于此级别丢弃，0=debug…3=error）。
+
 ---
 
 ## 4. 事件回流机制（按钮点击 → Lua）
@@ -169,7 +192,15 @@ GDScript 侧 `InputService` 额外提供：`get_vector(nx,px,ny,py)`（归一化
 
 值统一转成字符串传给 Lua（数值用 `String::num`），Lua 侧按需 `tonumber()`。
 
-> 四个 relay 类（`GdUiClickRelay` / `GdUiPanelReadyRelay` / `GdInputActionRelay` / `GdUiValueRelay`）
+### 4.4 计时器回流（Timer.after/every → Lua）
+
+`Timer.after/every` 无法直接把 Lua 函数交给 GDScript 的 `TimerService`，走 relay：
+1. 把 Lua 回调 `luaL_ref` 存注册表
+2. 建一个 `GdTimerRelay`（init 时注册），`add_child` 到 TimerService
+3. 把 relay 的 `_fire` 方法作为 `Callable` 传给 `TimerService.after/every(ttl, callable, late)`
+4. 到期时 `TimerService` 调 `_fire` → `lua_pcall(fn)`；**一次性(after)** 触发后 relay 自动 `luaL_unref` + `queue_free`（循环 every 则常驻，靠 `Timer.cancel(id)` 取消）
+
+> 五个 relay 类（`GdUiClickRelay` / `GdUiPanelReadyRelay` / `GdInputActionRelay` / `GdUiValueRelay` / `GdTimerRelay`）
 > **全部在 `register_types.cpp` 的 `initialize` 里 `GDREGISTER_INTERNAL_CLASS`**，且都在
 > `#ifdef BLUEPRINT_HAS_LUA` 守卫内（Lua OFF 编译时不注册）。
 

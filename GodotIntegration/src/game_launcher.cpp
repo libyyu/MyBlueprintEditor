@@ -3,8 +3,8 @@
 #include "game_launcher.h"
 #include "blueprint_node.h"
 #include "godot_file_bridge.h"
-#include "godot_lua_loader.h"
 #ifdef BLUEPRINT_HAS_LUA
+#include "godot_lua_loader.h"
 #include "godot_lua_bindings.h"
 #endif
 
@@ -23,6 +23,12 @@ GameLauncher::GameLauncher() {
     // Sensible default require root.
     _lua_roots.append("res://lua");
 #endif
+}
+
+void GameLauncher::_process(double delta) {
+    if (Engine::get_singleton()->is_editor_hint()) return;
+    // Process async results posted from background threads, then advance timers.
+    BP_DrainQueue();
 }
 
 void GameLauncher::_ready() {
@@ -45,14 +51,16 @@ void GameLauncher::install_resolver() {
 
 bool GameLauncher::setup() {
     if (_did_setup) return true;
+    _did_setup = true;
     // Process-level environment — needed by EVERY phase (update + game):
     BP_InitDefaultHttpClient();        // LLM/http nodes
     install_godot_file_reader("");     // all file reads -> Godot FileAccess
 #ifdef BLUEPRINT_HAS_LUA
     install_resolver();                // require -> res://lua/...
-#endif
-    _did_setup = true;
     UtilityFunctions::print("[GameLauncher] setup complete (file reader + lua resolver)");
+#else
+    UtilityFunctions::print("[GameLauncher] setup complete (file reader)");
+#endif
     return true;
 }
 

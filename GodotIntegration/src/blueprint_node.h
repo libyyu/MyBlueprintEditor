@@ -58,6 +58,7 @@ public:
     bool is_loaded() const;
     String get_last_error() const;
 
+    // 加载lua废弃，需要删除
     // Load a Lua script file into this runner's VM (require-resolved, runs it).
     bool run_lua_file(const String &path);
     // Execute an inline Lua chunk in this runner's VM (project-layer helper).

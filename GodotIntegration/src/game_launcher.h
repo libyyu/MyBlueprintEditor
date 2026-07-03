@@ -42,6 +42,7 @@ public:
     GameLauncher();
 
     void _ready() override;
+    void _process(double delta) override;
 
     // Idempotent process-level initialization (file reader + Lua resolver).
     // Safe to call multiple times; only the first call has effect.
