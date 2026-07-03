@@ -43,8 +43,9 @@ BUSYBOX="$REPO_ROOT/tools/busybox.exe"                 # Windows 下的 sh 驱�
 # --- 工具（按需用环境变量指定）---
 : "${GODOT_BIN:=godot}"          # Godot 编辑器/导出可执行；Win 用 Godot_v4.5-stable_win64_console.exe
 : "${GODOT_TEMPLATES:=}"         # 导出模板路径（可选，默认用已安装模板）
-: "${NDK_PATH:=${ANDROID_NDK_HOME:-}}"   # Android NDK
 : "${DIST_DIR:=$GODOT_INT_DIR/dist}"     # 打包产物输出根
+: "${EMSDK_PATH:=${EMSDK:-}}"     # Emscripten
+: "${NDK_PATH:=${ANDROID_NDK_HOME:-}}"   # Android NDK
 
 log()  { printf '\033[1;36m[pack]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[pack:warn]\033[0m %s\n' "$*"; }
@@ -94,4 +95,39 @@ make_patch() {
   "$GODOT_BIN" --headless --path "$GAME_DIR" --script res://tools/make_patch.gd
 }
 
-mkdir -p "$DIST_DIR"
+EMCMAKE=
+check_emcmake() {
+  if [ -z "$EMSDK_PATH" ]; then
+      if command -v emcmake >/dev/null 2>&1; then
+          EMSDK_PATH="$(dirname "$(command -v emcmake)")"
+      elif command -v emsdk >/dev/null 2>&1; then
+          EMSDK_PATH="$(dirname "$(command -v emsdk)")"
+          echo "EMSDK_PATH $EMSDK_PATH"
+          if [ -f "${EMSDK_PATH}/emsdk_env.sh" ]; then
+              . "${EMSDK_PATH}/emsdk_env.sh" #>/dev/null 2>&1 || true
+          fi
+      else
+          die "Emscripten not found. Install the Emscripten SDK or pass EMSDK"
+      fi
+  fi
+  if [ ! -f "${EMSDK_PATH}/emcmake" ] && [ ! -f "${EMSDK_PATH}/upstream/emscripten/emcmake" ]; then
+      if [ -f "${EMSDK_PATH}/emsdk_env.sh" ]; then
+          . "${EMSDK_PATH}/emsdk_env.sh" >/dev/null 2>&1 || true
+      fi
+  fi
+      
+  if is_windows_host; then
+      EMCMAKE="$(command -v ${EMSDK_PATH}/upstream/emscripten/emcmake.py 2>/dev/null)" || error "emcmake.py not found after sourcing EMSDK. Check your Emscripten installation."
+  else
+      EMCMAKE="$(command -v emcmake 2>/dev/null)" || error "emcmake not found after sourcing EMSDK. Check your Emscripten installation."
+  fi
+  echo "Using Emscripten EMCMAKE: ${EMCMAKE}"
+
+  if [ -z "$EMCMAKE" ]; then
+    die "需要 Emscripten（先 source emsdk_env）"
+  fi
+}
+
+check_android() {
+  [[ -n "$NDK_PATH" ]] || die "需要 ANDROID_NDK_HOME / NDK_PATH"
+}
