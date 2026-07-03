@@ -35,8 +35,8 @@ if [ -z "${SCRIPT_DIR:-}" ] ; then
 fi
 
 # --- 路径（相对本脚本，可被环境变量覆盖）---
-GODOT_INT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"          # GodotIntegration/
-REPO_ROOT="$(cd "$GODOT_INT_DIR/.." && pwd)"           # MyBlueprintEditor/
+GODOT_INT_DIR="${SCRIPT_DIR%/scripts}"                # GodotIntegration/  (父目录)
+REPO_ROOT="${GODOT_INT_DIR%/*}"                       # MyBlueprintEditor/   (祖父目录)
 GAME_DIR="$GODOT_INT_DIR/game"                         # Godot 工程
 BUSYBOX="$REPO_ROOT/tools/busybox.exe"                 # Windows 下的 sh 驱动
 

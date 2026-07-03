@@ -76,7 +76,7 @@ BUNDLE_LUASOCKET="OFF"
 # ── Argument parsing ──────────────────────────────────────────────────────────
 while [ $# -gt 0 ]; do
     case "$1" in
-        linux|macos|wasm|android|ios|runtime|windows|windows-dll|dll)
+        linux|macos|wasm|wxgame|android|ios|runtime|windows|windows-dll|dll)
             PLATFORM="$1"; shift ;;
         debug)
             BUILD_TYPE="Debug"; shift ;;
@@ -194,7 +194,7 @@ case "$PLATFORM" in
         CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=${MINGW_PREFIX}-gcc -DCMAKE_CXX_COMPILER=${MINGW_PREFIX}-g++ -DCMAKE_RC_COMPILER=${MINGW_PREFIX}-windres -DBUILD_RUNTIME_ONLY=ON -DBUILD_SHARED_LIBS=ON -DBUILD_EXAMPLES=${BUILD_EXAMPLES} -DRUNTIME_NAME=${RUNTIME_NAME} -DBLUEPRINT_LUA=${BLUEPRINT_LUA} -DLUA_LINK_STATIC=${LUA_LINK_STATIC} -DBLUEPRINT_LUASOCKET=${BLUEPRINT_LUASOCKET} -DBLUEPRINT_PROTOBUF=${BLUEPRINT_PROTOBUF} -DBUILD_BUNDLE=${BUILD_BUNDLE} -DBUNDLE_LUA=${BUNDLE_LUA} -DBUNDLE_PROTOBUF=${BUNDLE_PROTOBUF} -DBUNDLE_LUASOCKET=${BUNDLE_LUASOCKET} -DBLUEPRINT_LINK_XLUA=${BLUEPRINT_LINK_XLUA}"
         ;;
 
-    wasm)
+    wasm|wxgame)
         RUNTIME_ONLY="ON"
         if [ -z "$EMSDK_PATH" ]; then
             if command -v emcmake >/dev/null 2>&1; then
@@ -224,6 +224,9 @@ case "$PLATFORM" in
         LUA_LINK_STATIC="OFF"
         BLUEPRINT_LUASOCKET="OFF"
         CMAKE_EXTRA_ARGS="-DBUILD_RUNTIME_ONLY=ON -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DRUNTIME_NAME=${RUNTIME_NAME} -DBLUEPRINT_LUA=${BLUEPRINT_LUA} -DLUA_LINK_STATIC=OFF -DBLUEPRINT_PROTOBUF=${BLUEPRINT_PROTOBUF} -DBUILD_BUNDLE=${BUILD_BUNDLE} -DBUNDLE_LUA=${BUNDLE_LUA} -DBUNDLE_PROTOBUF=${BUNDLE_PROTOBUF} -DBLUEPRINT_LINK_XLUA=${BLUEPRINT_LINK_XLUA}"
+        if [ "$PLATFORM" = "wxgame" ]; then
+            CMAKE_EXTRA_ARGS="${CMAKE_EXTRA_ARGS} -DBLUEPRINT_WXGAME=ON"
+        fi
         ;;
 
     android)
@@ -297,7 +300,7 @@ mkdir -p "${BUILD_DIR}"
 
 # ── Step 2 - CMake configure ─────────────────────────────────────────────────
 info "[2/3] Running CMake configure..."
-if [ "$PLATFORM" = "wasm" ]; then
+if [ "$PLATFORM" = "wasm" ] || [ "$PLATFORM" = "wxgame" ]; then
     # shellcheck disable=SC2086
     if is_windows_host; then
         python "${EMCMAKE}" cmake -S "${PROJECT_DIR}" -B "${BUILD_DIR}" ${CMAKE_EXTRA_ARGS}

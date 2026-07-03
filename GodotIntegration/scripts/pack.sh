@@ -8,7 +8,7 @@
 #   ANDROID_NDK_HOME     Android NDK（android 需要）
 #   (Emscripten)         web / minigame 前先 source emsdk_env
 #set -euo pipefail
-export SCRIPT_DIR="$(dirname "$0")"
+export SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/pack_common.sh"
 
 prepare_target() {
@@ -117,18 +117,7 @@ pack_minigame() {
   
   # ① 引擎核心：小游戏专用 wasm（BLUEPRINT_WXGAME=ON，导出 addFunction 等额外符号）
   log "① building engine wasm for mini-game (BLUEPRINT_WXGAME=ON)"
-  local tmpdir=`pwd`
-  cd "$REPO_ROOT"
-  emcmake cmake -B build-wxgame \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_RUNTIME_ONLY=ON \
-  -DBUILD_SHARED_LIBS=OFF \
-  -DBUILD_TESTS=OFF \
-  -DBLUEPRINT_LUA=ON \
-  -DLUA_LINK_STATIC=ON \
-  -DBLUEPRINT_WXGAME=ON
-  cmake --build build-wxgame --config Release
-  cd "$tmpdir"
+  run_build_sh wxgame
 
   # ② 收集产物：wasm + js 胶水 + adapter
   log "② collecting artifacts → $OUT"
