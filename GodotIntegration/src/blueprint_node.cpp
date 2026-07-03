@@ -15,13 +15,15 @@
 
 // The plain-C BlueprintRuntime API. Path is relative to the project Runtime/ dir;
 // the include dir is wired up in CMakeLists.txt.
-extern "C" {
+//
+// 注意：BlueprintCAPI.h / lua.h 内部都用 #ifdef __cplusplus extern "C" 包裹了自己的
+// 函数声明，此处不能再套一层 extern "C" { ... }——Emscripten 下 BlueprintCAPI.h 会
+// include <emscripten.h>，其中含 C++ 模板，塞进 C 链接块会触发
+// "templates must have C++ linkage"。
 #include "BlueprintCAPI.h"
 #ifdef BLUEPRINT_HAS_LUA
-#include <lua.h>
-#include <lauxlib.h>
+#include <lua.hpp>
 #endif
-}
 
 using namespace godot;
 

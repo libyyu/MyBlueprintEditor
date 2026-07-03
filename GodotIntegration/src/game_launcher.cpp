@@ -12,9 +12,10 @@
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
-extern "C" {
+// BlueprintCAPI.h 内部已用 #ifdef __cplusplus extern "C" 包裹函数声明，
+// 这里不能再套一层 extern "C" { ... }——Emscripten 下 <emscripten.h> 里含 C++ 模板，
+// 塞进 C 链接块会触发 "templates must have C++ linkage" 编译错误。
 #include "BlueprintCAPI.h"
-}
 
 using namespace godot;
 

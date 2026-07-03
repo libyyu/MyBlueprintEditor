@@ -18,12 +18,11 @@
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
-extern "C" {
+// BlueprintCAPI.h / lua.h 内部已用 __cplusplus + extern "C" 包裹自身声明。
+// 此处禁止再包 extern "C" { ... }：Emscripten 下 BlueprintCAPI.h 会 include
+// <emscripten.h>（含 C++ 模板），塞进 C 链接块会编译失败。
 #include "BlueprintCAPI.h"   // BP_GetLuaState only
-#include <lua.h>
-#include <lauxlib.h>
-#include <lualib.h>
-}
+#include <lua.hpp>
 
 #include <string>
 #include <unordered_map>

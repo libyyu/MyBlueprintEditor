@@ -11,9 +11,8 @@
 #include <string>
 #include <vector>
 
-extern "C" {
+// 见 blueprint_node.cpp / game_launcher.cpp 同处注释：不要再套 extern "C"。
 #include "BlueprintCAPI.h"
-}
 
 using namespace godot;
 
