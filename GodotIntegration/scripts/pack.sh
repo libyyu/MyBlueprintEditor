@@ -45,10 +45,18 @@ pack_web() {
   log "② building GDExtension (emscripten)"
   local tmpdir=`pwd`
   cd "$GODOT_INT_DIR"
-  emcmake cmake -B build-wasm-gdext \
-  -DBP_BUILD_DIR="build-wasm" \
-  -DGDEXT_WITH_LUA=ON \
-  -DCMAKE_BUILD_TYPE=Release
+  if is_windows_host; then
+      python "${EMCMAKE}" cmake -B build-wasm-gdext \
+      -DBP_BUILD_DIR="build-wasm" \
+      -DGDEXT_WITH_LUA=ON \
+      -DCMAKE_BUILD_TYPE=Release
+  else
+      "${EMCMAKE}" cmake -B build-wasm-gdext \
+      -DBP_BUILD_DIR="build-wasm" \
+      -DGDEXT_WITH_LUA=ON \
+      -DCMAKE_BUILD_TYPE=Release
+  fi
+
   cmake --build build-wasm-gdext --config Release --target blueprint_gdext
   cd "$tmpdir"
 
