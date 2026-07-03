@@ -122,8 +122,12 @@ pack_minigame() {
   # ② 收集产物：wasm + js 胶水 + adapter
   log "② collecting artifacts → $OUT"
   # Emscripten 产物名可能是 BlueprintRuntime.js/.wasm，按实际匹配拷贝
-  find build-wxgame -maxdepth 3 \( -name "*.wasm" -o -name "BlueprintRuntime*.js" \) \
-    -exec cp -f {} "$OUT/" \; 2>/dev/null || true
+  cp -f "$REPO_ROOT/build-wxgame/bin/Release/BlueprintRuntime.wasm" "$OUT/" 2>/dev/null \
+    || warn "未找到 BlueprintRuntime.wasm"
+
+  cp -f "$REPO_ROOT/build-wxgame/bin/Release/BlueprintRuntime.js" "$OUT/" 2>/dev/null \
+    || warn "未找到 BlueprintRuntime.js"
+
   cp -f "$REPO_ROOT/WechatMiniGame/blueprint-wx-adapter.js" "$OUT/" 2>/dev/null \
     || warn "未找到 blueprint-wx-adapter.js"
 
