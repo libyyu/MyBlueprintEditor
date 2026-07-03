@@ -39,6 +39,51 @@ func _demo() -> void:
 				await get_tree().process_frame
 				print("[GameScene] 点击后 Lua 回调改写的提示 = '", hint.text, "'")
 
+			# --- 验证 UI.on_text_changed（Lua 订阅输入框文本变化） ---
+			var name_input = panel.get_node_or_null("Center/VBox/NameInput")
+			if name_input and hint:
+				name_input.text_changed.emit("阿伟")   # headless 模拟一次输入
+				await get_tree().process_frame
+				print("[GameScene] 文本变化后 Lua 回调改写的提示 = '", hint.text, "'")
+
+	# --- 验证 Input 系统（GDScript + Lua 双端） ---
+	var input_srv := get_node_or_null("/root/InputService")
+	if input_srv:
+		# Lua 侧先订阅 ui_confirm
+		bp.run_lua("local ok,m = pcall(require,'demo.main_menu_logic'); if ok then m.setup_input() end")
+		await get_tree().process_frame
+		# GDScript 侧也订阅同一 action，验证 GDScript 路径
+		var gd_fired := {"hit": false}
+		input_srv.on_action("ui_confirm", func(): gd_fired["hit"] = true)
+		# 模拟 action 触发（headless 无键盘）→ 两端回调都应触发
+		input_srv.fire_action("ui_confirm", "pressed")
+		await get_tree().process_frame
+		print("[GameScene] GDScript Input.on_action 回调触发 = ", gd_fired["hit"])
+		if ui:
+			var panel2 = ui.get_panel("MainMenuPanel")
+			if panel2:
+				var hint2 = panel2.get_node_or_null("Center/VBox/Hint")
+				if hint2:
+					print("[GameScene] Lua Input.on_action 改写的提示 = '", hint2.text, "'")
+
+	# --- 验证 Timer + Log（GDScript + Lua 双端） ---
+	var timer_srv := get_node_or_null("/root/TimerService")
+	var log_srv := get_node_or_null("/root/LogService")
+	if timer_srv and log_srv:
+		# GDScript 侧：after 一次性
+		var gd_fired := {"hit": 0}
+		log_srv.info("[GameScene] GDScript 安排 Timer.after")
+		timer_srv.after(0.1, func():
+			gd_fired["hit"] += 1
+			log_srv.info("[GameScene] GDScript Timer.after 触发"))
+		# Lua 侧：after + every（模块里 setup_timer_log）
+		bp.run_lua("local ok,m=pcall(require,'demo.main_menu_logic'); if ok then m.setup_timer_log() end")
+		# 等足够帧让计时器到期（0.1s after + 3×0.05s every）
+		await get_tree().create_timer(0.4).timeout
+		print("[GameScene] GDScript Timer.after 触发次数 = ", gd_fired["hit"])
+		# 读回 Lua 模块状态验证 Lua 计时器也跑了
+		bp.run_lua("local ok,m=pcall(require,'demo.main_menu_logic'); if ok then print('[GameScene] Lua after_fired='..tostring(m.after_fired)..' every_ticks='..tostring(m.tick_count)) end")
+
 	# --- 异步加载演示（后台线程加载 .tscn，不卡主线程） ---
 	if ui:
 		# 路径 1（GDScript）：await 拿到实例

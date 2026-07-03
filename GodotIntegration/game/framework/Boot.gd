@@ -13,6 +13,10 @@ extends Node
 
 @onready var launcher := get_node("/root/Launcher")
 
+## 调试开关：跳过热更阶段，直接用内置资源（res://）跑框架。
+## 用于纯框架/输入/UI 验证，避免热更补丁覆盖 res:// 源码造成干扰。生产保持 false。
+@export var skip_update: bool = false
+
 func _ready() -> void:
 	print("========== Boot: framework + hot-update ==========")
 	await _run()
@@ -22,26 +26,29 @@ func _run() -> void:
 	launcher.setup()
 	print("[Boot] env ready")
 
-	# 阶段 1：更新阶段（独立 VM 隔离）
-	launcher.begin_update_phase()
+	if not skip_update:
+		# 阶段 1：更新阶段（独立 VM 隔离）
+		launcher.begin_update_phase()
 
-	# 更新 UI
-	var panel := UiService.open_panel("UpdatePanel")
-	UpdateService.progress.connect(func(p: float, s: String):
-		if is_instance_valid(panel):
-			panel.set_progress(p)
-			panel.set_status(s))
+		# 更新 UI
+		var panel := UiService.open_panel("UpdatePanel")
+		UpdateService.progress.connect(func(p: float, s: String):
+			if is_instance_valid(panel):
+				panel.set_progress(p)
+				panel.set_status(s))
 
-	# 阶段 2：真实热更
-	var result = await UpdateService.run_update()
-	print("[Boot] update result: success=%s updated=%s version=%s reason=%s" % [
-		result.success, result.updated, result.version, result.reason])
-	await get_tree().create_timer(0.2).timeout
+		# 阶段 2：真实热更
+		var result = await UpdateService.run_update()
+		print("[Boot] update result: success=%s updated=%s version=%s reason=%s" % [
+			result.success, result.updated, result.version, result.reason])
+		await get_tree().create_timer(0.2).timeout
 
-	# 阶段 3：销毁更新 VM，切全新主 VM
-	UiService.close_panel("UpdatePanel")
-	launcher.end_update_phase()
-	print("[Boot] game VM fresh, in_update_phase=", launcher.in_update_phase())
+		# 阶段 3：销毁更新 VM，切全新主 VM
+		UiService.close_panel("UpdatePanel")
+		launcher.end_update_phase()
+		print("[Boot] game VM fresh, in_update_phase=", launcher.in_update_phase())
+	else:
+		print("[Boot] skip_update=true → 跳过热更，用内置资源跑框架")
 
 	# 阶段 4：主场景
 	var ok := SceneService.change_scene("res://scenes/GameScene.tscn")

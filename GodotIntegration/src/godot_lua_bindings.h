@@ -51,6 +51,50 @@ protected:
     static void _bind_methods();
 };
 
+// Relay for InputService.action_triggered(action, edge). Forwards a matching
+// action's "pressed" edge into a stored Lua handler. Registered at module init.
+class GdInputActionRelay : public Node {
+    GDCLASS(GdInputActionRelay, Node)
+public:
+    std::string want_action;     // the action name this relay listens for
+    int         lua_ref = -1;    // ref to the Lua callback fn(action)
+    lua_State  *state = nullptr;
+    void _on_action(const String &action, const String &edge);
+protected:
+    static void _bind_methods();
+};
+
+// Relay for widget value/text change signals. Forwards the new value (as a
+// string) into a stored Lua handler fn(value). Registered at module init.
+class GdUiValueRelay : public Node {
+    GDCLASS(GdUiValueRelay, Node)
+public:
+    int         lua_ref = -1;    // ref to the Lua callback fn(value_string)
+    lua_State  *state = nullptr;
+    // LineEdit.text_changed(new_text: String)
+    void _on_text_changed(const String &new_text);
+    // Range.value_changed(value: double)  /  CheckBox.toggled(pressed: bool)
+    void _on_value_changed(double value);
+    void _on_toggled(bool pressed);
+protected:
+    static void _bind_methods();
+};
+
+// Relay for TimerService callbacks. TimerService.after/every take a Callable;
+// we bind this relay's _fire as the Callable. On fire it invokes the stored Lua
+// function; for one-shot timers it frees the Lua ref (and self) after firing.
+// Registered at module init.
+class GdTimerRelay : public Node {
+    GDCLASS(GdTimerRelay, Node)
+public:
+    int         lua_ref = -1;    // ref to the Lua callback fn()
+    lua_State  *state = nullptr;
+    bool        once = false;    // one-shot: unref + free after first fire
+    void _fire();
+protected:
+    static void _bind_methods();
+};
+
 } // namespace godot
 
 // Register Scene.*/UI.* into the given runner's Lua VM. `runner` is BP_Runner

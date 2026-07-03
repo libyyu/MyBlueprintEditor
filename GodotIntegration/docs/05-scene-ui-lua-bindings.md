@@ -100,6 +100,25 @@ return M
 | `UI.set_text(id, node, text)` | 面板内相对节点路径 | 设置 Label/Button/LineEdit 文本 |
 | `UI.get_input_text(id, node)` | | 读取输入框文本，返回 string |
 | `UI.on_click(id, node, fn)` | fn = Lua 函数 | 订阅按钮点击，点击时回调 fn |
+| `UI.on_text_changed(id, node, fn)` | fn = `function(text)` | 订阅 LineEdit 文本变化，回调带新文本 |
+| `UI.on_value_changed(id, node, fn)` | fn = `function(value_str)` | 订阅 Range(Slider/SpinBox) 的 value_changed 或 CheckBox/CheckButton 的 toggled，回调带值（字符串）|
+
+### Input 全局表（统一输入抽象）
+
+一切以「action 名」为中心，桌面键鼠 / 移动触摸 / 小游戏宿主映射统一。GDScript 侧对应 `InputService`（autoload），Lua 侧 `Input` 表转发到它。
+
+| 表.函数 | 参数 | 说明 |
+|---|---|---|
+| `Input.is_pressed(action)` | action 名 | 该 action 当前是否按下，返回 bool |
+| `Input.just_pressed(action)` | | 本帧刚按下 |
+| `Input.just_released(action)` | | 本帧刚松开 |
+| `Input.get_axis(neg, pos)` | 两个 action 名 | 轴值 = pos 强度 - neg 强度，范围 [-1,1] |
+| `Input.get_pointer()` | | 指针(鼠标/触摸)位置，返回 `x, y` 两个数 |
+| `Input.on_action(action, fn)` | fn = `function(action)` | 订阅 action 按下边沿，触发时回调 fn（带 action 名）|
+
+GDScript 侧 `InputService` 额外提供：`get_vector(nx,px,ny,py)`（归一化二维向量，适合移动）、`action_triggered(action, edge)` 信号（edge="pressed"/"released"）、`fire_action(action, edge)`（手动派发，供 headless 测试或小游戏宿主把 JS 触摸转成 action 用）。
+
+> 默认 InputMap action 在 `project.godot` 的 `[input]` 段定义：`move_left/right/up/down`（WASD）。`ui_confirm`/`ui_cancel` 用 Godot 内置。业务按需在编辑器 Project → Input Map 里加更多，Lua/GDScript 用同一 action 名即可，跨平台一致。
 
 ---
 
@@ -129,6 +148,30 @@ return M
 > `GdUiPanelReadyRelay` 同样**必须在 init 时 `GDREGISTER_INTERNAL_CLASS`**。
 > 连接**不用 `CONNECT_ONE_SHOT`**：多个并发 async 共享同一个 `panel_ready` 信号，每个 relay 按
 > `want_id` 过滤，只在自己那次到达时才 free，避免被别的 panel 的完成事件误触发而提前断连。
+
+### 4.2 输入事件回流（Input.on_action → Lua）
+
+同一套 relay 范式，方向：`InputService.action_triggered(action, edge)` → Lua。
+
+1. `Input.on_action(action, fn)` 把 Lua 回调 `luaL_ref` 存注册表
+2. 建一个 `GdInputActionRelay`（init 时注册），`add_child` 到 InputService，
+   把 `action_triggered` 信号 connect 到 `_on_action(action, edge)`
+3. relay 内部按 `want_action` + `edge=="pressed"` 过滤，命中后 `lua_pcall(fn, action)`
+
+`InputService._process` 每帧对 `_watched` 里的 action 做边沿检测（`Input.is_action_pressed` 前后帧对比），产生 pressed/released 边沿并 `emit action_triggered`。这样订阅回调和信号都统一走边沿，覆盖 InputMap 未定义的 action 也安全（查询返回 false，不报错）。
+
+### 4.3 控件值变化回流（UI.on_text_changed / on_value_changed → Lua）
+
+用同一个 `GdUiValueRelay`（init 时注册），按目标控件类型连不同信号：
+- `LineEdit` → `text_changed(new_text)` → Lua `fn(text)`
+- `Range`(Slider/SpinBox/ProgressBar) → `value_changed(double)` → Lua `fn(value_str)`
+- `CheckBox`/`CheckButton`/toggle Button → `toggled(bool)` → Lua `fn("true"/"false")`
+
+值统一转成字符串传给 Lua（数值用 `String::num`），Lua 侧按需 `tonumber()`。
+
+> 四个 relay 类（`GdUiClickRelay` / `GdUiPanelReadyRelay` / `GdInputActionRelay` / `GdUiValueRelay`）
+> **全部在 `register_types.cpp` 的 `initialize` 里 `GDREGISTER_INTERNAL_CLASS`**，且都在
+> `#ifdef BLUEPRINT_HAS_LUA` 守卫内（Lua OFF 编译时不注册）。
 
 ---
 

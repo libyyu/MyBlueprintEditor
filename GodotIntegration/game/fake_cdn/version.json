@@ -3,8 +3,8 @@
   "packs": [
     {
       "name": "game.pck",
-      "sha256": "a5791d49e4fe50c782b44d9496938f2b29632ead291041f84e1d8c2e79f249f0",
-      "size": 1384,
+      "sha256": "cbb72d6602d33b3813eeb68df24f5ab54ae7d912f969b1dd454967982b5decc7",
+      "size": 2056,
       "url": "res://fake_cdn/1.0.1/game.pck"
     }
   ],

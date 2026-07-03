@@ -27,6 +27,9 @@ void initialize_blueprint_module(ModuleInitializationLevel p_level) {
     // crashes Godot.
     GDREGISTER_INTERNAL_CLASS(GdUiClickRelay);      // UI.on_click
     GDREGISTER_INTERNAL_CLASS(GdUiPanelReadyRelay); // UI.open_panel_async
+    GDREGISTER_INTERNAL_CLASS(GdInputActionRelay);  // Input.on_action
+    GDREGISTER_INTERNAL_CLASS(GdUiValueRelay);      // UI.on_text_changed / on_value_changed
+    GDREGISTER_INTERNAL_CLASS(GdTimerRelay);        // Timer.after / every
 #endif
 }
 

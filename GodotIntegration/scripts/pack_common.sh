@@ -10,7 +10,7 @@
 #   - 真 bash（推荐）：bash scripts/pack.sh <target>
 #   - RunShell.bat（busybox，Windows）：RunShell.bat pack.sh <target>
 #     RunShell.bat 会 set USE_BUSYBOX=1，本脚本据此用 $0 兜底定位目录。
-set -euo pipefail
+#set -euo pipefail
 HOST_OS="$(uname -s)"
 
 # 是否用 RunShell.bat（busybox）驱动。RunShell.bat 会 set USE_BUSYBOX=1。

@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # pack.sh —— 发版打包总入口，分发到各平台脚本。
 #
 #   用法：bash pack.sh <target>
@@ -8,7 +7,7 @@
 #   GODOT_BIN            Godot 可执行（导出用）。Win: .../Godot_v4.5-stable_win64_console.exe
 #   ANDROID_NDK_HOME     Android NDK（android 需要）
 #   (Emscripten)         web / minigame 前先 source emsdk_env
-set -euo pipefail
+#set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/pack_common.sh"
 
