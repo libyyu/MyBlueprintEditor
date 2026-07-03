@@ -158,6 +158,26 @@ target_include_directories(blueprint_gdext PRIVATE
 target_link_libraries(blueprint_gdext PRIVATE godot-cpp)
 
 # ---------------------------------------------------------------------------
+# Emscripten (Web): link as SIDE_MODULE so Godot Web runtime can load us.
+#
+# 编译期 godot-cpp / -fPIC 已把 -sSIDE_MODULE=1 加进 compile flags；但 em++ 在
+# link 阶段不会自动继承，需要显式再加一遍，否则产物只是"伪装成 .so 的静态目标
+# 文件"（em++ 会给出 warning: linking a library with `-shared` will emit a
+# static object file），Godot Web 运行时无法作为动态模块加载。
+#
+# 说明：SIDE_MODULE=1 会禁用主线程 export，产物是可被 wasm dlopen 的动态模块，
+# Godot Web 侧通过 .gdextension 中 web.wasm32.* 条目加载。SUPPORT_LONGJMP=wasm
+# 与 USE_PTHREADS=1 需要与主 Godot Web export 保持一致，否则会 ABI 不兼容。
+# ---------------------------------------------------------------------------
+if(_IS_WEB)
+    target_link_options(blueprint_gdext PRIVATE
+        -sSIDE_MODULE=1
+        -sSUPPORT_LONGJMP=wasm
+        -sUSE_PTHREADS=1
+    )
+endif()
+
+# ---------------------------------------------------------------------------
 # Lua wiring (only when GDEXT_WITH_LUA). We compile godot_lua_bindings.cpp which
 # uses the Lua C API against the runner's lua_State (via BP_GetLuaState). The
 # engine header gates BP_GetLuaState behind BLUEPRINT_HAS_LUA, so define it.
