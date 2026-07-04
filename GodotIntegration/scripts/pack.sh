@@ -26,7 +26,7 @@ pack_desktop() {  # $1 = windows|linux|macos ; $2 = preset名 ; $3 = 输出文�
   local plat="$1" preset="$2" out="$3"
   log "① engine core ($plat)"; run_build_sh "$plat"
   if [[ "$plat" == "windows" ]]; then
-    build_gdext "build" -G "Visual Studio 17 2022" -A x64 -DBP_BUILD_DIR=build-windows -DGDEXT_WITH_LUA=ON
+    build_gdext "build" -A x64 -DBP_BUILD_DIR=build-windows -DGDEXT_WITH_LUA=ON
   else
     build_gdext "build-$plat" -DCMAKE_BUILD_TYPE=Release -DBP_BUILD_DIR="build-$plat" -DGDEXT_WITH_LUA=ON
   fi

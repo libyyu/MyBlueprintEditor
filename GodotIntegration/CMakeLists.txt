@@ -145,7 +145,6 @@ set(BP_GDEXT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/godot_file_bridge.cpp")
 
 if(GDEXT_WITH_LUA)
-    list(APPEND BP_GDEXT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/godot_lua_loader.cpp")
     list(APPEND BP_GDEXT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/godot_lua_bindings.cpp")
 endif()
 
@@ -248,8 +247,12 @@ endif()
 # ---------------------------------------------------------------------------
 set(BP_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/game/bin")
 set_target_properties(blueprint_gdext PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${BP_OUT_DIR}"
+    RUNTIME_OUTPUT_DIRECTORY           "${BP_OUT_DIR}"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG     "${BP_OUT_DIR}"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE   "${BP_OUT_DIR}"
     LIBRARY_OUTPUT_DIRECTORY "${BP_OUT_DIR}"
+    LIBRARY_OUTPUT_DIRECTORY_DEBUG "${BP_OUT_DIR}"
+    LIBRARY_OUTPUT_DIRECTORY_DEBUG "${BP_OUT_DIR}"
     PREFIX ""
     OUTPUT_NAME "blueprint_gdext.${_PLAT_TAG}.template_debug.${_ARCH_TAG}")
 

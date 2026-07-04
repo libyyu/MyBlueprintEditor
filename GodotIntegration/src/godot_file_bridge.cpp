@@ -47,7 +47,9 @@ String to_godot_path(const char *raw) {
 // --- C callbacks handed to BP_SetFileReader -------------------------------
 
 int BLUEPRINT_CAPI_CALL bridge_read(const char *path, char **outData, int *outSize, void * /*ud*/) {
+    UtilityFunctions::print(String("[FileBridge] read ") + String::utf8(path));
     String gp = to_godot_path(path);
+    UtilityFunctions::print(String("[FileBridge] read godot path ") + gp);
     if (!FileAccess::file_exists(gp)) {
         // Try the raw path as a fallback (covers absolute OS paths in editor).
         gp = String::utf8(path);
@@ -55,6 +57,7 @@ int BLUEPRINT_CAPI_CALL bridge_read(const char *path, char **outData, int *outSi
             return 0;
         }
     }
+    UtilityFunctions::print(String("[FileBridge] 2 read godot path ") + gp);
     Ref<FileAccess> f = FileAccess::open(gp, FileAccess::READ);
     if (f.is_null()) {
         UtilityFunctions::printerr(String("[FileBridge] open NULL: ") + gp);
@@ -81,6 +84,7 @@ void BLUEPRINT_CAPI_CALL bridge_free(char *data, void * /*ud*/) {
 }
 
 int BLUEPRINT_CAPI_CALL bridge_exists(const char *path, void * /*ud*/) {
+    UtilityFunctions::print(String("[FileBridge] exists ") + String::utf8(path));
     String gp = to_godot_path(path);
     if (FileAccess::file_exists(gp)) return 1;
     return FileAccess::file_exists(String::utf8(path)) ? 1 : 0;

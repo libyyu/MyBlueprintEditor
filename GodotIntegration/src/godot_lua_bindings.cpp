@@ -522,11 +522,11 @@ int l_log_error(lua_State *L) { return log_common(L, "error"); }
 
 } // namespace
 
-void register_godot_lua_bindings(void *runner, Node *ctx) {
+void register_godot_lua_bindings(void *luaEnv, Node *ctx) {
     g_ctx = ctx;
-    lua_State *L = BP_GetLuaState(static_cast<BP_Runner>(runner));
+    lua_State *L = static_cast<lua_State*>(luaEnv);
     if (L == nullptr) {
-        UtilityFunctions::printerr("[GodotLua] BP_GetLuaState returned null (no Lua VM yet)");
+        UtilityFunctions::printerr("[GodotLua] luaEnv is null (no Lua VM yet)");
         return;
     }
     g_L = L;

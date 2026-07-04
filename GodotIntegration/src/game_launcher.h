@@ -30,11 +30,13 @@ class GameLauncher : public Node {
 private:
     bool _auto_setup = true;          // run setup() automatically in _ready
     bool _did_setup = false;          // process-level guard
+    
     BlueprintNode *_update_node = nullptr; // dedicated update-phase runner
 #ifdef BLUEPRINT_HAS_LUA
+    void* _global_lua_state = nullptr;
     PackedStringArray _lua_roots;     // require search roots, e.g. ["res://lua"]
-    void install_resolver();          // (re)bind Lua require resolver to current VM
 #endif
+    
 protected:
     static void _bind_methods();
 
@@ -55,7 +57,7 @@ public:
     // Phase A: ensure setup() has run (env up), then create a dedicated update
     //   runner whose Lua VM is used only for the update phase.
     //   Returns the update BlueprintNode; load your update blueprint on it.
-    BlueprintNode *begin_update_phase();
+    void begin_update_phase();
 
     // Phase B: tear down the update VM. Destroys the update runner and closes
     //   its lua_State, so the next runner builds a fresh VM. Call after the
@@ -67,17 +69,27 @@ public:
 
     // Whether process-level setup has completed.
     bool is_ready() const { return _did_setup; }
+    
+    void enter_game_logic();
 
 #ifdef BLUEPRINT_HAS_LUA
+    void* get_global_lua_state() const;
+    void* ensure_global_lua_state();
+    void reset_global_lua_state();
+    
     // Register the project-layer Scene.*/UI.* Lua tables onto the given node's
     // Lua VM (via BP_GetLuaState). Call after the node has loaded a blueprint.
     // Lets Lua scripts drive Godot SceneService/UiService. Engine untouched.
-    void bind_lua_api(BlueprintNode *node);
+    void bind_lua_api();
 
     // Configure Lua require roots BEFORE setup() (or call setup() again is a no-op).
     void set_lua_roots(const PackedStringArray &roots);
     PackedStringArray get_lua_roots() const;
-
+    void init_lua_search();
+    
+    bool run_lua_code(const String &code);
+    bool run_lua_file(const String &path);
+    bool require_lua_file(const String &path);
 #endif
 
     void set_auto_setup(bool v);

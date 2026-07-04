@@ -163,6 +163,43 @@ extern "C" BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetFileReader(
     SetDefaultFileSystem(std::make_shared<CallbackFileSystem>(read_cb, free_cb, exists_cb, userdata));
 }
 
+extern "C" BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_ReadFileBuff(const char* path, char** outData, int* outSize)
+{
+    if (!path || !outData || !outSize) return 0;
+    
+    auto fs = GetDefaultFileSystem();
+    if (!fs)
+    {
+        fprintf(stderr, "BP_ReadFileBuff: no file system\n");
+        return -1;
+    }
+    
+    std::string content, error;
+    if (!fs->ReadFile(path, content, error))
+    {
+        fprintf(stderr, "BP_ReadFileBuff: %s\n", error.c_str());
+        return 2;
+    }
+    
+    *outData = static_cast<char*>(malloc(content.size() + 1));
+    if (!*outData)
+    {
+        fprintf(stderr, "BP_ReadFileBuff: malloc failed\n");
+        return 3;
+    }
+    std::memcpy(*outData, content.c_str(), content.size());
+    (*outData)[content.size()] = '\0';
+    *outSize = static_cast<int>(content.size());
+    return 0;
+}
+
+extern "C" BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_FreeFileBuff(char* data)
+{
+    if (!data) return;
+    free(data);
+}
+
+
 // ---------------------------------------------------------------------------
 // Internal wrapper: wraps BlueprintRunner + last-error string
 // ---------------------------------------------------------------------------
@@ -408,80 +445,6 @@ BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadLuaScript(BP_Runner runner,
     return 0;
 }
 
-// ---------------------------------------------------------------------------
-// Host-provided Lua module resolver (project-layer owns the "where" logic)
-// ---------------------------------------------------------------------------
-// The engine stays agnostic about HOW Lua modules are located. The host (e.g.
-// the Godot GDExtension layer) registers a C callback that, given a module name
-// ("a.b.c"), returns the module's source bytes (resolved however the host
-// likes: res:// roots, FileAccess, embedded blobs, network, ...). The engine
-// installs a thin package.searchers[1] entry that calls this callback and
-// compiles whatever source it returns. No file-system policy lives in the engine.
-namespace {
-    BP_LuaModuleResolveFn s_luaModResolve = nullptr;
-    BP_LuaModuleFreeFn    s_luaModFree    = nullptr;
-    void*                 s_luaModUd      = nullptr;
-}
-
-#ifdef BLUEPRINT_HAS_LUA
-// The C function inserted into package.searchers; bridges to the host resolver.
-static int hostLuaSearcher(lua_State* L)
-{
-    const char* modname = luaL_checkstring(L, 1);
-    if (!s_luaModResolve || !modname) {
-        lua_pushfstring(L, "\n\t[host-searcher] no resolver for '%s'", modname ? modname : "?");
-        return 1;
-    }
-    char* data = nullptr; int size = 0; char* chunkName = nullptr;
-    int ok = s_luaModResolve(modname, &data, &size, &chunkName, s_luaModUd);
-    if (!ok || data == nullptr || size < 0) {
-        if (data && s_luaModFree) s_luaModFree(data, s_luaModUd);
-        if (chunkName && s_luaModFree) s_luaModFree(chunkName, s_luaModUd);
-        lua_pushfstring(L, "\n\t[host-searcher] module not found: '%s'", modname);
-        return 1;
-    }
-    std::string cn = chunkName ? std::string("@") + chunkName : std::string("@") + modname;
-    int loadRc = luaL_loadbuffer(L, data, static_cast<size_t>(size), cn.c_str());
-    if (data && s_luaModFree) s_luaModFree(data, s_luaModUd);
-    if (chunkName && s_luaModFree) s_luaModFree(chunkName, s_luaModUd);
-    if (loadRc != LUA_OK) {
-        return lua_error(L); // syntax error: propagate per Lua searcher contract
-    }
-    return 1; // success: return the compiled chunk
-}
-#endif
-
-extern "C" BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_SetLuaModuleResolver(
-    BP_Runner runner, BP_LuaModuleResolveFn resolve_cb, BP_LuaModuleFreeFn free_cb, void* userdata)
-{
-#ifdef BLUEPRINT_HAS_LUA
-    // The resolver + searcher are PROCESS-LEVEL: the Lua VM is a shared singleton,
-    // so package.searchers carries a single entry regardless of runner count.
-    // `runner` may be NULL — callers like GameLauncher have no runner yet and
-    // want to configure resolution once at startup. In that case we use the
-    // process-default shared Lua engine (created on demand).
-    LuaScriptEngine* engine = nullptr;
-    if (runner) {
-        engine = asWrapper(runner)->runner.GetLuaEngine();
-    } else {
-        auto def = NodeEditor::Runtime::LuaScriptEngineRegistry::GetDefault();
-        engine = def.get();
-    }
-    if (!engine) return 1;
-
-    s_luaModResolve = resolve_cb;
-    s_luaModFree    = free_cb;
-    s_luaModUd      = userdata;
-    if (resolve_cb) {
-        engine->SetSearcher(&hostLuaSearcher); // insert at package.searchers[1]
-    }
-    return 0;
-#else
-    (void)runner; (void)resolve_cb; (void)free_cb; (void)userdata;
-    return 0;
-#endif
-}
-
 extern "C" BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_ResetSharedLuaVM(void)
 {
 #ifdef BLUEPRINT_HAS_LUA
@@ -496,12 +459,6 @@ extern "C" BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_ResetSharedLuaVM(vo
     // calling this (its shared_ptr keeps the old VM alive otherwise). In the
     // Godot host, the update-phase runner is queue_free'd first.
     NodeEditor::Runtime::LuaScriptEngineRegistry::SetDefault(nullptr);
-
-    // Also clear the host searcher binding; the new VM has no searchers yet, so
-    // the host re-installs its resolver after creating the game VM.
-    s_luaModResolve = nullptr;
-    s_luaModFree    = nullptr;
-    s_luaModUd      = nullptr;
 #endif
 }
 
@@ -1046,6 +1003,15 @@ BLUEPRINT_CAPI_EXPORT lua_State* BLUEPRINT_CAPI_CALL BP_GetLuaState(BP_Runner ru
     return nullptr;
 }
 
+BLUEPRINT_CAPI_EXPORT lua_State* BLUEPRINT_CAPI_CALL BP_GetDefaultLuaState(int skipCreate)
+{
+    if (auto eng = NodeEditor::Runtime::LuaScriptEngineRegistry::GetDefault(!!skipCreate))
+    {
+        return eng->GetState();
+    }
+    return nullptr;
+}
+
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_NotifyLuaStateClosing(lua_State* L)
 {
     // 1. Any Variant 生命周期保护：标记该 VM 已关闭，残留引用的析构变成 no-op
@@ -1058,6 +1024,36 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_NotifyLuaStateClosing(lua_Stat
         if (eng->GetState() == L)
             eng->InvalidateLuaState();  // 将 m_L 置 null，不调 lua_close（外部 VM）
     }
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetLuaSearchFileFn(BP_LuaSearchFileFn fn)
+{
+    if (auto eng = NodeEditor::Runtime::LuaScriptEngineRegistry::GetDefault(true))
+    {
+        eng->SetSearcher(fn);
+        return;
+    }
+    fprintf(stderr, "BP_SetLuaSearchFileFn: Lua VM not started.\n");
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_AddLuaSearchPath(const char* path)
+{
+    if (auto eng = NodeEditor::Runtime::LuaScriptEngineRegistry::GetDefault(true))
+    {
+        eng->AddLuaPath(path);
+        return;
+    }
+    fprintf(stderr, "BP_AddLuaSearchPath Lua VM not started.\n");
+}
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetLuaPrintCallback(lua_LogCallback callback)
+{
+    if (auto eng = NodeEditor::Runtime::LuaScriptEngineRegistry::GetDefault(true))
+    {
+        eng->SetLogCallback(callback);
+        return;
+    }
+    fprintf(stderr, "BP_SetLuaPrintCallback Lua VM not started.\n");
 }
 
 } // extern "C"

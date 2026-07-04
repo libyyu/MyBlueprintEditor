@@ -22,7 +22,7 @@
 struct lua_State;
 
 namespace godot {
-
+    
 // A relay Node bound per click subscription; forwards a Godot Button "pressed"
 // signal back into the stored Lua handler. MUST be registered as a GDExtension
 // class at module init time (see register_types.cpp) — registering a class at
@@ -101,6 +101,6 @@ protected:
 // (void*). `ctx` is any Node in the tree (to reach autoloads). Call once after
 // the runner's Lua VM exists (e.g. right after load_blueprint / first Lua use).
 // Safe to call again for a fresh VM (after BP_ResetSharedLuaVM).
-void register_godot_lua_bindings(void *runner, godot::Node *ctx);
+void register_godot_lua_bindings(void *luaEnv, godot::Node *ctx);
 
 #endif // GODOT_LUA_BINDINGS_H

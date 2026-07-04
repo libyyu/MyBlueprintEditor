@@ -60,11 +60,7 @@ public:
 
     // 外部 VM 即将关闭时调用：将 m_L 置 null，不调 lua_close（生命周期由外部管理）。
     // 调用后 Tick / LoadFile 等操作会安全跳过（if (!m_L) return）。
-    void InvalidateLuaState()
-    {
-        m_L = nullptr;
-        // m_ownsState 保持不变（false），确保 Shutdown 不会尝试 lua_close
-    }
+    void InvalidateLuaState();
 
     // 关闭 VM，释放所有资源（外部 State 模式下只注销绑定，不 close VM）
     void Shutdown();
@@ -92,6 +88,9 @@ public:
     // 向 package.path 追加搜索路径（dir 末尾自动补 /?.lua;/?.lua）
     // 如 AddLuaPath("/home/user/scripts") => "/home/user/scripts/?.lua"
     void AddLuaPath(const std::string& dir);
+    
+    typedef void (*lua_LogCallback)(int level, const char* message);
+    void SetLogCallback(lua_LogCallback callback) { m_logCallback = callback; }
 
     // 获取已加载的脚本文件列表（按加载顺序）
     const std::vector<std::string>& GetLoadedFiles() const { return m_loadedFiles; }
@@ -147,6 +146,8 @@ private:
     // Per-VM Lua-注册节点集合（共享 VM 时所有 Runner 看到同一集合）
     std::unordered_set<std::string>           m_registeredNodeIds;
     std::unordered_map<std::string, int64_t>  m_fileMtimes;
+    
+    lua_LogCallback             m_logCallback = nullptr;
 };
 
 // =========================================================================

@@ -14,13 +14,13 @@ func _ready() -> void:
 
 func _demo() -> void:
 	# --- 准备：加载一个占位蓝图（有 runner 才有 Lua VM），并把 Scene/UI 绑进该 VM ---
-	var launcher := get_node_or_null("/root/Launcher")   # autoload，跨场景常驻
-	bp.load_blueprint("res://blueprints/blueprint_1_1.bjson")
-	if launcher and launcher.has_method("bind_lua_api"):
-		launcher.bind_lua_api(bp)   # 注册 Scene.*/UI.* 到该 runner 的 Lua VM（引擎零改动）
+	#var launcher := get_node_or_null("/root/Launcher")   # autoload，跨场景常驻
+	#bp.load_blueprint("res://blueprints/blueprint_1_1.bjson")
+	#if launcher and launcher.has_method("bind_lua_api"):
+		#launcher.bind_lua_api(bp)   # 注册 Scene.*/UI.* 到该 runner 的 Lua VM（引擎零改动）
 
 	# --- 路径 2：纯 Lua 编写的 UI 逻辑（开面板 / 设文本 / 订阅按钮点击） ---
-	bp.run_lua("local ok, m = pcall(require, 'demo.main_menu_logic'); if ok then m.open() else print('[lua] require failed: '..tostring(m)) end")
+	#bp.run_lua("local ok, m = pcall(require, 'demo.main_menu_logic'); if ok then m.open() else print('[lua] require failed: '..tostring(m)) end")
 
 	# --- 验证：Lua 确实驱动了 Godot 侧（不依赖 Lua print 通道） ---
 	var ui := get_node_or_null("/root/UiService")
@@ -50,7 +50,7 @@ func _demo() -> void:
 	var input_srv := get_node_or_null("/root/InputService")
 	if input_srv:
 		# Lua 侧先订阅 ui_confirm
-		bp.run_lua("local ok,m = pcall(require,'demo.main_menu_logic'); if ok then m.setup_input() end")
+		#bp.run_lua("local ok,m = pcall(require,'demo.main_menu_logic'); if ok then m.setup_input() end")
 		await get_tree().process_frame
 		# GDScript 侧也订阅同一 action，验证 GDScript 路径
 		var gd_fired := {"hit": false}
@@ -77,7 +77,7 @@ func _demo() -> void:
 			gd_fired["hit"] += 1
 			log_srv.info("[GameScene] GDScript Timer.after 触发"))
 		# Lua 侧：after + every（模块里 setup_timer_log）
-		bp.run_lua("local ok,m=pcall(require,'demo.main_menu_logic'); if ok then m.setup_timer_log() end")
+		#bp.run_lua("local ok,m=pcall(require,'demo.main_menu_logic'); if ok then m.setup_timer_log() end")
 		# 等足够帧让计时器到期（0.1s after + 3×0.05s every）
 		await get_tree().create_timer(0.4).timeout
 		print("[GameScene] GDScript Timer.after 触发次数 = ", gd_fired["hit"])
@@ -92,6 +92,6 @@ func _demo() -> void:
 		print("[GameScene] GDScript await open_panel_async -> ", async_panel != null)
 		# 路径 2（Lua）：回调风格，加载完成后回调 function(ok)
 		ui.close_panel("UpdatePanel")
-		bp.run_lua("UI.open_panel_async('UpdatePanel', function(ok) print('[lua] UpdatePanel async loaded, ok=', ok) end)")
+		#bp.run_lua("UI.open_panel_async('UpdatePanel', function(ok) print('[lua] UpdatePanel async loaded, ok=', ok) end)")
 		await get_tree().create_timer(0.3).timeout
 		print("[GameScene] Lua async 完成后 is_open(UpdatePanel) = ", ui.is_open("UpdatePanel"))

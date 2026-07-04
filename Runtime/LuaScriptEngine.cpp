@@ -84,7 +84,7 @@ bool LuaScriptEngine::Initialize(BlueprintRunner* runner)
         return false;
     }
     // runner 允许为 nullptr（编辑器模式：不需要执行节点 handler）
-
+    fprintf(stdout, "LuaScriptEngine Initialize\n");
     m_runner = runner;
 
     // 创建 Lua 虚拟机
@@ -116,13 +116,24 @@ bool LuaScriptEngine::Initialize(BlueprintRunner* runner)
         static auto luaPrintImpl = [](lua_State* L) -> int {
             int level = static_cast<int>(lua_tointeger(L, lua_upvalueindex(1)));
             std::string msg = _luaArgsToString(L);
+            
+            if (auto eng = NodeEditor::Runtime::LuaScriptEngineRegistry::GetDefault(true))
+            {
+                auto callback = eng->m_logCallback;
+                if (callback)
+                {
+                    callback(level, msg.c_str());
+                    return 0;
+                }
+            }
+            
             lua_getfield(L, LUA_REGISTRYINDEX, "__blueprint_runner");
             auto* r = static_cast<BlueprintRunner*>(lua_touserdata(L, -1));
             lua_pop(L, 1);
             if (r)
                 r->Print(msg, static_cast<LogLevel>(level));
             else
-                fprintf(level >= static_cast<int>(LogLevel::Error) ? stderr : stdout, "%s\n", msg.c_str());
+                fprintf(level >= static_cast<int>(LogLevel::Error) ? stderr : stdout, "[lua]%s\n", msg.c_str());
             return 0;
         };
 
@@ -138,6 +149,106 @@ bool LuaScriptEngine::Initialize(BlueprintRunner* runner)
         lua_pushinteger(m_L, static_cast<lua_Integer>(LogLevel::Error));
         lua_pushcclosure(m_L, luaPrintImpl, 1);
         lua_setglobal(m_L, "printerror");
+        
+        static auto ll_script_loadfile = [](lua_State* L) -> int
+        {
+            std::string s_fileName = luaL_checkstring(L, 1);
+            std::replace(s_fileName.begin(), s_fileName.end(), '.', '/');
+            std::string fileName = s_fileName;
+            if (fileName.find(".lua") == std::string::npos) fileName += ".lua";
+            auto fs = GetDefaultFileSystem();
+            if (!fs)
+            {
+                lua_pushnil(L);
+                lua_pushfstring(L, "failed to loadfile: %s, FileSystem not valid.", fileName.c_str());
+                return 2;
+            }
+            std::string outBuffer;
+            std::string outError;
+            if (!fs->ReadFile(fileName.c_str(), outBuffer, outError))
+            {
+                lua_pushnil(L);
+                lua_pushfstring(L, "failed to loadfile: %s, file load error %s.", fileName.c_str(), outError.c_str());
+                return 2;
+            }
+            std::string chunk = "@"; chunk += fileName;
+            if (luaL_loadbuffer(L, outBuffer.c_str(), outBuffer.size(), chunk.c_str()) != 0)
+            {
+                lua_pushnil(L);
+                lua_pushfstring(L, "failed to loadfile: %s", fileName.c_str());
+                return 2;
+            }
+            
+            return 1;
+        };
+        lua_pushcfunction(m_L, ll_script_loadfile);
+        lua_setglobal(m_L, "loadfile");
+        
+        static auto ll_script_dofile = [](lua_State* L) -> int
+        {
+            int n = lua_gettop(L);
+            std::string s_fileName = luaL_checkstring(L, 1);
+            std::replace(s_fileName.begin(), s_fileName.end(), '.', '/');
+            std::string fileName = s_fileName;
+            if (fileName.find(".lua") == std::string::npos) fileName += ".lua";
+            auto fs = GetDefaultFileSystem();
+            if (!fs)
+            {
+                luaL_error(L, "failed to dofile: %s, FileSystem not valid.", fileName.c_str());
+                return 0;
+            }
+            std::string outBuffer;
+            std::string outError;
+            if (!fs->ReadFile(fileName.c_str(), outBuffer, outError))
+            {
+                luaL_error(L, "failed to dofile: %s, file load error %s.", fileName.c_str(), outError.c_str());
+                return 0;
+            }
+            std::string chunk = "@"; chunk += fileName;
+            if (luaL_loadbuffer(L, outBuffer.c_str(), outBuffer.size(), chunk.c_str()) != 0)
+            {
+                luaL_error(L, "failed to dofile: %s", fileName.c_str());
+                return 0;
+            }
+            
+            lua_replace(L, 1);
+            if (lua_pcall(L, n-1, LUA_MULTRET, 0) != 0)
+            {
+                luaL_error(L, "failed to dofile: %s", fileName.c_str());
+                return 0;
+            }
+            return lua_gettop(L);
+        };
+        lua_pushcfunction(m_L, ll_script_dofile);
+        lua_setglobal(m_L, "dofile");
+        
+        // static auto luaSearcher = [](lua_State* L) -> int {
+        //     std::string s_fileName = luaL_checkstring(L, 1);
+        //     std::replace(s_fileName.begin(), s_fileName.end(), '.', '/');
+        //     std::string fileName = s_fileName;
+        //     if (fileName.find(".lua") == std::string::npos) fileName += ".lua";
+        //     
+        //     auto fs = GetDefaultFileSystem();
+        //     if (!fs)
+        //     {
+        //         return 0;
+        //     }
+        //     
+        //     std::string outBuffer;
+        //     std::string outError;
+        //     if (fs->ReadFile(fileName.c_str(), outBuffer, outError))
+        //     {
+        //         std::string chunk = "@"; chunk += fileName;
+        //         if (luaL_loadbuffer(L, outBuffer.c_str(), outBuffer.size(), chunk.c_str()) != 0)
+        //         {
+        //             lua_error(L);
+        //             return 0;
+        //         }
+        //         return 1;
+        //     }
+        //     return 0;
+        // };
+        // SetSearcher(luaSearcher);
     }
 
     m_lastError.clear();
@@ -224,6 +335,7 @@ void LuaScriptEngine::AddLuaPath(const std::string& dir)
         {
             if (!newPath.empty()) newPath += ";";
             newPath += pat;
+            fprintf(stdout, "AddLuaPath: %s\n", pat.c_str());
         }
     };
     append(dir + "/?.lua");
@@ -236,10 +348,21 @@ void LuaScriptEngine::AddLuaPath(const std::string& dir)
     lua_settop(L, top);
 }
 
+void LuaScriptEngine::InvalidateLuaState()
+{
+    if (m_L)
+    {
+        fprintf(stdout, "InvalidateLuaState to null\n");
+        m_L = nullptr;
+    }
+    // m_ownsState 保持不变（false），确保 Shutdown 不会尝试 lua_close
+}
+
 void LuaScriptEngine::Shutdown()
 {
     if (m_L)
     {
+        fprintf(stdout, "LuaScriptEngine Shutdown\n");
         // 自有 VM：先 Unregister guard（让残留 Any Variant 析构变 no-op），
         // 再 lua_close。外部 VM 不动，host 自己负责 lifecycle。
         if (m_ownsState)

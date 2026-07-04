@@ -41,7 +41,7 @@ GAME_DIR="$GODOT_INT_DIR/game"                         # Godot 工程
 BUSYBOX="$REPO_ROOT/tools/busybox.exe"                 # Windows 下的 sh 驱动
 
 # --- 工具（按需用环境变量指定）---
-: "${GODOT_BIN:=godot}"          # Godot 编辑器/导出可执行；Win 用 Godot_v4.5-stable_win64_console.exe
+: "${GODOT_BIN:=}"          # Godot 编辑器/导出可执行；Win 用 Godot_v4.5-stable_win64_console.exe
 : "${GODOT_TEMPLATES:=}"         # 导出模板路径（可选，默认用已安装模板）
 : "${DIST_DIR:=$GODOT_INT_DIR/dist}"     # 打包产物输出根
 : "${EMSDK_PATH:=${EMSDK:-}}"     # Emscripten
@@ -69,6 +69,18 @@ run_build_sh() {
   cd "$tmpdir"
 }
 
+check_godot_bin() {
+  if [ -z "$GODOT_BIN" ]; then
+    if command -v godot >/dev/null 2>&1; then
+      GODOT_BIN="godot"
+    elif is_windows_host; then
+      GODOT_BIN="C:/Software/Godot_v4.5/Godot_v4.5-stable_win64_console.exe"
+    else
+      die "Godot not found. Install the Godot engine or pass --godot <path>."
+    fi
+  fi
+}
+
 # ② 编 GDExtension。参数：<平台build目录名> [额外cmake参数...]
 #   例：build_gdext build-android -DCMAKE_TOOLCHAIN_FILE=... -DANDROID_ABI=arm64-v8a -DBP_BUILD_DIR=build-android
 build_gdext() {
@@ -83,6 +95,7 @@ build_gdext() {
 
 # ③ Godot 导出。参数：<preset名> <输出文件>
 godot_export() {
+  check_godot_bin
   local preset="$1" out="$2"
   [[ -f "$GAME_DIR/export_presets.cfg" ]] || die "缺少 export_presets.cfg（先在 Godot 编辑器里为该平台建导出预设）"
   log "③ Godot export: preset='$preset' → $out"
@@ -92,6 +105,7 @@ godot_export() {
 # 生成补丁 + version.json（发版热更用）
 make_patch() {
   log "打补丁 pck + version.json"
+  check_godot_bin
   "$GODOT_BIN" --headless --path "$GAME_DIR" --script res://tools/make_patch.gd
 }
 

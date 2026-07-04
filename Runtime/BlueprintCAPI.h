@@ -148,6 +148,8 @@ typedef int (BLUEPRINT_CAPI_CALL *BP_FileExistsFn)(const char* path, void* userd
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetFileReader(
     BP_FileReadFn read_cb, BP_FileFreeFn free_cb, BP_FileExistsFn exists_cb, void* userdata);
 
+BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_ReadFileBuff(const char* path, char** outData, int* outSize);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_FreeFileBuff(char* data);
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
@@ -192,43 +194,6 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetBasePath(BP_Runner runner, 
 /// BP_LoadFromFile and BP_LoadFromJsonWithBaseDir automatically attempt to load
 /// BlueprintEntry.lua from the blueprint directory (then the DLL directory).
 BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_LoadLuaScript(BP_Runner runner, const char* filePath);
-
-// ---------------------------------------------------------------------------
-// Host Lua module resolver  (project layer owns module-location policy)
-// ---------------------------------------------------------------------------
-// The engine does not decide HOW a Lua module is found. The host registers a
-// resolver callback; the engine installs a package.searchers entry that, on
-// `require "a.b.c"`, asks the host for the module source and compiles it.
-//
-// This keeps all path policy (res:// roots, FileAccess, embedded blobs, etc.)
-// in the project/GDExtension layer — the runtime stays engine-agnostic.
-
-/// Resolve a Lua module by name into source bytes.
-/// modname:    the requested module, e.g. "ui.FGUIMan".
-/// outData:    receives a malloc'd buffer with the Lua source (host-owned).
-/// outSize:    receives the byte count.
-/// outChunk:   optional; receives a malloc'd chunk name for error messages
-///             (e.g. the resolved path). May be left untouched / set to NULL.
-/// Return 1 on success (outData/outSize filled), 0 if the module is not found.
-typedef int (BLUEPRINT_CAPI_CALL *BP_LuaModuleResolveFn)(
-    const char* modname, char** outData, int* outSize, char** outChunk, void* userdata);
-
-/// Free a buffer (data or chunk name) previously returned by the resolver.
-/// May be NULL, in which case the engine will not free host buffers.
-typedef void (BLUEPRINT_CAPI_CALL *BP_LuaModuleFreeFn)(char* ptr, void* userdata);
-
-/// Install a host Lua module resolver as the highest-priority package.searchers
-/// entry. This is PROCESS-LEVEL: the Lua VM is a shared singleton, so the
-/// searcher exists once regardless of how many runners/blueprints there are.
-///
-/// `runner` MAY be NULL — pass NULL to configure resolution at startup (e.g.
-/// from a GameLauncher) using the process-default shared Lua engine, which is
-/// created on demand. Pass a runner only if you specifically target its engine.
-///
-/// Call this ONCE at startup. Loading blueprints does NOT need to re-call it.
-/// Returns 0 on success. No-op (0) when built without Lua.
-BLUEPRINT_CAPI_EXPORT int BLUEPRINT_CAPI_CALL BP_SetLuaModuleResolver(
-    BP_Runner runner, BP_LuaModuleResolveFn resolve_cb, BP_LuaModuleFreeFn free_cb, void* userdata);
 
 /// Tear down the process-default shared Lua VM (closes its lua_State).
 /// Building block for a two-phase startup where the UPDATE phase runs on a
@@ -380,6 +345,7 @@ BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetExternalLuaState(BP_Runner 
 /// Use this to attach an xLua LuaEnv to the same VM as the Blueprint Runtime.
 BLUEPRINT_CAPI_EXPORT lua_State* BLUEPRINT_CAPI_CALL BP_GetLuaState(BP_Runner runner);
 
+BLUEPRINT_CAPI_EXPORT lua_State* BLUEPRINT_CAPI_CALL BP_GetDefaultLuaState(int skipCreate);
 /// Notify Blueprint that a lua_State is going to be closed by the host.
 ///
 /// Must be called BEFORE host's lua_close(L) when:
@@ -395,6 +361,14 @@ BLUEPRINT_CAPI_EXPORT lua_State* BLUEPRINT_CAPI_CALL BP_GetLuaState(BP_Runner ru
 ///
 /// Safe to call multiple times; safe to call on a state never seen by Blueprint.
 BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_NotifyLuaStateClosing(lua_State* L);
+
+typedef int (BLUEPRINT_CAPI_CALL *BP_LuaSearchFileFn)(lua_State* L);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetLuaSearchFileFn(BP_LuaSearchFileFn fn);
+
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_AddLuaSearchPath(const char* path);
+
+typedef void (*lua_LogCallback)(int level, const char* message);
+BLUEPRINT_CAPI_EXPORT void BLUEPRINT_CAPI_CALL BP_SetLuaPrintCallback(lua_LogCallback callback);
 #endif
 
 // ---------------------------------------------------------------------------
