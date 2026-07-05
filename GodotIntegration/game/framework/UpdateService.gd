@@ -12,7 +12,7 @@ extends Node
 ## 本地假 CDN：cdn_base_url 支持 res:// 或 user:// 或 http(s)://。res:///user:// 走 FileAccess，
 ## http(s):// 走 HTTPRequest —— 这样最小 Demo 无需真服务器即可端到端验证。
 
-signal progress(p: float, status: String)   # p ∈ [0,1]
+signal update_progress(p: float, status: String)   # p ∈ [0,1]
 
 ## 结果结构（Boot 据此决定进主逻辑用哪份资源）
 class UpdateResult:
@@ -48,7 +48,8 @@ func run_update() -> UpdateResult:
 	# ① 拉 version.json
 	var manifest: Variant = await _fetch_json(_join(cdn_base_url, "version.json"), version_timeout)
 	if manifest == null or typeof(manifest) != TYPE_DICTIONARY:
-		res.success = true; res.reason = "no_manifest_fallback"
+		res.success = true; 
+		res.reason = "no_manifest_fallback"
 		_emit(1.0, "无法获取更新信息，使用内置资源")
 		return res
 
@@ -87,7 +88,8 @@ func run_update() -> UpdateResult:
 		var ok: bool = await _download_to(url, dst)
 		if not ok:
 			# 下载失败 → 弱网回退（不阻断）
-			res.success = true; res.reason = "download_failed_fallback"
+			res.success = true; 
+			res.reason = "download_failed_fallback"
 			_emit(1.0, "下载失败，使用内置资源")
 			return res
 
@@ -205,4 +207,4 @@ func _join(base: String, rel: String) -> String:
 	return base + "/" + rel
 
 func _emit(p: float, status: String) -> void:
-	progress.emit(p, status)
+	update_progress.emit(p, status)

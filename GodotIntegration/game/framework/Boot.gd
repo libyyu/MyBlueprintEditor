@@ -32,7 +32,7 @@ func _run() -> void:
 
 		# 更新 UI
 		var panel := UiService.open_panel("UpdatePanel")
-		UpdateService.progress.connect(func(p: float, s: String):
+		UpdateService.update_progress.connect(func(p: float, s: String):
 			if is_instance_valid(panel):
 				panel.set_progress(p)
 				panel.set_status(s))

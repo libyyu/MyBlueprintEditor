@@ -11,6 +11,9 @@
 #ifndef GODOT_FILE_BRIDGE_H
 #define GODOT_FILE_BRIDGE_H
 
+#include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/variant/packed_string_array.hpp>
+
 // Install the Godot FileAccess-backed reader as BlueprintRuntime's file system.
 // `res_root` is a Godot path prefix (e.g. "res://") prepended to relative paths
 // the engine asks for, so a blueprint dependency like "blueprint_1_1.bjson"

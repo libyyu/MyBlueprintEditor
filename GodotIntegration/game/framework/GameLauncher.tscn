@@ -1,4 +1,4 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://ccabfh1g5b46x"]
 
 [node name="GameLauncher" type="GameLauncher"]
 lua_roots = PackedStringArray("res://lua", "res://blueprints")

@@ -1,0 +1,35 @@
+{
+  "latest_resource_version": "r103",
+  "resource_versions": {
+	"r101": {
+	  "resource_version": "r101",
+	  "min_client_version": "1.1.0",
+	  "min_api_level": 101,
+	  "base_version": "r0",
+	  "file_count": 15,
+	  "total_size": 1024000
+	},
+	"r102": {
+	  "resource_version": "r102",
+	  "min_client_version": "1.2.0",
+	  "min_api_level": 102,
+	  "base_version": "r101",
+	  "file_count": 3,
+	  "total_size": 20480
+	},
+	"r103": {
+	  "resource_version": "r103",
+	  "min_client_version": "1.2.0",
+	  "min_api_level": 102,
+	  "base_version": "r102",
+	  "file_count": 1,
+	  "total_size": 5120
+	}
+  },
+  "store_urls": {
+	"android": "https://play.google.com/store/apps/details?id=com.your.game",
+	"ios": "https://apps.apple.com/app/your-game/id123456789",
+	"web": "https://your-game.com/play",
+	"default": "https://your-game.com/download"
+  }
+}
