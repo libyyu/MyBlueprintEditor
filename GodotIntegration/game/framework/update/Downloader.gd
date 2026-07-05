@@ -106,8 +106,14 @@ func _start_request() -> void:
 	_http.timeout = timeout_sec
 	_http.download_file = _save_path
 
-	_http.download_progress.connect(_on_progress)
 	_http.request_completed.connect(_on_completed)
+	if _http.has_signal("download_progress"):
+		_http.download_progress.connect(_on_progress)
+	elif _http.has_signal("progress"):
+		_http.progress.connect(_on_progress)
+	else:
+		push_error("[Downloader] no progress singal")
+	
 
 	# 确保保存目录存在
 	var dir_path = _save_path.get_base_dir()
@@ -138,7 +144,7 @@ func _start_request() -> void:
 # 进度回调
 # ================================
 
-func _on_progress(downloaded: int, total: int) -> void:
+func _on_progress(total: int, downloaded: int) -> void:
 	if _canceled:
 		return
 
