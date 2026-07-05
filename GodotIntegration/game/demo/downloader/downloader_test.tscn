@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://cgir0y4nehnm7"]
+
+[ext_resource type="Script" uid="uid://dq45r3o7fbqx2" path="res://demo/downloader/downloader_test.gd" id="1_kyh2b"]
+
+[node name="DownloaderTest" type="Node"]
+script = ExtResource("1_kyh2b")
