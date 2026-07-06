@@ -39,7 +39,7 @@ pack_web() {
   
   # ① 引擎核心（wasm 静态 .a）
   log "① building engine core (wasm/emscripten, static)"
-  run_build_sh wasm
+  run_build_sh wasm --merge-all-libs
 
   # ② GDExtension（emcmake 驱动；CMakeLists 检测到 EMSCRIPTEN 会静态链接引擎 .a）
   log "② building GDExtension (emscripten)"

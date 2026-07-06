@@ -116,6 +116,12 @@ while [ $# -gt 0 ]; do
             BUNDLE_LUASOCKET="ON"; shift ;;
         --no-xlua)
             BLUEPRINT_LINK_XLUA="OFF"; shift ;;
+        --merge-all-libs)
+            BUILD_BUNDLE="ON";
+            BUNDLE_LUA="ON";
+            BUNDLE_PROTOBUF="ON";
+            BUNDLE_LUASOCKET="ON";
+            shift ;;
         -h|--help)
             sed -n '2,/^# ===/p' "$0" | sed 's/^# \{0,1\}//'
             exit 0 ;;

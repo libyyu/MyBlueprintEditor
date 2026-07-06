@@ -145,7 +145,8 @@ static void BindCrtHandlesToStdHandles(bool bindStdIn, bool bindStdOut, bool bin
 static void ShowConsole(bool newConsole=false)
 {
     //// 分配一个控制台，以便于输出一些有用的信息
-    if (!newConsole && AttachConsole(ATTACH_PARENT_PROCESS)) {
+    if (!newConsole) {
+        AttachConsole(ATTACH_PARENT_PROCESS);
         BindCrtHandlesToStdHandles(false, true, true);
     }
     else

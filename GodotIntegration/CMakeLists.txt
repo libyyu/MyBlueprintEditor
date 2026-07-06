@@ -167,6 +167,14 @@ if(GDEXT_WITH_LUA)
     list(APPEND BP_GDEXT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/godot_lua_bindings.cpp")
 endif()
 
+# Web：补 saveSetjmp/testSetjmp stub。emsdk 3.1.50 编 Lua ldo.c 会残留旧模式
+# SjLj 符号(saveSetjmp/testSetjmp)，而 Godot 引擎主模块只提供新模式
+# (__wasm_longjmp/__c_longjmp)，导致 side module 加载时 undefined symbol abort。
+# 这两个旧符号运行时不会被真正调用，提供空实现让 dylink 能解析即可。见 web_sjlj_stub.c。
+if(_IS_WEB)
+    list(APPEND BP_GDEXT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/web_sjlj_stub.c")
+endif()
+
 add_library(blueprint_gdext SHARED ${BP_GDEXT_SOURCES})
 
 target_include_directories(blueprint_gdext PRIVATE
@@ -184,6 +192,61 @@ target_link_libraries(blueprint_gdext PRIVATE godot-cpp)
 # 切勿在这里补一句 -sUSE_PTHREADS=1！那会与引擎 .a 不匹配，触发 wasm-ld:
 #   --shared-memory is disallowed by <engine>.o
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Web(Emscripten)：让产物成为带 dylink 段的真正 SIDE_MODULE。
+#
+# 现象：运行时浏览器报
+#   Uncaught Error: need the dylink section to be first
+# 且链接时 em++ 警告：
+#   linking a library with `-shared` will emit a static object file ...
+#   If you want to build a runtime shared library use the SIDE_MODULE setting.
+#
+# 真因（从 build.ninja 的 LINK_FLAGS 反查确认）：
+#   LINK_FLAGS = -shared ... -s        ← 注意结尾的 -s，且【没有】 -sSIDE_MODULE=1
+#   -sSIDE_MODULE=1 只加在 compile 阶段（godot-cpp target_compile_options），
+#   link 阶段没传，于是 emcc 退回 `-shared` 模拟模式 → emit 静态 object →
+#   产物根本没有 dylink 段（不是被重排，是压根没生成）。
+#   结尾的 -s 是 strip，同样有害。
+#
+# 修复：在 link 阶段【显式】补 -sSIDE_MODULE=1，让 emcc 产真正的 side module
+#   （带 dylink 段且在首位）；不要去动 CMAKE_*_LINKER_FLAGS_<CONFIG>
+#   （上一版清空它们无效，因为 -s 来自别处）。
+#   注意：SIDE_MODULE 下不能再叠 -O0/wasm-opt 相关魔改，交给 emcc 默认处理。
+# ---------------------------------------------------------------------------
+if(_IS_WEB)
+    # 关键修复：link 阶段显式补 -sSIDE_MODULE=1。
+    #
+    # 现象：运行时浏览器报 "need the dylink section to be first"。
+    # 真因（从 build.ninja 的 LINK_FLAGS 反查确认）：-sSIDE_MODULE=1 只加在了
+    #   compile 阶段（godot-cpp target_compile_options），link 阶段没传，于是 emcc
+    #   退回 `-shared` 模拟模式 emit 静态 object → 产物根本没有 dylink 段。
+    # 修复后 check_dylink.py 确认：首段变为 custom 'dylink.0' → Godot Web 可加载。
+    #
+    # 注：LINK_FLAGS 末尾的 -s(来自 CMAKE_SHARED_LINKER_FLAGS_RELEASE 默认值)在
+    #   SIDE_MODULE 模式下并不破坏段布局，实测保留也能正常出 dylink，无需清除。
+    target_link_options(blueprint_gdext PRIVATE -sSIDE_MODULE=1)
+    message(STATUS "[blueprint_gdext] web: force -sSIDE_MODULE=1 at link "
+                   "(emit real side module with dylink section first)")
+
+    # setjmp/longjmp：Lua(ldo.c) 用 setjmp 做错误处理。emcc 编 .c 时 .o 里总会留
+    # saveSetjmp/testSetjmp/emscripten_longjmp 字符串；它们是走 emscripten 模式还是
+    # wasm 原生 SjLj，由【最终 link 阶段】的 -sSUPPORT_LONGJMP 决定。
+    # 若 link 期没传 wasm，.so 里这三个就变成真·未定义 import（MAIN_MODULE 引擎不
+    # 提供）→ 运行时 Aborted: undefined symbol 'saveSetjmp'。
+    # 所以这里【在 link 阶段显式补】，把 Lua 的 setjmp 转成 wasm SjLj，消除 import。
+    target_link_options(blueprint_gdext PRIVATE -sSUPPORT_LONGJMP=wasm)
+    message(STATUS "[blueprint_gdext] web: link -sSUPPORT_LONGJMP=wasm "
+                   "(resolve Lua setjmp to native wasm SjLj, drop saveSetjmp import)")
+
+    # 调试期：保留函数名，让浏览器 RuntimeError 栈显示符号而非裸地址。
+    # 定位完 null function 崩溃点后可去掉（-g2 会显著增大 .so / 拖慢加载）。
+    option(GDEXT_WEB_DEBUG_SYMBOLS "Keep wasm function names for stack traces" ON)
+    if(GDEXT_WEB_DEBUG_SYMBOLS)
+        target_link_options(blueprint_gdext PRIVATE -g2)
+        message(STATUS "[blueprint_gdext] web: -g2 (debug symbols in stack traces)")
+    endif()
+endif()
 
 # ---------------------------------------------------------------------------
 # Lua wiring (only when GDEXT_WITH_LUA). We compile godot_lua_bindings.cpp which
@@ -207,21 +270,58 @@ endif()
 # Link BlueprintRuntime — shared (import lib) on desktop/android,
 #                         static (.a, absorb lua) on web/ios.
 # ---------------------------------------------------------------------------
-if(_LINK_ENGINE_STATIC)
-    # Web / iOS: statically link the engine .a (it already bakes Lua in).
-    set(BP_RUNTIME_STATIC "${BP_BUILD_ABS}/Runtime/libBlueprintRuntime.a")
-    if(NOT EXISTS "${BP_RUNTIME_STATIC}")
-        # dist/ fallback (e.g. prebuilt WebGL archive)
-        set(BP_RUNTIME_STATIC "${BP_REPO_ROOT}/dist/UnityPlugins/WebGL/libBlueprintRuntime.a")
+if(_IS_WEB)
+    # Web(Emscripten)：链接【多个原子静态库】，而不是 libBlueprintBundle.a。
+    #
+    # 为什么不用 Bundle：libBlueprintBundle.a 是"库套库"（嵌套 .a——成员是别的 .a
+    #   而非 .o），只有桌面/MSVC 链接器能吃。emscripten 的 wasm-ld 不认嵌套归档：
+    #     wasm-ld: error: unknown file type: libBlueprintBundle.a(libBlueprintRuntime.a)
+    #
+    # 解法：直接平级链 build-wasm 里的原子库（内容都是 .o）：
+    #   Runtime + lua54 + protobuf(+ luasocket/json 若被引用)。
+    #   用 --whole-archive 强制把符号全打进 side module（否则 --gc-sections 会把
+    #   "Runtime 内部引用、GDExtension 没直接调"的 protobuf 实现 gc 成 undefined
+    #   import → 运行时 reportUndefinedSymbols 崩在 kTypeToCppTypeMap 等符号）。
+    set(_BP_WEB_ARCHIVES "")
+    foreach(_rel
+            "Runtime/libBlueprintRuntime.a"
+            "Runtime/liblua54.a"
+            "external/protobuf/libprotobuf_s.a"
+            "external/lprotos/liblprotos_s.a"
+            "Utils/Json/libcrude_json.a")
+        set(_abs "${BP_BUILD_ABS}/${_rel}")
+        if(EXISTS "${_abs}")
+            list(APPEND _BP_WEB_ARCHIVES "${_abs}")
+        endif()
+    endforeach()
+    if(NOT _BP_WEB_ARCHIVES)
+        message(FATAL_ERROR
+            "[blueprint_gdext] No atomic engine archives found under ${BP_BUILD_ABS}.\n"
+            "Build the engine for wasm first (build.sh wasm).")
     endif()
-    if(EXISTS "${BP_RUNTIME_STATIC}")
+    # 整个 archive 列表包在一对 whole-archive 之间
+    target_link_options(blueprint_gdext PRIVATE
+        "-Wl,--whole-archive" ${_BP_WEB_ARCHIVES} "-Wl,--no-whole-archive")
+    message(STATUS "[blueprint_gdext] web: whole-archive link atomic libs: ${_BP_WEB_ARCHIVES}")
+
+elseif(_LINK_ENGINE_STATIC)
+    # iOS: 静态链引擎 .a（iOS 工具链能吃 Bundle，若有则优先）
+    set(BP_RUNTIME_STATIC "")
+    foreach(_cand
+            "${BP_BUILD_ABS}/bin/Release/libBlueprintBundle.a"
+            "${BP_BUILD_ABS}/bin/libBlueprintBundle.a"
+            "${BP_BUILD_ABS}/Runtime/libBlueprintRuntime.a"
+            "${BP_REPO_ROOT}/dist/UnityPlugins/WebGL/libBlueprintRuntime.a")
+        if(NOT BP_RUNTIME_STATIC AND EXISTS "${_cand}")
+            set(BP_RUNTIME_STATIC "${_cand}")
+        endif()
+    endforeach()
+    if(BP_RUNTIME_STATIC)
         target_link_libraries(blueprint_gdext PRIVATE "${BP_RUNTIME_STATIC}")
         message(STATUS "[blueprint_gdext] static-linking engine: ${BP_RUNTIME_STATIC}")
     else()
         message(FATAL_ERROR
-            "Static engine archive not found for ${_PLAT_TAG}.\n"
-            "Expected: ${BP_RUNTIME_STATIC}\n"
-            "Build the engine as STATIC for this platform first.")
+            "Static engine archive not found for ${_PLAT_TAG}.")
     endif()
 else()
     # Desktop (Win/Linux/macOS) + Android: shared engine.

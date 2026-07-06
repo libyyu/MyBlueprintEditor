@@ -41,6 +41,9 @@ func _run() -> void:
 		var result = await UpdateService.run_update()
 		print("[Boot] update result: success=%s updated=%s version=%s reason=%s" % [
 			result.success, result.updated, result.version, result.reason])
+		if result.need_store_upgrade:
+			# 客户端版本过低。本 Demo 不 real-jump，先打日志；生产可跳浏览器/商店。
+			push_warning("[Boot] need store upgrade -> %s" % result.store_url)
 		await get_tree().create_timer(0.2).timeout
 
 		# 阶段 3：销毁更新 VM，切全新主 VM

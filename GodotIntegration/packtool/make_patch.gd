@@ -44,16 +44,21 @@ func _init() -> void:
 	var f := FileAccess.open(pack_path, FileAccess.READ)
 	if f: size = f.get_length(); f.close()
 
-	# 3) version.json
+	# 3) version.json —— 新版 entries[] 格式（docs/08）
 	var manifest := {
 		"version": PATCH_VERSION,
 		"min_engine": "4.5",
-		"packs": [
+		"min_api_level": 0,
+		"min_client_version": "",
+		"store_urls": {},
+		"entries": [
 			{
-				"name": PACK_NAME,
+				"name": PACK_NAME.get_basename(),
+				"kind": "pck",
 				"url": "res://fake_cdn/%s/%s" % [PATCH_VERSION, PACK_NAME],
 				"sha256": sha,
 				"size": size,
+				"order": 0,
 			}
 		]
 	}

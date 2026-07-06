@@ -1,12 +1,17 @@
 {
+  "version": "1.0.1",
   "min_engine": "4.5",
-  "packs": [
-	{
-	  "name": "game.pck",
-	  "sha256": "cbb72d6602d33b3813eeb68df24f5ab54ae7d912f969b1dd454967982b5decc7",
-	  "size": 2056,
-	  "url": "res://fake_cdn/1.0.1/game.pck"
-	}
-  ],
-  "version": "1.0.1"
+  "min_api_level": 0,
+  "min_client_version": "",
+  "store_urls": {},
+  "entries": [
+    {
+      "name": "game",
+      "kind": "pck",
+      "url": "res://fake_cdn/1.0.1/game.pck",
+      "sha256": "cbb72d6602d33b3813eeb68df24f5ab54ae7d912f969b1dd454967982b5decc7",
+      "size": 2056,
+      "order": 0
+    }
+  ]
 }

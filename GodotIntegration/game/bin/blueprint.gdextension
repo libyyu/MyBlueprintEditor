@@ -8,6 +8,12 @@ compatibility_minimum = "4.5"
 windows.debug.x86_64   = "res://bin/blueprint_gdext.windows.template_debug.x86_64.dll"
 windows.release.x86_64 = "res://bin/blueprint_gdext.windows.template_debug.x86_64.dll"
 
+; Web (wasm32) —— 引擎 .a 已静态链进 .so，无需 [dependencies] 条目。
+; 注意：目前只编了 template_debug；release 暂复用 debug 产物，
+; 待 build.sh 出 template_release 后再改指向。
+web.debug.wasm32   = "res://bin/blueprint_gdext.web.template_debug.wasm32.so"
+web.release.wasm32 = "res://bin/blueprint_gdext.web.template_debug.wasm32.so"
+
 [dependencies]
 
 windows.debug.x86_64   = { "res://bin/BlueprintRuntime.dll" : "" }

@@ -6,7 +6,8 @@ extends SceneTree
 ##   1) 用 PCKPacker 把 patch_src/** 下的文件打成一个补丁 pck，
 ##      pck 内路径映射为 res://...（挂载时 replace=true 覆盖原版）
 ##   2) 算该 pck 的 sha256
-##   3) 生成 version.json（含 version + packs[{name,url,sha256,size}]）
+##   3) 生成 version.json（新版 entries[] 格式，见 docs/08）
+##      每个 entry: { name, kind, url, sha256, size, order }
 ##      —— url 用 res:// 相对假 CDN，Demo 无需真服务器
 ##
 ## 产出目录：res://fake_cdn/  (打进主包，运行时 UpdateService 从这里“拉取”)
@@ -19,6 +20,11 @@ const PACK_NAME := "game.pck"
 const FILES := {
 	"res://lua/demo/main_menu_logic.lua": "res://patch_src/lua/demo/main_menu_logic.lua",
 }
+
+## 与运行时兼容闸联动的最低版本要求（客户端 API Level / 语义版本）。
+## planner 优先看 min_api_level；两者都写上更保险。
+const MIN_API_LEVEL := 0             # 0 = 不设 API Level 门槛
+const MIN_CLIENT_VERSION := ""       # "" = 不设语义版本门槛
 
 func _init() -> void:
 	var cdn_os := ProjectSettings.globalize_path(CDN_DIR)
@@ -48,17 +54,22 @@ func _init() -> void:
 	var f := FileAccess.open(pack_os_path, FileAccess.READ)
 	if f: size = f.get_length(); f.close()
 
-	# 3) version.json
+	# 3) version.json —— 新版 entries[] 格式（docs/08）
 	var manifest := {
 		"version": PATCH_VERSION,
 		"min_engine": "4.5",
-		"packs": [
+		"min_api_level": MIN_API_LEVEL,
+		"min_client_version": MIN_CLIENT_VERSION,
+		"store_urls": {},
+		"entries": [
 			{
-				"name": PACK_NAME,
+				"name": PACK_NAME.get_basename(),   # 条目名（不带扩展）
+				"kind": "pck",
 				# 相对假 CDN 的 res:// 路径；真 CDN 换成 https://... 即可
 				"url": "%s/%s/%s" % [CDN_DIR, PATCH_VERSION, PACK_NAME],
 				"sha256": sha,
 				"size": size,
+				"order": 0,               # 越大越晚挂、优先级越高；本 Demo 单包，0 即可
 			}
 		]
 	}

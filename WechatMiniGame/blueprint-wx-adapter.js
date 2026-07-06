@@ -25,14 +25,17 @@
 //
 // 注意：Runtime 编译参数必须包含：
 //   -sEXPORTED_RUNTIME_METHODS=[ccall,cwrap,UTF8ToString,stringToUTF8,lengthBytesUTF8,addFunction,getValue,setValue]
-//   -sEXPORTED_FUNCTIONS=[_malloc,_free,_BP_CreateRunner,_BP_DestroyRunner,_BP_LoadFromJson,_BP_Execute,_BP_Tick,_BP_SetVariableString,_BP_SetVariableInt,_BP_SetVariableFloat,_BP_SetVariableBool,_BP_GetVariableString,_BP_GetVariableInt,_BP_GetVariableFloat,_BP_GetVariableBool,_BP_SetLogCallback,_BP_SetPrintCallback,_BP_InstallJSBridgeHttpClient,_BP_Http_SetRequestDispatcher,_BP_Http_GetReqUrl,_BP_Http_GetReqMethod,_BP_Http_GetReqBody,_BP_Http_GetReqHeaders,_BP_Http_OnResponse,_BP_InitDefaultHttpClient]
-//   -sALLOW_TABLE_GROWTH=1            // addFunction 需要
+//   -sEXPORTED_FUNCTIONS=[_malloc,_free,_BP_CreateRunner,_BP_DestroyRunner,_BP_LoadFromJson,_BP_Execute,_BP_Tick,_BP_SetVariableString,_BP_SetVariableInt,_BP_SetVariableFloat,_BP_SetVariableBool,_BP_GetVariableString,_BP_GetVariableInt,_BP_GetVariableFloat,_BP_GetVariableBool,_BP_SetLogCallback,_BP_SetPrintCallback,_BP_InstallJSBridgeHttpClient,_BP_Http_SetRequestDispatcher,_BP_Http_GetReqUrl,_BP_Http_GetReqMethod,_BP_Http_GetReqBody,_BP_Http_GetReqHeaders,_BP_Http_OnResponse,_BP_InitDefaultHttpClient,_BP_SetFileReader]
+//   -sALLOW_TABLE_GROWTH=1            // addFunction 需要（HTTP dispatcher + 文件桥回调）
 //   -sFETCH=1                          // 备用浏览器通道
 //   -sASYNCIFY                         // 按需
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { installFileReader } from './blueprint-wx-fs.js';
+
 let Module = null;        // Emscripten Module
 let _hostRequest = null;  // 被选中的 HTTP 后端：wx.request / tt.request / fetch 适配器
+let _fileReader = null;   // 文件桥句柄（installFileReader 返回，用于 uninstall）
 
 // ═════════════════════════════════════════════════════════════════════════════
 // 内部：HTTP 请求派发（WASM → JS → wx.request → WASM）
@@ -155,6 +158,11 @@ export const BlueprintBridge = {
      * @param {string} opts.jsLoader  Emscripten 生成的 BlueprintRuntime.js
      * @param {'wx'|'tt'|'fetch'|Function} [opts.host='wx']
      *        HTTP 后端；传函数则作为自定义 backend
+     * @param {boolean} [opts.enableFileReader=true]
+     *        是否安装文件读取桥（把 Runtime 文件读取接到 wx 用户目录）。
+     *        小游戏热更需要它才能读到下载后的 .bjson；纯随包资源可关。
+     * @param {object} [opts.fileReaderOpts]
+     *        透传给 installFileReader 的选项（userDir / extraRoots 等）。
      */
     async init(opts) {
         // 选择 HTTP 后端
@@ -184,7 +192,21 @@ export const BlueprintBridge = {
 
         // 安装 JSBridge HttpClient
         Module._BP_InstallJSBridgeHttpClient();
+
+        // 安装文件读取桥（默认开）：让 Runtime 读到 wx 用户目录里的文件（含热更下载的 .bjson）
+        if (opts.enableFileReader !== false) {
+            const host = typeof opts.host === 'string' ? opts.host : undefined;
+            _fileReader = installFileReader(Module, Object.assign({ host }, opts.fileReaderOpts || {}));
+        }
     },
+
+    /** 卸载文件桥（一般不需要手动调；进程退出前清理用） */
+    _uninstallFileReader() {
+        if (_fileReader) { _fileReader.uninstall(); _fileReader = null; }
+    },
+
+    /** 暴露 Module 给上层（MiniGameUpdater 需要 Module 做内存操作） */
+    getModule() { return Module; },
 
     /** 创建 Runner */
     createRunner() {

@@ -174,6 +174,12 @@ if(NOT DEFINED RUNTIME_NAME OR RUNTIME_NAME STREQUAL "")
     set(RUNTIME_NAME "BlueprintRuntime")
 endif()
 
+if (EMSCRIPTEN)
+    set(LUASOCKET_ENABLE OFF)
+else()
+    set(LUASOCKET_ENABLE ${BLUEPRINT_LUASOCKET})
+endif()
+
 # LUA_LINK_STATIC – controls how Lua is linked when BlueprintRuntime is SHARED.
 #
 #   ON  (default): Lua is built as STATIC and baked into BlueprintRuntime.dll/so/dylib.
@@ -288,10 +294,23 @@ if(BLUEPRINT_LUA)
             # LUA_USE_DLOPEN, LUA_USE_WINDOWS (implicit default).
             # There is NO LUA_USE_IOS or LUA_USE_ANDROID in the official source.
             if(EMSCRIPTEN)
-                # Emscripten: POSIX math/signal subset is available; no readline,
-                # no real dlopen (Emscripten's dlopen is a stub — omit LUA_USE_DLOPEN
-                # so Lua doesn't try to load dynamic modules at runtime).
-                target_compile_definitions(${_LUA_TARGET_NAME} PRIVATE LUA_USE_POSIX)
+                # Emscripten: 关键——【不要】定义 LUA_USE_POSIX。
+                #
+                # 原因（错误处理路径 saveSetjmp 崩溃根因）：
+                #   ldo.c 里 LUAI_THROW/LUAI_TRY 的选择逻辑：
+                #     - 定义 LUA_USE_POSIX → 用 _setjmp/_longjmp（带下划线的 POSIX 版）
+                #     - 否则(默认)        → 用标准 setjmp/longjmp
+                #   emcc 的 wasm 原生 SjLj 只认【标准 setjmp/longjmp】，不支持
+                #   _setjmp/_longjmp；后者会退回 emscripten 模式生成 saveSetjmp/
+                #   emscripten_longjmp，在 side module 里成为 MAIN_MODULE 未提供的
+                #   未定义符号 → Aborted: undefined symbol 'saveSetjmp'。
+                #   所以 Web 下不定义 LUA_USE_POSIX，让 Lua 走标准 setjmp 分支。
+                #   （POSIX 只影响 os.time 精度/io 细节，对蓝图运行时无关紧要。）
+                #
+                # 配套：给 Lua 编译传 -sSUPPORT_LONGJMP=wasm，用 wasm 原生 SjLj，
+                # 与 Godot 引擎 / godot-cpp / BlueprintRuntime 一致。
+                target_compile_options(${_LUA_TARGET_NAME} PRIVATE
+                    -sSUPPORT_LONGJMP=wasm)
             elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
                 # iOS: POSIX math available, but system()/popen()/pclose() are banned
                 # by Apple and will cause compile errors on iPhoneSimulator/iphoneos SDK.
@@ -494,7 +513,7 @@ if(BLUEPRINT_LUA)
     message(STATUS "[BlueprintRuntime] Lua scripting enabled (${_LUA_LIB_TYPE}, include: ${LUA_INCLUDE_DIR})")
 endif()
 
-if(BLUEPRINT_LUASOCKET AND BLUEPRINT_LUA)
+if(LUASOCKET_ENABLE AND BLUEPRINT_LUA)
     if(TARGET luasocket_s)
         target_link_libraries(BlueprintRuntime PRIVATE luasocket_s)
         target_include_directories(BlueprintRuntime PRIVATE
@@ -651,6 +670,8 @@ if(EMSCRIPTEN)
         -fno-exceptions          # Unity WebGL does not support C++ exceptions
         -fno-rtti                # Unity WebGL strips RTTI
         -O2
+        -sSUPPORT_LONGJMP=wasm   # 与 Godot 引擎/godot-cpp/Lua 一致的 wasm longjmp，
+                                 # 避免 emscripten 模式引用 saveSetjmp 等未定义符号
     )
     # NOTE: Emscripten link flags (-sWASM=1, -sALLOW_MEMORY_GROWTH=1, etc.)
     # are NOT set here because BlueprintRuntime is always a STATIC library
@@ -749,7 +770,7 @@ if(BLUEPRINT_LUA AND TARGET ${LUA_LIBRARIES})
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}   # .dll on Windows
         )
     endif()
-    if(BLUEPRINT_LUASOCKET AND TARGET luasocket_s)
+    if(BLUEPRINT_LUASOCKET_ENABLE AND TARGET luasocket_s)
         install(TARGETS luasocket_s
             EXPORT BlueprintRuntimeTargets
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
