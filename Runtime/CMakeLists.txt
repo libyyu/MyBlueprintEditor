@@ -770,7 +770,7 @@ if(BLUEPRINT_LUA AND TARGET ${LUA_LIBRARIES})
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}   # .dll on Windows
         )
     endif()
-    if(BLUEPRINT_LUASOCKET_ENABLE AND TARGET luasocket_s)
+    if(LUASOCKET_ENABLE AND TARGET luasocket_s)
         install(TARGETS luasocket_s
             EXPORT BlueprintRuntimeTargets
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
