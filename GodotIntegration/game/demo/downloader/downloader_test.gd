@@ -20,7 +20,7 @@ func _on_download_complete(result: Downloader.DownloadResult, error: String) -> 
 	downloader.queue_free()
 	
 func _on_download_progress(downloaded: int, total: int, speed: String) -> void:
-	print("[DownloaderTest] progress:", downloaded, total, speed)
+	print("[DownloaderTest] progress:", "downloaded:", downloaded, " total:", total, " speed:", speed)
 
 
 	
