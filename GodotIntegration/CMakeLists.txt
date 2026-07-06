@@ -133,6 +133,25 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/godot-cpp/CMakeLists.txt")
         "godot-cpp not found. Pull the submodule first:\n"
         "  git submodule update --init --recursive")
 endif()
+
+# ---------------------------------------------------------------------------
+# Web(Emscripten)：强制 godot-cpp 关掉 pthreads/共享内存，与引擎静态库对齐。
+#
+# 原因：build.sh wasm 编 BlueprintRuntime.a 时没加 -pthread（含 NodeDefinition.cpp.o
+# 等所有 .o 都没有 atomics/bulk-memory feature 标记）。若 godot-cpp 默认开
+# GODOTCPP_THREADS=ON → 链接期传 -sUSE_PTHREADS=1 → wasm-ld 拒绝混链：
+#   error: --shared-memory is disallowed by NodeDefinition.cpp.o because it was
+#          not compiled with 'atomics' or 'bulk-memory' features.
+#
+# 若日后要 Godot Web 多线程（需 SharedArrayBuffer + COOP/COEP header），必须：
+#   1) 用 -pthread 重编 build-wasm 里的引擎全部 .a
+#   2) 移除下面这行（或改成 ON）
+#   3) 用 threads-enabled Godot Web export template
+# ---------------------------------------------------------------------------
+if(_IS_WEB)
+    set(GODOTCPP_THREADS OFF CACHE BOOL "Disable pthreads to match single-threaded engine .a" FORCE)
+endif()
+
 add_subdirectory(godot-cpp)
 
 # ---------------------------------------------------------------------------
@@ -157,24 +176,14 @@ target_include_directories(blueprint_gdext PRIVATE
 target_link_libraries(blueprint_gdext PRIVATE godot-cpp)
 
 # ---------------------------------------------------------------------------
-# Emscripten (Web): link as SIDE_MODULE so Godot Web runtime can load us.
+# Emscripten (Web) 的 SIDE_MODULE + PUBLIC 编译/链接 flags 全部由 godot-cpp 的
+# cmake/web.cmake 提供（-sSIDE_MODULE=1 / -sSUPPORT_LONGJMP=wasm / -fPIC 等）。
+# 我们已在 add_subdirectory(godot-cpp) 之前通过 GODOTCPP_THREADS=OFF 与引擎 .a
+# 对齐（禁用 pthreads/共享内存），此处无需再自定义 target_link_options。
 #
-# 编译期 godot-cpp / -fPIC 已把 -sSIDE_MODULE=1 加进 compile flags；但 em++ 在
-# link 阶段不会自动继承，需要显式再加一遍，否则产物只是"伪装成 .so 的静态目标
-# 文件"（em++ 会给出 warning: linking a library with `-shared` will emit a
-# static object file），Godot Web 运行时无法作为动态模块加载。
-#
-# 说明：SIDE_MODULE=1 会禁用主线程 export，产物是可被 wasm dlopen 的动态模块，
-# Godot Web 侧通过 .gdextension 中 web.wasm32.* 条目加载。SUPPORT_LONGJMP=wasm
-# 与 USE_PTHREADS=1 需要与主 Godot Web export 保持一致，否则会 ABI 不兼容。
+# 切勿在这里补一句 -sUSE_PTHREADS=1！那会与引擎 .a 不匹配，触发 wasm-ld:
+#   --shared-memory is disallowed by <engine>.o
 # ---------------------------------------------------------------------------
-if(_IS_WEB)
-    target_link_options(blueprint_gdext PRIVATE
-        -sSIDE_MODULE=1
-        -sSUPPORT_LONGJMP=wasm
-        -sUSE_PTHREADS=1
-    )
-endif()
 
 # ---------------------------------------------------------------------------
 # Lua wiring (only when GDEXT_WITH_LUA). We compile godot_lua_bindings.cpp which
