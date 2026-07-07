@@ -37,14 +37,24 @@ pack_desktop() {  # $1 = windows|linux|macos ; $2 = preset名 ; $3 = 输出文�
 pack_web() {
   check_emcmake
   
+  export EMCC_FORCE_STDLIBS=1
+
   # ① 引擎核心（wasm 静态 .a）
   log "① building engine core (wasm/emscripten, static)"
   run_build_sh wasm --merge-all-libs
 
   # ② GDExtension（emcmake 驱动；CMakeLists 检测到 EMSCRIPTEN 会静态链接引擎 .a）
-  log "② building GDExtension (emscripten)"
+  #
+  # EMCC_FORCE_STDLIBS=1：强制 emcc 把 libc/libc++ 完整内嵌到 side module，包含
+  #   saveSetjmp / testSetjmp / emscripten_longjmp 等 Lua ldo.c 编译期残留的旧模式
+  #   SjLj 符号实现。这是 emscripten 官方对
+  #     Aborted(Assertion failed: undefined symbol 'saveSetjmp')
+  #   的推荐修法（issue #23128）。
+  #   代价：.so 会比 SIDE_MODULE=2 大一些（+几 MB stdlib 副本），但换回稳定运行。
+  log "② building GDExtension (emscripten, EMCC_FORCE_STDLIBS=1)"
   local tmpdir=`pwd`
   cd "$GODOT_INT_DIR"
+  
   if is_windows_host; then
       python "${EMCMAKE}" cmake -B build-wasm-gdext \
       -DBP_BUILD_DIR="build-wasm" \
@@ -58,10 +68,31 @@ pack_web() {
   fi
 
   cmake --build build-wasm-gdext --config Release --target blueprint_gdext
+  unset EMCC_FORCE_STDLIBS
   cd "$tmpdir"
 
   # ③ Godot 导出 Web
   godot_export "Web" "$DIST_DIR/web/index.html"
+
+  # ④ Patch index.js：往 wasmImports 注入 saveSetjmp/testSetjmp/emscripten_longjmp
+  #    空 stub。Godot 4.5+ template 用 -sSUPPORT_LONGJMP=wasm 编，JS runtime 里没有
+  #    这三个旧模式 helper；而 emsdk 3.1.50 编 Lua ldo.c 时会 emit 死引用。
+  #    dylink loader 走 resolveGlobalSymbol → wasmImports[symName] 查不到 → abort。
+  #    补丁在 wasmImports 表定义之后、resolveGlobalSymbol 之前插入 no-op 实现。
+  local index_js="$DIST_DIR/web/index.js"
+  if [ -f "$index_js" ]; then
+      log "④ patching index.js: inject SjLj stubs into wasmImports"
+      if is_windows_host; then
+          python "$SCRIPT_DIR/patch_web_sjlj.py" "$index_js" \
+              || warn "patch_web_sjlj.py failed; game may abort at Lua init"
+      else
+          python3 "$SCRIPT_DIR/patch_web_sjlj.py" "$index_js" \
+              || warn "patch_web_sjlj.py failed; game may abort at Lua init"
+      fi
+  else
+      warn "index.js not found after export: $index_js"
+  fi
+
   log "Web 完成 → $DIST_DIR/web/（需用支持 SharedArrayBuffer 的 http 头托管）"
   warn "Godot 对 Web GDExtension 支持仍在完善；若导出模板不支持，见 docs/01 §7 路线 A/B"
 }

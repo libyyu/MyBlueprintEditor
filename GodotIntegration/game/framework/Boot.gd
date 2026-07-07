@@ -28,17 +28,26 @@ func _run() -> void:
 
 	if not skip_update:
 		# 阶段 1：更新阶段（独立 VM 隔离）
+		print("[Boot] >>> before begin_update_phase")
 		launcher.begin_update_phase()
+		print("[Boot] <<< after begin_update_phase")
 
 		# 更新 UI
+		print("[Boot] >>> before open_panel UpdatePanel")
 		var panel := UiService.open_panel("UpdatePanel")
+		print("[Boot] <<< after open_panel: panel=", panel)
+
+		print("[Boot] >>> before connect update_progress")
 		UpdateService.update_progress.connect(func(p: float, s: String):
 			if is_instance_valid(panel):
 				panel.set_progress(p)
 				panel.set_status(s))
+		print("[Boot] <<< after connect update_progress")
 
 		# 阶段 2：真实热更
+		print("[Boot] >>> before run_update()")
 		var result = await UpdateService.run_update()
+		print("[Boot] <<< after run_update()")
 		print("[Boot] update result: success=%s updated=%s version=%s reason=%s" % [
 			result.success, result.updated, result.version, result.reason])
 		if result.need_store_upgrade:

@@ -165,14 +165,14 @@ set(BP_GDEXT_SOURCES
 
 if(GDEXT_WITH_LUA)
     list(APPEND BP_GDEXT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/godot_lua_bindings.cpp")
-endif()
 
-# Web：补 saveSetjmp/testSetjmp stub。emsdk 3.1.50 编 Lua ldo.c 会残留旧模式
-# SjLj 符号(saveSetjmp/testSetjmp)，而 Godot 引擎主模块只提供新模式
-# (__wasm_longjmp/__c_longjmp)，导致 side module 加载时 undefined symbol abort。
-# 这两个旧符号运行时不会被真正调用，提供空实现让 dylink 能解析即可。见 web_sjlj_stub.c。
-if(_IS_WEB)
-    list(APPEND BP_GDEXT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/web_sjlj_stub.c")
+    # Web：补 saveSetjmp/testSetjmp stub。emsdk 3.1.50 编 Lua ldo.c 会残留旧模式
+    # SjLj 符号(saveSetjmp/testSetjmp)，而 Godot 引擎主模块只提供新模式
+    # (__wasm_longjmp/__c_longjmp)，导致 side module 加载时 undefined symbol abort。
+    # 这两个旧符号运行时不会被真正调用，提供空实现让 dylink 能解析即可。见 web_sjlj_stub.c。
+    if(_IS_WEB)
+        list(APPEND BP_GDEXT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/web_sjlj_stub.c")
+    endif()
 endif()
 
 add_library(blueprint_gdext SHARED ${BP_GDEXT_SOURCES})
@@ -238,6 +238,20 @@ if(_IS_WEB)
     target_link_options(blueprint_gdext PRIVATE -sSUPPORT_LONGJMP=wasm)
     message(STATUS "[blueprint_gdext] web: link -sSUPPORT_LONGJMP=wasm "
                    "(resolve Lua setjmp to native wasm SjLj, drop saveSetjmp import)")
+
+    # ---- 追加：JS-library stub 覆盖旧模式 SjLj helper -----------------------
+    # 尽管加了 -sSUPPORT_LONGJMP=wasm，emsdk 3.1.50 编 Lua ldo.c 时仍会 emit
+    # 对旧模式 JS helper 的引用（saveSetjmp / testSetjmp / emscripten_longjmp）。
+    # Godot template 的 JS runtime 里没有这三个 helper，dylink 通过 stub 表调用
+    # 时报：TypeError: resolved is not a function（at stubs.<computed>）。
+    #
+    # 用 --js-library 给 side module 注入空 JS 实现，让 dylink 从自己的 JS
+    # runtime 解析成功。见 src/web_sjlj_stub.js 里的详细说明。
+    target_link_options(blueprint_gdext PRIVATE
+        "--js-library=${CMAKE_CURRENT_SOURCE_DIR}/src/web_sjlj_stub.js"
+    )
+    message(STATUS "[blueprint_gdext] web: --js-library web_sjlj_stub.js "
+                   "(inject empty saveSetjmp/testSetjmp/emscripten_longjmp)")
 
     # 调试期：保留函数名，让浏览器 RuntimeError 栈显示符号而非裸地址。
     # 定位完 null function 崩溃点后可去掉（-g2 会显著增大 .so / 拖慢加载）。

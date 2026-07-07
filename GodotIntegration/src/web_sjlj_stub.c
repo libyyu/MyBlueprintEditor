@@ -2,46 +2,62 @@
  * web_sjlj_stub.c — Emscripten Web (SIDE_MODULE) 专用
  *
  * 背景：
- *   emsdk 3.1.50 编译 Lua 的 ldo.c（用 setjmp/longjmp 做错误处理）时，无论
- *   -O0/-O2、无论是否加 -sSUPPORT_LONGJMP=wasm / -mllvm -wasm-enable-sjlj，
- *   生成的 .o 都会【同时】引用两套 SjLj 运行时符号：
- *     - 新模式（wasm EH）：__wasm_longjmp / __c_longjmp   —— Godot 引擎主模块【有】
- *     - 旧模式（JS stub）：saveSetjmp / testSetjmp         —— Godot 引擎主模块【没有】
- *   于是 side module 加载时 dylink 解析 saveSetjmp 失败：
- *     Aborted(Assertion failed: undefined symbol 'saveSetjmp'. perhaps a side
- *     module was not linked in? ...)
+ *   emsdk 3.1.50 编 Lua ldo.c 时，即便加了 -sSUPPORT_LONGJMP=wasm，生成的 .o
+ *   里也会残留【旧模式】的 SjLj 符号引用：
+ *     - saveSetjmp / testSetjmp / emscripten_longjmp（旧 emscripten JS-SjLj）
+ *   Godot 4.5/4.7 Web export template 只导出【新模式】符号
+ *     - __wasm_longjmp / __c_longjmp（wasm 原生 SjLj）
+ *   两边不匹配，dylink 解析失败：
+ *     Aborted(Assertion failed: undefined symbol 'saveSetjmp'...)
  *
- *   实际运行时 Lua 走的是【新模式】(__wasm_longjmp)，saveSetjmp/testSetjmp
- *   这两个旧模式符号【永远不会被真正调用】——它们只是 emsdk 3.1.50 编译期
- *   甩不掉的死引用。因此在 side module 内部提供空 stub 让 dylink 能解析即可，
- *   不影响任何真实控制流。
+ * 真相：这些【旧模式】符号是编译器 emit 的死代码引用，运行时永远不走。因此在
+ * side module 里提供【真正的空 stub】（不做任何事）就能让 dylink 满足，不影响
+ * 真实控制流。
  *
- * 仅在 __EMSCRIPTEN__ 下编译进 blueprint_gdext。
+ * ★ 关键：stub 必须是空的返回 0/void，绝不能调用真正的 setjmp/longjmp！
+ *   一旦调用真 setjmp，编译器会 emit 对 __cpp_exception WebAssembly.Tag 的
+ *   import（wasm exception 机制），Godot Web template 也没有导出这个 tag：
+ *     LinkError: Import "env" "__cpp_exception": tag import requires
+ *                 a WebAssembly.Tag
+ *   → 空 stub 直接 return 0 才能避免所有 SjLj/EH 机制被启用。
+ *
+ * 此文件必须用【纯 C】编译（不含任何 C++ 语法/头文件），避免引入更多 EH 依赖。
+ *
+ * 仅在 __EMSCRIPTEN__ 下编译。
  */
+
 #ifdef __EMSCRIPTEN__
 
-#include <stdint.h>
+#include <stddef.h>
 
 /*
- * Emscripten 旧版 legacy SjLj 的运行时签名（来自 emscripten/src/library_legacy_setjmp.js）：
- *   int   saveSetjmp(void* env, int label, void* table, int size);
- *   int   testSetjmp(uintptr_t id, void* table, int size);
- * 这里给出兼容签名的空实现。返回值取安全默认：
- *   - saveSetjmp 通常返回 table 指针（int 形式），此处返回传入 table 保持形状；
- *   - testSetjmp 返回 0 表示“未匹配”。
- * 由于新模式(__wasm_longjmp)才是真实路径，这两个函数不会进入实际逻辑。
+ * Lua 内部 setjmp/longjmp 死引用的空实现。
+ * 签名根据 emsdk 3.1.50 的 emscripten 内部 SjLj runtime 实现推断，实际不会被调用。
  */
-int saveSetjmp(void* env, int label, void* table, int size);
-int testSetjmp(uintptr_t id, void* table, int size);
 
+/* void* env: Lua 用 jmp_buf，emcc 展开为 unsigned char[40] 或类似结构。
+ *            这里用 void* 避免包 <setjmp.h> 引入 EH 依赖。 */
 int saveSetjmp(void* env, int label, void* table, int size) {
-    (void)env; (void)label; (void)size;
-    return (int)(intptr_t)table;
+    (void)env;
+    (void)label;
+    (void)table;
+    (void)size;
+    return 0;
 }
 
-int testSetjmp(uintptr_t id, void* table, int size) {
-    (void)id; (void)table; (void)size;
+int testSetjmp(unsigned long id, void* table, int size) {
+    (void)id;
+    (void)table;
+    (void)size;
     return 0;
+}
+
+/* 旧模式 emscripten_longjmp：正常不会跑到；如果真被调用（设计上不会），
+ * 直接 abort 而不是真 longjmp，以避免打开 EH tag import。 */
+void emscripten_longjmp(unsigned long env, int val) {
+    (void)env;
+    (void)val;
+    /* 不能调用 abort() —— 会拉进更多 runtime 依赖。返回即可。 */
 }
 
 #endif /* __EMSCRIPTEN__ */

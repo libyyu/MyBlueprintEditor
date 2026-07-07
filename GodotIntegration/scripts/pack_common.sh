@@ -94,12 +94,22 @@ build_gdext() {
 }
 
 # ③ Godot 导出。参数：<preset名> <输出文件>
+#
+# 环境变量：
+#   PACK_EXPORT_DEBUG=1   走 --export-debug（保留符号名，Web 平台栈能显示函数名，
+#                         便于定位崩溃）；默认 --export-release。
 godot_export() {
   check_godot_bin
   local preset="$1" out="$2"
   [[ -f "$GAME_DIR/export_presets.cfg" ]] || die "缺少 export_presets.cfg（先在 Godot 编辑器里为该平台建导出预设）"
-  log "③ Godot export: preset='$preset' → $out"
-  "$GODOT_BIN" --headless --path "$GAME_DIR" --export-release "$preset" "$out"
+  local export_mode="--export-release"
+  if [ "${PACK_EXPORT_DEBUG:-0}" = "1" ]; then
+      export_mode="--export-debug"
+      log "③ Godot export (DEBUG, symbols preserved): preset='$preset' → $out"
+  else
+      log "③ Godot export: preset='$preset' → $out"
+  fi
+  "$GODOT_BIN" --headless --path "$GAME_DIR" "$export_mode" "$preset" "$out"
 }
 
 # 生成补丁 + version.json（发版热更用）
