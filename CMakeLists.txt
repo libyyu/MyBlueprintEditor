@@ -233,6 +233,12 @@ if(EMSCRIPTEN AND BLUEPRINT_WXGAME)
         -sALLOW_TABLE_GROWTH=1
         -sFETCH=1
         -sWASM=1
+        # Lua ldo.c 用 wasm 原生 SjLj 编译（Runtime/CMakeLists.txt 给 lua54 target
+        # 加了 -sSUPPORT_LONGJMP=wasm），生成 __c_longjmp / __wasm_longjmp import。
+        # 作为独立 executable，link 阶段必须显式声明同款 SjLj 模式，emcc 才会把
+        # 对应的 wasm-native SjLj runtime 链进来，否则报：
+        #   wasm-ld: error: liblua54.a(ldo.c.o): undefined symbol: __c_longjmp
+        -sSUPPORT_LONGJMP=wasm
         -sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','UTF8ToString','stringToUTF8','lengthBytesUTF8','addFunction','removeFunction','getValue','setValue']
         -sEXPORTED_FUNCTIONS=['_main','_malloc','_free','_BP_CreateRunner','_BP_DestroyRunner','_BP_LoadFromJson','_BP_LoadFromFile','_BP_IsLoaded','_BP_Execute','_BP_ExecuteNode','_BP_Tick','_BP_SetVariableInt','_BP_SetVariableFloat','_BP_SetVariableString','_BP_SetVariableBool','_BP_GetVariableInt','_BP_GetVariableFloat','_BP_GetVariableBool','_BP_GetVariableString','_BP_SetLogCallback','_BP_SetPrintCallback','_BP_EnableLogging','_BP_IsLoggingEnabled','_BP_GetLastError','_BP_InitDefaultHttpClient','_BP_InstallJSBridgeHttpClient','_BP_Http_SetRequestDispatcher','_BP_Http_GetReqUrl','_BP_Http_GetReqMethod','_BP_Http_GetReqBody','_BP_Http_GetReqHeaders','_BP_Http_OnResponse']
         -O2
